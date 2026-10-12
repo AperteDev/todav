@@ -32,6 +32,19 @@
     "reveal": "always"
   },
   {
+    "label": "linux: run in browser (Broadway)",
+    // GTK's Broadway backend draws into a web page; drag and drop crashes there.
+    // Stopping the task stops broadwayd too.
+    "command": "bash",
+    "args": [
+      "-c",
+      "cargo build -p todav-linux && { gtk4-broadwayd :5 & b=$!; trap 'kill $b' EXIT; sleep 0.5; xdg-open http://127.0.0.1:8085; GDK_BACKEND=broadway BROADWAY_DISPLAY=:5 target/debug/todav-linux; }"
+    ],
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
     "label": "linux: quit running instance",
     // --auto-start=no so this never D-Bus-activates an installed copy just to quit it.
     "command": "busctl --user --auto-start=no call io.github.selfref.Todav /io/github/selfref/Todav org.gtk.Actions Activate 'sava{sv}' quit 0 0 || true",
