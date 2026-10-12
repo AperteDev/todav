@@ -23,6 +23,8 @@ splitbutton.pill > menubutton > button { padding: 10px 16px 10px 12px; border-ra
 row.subtask-done label.title { text-decoration-line: line-through; opacity: 0.55; }
 .tag { padding: 2px 10px; border-radius: 9999px; font-size: smaller; color: @accent_color; background: alpha(@accent_bg_color, 0.15); }
 :drop(active) { box-shadow: none; outline: none; }
+row.dragged { opacity: 0.4; }
+.drag-card { margin: 8px; padding: 12px 18px; border-radius: 12px; background: @card_bg_color; color: @card_fg_color; box-shadow: 0 2px 8px alpha(black, 0.25); }
 row.drop-above { box-shadow: inset 0 2px 0 0 @accent_bg_color; }
 row.drop-below { box-shadow: inset 0 -2px 0 0 @accent_bg_color; }
 ";
@@ -913,18 +915,24 @@ fn connect_dnd(
         }
         Some(gtk::gdk::ContentProvider::for_value(&task.uid.to_value()))
     });
-    // Recorded on begin, not prepare: a subtask's row sits inside its parent's expander, and
-    // GTK prepares the parent's source too even though only the subtask's drag starts.
+    // Recorded on begin, not prepare: prepare also runs for drags that never start.
     let r = row.clone().upcast::<gtk::Widget>();
     let (task, s) = (t.clone(), slot.clone());
-    drag.connect_drag_begin(move |src, _| {
+    drag.connect_drag_begin(move |_, drag| {
         if let Some(ui) = weak.upgrade() {
             *ui.dragging.borrow_mut() = Some((task.clone(), s.clone()));
         }
-        src.set_icon(Some(&gtk::WidgetPaintable::new(Some(&r))), 0, 0);
+        // The task's title on a card; the row stays in place, faded.
+        let card = gtk::Label::new(Some(&task.summary));
+        card.add_css_class("drag-card");
+        if let Ok(icon) = gtk::DragIcon::for_drag(drag).downcast::<gtk::DragIcon>() {
+            icon.set_child(Some(&card));
+        }
+        r.add_css_class("dragged");
     });
-    let weak = Rc::downgrade(ui);
+    let (weak, r) = (Rc::downgrade(ui), row.clone().upcast::<gtk::Widget>());
     drag.connect_drag_end(move |_, _, _| {
+        r.remove_css_class("dragged");
         if let Some(ui) = weak.upgrade() {
             ui.dragging.take();
             if let Some((_, w, class)) = ui.drop_mark.take() {
@@ -952,13 +960,19 @@ fn connect_dnd(
                 .is_some_and(|(d, ds)| can_drop(d, ds, &target, &s))
         })
     });
-    let (weak, s) = (Rc::downgrade(ui), slot.clone());
+    let (weak, target, s) = (Rc::downgrade(ui), t.clone(), slot.clone());
     drop.connect_motion(move |dt, x, y| {
         if let (Some(ui), Some(w)) = (weak.upgrade(), dt.widget()) {
-            if over_subtasks(&s, &w, x, y) {
+            let above = y < w.height() as f64 / 2.0;
+            let stays = ui
+                .dragging
+                .borrow()
+                .as_ref()
+                .is_some_and(|(d, ds)| stays_put(d, ds, &target, &s, above));
+            if stays || over_subtasks(&s, &w, x, y) {
                 unmark(&ui, &w);
             } else {
-                mark(&ui, &w, y >= w.height() as f64 / 2.0);
+                mark(&ui, &w, !above);
             }
         }
         gtk::gdk::DragAction::MOVE
@@ -1029,6 +1043,15 @@ fn unmark(ui: &Ui, owner: &gtk::Widget) {
         let (_, w, c) = m.take().unwrap();
         w.remove_css_class(c);
     }
+}
+
+/// Would dropping `d` above or below `t` leave it where it is? Then no line is drawn there.
+fn stays_put(d: &Task, ds: &Slot, t: &Task, ts: &Slot, above: bool) -> bool {
+    let before = if above { Some(&t.uid) } else { ts.next.as_ref() };
+    ds.root == ts.root
+        && ds.group == ts.group
+        && d.parent_uid == t.parent_uid
+        && (before == Some(&d.uid) || before == ds.next.as_ref())
 }
 
 /// Top-level tasks move within and between groups (changing category); a subtask dropped among
