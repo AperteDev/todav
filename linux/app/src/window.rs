@@ -538,7 +538,26 @@ fn refresh_sidebar_counts(ui: &Rc<Ui>) {
     }
 }
 
+/// Rebuild the task page where it is scrolled to. The rebuild destroys the focused widget when
+/// it is a row's (a ticked checkbox): GTK would move focus to a container and scroll that into
+/// view, so focus is dropped first.
 fn refresh_tasks(ui: &Rc<Ui>) {
+    if GtkWindowExt::focus(&ui.window).is_some_and(|f| f.is_ancestor(&ui.groups)) {
+        GtkWindowExt::set_focus(&ui.window, None::<&gtk::Widget>);
+    }
+    let adj = ui
+        .groups
+        .ancestor(gtk::ScrolledWindow::static_type())
+        .and_downcast::<gtk::ScrolledWindow>()
+        .map(|s| s.vadjustment());
+    let keep = adj.as_ref().map(|a| a.value());
+    rebuild_tasks(ui);
+    if let (Some(adj), Some(v)) = (adj, keep) {
+        adj.set_value(v);
+    }
+}
+
+fn rebuild_tasks(ui: &Rc<Ui>) {
     while let Some(c) = ui.groups.first_child() {
         ui.groups.remove(&c);
     }
