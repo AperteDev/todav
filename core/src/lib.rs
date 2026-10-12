@@ -210,7 +210,7 @@ impl Client {
                 "SELECT COALESCE(MAX(sort_order), 0) + 1 FROM tasks WHERE list_href = ?"
             };
             let next: i64 = db.query_row(sql, [&list_href], |r| r.get(0))?;
-            cal.set("X-TODAV-ORDER", "", Some(&next.to_string()));
+            set_order(&mut cal, next);
             store::save(&db, &list_href, None, None, &cal, store::MODIFIED)?;
         }
         self.emit(&list_href, vec![uid.clone()]);
@@ -307,13 +307,17 @@ impl Client {
         for (i, t) in order.iter().enumerate() {
             let i = i as i64 + 1;
             if t.sort_order != Some(i) {
-                self.modify(&t.uid, |cal| {
-                    cal.set("X-TODAV-ORDER", "", Some(&i.to_string()))
-                })?;
+                self.modify(&t.uid, |cal| set_order(cal, i))?;
             }
         }
         Ok(())
     }
+}
+
+/// Nextcloud Tasks' manual order, so both apps share one order; drops our old X-TODAV-ORDER.
+fn set_order(cal: &mut Calendar, order: i64) {
+    cal.set("X-APPLE-SORT-ORDER", "", Some(&order.to_string()));
+    cal.set("X-TODAV-ORDER", "", None);
 }
 
 /// Bump LAST-MODIFIED, DTSTAMP and SEQUENCE after a local edit.

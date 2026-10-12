@@ -193,7 +193,9 @@ pub fn save(
             cal.parent_uid(),
             cal.text("PRIORITY").and_then(|p| p.parse::<i64>().ok()).filter(|&p| p != 0), // 0 = undefined
             cal.time("DUE"),
-            cal.text("X-TODAV-ORDER").and_then(|p| p.parse::<i64>().ok()),
+            cal.text("X-APPLE-SORT-ORDER")
+                .or_else(|| cal.text("X-TODAV-ORDER"))
+                .and_then(|p| p.parse::<i64>().ok()),
             cal.time("CREATED"),
             cal.time("LAST-MODIFIED"),
             dirty,

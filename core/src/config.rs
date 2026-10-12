@@ -11,7 +11,7 @@ pub struct CategoryMeta {
 }
 
 /// Display order of top-level tasks or of subtasks among their siblings.
-/// `Manual` is the stored order (X-TODAV-ORDER); the others sort by creation time.
+/// `Manual` is the stored order (X-APPLE-SORT-ORDER, shared with Nextcloud Tasks); the others sort by creation time.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum Sort {
     #[default]
