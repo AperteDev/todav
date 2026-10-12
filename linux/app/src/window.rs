@@ -12,7 +12,7 @@ use todav_core::{CategoryGroup, Sort, Task, TaskPatch};
 /// Libadwaita only styles plain buttons as pills; round the ends of the sign-in split button to match.
 /// The category section header turns its arrow like an expander row, without a "pressed" look.
 /// Done subtasks are struck through; drop targets show a line where the task will land
-/// instead of GTK's frame around the target.
+/// instead of GTK's frame around the target, and "+" buttons taking the dragged task are outlined.
 const CSS: &str = "
 splitbutton.pill { border-radius: 9999px; }
 splitbutton.pill > button { padding: 10px 20px 10px 32px; border-radius: 9999px 0 0 9999px; }
@@ -23,6 +23,8 @@ splitbutton.pill > menubutton > button { padding: 10px 16px 10px 12px; border-ra
 row.subtask-done label.title { text-decoration-line: line-through; opacity: 0.55; }
 .tag { padding: 2px 10px; border-radius: 9999px; font-size: smaller; color: @accent_color; background: alpha(@accent_bg_color, 0.15); }
 :drop(active) { box-shadow: none; outline: none; }
+button.drop-hint { outline: 2px solid @accent_bg_color; outline-offset: -2px; }
+button.drop-hint:drop(active) { background: alpha(@accent_bg_color, 0.2); }
 row.dragged { opacity: 0.4; }
 .drag-card { margin: 8px; padding: 12px 18px; border-radius: 12px; background: @card_bg_color; color: @card_fg_color; box-shadow: 0 2px 8px alpha(black, 0.25); }
 row.drop-above { box-shadow: inset 0 2px 0 0 @accent_bg_color; }
@@ -72,6 +74,9 @@ struct Ui {
     handles: Cell<bool>,
     /// The task being dragged and where it came from.
     dragging: RefCell<Option<(Task, Slot)>>,
+    /// "+" buttons taking dropped tasks as subtasks of their task; for a tree row's drag-only
+    /// "+", the row it shows on while collapsed.
+    adopters: RefCell<Vec<(gtk::Widget, Task, Option<adw::ExpanderRow>)>>,
     /// Drop line: (row under the pointer, row showing the line, its class).
     drop_mark: RefCell<Option<(gtk::Widget, gtk::Widget, &'static str)>>,
     /// Root task whose "Add subtask" entry takes focus after the next rebuild.
@@ -248,6 +253,7 @@ fn build(app: &adw::Application) -> Rc<Ui> {
         handles: Cell::new(false),
         dragging: RefCell::new(None),
         drop_mark: RefCell::new(None),
+        adopters: RefCell::new(Vec::new()),
         focus_sub: RefCell::new(None),
         server: (get(&b, "server_scheme"), get(&b, "server")),
         ntfy: (get(&b, "ntfy_scheme"), get(&b, "ntfy")),
@@ -534,6 +540,7 @@ fn refresh_tasks(ui: &Rc<Ui>) {
     while let Some(c) = ui.groups.first_child() {
         ui.groups.remove(&c);
     }
+    ui.adopters.borrow_mut().clear();
     let Some(href) = ui.current.borrow().clone() else {
         ui.title.set_title("");
         return;
@@ -781,6 +788,7 @@ fn leaf_row(ui: &Rc<Ui>, t: &Task, slot: Slot) -> adw::ActionRow {
         // Rebuild outside the handler: refresh_tasks replaces this row.
         glib::idle_add_local_once(move || refresh_tasks(&ui));
     });
+    adopt_target(ui, &add, t, None);
     row.add_suffix(&add);
     row
 }
@@ -805,6 +813,11 @@ fn tree_row(
     if let Some(d) = subtitle(root) {
         row.set_subtitle(d);
     }
+    // Collapsed, the header shows no subtask list to drop on: a "+" appears during drags.
+    let plus = icon_button("list-add-symbolic", "Add Subtask");
+    plus.set_visible(false);
+    row.add_suffix(&plus);
+    adopt_target(ui, &plus, root, Some(&row));
     // The header toggles the subtasks, so editing gets its own button.
     let edit = icon_button("document-edit-symbolic", "Edit");
     let (weak, task) = (Rc::downgrade(ui), root.clone());
@@ -921,6 +934,12 @@ fn connect_dnd(
     drag.connect_drag_begin(move |_, drag| {
         if let Some(ui) = weak.upgrade() {
             *ui.dragging.borrow_mut() = Some((task.clone(), s.clone()));
+            for (w, parent, tree) in ui.adopters.borrow().iter() {
+                if can_adopt(&task, parent) && tree.as_ref().is_none_or(|t| !t.is_expanded()) {
+                    w.set_visible(true);
+                    w.add_css_class("drop-hint");
+                }
+            }
         }
         // The task's title on a card; the row stays in place, faded.
         let card = gtk::Label::new(Some(&task.summary));
@@ -935,6 +954,12 @@ fn connect_dnd(
         r.remove_css_class("dragged");
         if let Some(ui) = weak.upgrade() {
             ui.dragging.take();
+            for (w, _, tree) in ui.adopters.borrow().iter() {
+                w.remove_css_class("drop-hint");
+                if tree.is_some() {
+                    w.set_visible(false);
+                }
+            }
             if let Some((_, w, class)) = ui.drop_mark.take() {
                 w.remove_css_class(class); // cancelled drags get no leave
             }
@@ -969,7 +994,7 @@ fn connect_dnd(
                 .borrow()
                 .as_ref()
                 .is_some_and(|(d, ds)| stays_put(d, ds, &target, &s, above));
-            if stays || over_subtasks(&s, &w, x, y) {
+            if stays || over_nested(&s, &w, x, y) {
                 unmark(&ui, &w);
             } else {
                 mark(&ui, &w, !above);
@@ -989,7 +1014,7 @@ fn connect_dnd(
             return false;
         };
         unmark(&ui, &w);
-        if over_subtasks(&slot, &w, x, y) {
+        if over_nested(&slot, &w, x, y) {
             return false;
         }
         let Some((d, ds)) = ui.dragging.take() else {
@@ -1004,11 +1029,12 @@ fn connect_dnd(
     row.add_controller(drop);
 }
 
-/// Is the pointer over a row nested in `w`: a subtask or the "Add subtask" entry of a tree row?
+/// Is the pointer over something nested in row `w` with its own drag or drop handling: a
+/// subtask row, an "Add subtask" entry or a "+" button?
 fn nested_row(w: &gtk::Widget, x: f64, y: f64) -> bool {
     let mut p = w.pick(x, y, gtk::PickFlags::DEFAULT);
     while let Some(c) = p.filter(|c| c != w) {
-        if c.is::<adw::EntryRow>() || c.has_css_class("task-dnd") {
+        if c.is::<adw::EntryRow>() || c.has_css_class("task-dnd") || c.has_css_class("adopt") {
             return true;
         }
         p = c.parent();
@@ -1016,8 +1042,8 @@ fn nested_row(w: &gtk::Widget, x: f64, y: f64) -> bool {
     false
 }
 
-/// A tree row leaves drops over its subtasks to the subtask rows.
-fn over_subtasks(ts: &Slot, w: &gtk::Widget, x: f64, y: f64) -> bool {
+/// A top-level row leaves drops over its subtasks and "+" to those.
+fn over_nested(ts: &Slot, w: &gtk::Widget, x: f64, y: f64) -> bool {
     ts.root && nested_row(w, x, y)
 }
 
@@ -1045,6 +1071,82 @@ fn unmark(ui: &Ui, owner: &gtk::Widget) {
     }
 }
 
+/// Dropping a task on `w` (a "+" button) makes it a subtask of `parent`. With `collapsed`, the
+/// button belongs to that tree row and only shows during a drag while the row is collapsed.
+fn adopt_target(
+    ui: &Rc<Ui>,
+    w: &impl IsA<gtk::Widget>,
+    parent: &Task,
+    collapsed: Option<&adw::ExpanderRow>,
+) {
+    w.add_css_class("adopt");
+    ui.adopters.borrow_mut().push((
+        w.clone().upcast(),
+        parent.clone(),
+        collapsed.cloned(),
+    ));
+    let drop = gtk::DropTarget::new(glib::Type::STRING, gtk::gdk::DragAction::MOVE);
+    let (weak, p) = (Rc::downgrade(ui), parent.clone());
+    drop.connect_accept(move |_, _| {
+        weak.upgrade().is_some_and(|ui| {
+            let dragging = ui.dragging.borrow();
+            dragging.as_ref().is_some_and(|(d, _)| can_adopt(d, &p))
+        })
+    });
+    let (weak, p) = (Rc::downgrade(ui), parent.clone());
+    drop.connect_drop(move |_, _, _, _| {
+        let Some(ui) = weak.upgrade() else {
+            return false;
+        };
+        let Some((d, _)) = ui.dragging.take() else {
+            return false;
+        };
+        match adopt(&d, &p) {
+            Ok(()) => {
+                ui.expanded.borrow_mut().insert(p.uid.clone()); // show where it went
+                request_sync();
+            }
+            Err(e) => ui.toasts.add_toast(adw::Toast::new(&e.to_string())),
+        }
+        true
+    });
+    w.add_controller(drop);
+}
+
+/// `d` can become a subtask of `parent` unless it already is one or is `parent`, or has
+/// subtasks of its own (nested trees are not supported yet).
+fn can_adopt(d: &Task, parent: &Task) -> bool {
+    d.uid != parent.uid && d.parent_uid.as_ref() != Some(&parent.uid) && !has_subtasks(d)
+}
+
+fn has_subtasks(t: &Task) -> bool {
+    core()
+        .tasks(t.list_href.clone(), true)
+        .iter()
+        .any(|s| s.parent_uid.as_ref() == Some(&t.uid))
+}
+
+/// Make `d` a subtask of `parent`, first or last among its subtasks as new subtasks would be.
+fn adopt(d: &Task, parent: &Task) -> todav_core::Result<()> {
+    core().set_parent(d.uid.clone(), parent.uid.clone())?;
+    if d.category.is_some() {
+        set_category(&d.uid, None)?; // the top-level task's category decides
+    }
+    let order = crate::settings::order();
+    if order.subtasks == Sort::Manual {
+        let first = core()
+            .tasks(parent.list_href.clone(), true)
+            .into_iter()
+            .find(|t| t.parent_uid.as_ref() == Some(&parent.uid) && t.uid != d.uid);
+        match first {
+            Some(f) if order.sub_start => core().reorder(d.uid.clone(), Some(f.uid))?,
+            Some(_) => core().reorder(d.uid.clone(), None)?,
+            None => {} // the only subtask
+        }
+    }
+    Ok(())
+}
+
 /// Would dropping `d` above or below `t` leave it where it is? Then no line is drawn there.
 fn stays_put(d: &Task, ds: &Slot, t: &Task, ts: &Slot, above: bool) -> bool {
     let before = if above { Some(&t.uid) } else { ts.next.as_ref() };
@@ -1055,8 +1157,8 @@ fn stays_put(d: &Task, ds: &Slot, t: &Task, ts: &Slot, above: bool) -> bool {
 }
 
 /// Top-level tasks move within and between groups (changing category); a subtask dropped among
-/// them is promoted. Any task dropped among subtasks joins them under their parent, unless that
-/// parent is inside its own tree. Reordering only means something in manual order.
+/// them is promoted. A task without subtasks dropped among subtasks joins them under their
+/// parent. Reordering only means something in manual order.
 fn can_drop(d: &Task, ds: &Slot, t: &Task, ts: &Slot) -> bool {
     let order = crate::settings::order();
     if d.uid == t.uid {
@@ -1068,7 +1170,7 @@ fn can_drop(d: &Task, ds: &Slot, t: &Task, ts: &Slot) -> bool {
     if d.parent_uid == t.parent_uid {
         return order.subtasks == Sort::Manual;
     }
-    !core().within(t.uid.clone(), d.uid.clone())
+    !has_subtasks(d) // nested trees are not supported yet
 }
 
 /// Move dragged task `d` above or below target `t`.
