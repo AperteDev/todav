@@ -1,10 +1,12 @@
 //! Preferences dialog: appearance (task order, applied at once) and server addresses with
 //! connection tests (applied on close).
 
+use crate::connection::Connection;
 use crate::window::{get, toast, url_text, view};
 use crate::{core, request_sync};
 use adw::prelude::*;
 use gtk::{gio, glib};
+use std::rc::Rc;
 use todav_core::Sort;
 
 type UrlRow = (gtk::DropDown, adw::EntryRow);
@@ -108,12 +110,14 @@ fn connect_order(b: &gtk::Builder, which: &'static str, hint: Option<&'static st
 pub fn present(parent: &impl IsA<gtk::Widget>) {
     let b = view!("settings");
     let dialog: adw::PreferencesDialog = get(&b, "dialog");
-    let server: UrlRow = (get(&b, "server_scheme"), get(&b, "server"));
     let ntfy: UrlRow = (get(&b, "ntfy_scheme"), get(&b, "ntfy"));
+    let conn = connect_account(&b, &dialog);
+    let server = conn.server.clone();
 
     let acc = core().account();
     let old_server = acc.as_ref().map(|a| a.url.clone()).unwrap_or_default();
     let user = acc.map(|a| a.user).unwrap_or_default();
+    let manual = crate::goa_id().is_none();
     let password = crate::password_load(&old_server, &user).unwrap_or_default();
     let old_ntfy = core().setting("ntfy_url".into()).unwrap_or_default();
     let sync: adw::SwitchRow = get(&b, "sync_settings");
@@ -136,12 +140,6 @@ pub fn present(parent: &impl IsA<gtk::Widget>) {
     set_url(&server, &old_server);
     set_url(&ntfy, &old_ntfy);
 
-    let (u, p) = (user.clone(), password.clone());
-    connect_test(&dialog, &get(&b, "server_test"), &server, move |url| {
-        todav_core::caldav::Dav::new(&url, &u, &p)
-            .principal()
-            .map(|_| ())
-    });
     connect_test(
         &dialog,
         &get(&b, "ntfy_test"),
@@ -159,8 +157,10 @@ pub fn present(parent: &impl IsA<gtk::Widget>) {
             }
             crate::restart_push();
         }
+        // Still signed in here and the address edited: same account, moved server.
         let new_server = url_text(&server);
-        if !new_server.is_empty() && new_server != old_server {
+        let still_manual = manual && crate::goa_id().is_none() && !conn.goa.is_active();
+        if still_manual && !new_server.is_empty() && new_server != old_server {
             move_account(
                 old_server.clone(),
                 user.clone(),
@@ -170,6 +170,170 @@ pub fn present(parent: &impl IsA<gtk::Widget>) {
         }
     });
     dialog.present(Some(parent));
+}
+
+/// The "Account" group: a status row, then the shared GOA / server rows, applied at once.
+/// Turning GOA on (or picking another account) connects through it; turning it off goes back
+/// to the last browser sign-in, or disconnects without one. Signing in with the browser
+/// replaces the connection (or renews that sign-in).
+fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Connection> {
+    let goa = crate::goa_id();
+    let conn = Connection::new(goa.is_some(), goa.as_deref());
+    conn.attach(&get(b, "account"));
+    let status: adw::ActionRow = get(b, "status");
+    let icon: gtk::Image = get(b, "status_icon");
+    let sign_in: adw::SplitButton = get(b, "sign_in");
+    let sign_out: adw::SplitButton = get(b, "sign_out");
+    // Everything here shows the actual connection, the switch included.
+    let describe = {
+        let (conn, sign_in, sign_out) = (conn.clone(), sign_in.clone(), sign_out.clone());
+        move || {
+            let goa = crate::goa_id().is_some();
+            let acc = core().account();
+            let host = acc.as_ref().map_or(String::new(), |a| {
+                a.url
+                    .split_once("://")
+                    .map_or(a.url.clone(), |(_, h)| h.to_string())
+            });
+            match &acc {
+                Some(a) if goa => {
+                    status.set_title(&format!("Connected as {}", a.user));
+                    status.set_subtitle(&format!("{host} · GNOME Online Accounts"));
+                }
+                Some(a) => {
+                    status.set_title(&format!("Signed in as {}", a.user));
+                    status.set_subtitle(&host);
+                }
+                None => {
+                    status.set_title("Not signed in");
+                    status.set_subtitle("");
+                }
+            }
+            icon.set_visible(acc.is_some());
+            sign_out.set_visible(acc.is_some() && !goa);
+            sign_in.set_visible(acc.is_none());
+            conn.goa.set_active(goa); // its handler sees nothing to change
+            conn.goa.set_sensitive(conn.has_accounts());
+        }
+    };
+    describe();
+
+    let (d, c, show) = (dialog.clone(), conn.clone(), describe.clone());
+    conn.connect_changed(move || {
+        let current = crate::goa_id();
+        let chosen = c.chosen();
+        if chosen.as_ref().map(|a| &a.id) == current.as_ref() {
+            return; // already so
+        }
+        c.goa.set_sensitive(false);
+        let (d, show) = (d.clone(), show.clone());
+        glib::spawn_future_local(async move {
+            let r = match chosen {
+                Some(a) => {
+                    let name = a.name.clone();
+                    crate::switch_account(crate::Target::Goa(a))
+                        .await
+                        .map(|()| format!("Connected as {name}"))
+                }
+                None => match crate::remembered_sign_in() {
+                    Some(c) => {
+                        let who = c.login_name.clone();
+                        crate::switch_account(crate::Target::Manual(c))
+                            .await
+                            .map(|()| format!("Signed in as {who}"))
+                    }
+                    None => crate::disconnect(false)
+                        .await
+                        .map(|()| "Disconnected".into()),
+                },
+            };
+            if r.is_ok() && core().account().is_some() {
+                crate::window::account_changed();
+            }
+            show(); // also puts the switch back when that failed
+            d.add_toast(adw::Toast::new(&r.unwrap_or_else(|e| e)));
+        });
+    });
+
+    // Sign in with the browser (or by a copied link): renews the account signed in to here, or
+    // replaces the GOA one.
+    let start = {
+        let (d, c, sign_in, sign_out) = (
+            dialog.clone(),
+            conn.clone(),
+            sign_in.clone(),
+            sign_out.clone(),
+        );
+        let describe = describe.clone();
+        move |copy: bool| {
+            let server = url_text(&c.server);
+            if server.is_empty() {
+                d.add_toast(adw::Toast::new("Enter the Nextcloud server first"));
+                return;
+            }
+            let button = if sign_in.is_visible() {
+                &sign_in
+            } else {
+                &sign_out
+            };
+            let label = button.label().unwrap_or_default();
+            button.set_sensitive(false);
+            button.set_label(if copy {
+                "Waiting for Sign-In…"
+            } else {
+                "Waiting for Browser…"
+            });
+            let (d, button, show) = (d.clone(), button.clone(), describe.clone());
+            glib::spawn_future_local(async move {
+                let msg = match crate::window::browser_login(server, copy).await {
+                    Ok(Some(c)) => {
+                        let who = c.login_name.clone();
+                        match crate::switch_account(crate::Target::Manual(c)).await {
+                            Ok(()) => {
+                                crate::window::account_changed();
+                                Some(format!("Signed in as {who}"))
+                            }
+                            Err(e) => Some(e),
+                        }
+                    }
+                    Ok(None) => None,
+                    Err(e) => Some(e),
+                };
+                button.set_sensitive(true);
+                button.set_label(&label);
+                show();
+                if let Some(msg) = msg {
+                    d.add_toast(adw::Toast::new(&msg));
+                }
+            });
+        }
+    };
+    let actions = gio::SimpleActionGroup::new();
+    for (name, copy) in [("sign-in", false), ("sign-in-copy", true)] {
+        let action = gio::SimpleAction::new(name, None);
+        let start = start.clone();
+        action.connect_activate(move |_, _| start(copy));
+        actions.add_action(&action);
+    }
+    dialog.insert_action_group("account", Some(&actions));
+    sign_in.connect_clicked(move |_| start(false));
+    // Only offered for a browser sign-in; a GOA account is managed in GNOME Settings.
+    let (d, show) = (dialog.clone(), describe.clone());
+    sign_out.connect_clicked(move |b| {
+        b.set_sensitive(false);
+        crate::forget_sign_in();
+        let (d, b, show) = (d.clone(), b.clone(), show.clone());
+        glib::spawn_future_local(async move {
+            if let Err(e) = crate::disconnect(true).await {
+                d.add_toast(adw::Toast::new(&e));
+            }
+            b.set_sensitive(true);
+            show();
+        });
+    });
+    // A sign-in still waiting for the browser stops with the dialog.
+    dialog.connect_closed(|_| crate::window::cancel_login());
+    conn
 }
 
 /// Fill a scheme picker and host entry from a full URL.

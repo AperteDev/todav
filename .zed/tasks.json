@@ -40,6 +40,21 @@
     "reveal": "always"
   },
   {
+    "label": "linux: run in sandbox",
+    // Own data and keyring entries, next to the normal app: for testing other connections.
+    "command": "make -C linux sandbox",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "linux: reset sandbox",
+    "command": "make -C linux sandbox-reset",
+    "use_new_terminal": false,
+    "reveal": "no_focus",
+    "hide": "on_success"
+  },
+  {
     "label": "linux: quit running instance",
     // --auto-start=no so this never D-Bus-activates an installed copy just to quit it.
     "command": "busctl --user --auto-start=no call io.github.selfref.Todav /io/github/selfref/Todav org.gtk.Actions Activate 'sava{sv}' quit 0 0 || true",

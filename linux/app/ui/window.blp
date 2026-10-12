@@ -28,18 +28,10 @@ Adw.ApplicationWindow window {
                 orientation: vertical;
                 spacing: 24;
 
+                // Filled with the shared connection rows (ui/connection.blp).
+                Adw.PreferencesGroup login_group {}
+
                 Adw.PreferencesGroup {
-                  Adw.EntryRow server {
-                    title: "Nextcloud server";
-
-                    [prefix]
-                    Gtk.DropDown server_scheme {
-                      valign: center;
-                      model: Gtk.StringList { strings ["https", "http"] };
-                      styles ["flat"]
-                    }
-                  }
-
                   Adw.EntryRow ntfy {
                     title: "ntfy server for push (optional)";
 
@@ -55,6 +47,12 @@ Adw.ApplicationWindow window {
                 Gtk.Box {
                   orientation: vertical;
                   spacing: 6;
+
+                  Gtk.Button connect_goa {
+                    label: "Connect";
+                    halign: center;
+                    styles ["suggested-action", "pill"]
+                  }
 
                   Adw.SplitButton login {
                     label: "Sign In with Browser";
@@ -229,7 +227,6 @@ Adw.ApplicationWindow window {
 
 menu main_menu {
   item ("Preferences", "win.preferences")
-  item ("Sign Out", "app.logout")
   item ("Quit", "app.quit")
 }
 

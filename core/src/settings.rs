@@ -7,7 +7,15 @@ use std::collections::BTreeMap;
 
 /// Settings that only make sense on one device and are never synced.
 /// (`drag_handles` depends on whether the device has a touchscreen.)
-pub const DEVICE_ONLY: &[&str] = &["ntfy_url", "last_list", "sync_settings", "drag_handles"];
+pub const DEVICE_ONLY: &[&str] = &[
+    "ntfy_url",
+    "last_list",
+    "sync_settings",
+    "drag_handles",
+    "goa_account",
+    "manual_url",
+    "manual_user",
+];
 
 /// key → (value, unix time of the last change)
 type Map = BTreeMap<String, (String, i64)>;

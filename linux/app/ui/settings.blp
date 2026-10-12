@@ -69,37 +69,41 @@ Adw.PreferencesDialog dialog {
     title: "Connection";
     icon-name: "network-server-symbolic";
 
-    Adw.PreferencesGroup {
-      title: "Sync";
+    // The status row, then the shared connection rows (ui/connection.blp).
+    Adw.PreferencesGroup account {
+      title: "Account";
 
-      Adw.SwitchRow sync_settings {
-        title: "Sync settings with server";
-        subtitle: "Server addresses always stay on this device";
-        active: true;
+      // How Todav is connected now. Signed in here: "Sign Out", with signing in again in its
+      // menu. Not connected: "Sign In with Browser". A GOA account is managed in GNOME Settings.
+      Adw.ActionRow status {
+        [prefix]
+        Gtk.Image status_icon {
+          icon-name: "object-select-symbolic";
+          styles ["success"]
+        }
+
+        [suffix]
+        Adw.SplitButton sign_out {
+          label: "Sign Out";
+          menu-model: sign_out_menu;
+          dropdown-tooltip: "Sign In Again";
+          valign: center;
+          styles ["destructive-action"]
+        }
+
+        [suffix]
+        Adw.SplitButton sign_in {
+          label: "Sign In with Browser";
+          menu-model: sign_in_menu;
+          dropdown-tooltip: "More Sign-In Options";
+          valign: center;
+        }
       }
     }
 
     Adw.PreferencesGroup {
-      title: "Servers";
+      title: "Push";
       description: "Changes are applied when this window closes";
-
-      Adw.EntryRow server {
-        title: "Nextcloud server";
-
-        [prefix]
-        Gtk.DropDown server_scheme {
-          valign: center;
-          model: Gtk.StringList { strings ["https", "http"] };
-          styles ["flat"]
-        }
-
-        [suffix]
-        Gtk.Button server_test {
-          label: "Test";
-          valign: center;
-          styles ["flat"]
-        }
-      }
 
       Adw.EntryRow ntfy {
         title: "ntfy server for push (optional)";
@@ -119,5 +123,24 @@ Adw.PreferencesDialog dialog {
         }
       }
     }
+
+    Adw.PreferencesGroup {
+      title: "Sync";
+
+      Adw.SwitchRow sync_settings {
+        title: "Sync settings with server";
+        subtitle: "Server addresses always stay on this device";
+        active: true;
+      }
+    }
   }
+}
+
+menu sign_out_menu {
+  item ("Sign In Again", "account.sign-in")
+  item ("Copy Login Link", "account.sign-in-copy")
+}
+
+menu sign_in_menu {
+  item ("Copy Login Link", "account.sign-in-copy")
 }

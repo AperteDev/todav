@@ -34,9 +34,18 @@ broadway:
 	  sleep 2; chromium --app=http://127.0.0.1:8085 >/dev/null 2>&1 & \
 	  wait $$a
 
+# A separate copy for testing other connections: own data in target/sandbox (kept between
+# runs; sandbox-reset wipes it), own keyring entries, runs next to the normal app.
+sandbox:
+	cargo build -p todav-linux
+	TODAV_SANDBOX=1 XDG_DATA_HOME=$(CURDIR)/../target/sandbox ../target/debug/todav-linux
+
+sandbox-reset:
+	rm -rf ../target/sandbox
+
 uninstall:
 	rm -f $(BINDIR)/todav-linux $(DATADIR)/applications/$(ID).desktop \
 	  $(DATADIR)/dbus-1/services/$(ID).service $(AUTOSTART)/$(ID).desktop \
 	  $(ICONS)/scalable/apps/$(ID).svg $(ICONS)/symbolic/apps/$(ID)-symbolic.svg
 
-.PHONY: install uninstall broadway
+.PHONY: install uninstall broadway sandbox sandbox-reset

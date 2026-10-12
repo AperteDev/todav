@@ -83,8 +83,10 @@ struct Ui {
     drop_mark: RefCell<Option<(gtk::Widget, gtk::Widget, &'static str)>>,
     /// Root task whose "Add subtask" entry takes focus after the next rebuild.
     focus_sub: RefCell<Option<String>>,
-    server: (gtk::DropDown, adw::EntryRow),
+    /// Welcome page: GNOME Online Accounts or a server to sign in to.
+    conn: Rc<crate::connection::Connection>,
     ntfy: (gtk::DropDown, adw::EntryRow),
+    connect_goa: gtk::Button,
     login: adw::SplitButton,
     cancel_login: gtk::Button,
     last_error: RefCell<String>,
@@ -111,21 +113,8 @@ pub fn setup_actions(app: &adw::Application) {
         app,
         move |_, _| app.quit()
     ));
-    let logout = gio::SimpleAction::new("logout", None);
-    logout.connect_activate(glib::clone!(
-        #[weak]
-        app,
-        move |_, _| {
-            if let Some(acc) = core().account() {
-                crate::password_clear(&acc.url, &acc.user);
-            }
-            let _ = core().logout();
-            app.quit(); // background threads hold the old session; next start shows the login page
-        }
-    ));
     app.add_action(&sync);
     app.add_action(&quit);
-    app.add_action(&logout);
     app.set_accels_for_action("app.sync", &["F5"]);
     app.set_accels_for_action("app.quit", &["<Control>q"]);
     app.set_accels_for_action("window.close", &["<Control>w"]);
@@ -145,6 +134,25 @@ pub fn present(app: &adw::Application) {
         refresh_lists(&ui);
     }
     ui.window.present();
+}
+
+/// Disconnected: back to the welcome page.
+pub fn show_welcome() {
+    if let Some(ui) = ui() {
+        ui.current.take();
+        ui.stack.set_visible_child_name("login");
+        refresh_lists(&ui); // empties the sidebar
+    }
+}
+
+/// The account was replaced (or one connected after a disconnect): show its lists once they
+/// arrive.
+pub fn account_changed() {
+    if let Some(ui) = ui() {
+        ui.current.take();
+        ui.stack.set_visible_child_name("main");
+        refresh_lists(&ui);
+    }
 }
 
 /// Rebuild the task page, e.g. after the task order changed.
@@ -220,6 +228,9 @@ fn build(app: &adw::Application) -> Rc<Ui> {
     let b = view!("window");
     let window: adw::ApplicationWindow = get(&b, "window");
     window.set_application(Some(app));
+    if crate::sandbox() {
+        window.set_title(Some("Todav (sandbox)"));
+    }
 
     let css = gtk::CssProvider::new();
     css.load_from_string(CSS);
@@ -257,12 +268,14 @@ fn build(app: &adw::Application) -> Rc<Ui> {
         drop_mark: RefCell::new(None),
         adopters: RefCell::new(Vec::new()),
         focus_sub: RefCell::new(None),
-        server: (get(&b, "server_scheme"), get(&b, "server")),
+        conn: crate::connection::Connection::new(true, None),
         ntfy: (get(&b, "ntfy_scheme"), get(&b, "ntfy")),
+        connect_goa: get(&b, "connect_goa"),
         login: get(&b, "login"),
         cancel_login: get(&b, "cancel_login"),
         last_error: RefCell::new(String::new()),
     });
+    ui.conn.attach(&get(&b, "login_group"));
     connect(&ui);
     ui
 }
@@ -345,6 +358,22 @@ fn connect(ui: &Rc<Ui>) {
         }
     });
     let weak = Rc::downgrade(ui);
+    ui.connect_goa.connect_clicked(move |_| {
+        if let Some(ui) = weak.upgrade() {
+            connect_goa(&ui);
+        }
+    });
+    let weak = Rc::downgrade(ui);
+    let show_buttons = move || {
+        if let Some(ui) = weak.upgrade() {
+            let goa = ui.conn.chosen().is_some();
+            ui.connect_goa.set_visible(goa);
+            ui.login.set_visible(!goa);
+        }
+    };
+    show_buttons();
+    ui.conn.connect_changed(show_buttons);
+    let weak = Rc::downgrade(ui);
     let copy = gio::SimpleAction::new("copy-login", None);
     copy.connect_activate(move |_, _| {
         if let Some(ui) = weak.upgrade() {
@@ -364,7 +393,7 @@ fn connect(ui: &Rc<Ui>) {
 
     let weak = Rc::downgrade(ui);
     ui.cancel_login.connect_clicked(move |_| {
-        LOGIN_ATTEMPT.fetch_add(1, Ordering::SeqCst); // the running attempt sees it is stale and stops
+        cancel_login(); // the running sign-in sees it is stale and stops
         if let Some(ui) = weak.upgrade() {
             reset_login(&ui);
         }
@@ -385,10 +414,10 @@ pub fn url_text((scheme, row): &(gtk::DropDown, adw::EntryRow)) -> String {
     format!("{scheme}://{host}")
 }
 
-/// Start Login Flow v2; `copy` puts the login link on the clipboard instead of opening the browser.
-fn start_login(ui: &Ui, copy: bool) {
-    let server = url_text(&ui.server);
-    let ntfy = url_text(&ui.ntfy);
+/// Sign in from the welcome page with the browser (Login Flow v2); `copy` puts the login link on
+/// the clipboard instead of opening the browser.
+fn start_login(ui: &Rc<Ui>, copy: bool) {
+    let server = url_text(&ui.conn.server);
     ui.login.set_sensitive(false);
     ui.login.set_label(if copy {
         "Waiting for Sign-In…"
@@ -396,15 +425,47 @@ fn start_login(ui: &Ui, copy: bool) {
         "Waiting for Browser…"
     });
     ui.cancel_login.set_visible(true);
-    let attempt = LOGIN_ATTEMPT.fetch_add(1, Ordering::SeqCst) + 1;
-    std::thread::spawn(move || login_thread(attempt, server, ntfy, copy));
+    let ui = ui.clone();
+    glib::spawn_future_local(async move {
+        match browser_login(server, copy).await {
+            Ok(Some(c)) => connect_with(&ui, crate::Target::Manual(c)).await,
+            Ok(None) => {} // cancelled or superseded
+            Err(e) => ui.toasts.add_toast(adw::Toast::new(&e)),
+        }
+        reset_login(&ui);
+    });
 }
 
-/// Bumped on every sign-in click and on cancel; a login thread only acts while its number is current.
+/// Connect from the welcome page with the chosen GNOME Online Accounts account.
+fn connect_goa(ui: &Rc<Ui>) {
+    let Some(account) = ui.conn.chosen() else {
+        return;
+    };
+    ui.connect_goa.set_sensitive(false);
+    let ui = ui.clone();
+    glib::spawn_future_local(async move {
+        connect_with(&ui, crate::Target::Goa(account)).await;
+        ui.connect_goa.set_sensitive(true);
+    });
+}
+
+async fn connect_with(ui: &Rc<Ui>, target: crate::Target) {
+    let _ = core().set_setting("ntfy_url".into(), url_text(&ui.ntfy));
+    match crate::switch_account(target).await {
+        Ok(()) => {
+            ui.stack.set_visible_child_name("main");
+            refresh_lists(ui);
+        }
+        Err(e) => ui.toasts.add_toast(adw::Toast::new(&e)),
+    }
+}
+
+/// Bumped on every sign-in and on cancel; a sign-in only goes on while its number is current.
 static LOGIN_ATTEMPT: AtomicU64 = AtomicU64::new(0);
 
-fn current(attempt: u64) -> bool {
-    LOGIN_ATTEMPT.load(Ordering::SeqCst) == attempt
+/// Stop a running `browser_login`; it then returns `Ok(None)`.
+pub fn cancel_login() {
+    LOGIN_ATTEMPT.fetch_add(1, Ordering::SeqCst);
 }
 
 fn reset_login(ui: &Ui) {
@@ -413,73 +474,49 @@ fn reset_login(ui: &Ui) {
     ui.cancel_login.set_visible(false);
 }
 
-/// Login Flow v2: open the browser (or copy the link), poll until the user approves, then store the app password.
-fn login_thread(attempt: u64, server: String, ntfy: String, copy: bool) {
-    let fail = |msg: String| {
-        glib::MainContext::default().invoke(move || {
-            if let Some(ui) = ui().filter(|_| current(attempt)) {
-                reset_login(&ui);
-                ui.toasts.add_toast(adw::Toast::new(&msg));
-            }
-        })
-    };
-    let flow = match todav_core::login_flow_start(server) {
-        Ok(f) => f,
-        Err(e) => return fail(format!("Cannot start login: {e}")),
-    };
-    let url = flow.login_url.clone();
-    if !current(attempt) {
-        return;
+/// Login Flow v2: open the browser (or copy the link) and wait until the user approves.
+/// `Ok(None)`: cancelled, or another sign-in started.
+pub async fn browser_login(
+    server: String,
+    copy: bool,
+) -> Result<Option<todav_core::Credentials>, String> {
+    let attempt = LOGIN_ATTEMPT.fetch_add(1, Ordering::SeqCst) + 1;
+    let current = move || LOGIN_ATTEMPT.load(Ordering::SeqCst) == attempt;
+    let flow = gio::spawn_blocking(move || todav_core::login_flow_start(server))
+        .await
+        .map_err(|_| "Cannot start login".to_string())?
+        .map_err(|e| format!("Cannot start login: {e}"))?;
+    if !current() {
+        return Ok(None);
     }
-    glib::MainContext::default().invoke(move || {
-        let Some(ui) = ui().filter(|_| current(attempt)) else {
-            return;
-        };
-        if copy {
-            ui.window.clipboard().set_text(&url);
-            ui.toasts
-                .add_toast(adw::Toast::new("Login link copied to clipboard"));
-        } else {
-            gtk::UriLauncher::new(&url).launch(Some(&ui.window), gio::Cancellable::NONE, |_| {});
+    if copy {
+        if let Some(d) = gtk::gdk::Display::default() {
+            d.clipboard().set_text(&flow.login_url);
         }
-    });
+        toast("Login link copied to clipboard");
+    } else {
+        let parent = ui().map(|u| u.window.clone());
+        gtk::UriLauncher::new(&flow.login_url).launch(
+            parent.as_ref(),
+            gio::Cancellable::NONE,
+            |_| {},
+        );
+    }
+    let flow = std::sync::Arc::new(flow);
     for _ in 0..600 {
-        std::thread::sleep(std::time::Duration::from_secs(2));
-        if !current(attempt) {
-            return;
+        glib::timeout_future_seconds(2).await;
+        if !current() {
+            return Ok(None);
         }
-        match todav_core::login_flow_poll(&flow) {
-            Ok(None) => continue,
-            Ok(Some(c)) => {
-                // Checked again on the main thread: cancel may land while this is queued.
-                glib::MainContext::default().invoke(move || {
-                    if current(attempt) {
-                        finish_login(c, ntfy)
-                    }
-                });
-                return;
-            }
-            Err(e) => return fail(format!("Login failed: {e}")),
+        let f = flow.clone();
+        match gio::spawn_blocking(move || todav_core::login_flow_poll(&f)).await {
+            Ok(Ok(None)) => continue,
+            Ok(Ok(Some(c))) => return Ok(current().then_some(c)),
+            Ok(Err(e)) => return Err(format!("Login failed: {e}")),
+            Err(_) => return Err("Login failed".into()),
         }
     }
-    fail("Login timed out".into());
-}
-
-fn finish_login(c: todav_core::Credentials, ntfy: String) {
-    let Some(ui) = ui() else { return };
-    reset_login(&ui);
-    if let Err(e) = crate::password_store(&c.server, &c.login_name, &c.app_password) {
-        ui.toasts
-            .add_toast(adw::Toast::new(&format!("Cannot save password: {e}")));
-    }
-    let _ = core().set_setting("ntfy_url".into(), ntfy);
-    if let Err(e) = core().set_account(c.server, c.login_name, c.app_password) {
-        ui.toasts.add_toast(adw::Toast::new(&e.to_string()));
-        return;
-    }
-    crate::start_background();
-    ui.stack.set_visible_child_name("main");
-    refresh_lists(&ui);
+    Err("Login timed out".into())
 }
 
 fn refresh_lists(ui: &Rc<Ui>) {
@@ -1079,7 +1116,10 @@ fn over_nested(ts: &Slot, w: &gtk::Widget, x: f64, y: f64) -> bool {
 fn mark(ui: &Ui, owner: &gtk::Widget, below: bool) {
     let (w, class) = match owner.next_sibling().filter(|_| below) {
         Some(next) => (next, "drop-above"),
-        None => (owner.clone(), if below { "drop-below" } else { "drop-above" }),
+        None => (
+            owner.clone(),
+            if below { "drop-below" } else { "drop-above" },
+        ),
     };
     let mut m = ui.drop_mark.borrow_mut();
     if let Some((_, old, c)) = m.take() {
@@ -1107,11 +1147,9 @@ fn adopt_target(
     collapsed: Option<&adw::ExpanderRow>,
 ) {
     w.add_css_class("adopt");
-    ui.adopters.borrow_mut().push((
-        w.clone().upcast(),
-        parent.clone(),
-        collapsed.cloned(),
-    ));
+    ui.adopters
+        .borrow_mut()
+        .push((w.clone().upcast(), parent.clone(), collapsed.cloned()));
     let drop = gtk::DropTarget::new(glib::Type::STRING, gtk::gdk::DragAction::MOVE);
     let (weak, p) = (Rc::downgrade(ui), parent.clone());
     drop.connect_accept(move |_, _| {
@@ -1176,7 +1214,11 @@ fn adopt(d: &Task, parent: &Task) -> todav_core::Result<()> {
 
 /// Would dropping `d` above or below `t` leave it where it is? Then no line is drawn there.
 fn stays_put(d: &Task, ds: &Slot, t: &Task, ts: &Slot, above: bool) -> bool {
-    let before = if above { Some(&t.uid) } else { ts.next.as_ref() };
+    let before = if above {
+        Some(&t.uid)
+    } else {
+        ts.next.as_ref()
+    };
     ds.root == ts.root
         && ds.group == ts.group
         && d.parent_uid == t.parent_uid

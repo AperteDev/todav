@@ -20,6 +20,10 @@
 
 - The app is single-instance over D-Bus (`io.github.selfref.Todav`): a new launch only shows the
   running window. Quit the running copy first (`pkill -x todav-linux`).
+- `make -C linux sandbox` (Zed task "linux: run in sandbox") runs a separate copy next to the
+  normal one (`TODAV_SANDBOX`): own data in `target/sandbox`, own keyring entries, same GNOME
+  Online Accounts. Use it to test other connections; `sandbox-reset` wipes it. Combine it with
+  Broadway by hand: `TODAV_SANDBOX=1 XDG_DATA_HOME=$PWD/target/sandbox` plus the variables below.
 - To see and drive the app yourself, run it on GTK's Broadway backend and use a browser automation
   tool (Playwright) on `http://127.0.0.1:8085`: screenshots, clicks and typing work, with the
   user's real data and keyring. `make -C linux broadway` (Zed task "linux: run in browser
@@ -34,8 +38,8 @@
     (`append_node_ops: assertion failed`); the target opens the page 2 s after the app.
   - Animations, e.g. expanding a task row, abort it the same way; the target sets
     `gtk-enable-animations=false` through `XDG_CONFIG_HOME=target/broadway`.
-  - Closing a popover (e.g. picking a ComboRow entry) and sometimes scrolling abort it the
-    same way. Use it for quick looks; to change a setting, write it to the stopped app's
+  - Closing a popover (e.g. picking a ComboRow entry), the sync spinner and sometimes
+    scrolling abort it the same way: wait for a sync to finish before interacting. Use it for quick looks; to change a setting, write it to the stopped app's
     database (`kv`: `setting_<key>` plus `settime_<key>` = now) instead of using Preferences.
   - After a while some icons are no longer drawn; cosmetic, Broadway only.
 - In the real GNOME Wayland session, xdotool and synthetic uinput input do not reach the window,
