@@ -17,9 +17,12 @@ install:
 	install -Dm644 data/$(ID)-symbolic.svg $(ICONS)/symbolic/apps/$(ID)-symbolic.svg
 
 # GTK's Broadway backend draws into a web page; drag and drop crashes there.
-# broadwayd stops with the app.
+# A running instance is quit first: the app is single-instance, so a new launch would only
+# show the existing window. broadwayd stops with the app.
 broadway:
 	cargo build -p todav-linux
+	busctl --user --auto-start=no call $(ID) /io/github/selfref/Todav org.gtk.Actions Activate 'sava{sv}' quit 0 0 2>/dev/null || true
+	for i in $$(seq 50); do busctl --user status $(ID) >/dev/null 2>&1 || break; sleep 0.1; done
 	gtk4-broadwayd :5 & b=$$!; trap 'kill $$b' EXIT; sleep 0.5; \
 	  xdg-open http://127.0.0.1:8085; \
 	  GDK_BACKEND=broadway BROADWAY_DISPLAY=:5 ../target/debug/todav-linux
