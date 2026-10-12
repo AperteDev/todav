@@ -23,7 +23,7 @@ class TodavIndicator extends PanelMenu.Button {
         this._proxy = null;
 
         const box = new St.BoxLayout({style_class: 'panel-status-menu-box'});
-        box.add_child(new St.Icon({icon_name: 'checkbox-checked-symbolic', style_class: 'system-status-icon'}));
+        box.add_child(new St.Icon({icon_name: 'io.github.selfref.Todav-symbolic', style_class: 'system-status-icon'}));
         this._count = new St.Label({text: '', y_align: Clutter.ActorAlign.CENTER, style_class: 'todav-count'});
         box.add_child(this._count);
         this._warning = new St.Icon({icon_name: 'dialog-warning-symbolic', style_class: 'system-status-icon', visible: false});

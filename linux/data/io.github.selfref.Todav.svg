@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="check" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#33d17a"/>
+      <stop offset="1" stop-color="#16857a"/>
+    </linearGradient>
+    <linearGradient id="arrow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#62a0ea"/>
+      <stop offset="1" stop-color="#5bc8af"/>
+    </linearGradient>
+    <linearGradient id="arrowShadow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1a5fb4"/>
+      <stop offset="1" stop-color="#1f7f73"/>
+    </linearGradient>
+    <linearGradient id="side" x1="12" y1="0" x2="116" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#c0bfbc"/>
+      <stop offset="0.04" stop-color="#deddda"/>
+      <stop offset="0.96" stop-color="#deddda"/>
+      <stop offset="1" stop-color="#c0bfbc"/>
+    </linearGradient>
+  </defs>
+  <rect x="12" y="12" width="104" height="104" rx="8" fill="url(#side)"/>
+  <rect x="12" y="12" width="104" height="96" rx="8" fill="#f6f5f4"/>
+  <g transform="translate(0 1)">
+  <g stroke-width="4" stroke-linecap="round">
+    <path d="M48 41h19" stroke="#a7b8f0"/>
+    <path d="M42 49h20" stroke="#a6e3d7"/>
+    <path d="M78 66h10" stroke="#a8e6a3"/>
+    <path d="M73 74h11" stroke="#f8c8a0"/>
+    <path d="M68 82h7" stroke="#f5aaaa"/>
+  </g>
+  <g transform="translate(0 2)">
+  <g fill="none" stroke="url(#arrowShadow)" stroke-width="9" stroke-linecap="round">
+    <path d="M71.5 23.8A36 36 0 0 0 28.14 62.14"/>
+    <path d="M56.5 94.2A36 36 0 0 0 99.86 55.86"/>
+  </g>
+  <g fill="url(#arrowShadow)" stroke="url(#arrowShadow)" stroke-width="2" stroke-linejoin="round">
+    <path d="M19.67 62.88L36.6 61.4 29.2 74.1z"/>
+    <path d="M108.3 55.12L91.4 56.6 98.8 43.9z"/>
+  </g>
+  </g>
+  <g fill="none" stroke="url(#arrow)" stroke-width="9" stroke-linecap="round">
+    <path d="M71.5 23.8A36 36 0 0 0 28.14 62.14"/>
+    <path d="M56.5 94.2A36 36 0 0 0 99.86 55.86"/>
+  </g>
+  <g fill="url(#arrow)" stroke="url(#arrow)" stroke-width="2" stroke-linejoin="round">
+    <path d="M19.67 62.88L36.6 61.4 29.2 74.1z"/>
+    <path d="M108.3 55.12L91.4 56.6 98.8 43.9z"/>
+  </g>
+  <path d="M48 64l10 10 27.2-40.3" fill="none" stroke="#0f5f57" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" transform="translate(0 2.5)"/>
+  <path d="M48 64l10 10 27.2-40.3" fill="none" stroke="url(#check)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
