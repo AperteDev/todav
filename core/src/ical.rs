@@ -200,6 +200,20 @@ impl Calendar {
         }
     }
 
+    /// Replace the parent link; other relations stay.
+    pub fn set_parent(&mut self, uid: &str) {
+        self.clear_parent();
+        let at = self.todo_props().last().map(|(i, _)| i + 1).unwrap();
+        self.lines.insert(
+            at,
+            Line {
+                name: "RELATED-TO".into(),
+                params: ";RELTYPE=PARENT".into(),
+                value: escape(uid),
+            },
+        );
+    }
+
     pub fn parent_uid(&self) -> Option<String> {
         self.props("RELATED-TO")
             .find(|l| {
@@ -426,6 +440,9 @@ mod tests {
         .unwrap();
         c.clear_parent();
         assert_eq!(c.parent_uid(), None);
+        assert!(c.to_ics().contains("RELATED-TO;RELTYPE=SIBLING:s"));
+        c.set_parent("q");
+        assert_eq!(c.parent_uid().as_deref(), Some("q"));
         assert!(c.to_ics().contains("RELATED-TO;RELTYPE=SIBLING:s"));
     }
 

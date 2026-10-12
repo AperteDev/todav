@@ -248,6 +248,29 @@ impl Client {
         self.modify(&uid, |cal| cal.clear_parent())
     }
 
+    /// Make `uid` a subtask of `parent_uid` (its own subtasks come along).
+    /// Refuses a parent inside `uid`'s own tree, which would make a loop.
+    pub fn set_parent(&self, uid: String, parent_uid: String) -> Result<()> {
+        if self.within(parent_uid.clone(), uid.clone()) {
+            return Err(Error::Parse(format!("{parent_uid} is inside {uid}")));
+        }
+        self.modify(&uid, |cal| cal.set_parent(&parent_uid))
+    }
+
+    /// Whether `uid` is `ancestor` or one of its (nested) subtasks.
+    pub fn within(&self, uid: String, ancestor: String) -> bool {
+        let mut p = Some(uid);
+        // ponytail: 64 levels deep at most, so foreign data with a parent loop cannot hang us.
+        for _ in 0..64 {
+            match p {
+                Some(cur) if cur == ancestor => return true,
+                Some(cur) => p = self.task(cur).and_then(|t| t.parent_uid),
+                None => break,
+            }
+        }
+        false
+    }
+
     pub fn update_task(&self, uid: String, patch: TaskPatch) -> Result<()> {
         self.modify(&uid, |cal| {
             if let Some(s) = &patch.summary {
@@ -431,4 +454,29 @@ pub fn b64decode(s: &str) -> Result<Vec<u8>> {
         }
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn set_parent_moves_trees_but_refuses_loops() {
+        let dir = std::env::temp_dir().join(format!("todav-test-parent-{}", now()));
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let l = "/l/".to_string();
+        c.db.lock()
+            .unwrap()
+            .execute("INSERT INTO lists (href, display_name) VALUES (?1, 'L')", [&l])
+            .unwrap();
+        let add = |s: &str, parent: Option<String>| {
+            c.add_task(l.clone(), s.into(), None, parent, false).unwrap().uid
+        };
+        let (a, b) = (add("a", None), add("b", None));
+        let b1 = add("b1", Some(b.clone()));
+        assert!(c.set_parent(b.clone(), b1.clone()).is_err(), "b under its own subtask");
+        c.set_parent(b.clone(), a.clone()).unwrap();
+        assert_eq!(c.task(b.clone()).unwrap().parent_uid, Some(a.clone()));
+        assert!(c.within(b1, a.clone()) && !c.within(a, b));
+    }
 }

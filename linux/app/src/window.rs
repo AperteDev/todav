@@ -671,7 +671,6 @@ fn refresh_tasks(ui: &Rc<Ui>) {
             let slot = Slot {
                 group: g.name.clone(),
                 root: true,
-                top: root.uid.clone(),
                 next: trees.get(i + 1).map(|(t, _)| t.uid.clone()),
             };
             let adding = ui.adding.borrow().as_ref() == Some(&root.uid);
@@ -798,7 +797,7 @@ fn tree_row(
         .use_markup(false)
         .expanded(ui.expanded.borrow().contains(&root.uid))
         .build();
-    let (slot_group, top) = (slot.group.clone(), root.uid.clone());
+    let slot_group = slot.group.clone();
     connect_dnd(ui, &row, root, slot, |h| row.add_prefix(h));
     row.add_prefix(&done_check(root));
     if let Some(d) = subtitle(root) {
@@ -868,7 +867,6 @@ fn tree_row(
         let slot = Slot {
             group: slot_group.clone(),
             root: false,
-            top: top.clone(),
             next: subs[i + 1..]
                 .iter()
                 .find(|(_, s)| s.parent_uid == t.parent_uid)
@@ -889,8 +887,6 @@ struct Slot {
     group: Option<String>,
     /// A top-level row (otherwise a subtask, movable only among its siblings).
     root: bool,
-    /// The top-level task of its tree (itself for a top-level row).
-    top: String,
     /// The row after it that a drop below lands in front of; None means last.
     next: Option<String>,
 }
@@ -956,10 +952,10 @@ fn connect_dnd(
                 .is_some_and(|(d, ds)| can_drop(d, ds, &target, &s))
         })
     });
-    let (weak, target, s) = (Rc::downgrade(ui), t.clone(), slot.clone());
+    let (weak, s) = (Rc::downgrade(ui), slot.clone());
     drop.connect_motion(move |dt, x, y| {
         if let (Some(ui), Some(w)) = (weak.upgrade(), dt.widget()) {
-            if own_subtask(&ui, &target, &s, &w, x, y) {
+            if over_subtasks(&s, &w, x, y) {
                 unmark(&ui, &w);
             } else {
                 mark(&ui, &w, y >= w.height() as f64 / 2.0);
@@ -979,7 +975,7 @@ fn connect_dnd(
             return false;
         };
         unmark(&ui, &w);
-        if own_subtask(&ui, &target, &slot, &w, x, y) {
+        if over_subtasks(&slot, &w, x, y) {
             return false;
         }
         let Some((d, ds)) = ui.dragging.take() else {
@@ -1006,15 +1002,9 @@ fn nested_row(w: &gtk::Widget, x: f64, y: f64) -> bool {
     false
 }
 
-/// A tree row leaves drags of its own subtasks over its subtasks to the rows inside it.
-fn own_subtask(ui: &Ui, t: &Task, ts: &Slot, w: &gtk::Widget, x: f64, y: f64) -> bool {
-    ts.root
-        && ui
-            .dragging
-            .borrow()
-            .as_ref()
-            .is_some_and(|(_, ds)| !ds.root && ds.top == t.uid)
-        && nested_row(w, x, y)
+/// A tree row leaves drops over its subtasks to the subtask rows.
+fn over_subtasks(ts: &Slot, w: &gtk::Widget, x: f64, y: f64) -> bool {
+    ts.root && nested_row(w, x, y)
 }
 
 /// Show where a drop on `owner` lands. Below it is drawn as the line above the next row when
@@ -1041,18 +1031,21 @@ fn unmark(ui: &Ui, owner: &gtk::Widget) {
     }
 }
 
-/// Top-level tasks move within and between groups (changing category); subtasks among their
-/// siblings, or out to the top level. Reordering only means something in manual order.
+/// Top-level tasks move within and between groups (changing category); a subtask dropped among
+/// them is promoted. Any task dropped among subtasks joins them under their parent, unless that
+/// parent is inside its own tree. Reordering only means something in manual order.
 fn can_drop(d: &Task, ds: &Slot, t: &Task, ts: &Slot) -> bool {
     let order = crate::settings::order();
     if d.uid == t.uid {
         return false;
     }
     if ts.root {
-        // A subtask dropped among top-level tasks is promoted into that group.
         return !ds.root || ds.group != ts.group || order.tasks == Sort::Manual;
     }
-    !ds.root && d.parent_uid == t.parent_uid && order.subtasks == Sort::Manual
+    if d.parent_uid == t.parent_uid {
+        return order.subtasks == Sort::Manual;
+    }
+    !core().within(t.uid.clone(), d.uid.clone())
 }
 
 /// Move dragged task `d` above or below target `t`.
@@ -1064,6 +1057,13 @@ fn drop_task(d: &Task, ds: &Slot, t: &Task, ts: &Slot, above: bool) -> todav_cor
     }
     if ts.root && (promote || ds.group != ts.group) {
         set_category(&d.uid, ts.group.clone())?;
+    }
+    if !ts.root && d.parent_uid != t.parent_uid {
+        let parent = t.parent_uid.clone().unwrap_or_default();
+        core().set_parent(d.uid.clone(), parent)?;
+        if d.category.is_some() {
+            set_category(&d.uid, None)?; // the new top-level task's category decides
+        }
     }
     let sort = if ts.root { order.tasks } else { order.subtasks };
     let before = if above {
