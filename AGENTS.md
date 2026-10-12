@@ -25,8 +25,8 @@
   user's real data and keyring. `make -C linux broadway` (Zed task "linux: run in browser
   (Broadway)") quits the running copy, starts `broadwayd`, the app and a Chromium app window;
   to drive it from Playwright instead, put a no-op `chromium` first in `PATH`. Ctrl+Q quits the
-  app (closing the window only hides it), and `broadwayd` stops with it. Afterwards start the
-  normal app again (`setsid -f target/debug/todav-linux`) and leave it running for the user.
+  app (closing the window only hides it), and `broadwayd` stops with it. Don't restart the
+  normal app afterwards; the user does that.
 - Broadway limits (GTK 4.24), worked around in the make target where possible:
   - Drag and drop aborts the app (`gdk_drag_set_property` assertion). Ask the user to test DnD
     in the real session.
