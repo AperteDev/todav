@@ -217,7 +217,8 @@ impl Client {
     }
 }
 
-/// Read an ntfy JSON stream until it ends or `stop()`; calls `f(id, body)` for every message event.
+/// Read an ntfy JSON stream until it ends, drops or `stop()`; calls `f(id, body)` for every
+/// message event. Only a failed connection is an error.
 fn ntfy_stream(url: &str, stop: &dyn Fn() -> bool, f: &mut dyn FnMut(&str, Vec<u8>)) -> Result<()> {
     let agent = ureq::Agent::config_builder()
         .timeout_global(None)
@@ -230,7 +231,11 @@ fn ntfy_stream(url: &str, stop: &dyn Fn() -> bool, f: &mut dyn FnMut(&str, Vec<u
         .map_err(|e| Error::Net(e.to_string()))?;
     let reader = std::io::BufReader::new(resp.into_body().into_reader());
     for line in reader.lines() {
-        let line = line.map_err(|e| Error::Net(e.to_string()))?;
+        // Dropped mid-stream (no keepalive within the timeout after suspend, a network change,
+        // an idle proxy): not an error, the caller reconnects. Failing to connect still is one.
+        let Ok(line) = line else {
+            return Ok(());
+        };
         if stop() {
             return Ok(());
         }
