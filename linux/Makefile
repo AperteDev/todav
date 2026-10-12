@@ -16,9 +16,17 @@ install:
 	install -Dm644 data/$(ID).svg $(ICONS)/scalable/apps/$(ID).svg
 	install -Dm644 data/$(ID)-symbolic.svg $(ICONS)/symbolic/apps/$(ID)-symbolic.svg
 
+# GTK's Broadway backend draws into a web page; drag and drop crashes there.
+# broadwayd stops with the app.
+broadway:
+	cargo build -p todav-linux
+	gtk4-broadwayd :5 & b=$$!; trap 'kill $$b' EXIT; sleep 0.5; \
+	  xdg-open http://127.0.0.1:8085; \
+	  GDK_BACKEND=broadway BROADWAY_DISPLAY=:5 ../target/debug/todav-linux
+
 uninstall:
 	rm -f $(BINDIR)/todav-linux $(DATADIR)/applications/$(ID).desktop \
 	  $(DATADIR)/dbus-1/services/$(ID).service $(AUTOSTART)/$(ID).desktop \
 	  $(ICONS)/scalable/apps/$(ID).svg $(ICONS)/symbolic/apps/$(ID)-symbolic.svg
 
-.PHONY: install uninstall
+.PHONY: install uninstall broadway
