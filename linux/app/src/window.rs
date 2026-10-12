@@ -11,7 +11,8 @@ use todav_core::{CategoryGroup, Sort, Task, TaskPatch};
 
 /// Libadwaita only styles plain buttons as pills; round the ends of the sign-in split button to match.
 /// The category section header turns its arrow like an expander row, without a "pressed" look.
-/// Done subtasks are struck through; drop targets show a line where the task will land.
+/// Done subtasks are struck through; drop targets show a line where the task will land
+/// instead of GTK's frame around the target.
 const CSS: &str = "
 splitbutton.pill { border-radius: 9999px; }
 splitbutton.pill > button { padding: 10px 20px 10px 32px; border-radius: 9999px 0 0 9999px; }
@@ -21,8 +22,9 @@ splitbutton.pill > menubutton > button { padding: 10px 16px 10px 12px; border-ra
 .cat-toggle:checked:not(:hover) { background: none; }
 row.subtask-done label.title { text-decoration-line: line-through; opacity: 0.55; }
 .tag { padding: 2px 10px; border-radius: 9999px; font-size: smaller; color: @accent_color; background: alpha(@accent_bg_color, 0.15); }
-.drop-above { box-shadow: inset 0 2px 0 0 @accent_bg_color; }
-.drop-below { box-shadow: inset 0 -2px 0 0 @accent_bg_color; }
+:drop(active) { box-shadow: none; outline: none; }
+row.drop-above { box-shadow: inset 0 2px 0 0 @accent_bg_color; }
+row.drop-below { box-shadow: inset 0 -2px 0 0 @accent_bg_color; }
 ";
 
 /// Left margin per subtask level, in pixels.
@@ -68,6 +70,8 @@ struct Ui {
     handles: Cell<bool>,
     /// The task being dragged and where it came from.
     dragging: RefCell<Option<(Task, Slot)>>,
+    /// Drop line: (row under the pointer, row showing the line, its class).
+    drop_mark: RefCell<Option<(gtk::Widget, gtk::Widget, &'static str)>>,
     /// Root task whose "Add subtask" entry takes focus after the next rebuild.
     focus_sub: RefCell<Option<String>>,
     server: (gtk::DropDown, adw::EntryRow),
@@ -241,6 +245,7 @@ fn build(app: &adw::Application) -> Rc<Ui> {
         tags: Cell::new(false),
         handles: Cell::new(false),
         dragging: RefCell::new(None),
+        drop_mark: RefCell::new(None),
         focus_sub: RefCell::new(None),
         server: (get(&b, "server_scheme"), get(&b, "server")),
         ntfy: (get(&b, "ntfy_scheme"), get(&b, "ntfy")),
@@ -666,6 +671,7 @@ fn refresh_tasks(ui: &Rc<Ui>) {
             let slot = Slot {
                 group: g.name.clone(),
                 root: true,
+                top: root.uid.clone(),
                 next: trees.get(i + 1).map(|(t, _)| t.uid.clone()),
             };
             let adding = ui.adding.borrow().as_ref() == Some(&root.uid);
@@ -792,7 +798,7 @@ fn tree_row(
         .use_markup(false)
         .expanded(ui.expanded.borrow().contains(&root.uid))
         .build();
-    let slot_group = slot.group.clone();
+    let (slot_group, top) = (slot.group.clone(), root.uid.clone());
     connect_dnd(ui, &row, root, slot, |h| row.add_prefix(h));
     row.add_prefix(&done_check(root));
     if let Some(d) = subtitle(root) {
@@ -862,6 +868,7 @@ fn tree_row(
         let slot = Slot {
             group: slot_group.clone(),
             root: false,
+            top: top.clone(),
             next: subs[i + 1..]
                 .iter()
                 .find(|(_, s)| s.parent_uid == t.parent_uid)
@@ -882,6 +889,8 @@ struct Slot {
     group: Option<String>,
     /// A top-level row (otherwise a subtask, movable only among its siblings).
     root: bool,
+    /// The top-level task of its tree (itself for a top-level row).
+    top: String,
     /// The row after it that a drop below lands in front of; None means last.
     next: Option<String>,
 }
@@ -895,15 +904,15 @@ fn connect_dnd(
     slot: Slot,
     add_handle: impl FnOnce(&gtk::Image),
 ) {
+    row.add_css_class("task-dnd");
     let drag = gtk::DragSource::new();
     drag.set_actions(gtk::gdk::DragAction::MOVE);
     let (weak, task) = (Rc::downgrade(ui), t.clone());
     drag.connect_prepare(move |src, x, y| {
-        // Without a handle the whole row drags, except from the "Add subtask" entry inside it.
-        let picked = src
-            .widget()
-            .and_then(|w| w.pick(x, y, gtk::PickFlags::DEFAULT));
-        if picked.is_some_and(|p| p.ancestor(adw::EntryRow::static_type()).is_some()) {
+        // Without a handle the whole row drags, except from the "Add subtask" entry inside it
+        // and from a subtask row inside it: that one starts its own drag, and a second drag
+        // from the parent gets cancelled, whose drag-end would clear `dragging`.
+        if nested_row(&src.widget()?, x, y) {
             return None;
         }
         Some(gtk::gdk::ContentProvider::for_value(&task.uid.to_value()))
@@ -922,6 +931,9 @@ fn connect_dnd(
     drag.connect_drag_end(move |_, _, _| {
         if let Some(ui) = weak.upgrade() {
             ui.dragging.take();
+            if let Some((_, w, class)) = ui.drop_mark.take() {
+                w.remove_css_class(class); // cancelled drags get no leave
+            }
         }
     });
     if ui.handles.get() {
@@ -944,28 +956,32 @@ fn connect_dnd(
                 .is_some_and(|(d, ds)| can_drop(d, ds, &target, &s))
         })
     });
-    drop.connect_motion(|dt, _, y| {
-        if let Some(w) = dt.widget() {
-            let above = y < w.height() as f64 / 2.0;
-            w.remove_css_class(if above { "drop-below" } else { "drop-above" });
-            w.add_css_class(if above { "drop-above" } else { "drop-below" });
+    let (weak, target, s) = (Rc::downgrade(ui), t.clone(), slot.clone());
+    drop.connect_motion(move |dt, x, y| {
+        if let (Some(ui), Some(w)) = (weak.upgrade(), dt.widget()) {
+            if own_subtask(&ui, &target, &s, &w, x, y) {
+                unmark(&ui, &w);
+            } else {
+                mark(&ui, &w, y >= w.height() as f64 / 2.0);
+            }
         }
         gtk::gdk::DragAction::MOVE
     });
-    drop.connect_leave(|dt| {
-        if let Some(w) = dt.widget() {
-            w.remove_css_class("drop-above");
-            w.remove_css_class("drop-below");
+    let weak = Rc::downgrade(ui);
+    drop.connect_leave(move |dt| {
+        if let (Some(ui), Some(w)) = (weak.upgrade(), dt.widget()) {
+            unmark(&ui, &w);
         }
     });
     let (weak, target) = (Rc::downgrade(ui), t.clone());
-    drop.connect_drop(move |dt, _, _, y| {
-        let Some(ui) = weak.upgrade() else {
+    drop.connect_drop(move |dt, _, x, y| {
+        let (Some(ui), Some(w)) = (weak.upgrade(), dt.widget()) else {
             return false;
         };
-        let Some(w) = dt.widget() else { return false };
-        w.remove_css_class("drop-above");
-        w.remove_css_class("drop-below");
+        unmark(&ui, &w);
+        if own_subtask(&ui, &target, &slot, &w, x, y) {
+            return false;
+        }
         let Some((d, ds)) = ui.dragging.take() else {
             return false;
         };
@@ -976,6 +992,53 @@ fn connect_dnd(
         true
     });
     row.add_controller(drop);
+}
+
+/// Is the pointer over a row nested in `w`: a subtask or the "Add subtask" entry of a tree row?
+fn nested_row(w: &gtk::Widget, x: f64, y: f64) -> bool {
+    let mut p = w.pick(x, y, gtk::PickFlags::DEFAULT);
+    while let Some(c) = p.filter(|c| c != w) {
+        if c.is::<adw::EntryRow>() || c.has_css_class("task-dnd") {
+            return true;
+        }
+        p = c.parent();
+    }
+    false
+}
+
+/// A tree row leaves drags of its own subtasks over its subtasks to the rows inside it.
+fn own_subtask(ui: &Ui, t: &Task, ts: &Slot, w: &gtk::Widget, x: f64, y: f64) -> bool {
+    ts.root
+        && ui
+            .dragging
+            .borrow()
+            .as_ref()
+            .is_some_and(|(_, ds)| !ds.root && ds.top == t.uid)
+        && nested_row(w, x, y)
+}
+
+/// Show where a drop on `owner` lands. Below it is drawn as the line above the next row when
+/// there is one, so the gap between two rows has a single line.
+fn mark(ui: &Ui, owner: &gtk::Widget, below: bool) {
+    let (w, class) = match owner.next_sibling().filter(|_| below) {
+        Some(next) => (next, "drop-above"),
+        None => (owner.clone(), if below { "drop-below" } else { "drop-above" }),
+    };
+    let mut m = ui.drop_mark.borrow_mut();
+    if let Some((_, old, c)) = m.take() {
+        old.remove_css_class(c);
+    }
+    w.add_css_class(class);
+    *m = Some((owner.clone(), w, class));
+}
+
+/// Remove the line `owner` drew; a row already marked by the one now entered stays.
+fn unmark(ui: &Ui, owner: &gtk::Widget) {
+    let mut m = ui.drop_mark.borrow_mut();
+    if m.as_ref().is_some_and(|(o, _, _)| o == owner) {
+        let (_, w, c) = m.take().unwrap();
+        w.remove_css_class(c);
+    }
 }
 
 /// Top-level tasks move within and between groups (changing category); subtasks among their
