@@ -11,7 +11,8 @@ use todav_core::{CategoryGroup, Sort, Task, TaskPatch};
 
 /// Libadwaita only styles plain buttons as pills; round the ends of the sign-in split button to match.
 /// The category section header turns its arrow like an expander row, without a "pressed" look.
-/// Done subtasks are struck through; drop targets show a line where the task will land
+/// Completed tasks shown among open ones are struck through (only their own title, not their
+/// subtasks'); drop targets show a line where the task will land
 /// instead of GTK's frame around the target, and "+" buttons taking the dragged task are outlined.
 const CSS: &str = "
 splitbutton.pill { border-radius: 9999px; }
@@ -20,7 +21,8 @@ splitbutton.pill > menubutton > button { padding: 10px 16px 10px 12px; border-ra
 .cat-toggle image { transition: -gtk-icon-transform 200ms ease; }
 .cat-toggle:not(:checked) image { -gtk-icon-transform: rotate(-90deg); }
 .cat-toggle:checked:not(:hover) { background: none; }
-row.subtask-done label.title { text-decoration-line: line-through; opacity: 0.55; }
+row.task-done > box.header > box.title > label.title,
+row.expander.task-done > box > list > row.header > box.header > box.title > label.title { text-decoration-line: line-through; opacity: 0.55; }
 .tag { padding: 2px 10px; border-radius: 9999px; font-size: smaller; color: @accent_color; background: alpha(@accent_bg_color, 0.15); }
 :drop(active) { box-shadow: none; outline: none; }
 button.drop-hint { outline: 2px solid @accent_bg_color; outline-offset: -2px; }
@@ -37,7 +39,7 @@ const INDENT: i32 = 24;
 /// Header and sidebar name for tasks without a category.
 const OTHER: &str = "Other";
 
-/// Completed tasks shown in the "Done" expander, newest first.
+/// Completed tasks shown in the "Completed" expander, newest first.
 const DONE_SHOWN: usize = 50;
 
 struct Ui {
@@ -557,7 +559,8 @@ fn refresh_tasks(ui: &Rc<Ui>) {
     let order = crate::settings::order();
     ui.handles
         .set(core().setting("drag_handles".into()).as_deref() == Some("true"));
-    let groups = core().grouped_by(href.clone(), order.tasks, order.subtasks);
+    let done_view = crate::settings::done_view();
+    let groups = core().grouped_by(href.clone(), order.tasks, order.subtasks, done_view);
 
     // Category picker: configured categories, then any others in use; keep the selection.
     let selected = ui.cats.string(ui.cat.selected()).map(|s| s.to_string());
@@ -653,7 +656,7 @@ fn refresh_tasks(ui: &Rc<Ui>) {
         vec![CategoryGroup {
             name: None,
             icon: None,
-            tasks: core().ungrouped_by(href.clone(), order.tasks, order.subtasks),
+            tasks: core().ungrouped_by(href.clone(), order.tasks, order.subtasks, done_view),
         }]
     };
 
@@ -696,14 +699,14 @@ fn refresh_tasks(ui: &Rc<Ui>) {
     }
 
     let mut done: Vec<Task> = core()
-        .finished(href)
+        .finished(href, done_view)
         .into_iter()
         .filter(|t| shown(t.category.as_ref()))
         .collect();
     if !done.is_empty() {
         done.sort_by_key(|t| std::cmp::Reverse(t.completed_at));
         let exp = adw::ExpanderRow::builder()
-            .title(format!("Done ({})", done.len()))
+            .title(format!("Completed ({})", done.len()))
             .build();
         for t in done.iter().take(DONE_SHOWN) {
             exp.add_row(&task_row(ui, t, 0, None));
@@ -749,8 +752,10 @@ fn task_row(ui: &Rc<Ui>, t: &Task, indent: usize, slot: Option<Slot>) -> adw::Ac
         .activatable(true)
         .build();
     row.set_margin_start(INDENT * indent as i32);
-    if t.done && indent > 0 {
-        row.add_css_class("subtask-done"); // stays under its parent instead of moving to "Done"
+    // Shown among open tasks (a subtask, or kept in place): struck through. Rows in the
+    // "Completed" group have no slot and stay plain.
+    if t.done && slot.is_some() {
+        row.add_css_class("task-done");
     }
     row.add_prefix(&done_check(t));
     if let Some(slot) = slot {
@@ -807,6 +812,9 @@ fn tree_row(
         .use_markup(false)
         .expanded(ui.expanded.borrow().contains(&root.uid))
         .build();
+    if root.done {
+        row.add_css_class("task-done"); // kept in place
+    }
     let slot_group = slot.group.clone();
     connect_dnd(ui, &row, root, slot, |h| row.add_prefix(h));
     row.add_prefix(&done_check(root));

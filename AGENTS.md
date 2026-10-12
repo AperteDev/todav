@@ -34,6 +34,9 @@
     (`append_node_ops: assertion failed`); the target opens the page 2 s after the app.
   - Animations, e.g. expanding a task row, abort it the same way; the target sets
     `gtk-enable-animations=false` through `XDG_CONFIG_HOME=target/broadway`.
+  - Closing a popover (e.g. picking a ComboRow entry) and sometimes scrolling abort it the
+    same way. Use it for quick looks; to change a setting, write it to the stopped app's
+    database (`kv`: `setting_<key>` plus `settime_<key>` = now) instead of using Preferences.
   - After a while some icons are no longer drawn; cosmetic, Broadway only.
 - In the real GNOME Wayland session, xdotool and synthetic uinput input do not reach the window,
   and screenshots of it are not available.

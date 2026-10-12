@@ -174,30 +174,70 @@ impl Client {
     /// categories alphabetically, then uncategorised. Subtasks follow their top-level ancestor,
     /// done ones included while that ancestor is open.
     pub fn grouped(&self, list_href: String) -> Vec<CategoryGroup> {
-        self.grouped_by(list_href, Sort::Manual, Sort::Manual)
+        self.grouped_by(list_href, Sort::Manual, Sort::Manual, DoneView::default())
     }
 
     /// Open tasks as one list, no category grouping: each top-level task followed by its
-    /// subtasks, in the given orders (done subtasks included as in `grouped`).
-    pub fn ungrouped_by(&self, list_href: String, tasks: Sort, subtasks: Sort) -> Vec<Task> {
-        forest(split_done(self.tasks(list_href, true)).0, tasks, subtasks).concat()
+    /// subtasks, in the given orders (done tasks as `done` says).
+    pub fn ungrouped_by(
+        &self,
+        list_href: String,
+        tasks: Sort,
+        subtasks: Sort,
+        done: DoneView,
+    ) -> Vec<Task> {
+        forest(split(self.tasks(list_href, true), done).0, tasks, subtasks).concat()
     }
 
-    /// `grouped` with top-level tasks and subtasks (among siblings) in the given orders.
-    pub fn grouped_by(&self, list_href: String, tasks: Sort, subtasks: Sort) -> Vec<CategoryGroup> {
+    /// `grouped` with top-level tasks and subtasks (among siblings) in the given orders, and
+    /// done tasks as `done` says.
+    pub fn grouped_by(
+        &self,
+        list_href: String,
+        tasks: Sort,
+        subtasks: Sort,
+        done: DoneView,
+    ) -> Vec<CategoryGroup> {
         let meta = self.categories(list_href.clone());
         group(
-            split_done(self.tasks(list_href, true)).0,
+            split(self.tasks(list_href, true), done).0,
             &meta,
             tasks,
             subtasks,
         )
     }
 
-    /// Done tasks not shown by `grouped`: done top-level tasks and everything done below them.
-    pub fn finished(&self, list_href: String) -> Vec<Task> {
-        split_done(self.tasks(list_href, true)).1
+    /// Done tasks not shown by `grouped_by`: done top-level tasks and everything done below
+    /// them (none when they are shown in place).
+    pub fn finished(&self, list_href: String, done: DoneView) -> Vec<Task> {
+        split(self.tasks(list_href, true), done).1
     }
+}
+
+/// How completed tasks are shown. The default moves completed top-level tasks (with everything
+/// below them) to `finished` and keeps completed subtasks of open tasks in their tree.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct DoneView {
+    /// Completed top-level tasks stay in place among the open ones; `finished` is empty.
+    pub in_place: bool,
+    /// Completed subtasks are left out everywhere.
+    pub hide_subtasks: bool,
+}
+
+/// (shown in the groups, finished) for `view`.
+fn split(tasks: Vec<Task>, view: DoneView) -> (Vec<Task>, Vec<Task>) {
+    let (mut tree, mut finished) = if view.in_place {
+        (tasks, Vec::new())
+    } else {
+        split_done(tasks)
+    };
+    if view.hide_subtasks {
+        for v in [&mut tree, &mut finished] {
+            let uids: HashSet<String> = v.iter().map(|t| t.uid.clone()).collect();
+            v.retain(|t| !(t.done && t.parent_uid.as_ref().is_some_and(|p| uids.contains(p))));
+        }
+    }
+    (tree, finished)
 }
 
 /// (open tree, finished): a done task stays in the open tree while its parent does.
@@ -428,12 +468,22 @@ mod tests {
             done("loop_a", Some("loop_b")),
             done("loop_b", Some("loop_a")),
         ];
-        let (tree, finished) = split_done(tasks);
+        let (tree, finished) = split_done(tasks.clone());
         let uids = |v: &[Task]| v.iter().map(|t| t.uid.clone()).collect::<Vec<_>>();
         assert_eq!(uids(&tree), ["root", "sub", "subsub", "open_under_closed"]);
         assert_eq!(
             uids(&finished),
             ["closed", "closed_sub", "loop_a", "loop_b"]
         );
+
+        // In place: nothing finished. Hidden subtasks: done tasks under a shown parent go.
+        let (all, none) = split(tasks.clone(), DoneView { in_place: true, hide_subtasks: false });
+        assert_eq!((all.len(), none.len()), (tasks.len(), 0));
+        let hide = |in_place| DoneView { in_place, hide_subtasks: true };
+        let (tree, finished) = split(tasks.clone(), hide(false));
+        assert_eq!(uids(&tree), ["root", "open_under_closed"]);
+        assert_eq!(uids(&finished), ["closed"]); // the loop has no top: both hide each other
+        let (tree, _) = split(tasks, hide(true));
+        assert_eq!(uids(&tree), ["root", "closed", "open_under_closed"]);
     }
 }

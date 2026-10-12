@@ -14,7 +14,7 @@ use rusqlite::Connection;
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
 
-pub use config::{CategoryGroup, CategoryMeta, Sort};
+pub use config::{CategoryGroup, CategoryMeta, DoneView, Sort};
 pub use login::{Credentials, LoginFlow, login_flow_poll, login_flow_start};
 pub use push::{PushRegistration, ntfy_check};
 pub use settings::DEVICE_ONLY;

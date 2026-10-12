@@ -29,6 +29,26 @@ pub struct Order {
     pub sub_start: bool,
 }
 
+/// How completed tasks are shown, from the "Completed tasks" / "Completed subtasks" rows.
+pub fn done_view() -> todav_core::DoneView {
+    todav_core::DoneView {
+        in_place: core().setting("done_tasks".into()).as_deref() == Some("in_place"),
+        hide_subtasks: core().setting("done_subtasks".into()).as_deref() == Some("hide"),
+    }
+}
+
+/// Bind a ComboRow to the setting `key`, one stored value per row entry (the first is the
+/// default); changes apply at once.
+fn connect_choice(b: &gtk::Builder, key: &'static str, values: &'static [&'static str]) {
+    let row: adw::ComboRow = get(b, key);
+    let current = core().setting(key.into()).unwrap_or_default();
+    row.set_selected(values.iter().position(|v| *v == current).unwrap_or(0) as u32);
+    row.connect_selected_notify(move |r| {
+        let _ = core().set_setting(key.into(), values[r.selected() as usize].into());
+        crate::window::refresh();
+    });
+}
+
 pub fn order() -> Order {
     let sort = |key| SORTS[sort_index(key) as usize].1;
     let start = |sort, key: &str| match sort {
@@ -102,14 +122,9 @@ pub fn present(parent: &impl IsA<gtk::Widget>) {
         let _ = core().set_setting("sync_settings".into(), s.is_active().to_string());
         request_sync(); // turning it on pulls the server's settings right away
     });
-    const VIEWS: [&str; 3] = ["group", "tags", "none"];
-    let view: adw::ComboRow = get(&b, "category_view");
-    let current = core().setting("category_view".into()).unwrap_or_default();
-    view.set_selected(VIEWS.iter().position(|v| *v == current).unwrap_or(0) as u32);
-    view.connect_selected_notify(|v| {
-        let _ = core().set_setting("category_view".into(), VIEWS[v.selected() as usize].into());
-        crate::window::refresh();
-    });
+    connect_choice(&b, "category_view", &["group", "tags", "none"]);
+    connect_choice(&b, "done_tasks", &["group", "in_place"]);
+    connect_choice(&b, "done_subtasks", &["show", "hide"]);
     let handles: adw::SwitchRow = get(&b, "drag_handles");
     handles.set_active(core().setting("drag_handles".into()).as_deref() == Some("true"));
     handles.connect_active_notify(|h| {

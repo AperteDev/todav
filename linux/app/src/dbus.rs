@@ -60,7 +60,7 @@ fn call(method: &str, params: &glib::Variant) -> Result<Option<glib::Variant>, S
             let (list,) = params.get::<(String,)>().ok_or_else(bad)?;
             let mut out: Vec<(String, String, String, bool)> = Vec::new();
             let order = crate::settings::order();
-            for g in c.grouped_by(list, order.tasks, order.subtasks) {
+            for g in c.grouped_by(list, order.tasks, order.subtasks, crate::settings::done_view()) {
                 let cat = g.name.unwrap_or_default();
                 for t in g.tasks {
                     // The extension cannot see hierarchy; mark subtasks inline.

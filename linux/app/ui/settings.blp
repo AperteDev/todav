@@ -20,6 +20,11 @@ Adw.PreferencesDialog dialog {
         title: "Add new tasks";
         model: Gtk.StringList { strings ["At the start", "At the end"] };
       }
+
+      Adw.ComboRow done_tasks {
+        title: "Completed tasks";
+        model: Gtk.StringList { strings ["In a separate group", "Keep in place"] };
+      }
     }
 
     Adw.PreferencesGroup {
@@ -33,6 +38,11 @@ Adw.PreferencesDialog dialog {
       Adw.ComboRow sub_new {
         title: "Add new subtasks";
         model: Gtk.StringList { strings ["At the start", "At the end"] };
+      }
+
+      Adw.ComboRow done_subtasks {
+        title: "Completed subtasks";
+        model: Gtk.StringList { strings ["Show", "Hide"] };
       }
     }
 
