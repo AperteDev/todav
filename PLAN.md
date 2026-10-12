@@ -397,13 +397,14 @@ Deviation: no docker stack (`infra/`) for now — integration runs against the r
 - [x] Integration tests (`cargo test -p todav-core --features integration`): two-device round trip, foreign props preserved, offline tick-vs-edit conflict → done, remote delete. Each test makes and deletes its own calendar
 - [x] Push verified manually: server-side edit → dav_push → ntfy → decrypt → `sync_topic` in < 6 s
 - [x] ical round-trip on a real Nextcloud export (318 VTODOs): byte-stable, patching SUMMARY touches only SUMMARY. Exports go in gitignored `tmp/` (test skips when empty). Fixed: empty `DESCRIPTION:`/`RELATED-TO:` read as absent, `PRIORITY:0` = none
-- [ ] Automated push test + re-registration across expiry; invalid sync-token path test
+- [x] Automated push test + re-registration across expiry; invalid sync-token path test (malformed → 403, and never-issued → Nextcloud answers 207 with no changes; both trigger a full resync)
 - [x] `config` module: `todav/config.json` (ETag, created from categories in use if missing), `categories()`, `grouped()` (unknown categories get their own group after configured ones; uncategorised last as "Other")
 - [x] Core: Login Flow v2 (`login_flow_start/poll`), `logout`, `setting/set_setting`; hand-written `json.rs` (no serde)
-- [x] Integration fixture reuses `it-<name>` calendars (Nextcloud rate-limits MKCALENDAR: 10/h per user) — **unverified after this change; rerun once the limit allows**
+- [x] Integration fixture reuses `it-<name>` calendars (Nextcloud rate-limits MKCALENDAR: 10/h per user) — verified
 - [ ] M3 migration script
 - [x] M4 Linux app (`linux/app`): login via browser (Login Flow v2), app password in Secret Service (libsecret), lists sidebar, grouped tasks, add with category (Ctrl+K), tick, delete, edit dialog, Done expander, F5/Ctrl+Q, hide on close, `--gapplication-service`, sync worker + ntfy listener + 60 s/30 min fallback timer, D-Bus API. `make -C linux install` (desktop file, D-Bus activation, autostart). No GSettings: settings live in the core's kv. Verified via Broadway + D-Bus
-- [ ] M4 leftovers: drag-and-drop reorder, undo for delete, app icon, Flatpak
+- [x] Drag-and-drop reorder, app icon (`linux/data/*.svg`, also the extension's panel icon)
+- [ ] M4 leftovers: undo for delete, Flatpak
 - [x] M5 GNOME extension (`gnome-extension/`, ESM, Shell 48–51): pinned list, category sections, tick keeps menu open, add entry, list switcher, open app, warning on sync error. `make -C gnome-extension install`. Verified in a nested headless Shell
 - [ ] M6 Android (+ UniFFI exports) → M7 Pebble
 - [ ] Non-functional (last): README, `docs/`, CI, Flatpak
@@ -431,7 +432,7 @@ Each milestone ends with something you can use daily; nothing is started before 
 - [ ] **ntfy topic security**: topics must be random (22+ chars) and the ntfy server should have ACLs so only the owner can subscribe; the Linux app authenticates with an ntfy token stored in the Secret Service.
 - [ ] **Pebble SDK toolchain**: confirm the current open-source SDK builds for the user's watch model and that the Core Devices Pebble app forwards PebbleKit intents; otherwise fall back to the legacy Pebble app for the companion test.
 - [ ] **GNOME Shell version**: target the Shell version installed on the user's machine; GJS APIs for popup menus moved between 45 and 48.
-- [ ] **Nextcloud Tasks compatibility**: verify the web UI shows `X-TODAV-ORDER` tasks in a sane order (it uses its own `X-APPLE-SORT-ORDER`); consider writing both.
+- [x] **Nextcloud Tasks compatibility**: manual order is stored in Nextcloud Tasks' own `X-APPLE-SORT-ORDER`, so both share one order; `X-TODAV-ORDER` is still read and dropped on the next reorder.
 
 **Verification checklist for the agent** (run before marking any milestone done)
 

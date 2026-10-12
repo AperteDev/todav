@@ -193,6 +193,15 @@ impl Client {
         };
         let (full, res) = match dav.sync_collection(list_href, &token)? {
             SyncResult::InvalidToken => (true, dav.sync_collection(list_href, "")?),
+            // Nextcloud answers a token it never issued (calendar recreated under the same URL)
+            // with its current token and no changes, as if nothing happened.
+            SyncResult::Changes {
+                token: t,
+                changed,
+                removed,
+            } if !token.is_empty() && t != token && changed.is_empty() && removed.is_empty() => {
+                (true, dav.sync_collection(list_href, "")?)
+            }
             r => (token.is_empty(), r),
         };
         let SyncResult::Changes {
