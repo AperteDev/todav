@@ -1347,11 +1347,27 @@ fn done_check(t: &Task) -> gtk::CheckButton {
 
 fn delete_button(t: &Task) -> gtk::Button {
     let del = icon_button("user-trash-symbolic", "Delete");
-    let uid = t.uid.clone();
+    let task = t.clone();
     del.connect_clicked(move |_| {
-        if core().delete_task(uid.clone()).is_ok() {
-            request_sync();
-        }
+        let Ok(ics) = core().delete_task(task.uid.clone()) else {
+            return;
+        };
+        request_sync();
+        let Some(ui) = ui() else { return };
+        let toast = adw::Toast::builder()
+            .title(format!("“{}” deleted", task.summary))
+            .button_label("Undo")
+            .priority(adw::ToastPriority::High)
+            .build();
+        toast.set_use_markup(false);
+        let list = task.list_href.clone();
+        toast.connect_button_clicked(move |_| {
+            match core().restore_task(list.clone(), ics.clone()) {
+                Ok(()) => request_sync(),
+                Err(e) => self::toast(&e.to_string()),
+            }
+        });
+        ui.toasts.add_toast(toast);
     });
     del
 }

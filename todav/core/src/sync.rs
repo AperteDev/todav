@@ -86,7 +86,13 @@ impl Client {
                 match dav.delete(href, t.etag.as_deref(), reg.as_deref()) {
                     // 412: changed on the server since we saw it; the server copy wins and the next pull restores it.
                     Ok(()) | Err(Error::Conflict) => {
-                        store::delete(&self.db.lock().unwrap(), &t.uid)?
+                        let db = self.db.lock().unwrap();
+                        // Restored (undo) while the DELETE was on its way: upload it anew.
+                        if store::raw(&db, &t.uid)?.is_some_and(|r| r.dirty == store::MODIFIED) {
+                            store::set_sync_state(&db, &t.uid, None, None, store::MODIFIED)?
+                        } else {
+                            store::delete(&db, &t.uid)?
+                        }
                     }
                     Err(e) => return Err(e),
                 }

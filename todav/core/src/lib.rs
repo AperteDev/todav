@@ -300,8 +300,9 @@ impl Client {
         })
     }
 
-    pub fn delete_task(&self, uid: String) -> Result<()> {
-        let list = {
+    /// Returns the task's calendar data, for `restore_task`.
+    pub fn delete_task(&self, uid: String) -> Result<String> {
+        let raw = {
             let db = self.db.lock().unwrap();
             let raw = store::raw(&db, &uid)?.ok_or_else(|| Error::NotFound(uid.clone()))?;
             if raw.href.is_none() {
@@ -309,9 +310,33 @@ impl Client {
             } else {
                 db.execute("UPDATE tasks SET dirty = 2 WHERE uid = ?", [&uid])?;
             }
-            raw.list_href
+            raw
         };
-        self.emit(&list, vec![uid]);
+        self.emit(&raw.list_href, vec![uid]);
+        Ok(raw.raw_ics)
+    }
+
+    /// Undo `delete_task`: bring the task back from the data it returned. A delete the server
+    /// already has is re-created there as a new resource.
+    pub fn restore_task(&self, list_href: String, raw_ics: String) -> Result<()> {
+        let mut cal = Calendar::parse(&raw_ics).ok_or_else(|| Error::Parse(list_href.clone()))?;
+        touch(&mut cal); // newer than the deleted copy, should another device still have it
+        let uid = {
+            let db = self.db.lock().unwrap();
+            let (href, etag) = match store::raw(&db, &cal.text("UID").unwrap_or_default())? {
+                Some(r) => (r.href, r.etag), // delete not pushed yet
+                None => (None, None),
+            };
+            store::save(
+                &db,
+                &list_href,
+                href.as_deref(),
+                etag.as_deref(),
+                &cal,
+                store::MODIFIED,
+            )?
+        };
+        self.emit(&list_href, vec![uid]);
         Ok(())
     }
 
@@ -467,16 +492,56 @@ mod tests {
         let l = "/l/".to_string();
         c.db.lock()
             .unwrap()
-            .execute("INSERT INTO lists (href, display_name) VALUES (?1, 'L')", [&l])
+            .execute(
+                "INSERT INTO lists (href, display_name) VALUES (?1, 'L')",
+                [&l],
+            )
             .unwrap();
         let add = |s: &str, parent: Option<String>| {
-            c.add_task(l.clone(), s.into(), None, parent, false).unwrap().uid
+            c.add_task(l.clone(), s.into(), None, parent, false)
+                .unwrap()
+                .uid
         };
         let (a, b) = (add("a", None), add("b", None));
         let b1 = add("b1", Some(b.clone()));
-        assert!(c.set_parent(b.clone(), b1.clone()).is_err(), "b under its own subtask");
+        assert!(
+            c.set_parent(b.clone(), b1.clone()).is_err(),
+            "b under its own subtask"
+        );
         c.set_parent(b.clone(), a.clone()).unwrap();
         assert_eq!(c.task(b.clone()).unwrap().parent_uid, Some(a.clone()));
         assert!(c.within(b1, a.clone()) && !c.within(a, b));
+    }
+
+    #[test]
+    fn restore_brings_a_deleted_task_back() {
+        let dir = std::env::temp_dir().join(format!("todav-test-restore-{}", now()));
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let l = "/l/".to_string();
+        c.db.lock()
+            .unwrap()
+            .execute(
+                "INSERT INTO lists (href, display_name) VALUES (?1, 'L')",
+                [&l],
+            )
+            .unwrap();
+        let uid = c
+            .add_task(l.clone(), "a".into(), None, None, false)
+            .unwrap()
+            .uid;
+        // On the server: the delete is only marked until pushed, and undo clears the mark.
+        store::set_sync_state(&c.db.lock().unwrap(), &uid, Some("/l/a.ics"), Some("e"), 0).unwrap();
+        let ics = c.delete_task(uid.clone()).unwrap();
+        assert!(c.tasks(l.clone(), true).is_empty());
+        c.restore_task(l.clone(), ics.clone()).unwrap();
+        let raw = store::raw(&c.db.lock().unwrap(), &uid).unwrap().unwrap();
+        assert_eq!(
+            (raw.href.as_deref(), raw.dirty),
+            (Some("/l/a.ics"), store::MODIFIED)
+        );
+        // Delete already pushed (row gone): re-created as new.
+        store::delete(&c.db.lock().unwrap(), &uid).unwrap();
+        c.restore_task(l.clone(), ics).unwrap();
+        assert_eq!(c.task(uid).unwrap().summary, "a");
     }
 }
