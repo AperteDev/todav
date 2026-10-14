@@ -7,24 +7,49 @@ use todav_core::Task;
 
 const DAY: i64 = 86400;
 
+/// Reminder choices for a due date with a time: label, seconds after the due time.
+pub const TIMED: [(&str, i64); 6] = [
+    ("At due time", 0),
+    ("5 minutes before", -300),
+    ("15 minutes before", -900),
+    ("30 minutes before", -1800),
+    ("1 hour before", -3600),
+    ("1 day before", -DAY),
+];
+
+/// When reminders of tasks without a time go off, in seconds into the day: the synced
+/// `reminder_time` setting (minutes), 9:00 by default.
+pub fn all_day_time() -> i64 {
+    crate::core()
+        .setting("reminder_time".into())
+        .and_then(|m| m.parse::<i64>().ok())
+        .map_or(9 * 3600, |m| m * 60)
+}
+
+/// The offset a new reminder starts with: the synced `reminder_default` setting for a due time
+/// ("At due time" by default), the day itself at `all_day_time` for a date.
+pub fn default_reminder(all_day: bool) -> i64 {
+    if all_day {
+        return all_day_time();
+    }
+    crate::core()
+        .setting("reminder_default".into())
+        .and_then(|o| o.parse().ok())
+        .unwrap_or(0)
+}
+
 /// Reminder choices for a due date with a time or (`all_day`) without: label, seconds after the
 /// due time. A date alone counts from its midnight.
-pub fn reminders(all_day: bool) -> &'static [(&'static str, i64)] {
-    if all_day {
-        &[
-            ("On the day at 9:00", 9 * 3600),
-            ("The day before at 9:00", -15 * 3600),
-        ]
-    } else {
-        &[
-            ("At due time", 0),
-            ("5 minutes before", -300),
-            ("15 minutes before", -900),
-            ("30 minutes before", -1800),
-            ("1 hour before", -3600),
-            ("1 day before", -DAY),
-        ]
+pub fn reminders(all_day: bool) -> Vec<(String, i64)> {
+    if !all_day {
+        return TIMED.iter().map(|(l, o)| (l.to_string(), *o)).collect();
     }
+    let t = all_day_time();
+    let at = format!("{}:{:02}", t / 3600, t / 60 % 60);
+    vec![
+        (format!("On the day at {at}"), t),
+        (format!("The day before at {at}"), t - DAY),
+    ]
 }
 
 /// Units of a custom reminder, in the order of its unit picker.

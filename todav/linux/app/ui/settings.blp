@@ -47,6 +47,50 @@ Adw.PreferencesDialog dialog {
     }
 
     Adw.PreferencesGroup {
+      title: "Reminders";
+
+      Adw.ComboRow reminder_default {
+        title: "New reminders";
+        subtitle: "For tasks due at a time";
+        model: Gtk.StringList reminder_defaults {};
+      }
+
+      Adw.ActionRow {
+        title: "Time for all-day tasks";
+        subtitle: "When reminders of tasks due on a date go off";
+
+        [suffix]
+        Gtk.SpinButton reminder_hour {
+          valign: center;
+          numeric: true;
+          wrap: true;
+          adjustment: Gtk.Adjustment {
+            lower: 0;
+            upper: 23;
+            step-increment: 1;
+          };
+        }
+
+        [suffix]
+        Gtk.Label {
+          label: ":";
+        }
+
+        [suffix]
+        Gtk.SpinButton reminder_minute {
+          valign: center;
+          numeric: true;
+          wrap: true;
+          adjustment: Gtk.Adjustment {
+            lower: 0;
+            upper: 59;
+            step-increment: 5;
+          };
+        }
+      }
+    }
+
+    Adw.PreferencesGroup {
       title: "Categories";
 
       Adw.ComboRow category_view {

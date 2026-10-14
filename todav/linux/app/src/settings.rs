@@ -111,6 +111,38 @@ fn connect_order(b: &gtk::Builder, which: &'static str, hint: Option<&'static st
     });
 }
 
+/// The default for new reminders and the time reminders of all-day tasks go off; both apply to
+/// reminders added from now on.
+fn connect_reminders(b: &gtk::Builder) {
+    let default: adw::ComboRow = get(b, "reminder_default");
+    let model: gtk::StringList = get(b, "reminder_defaults");
+    for (label, _) in crate::dates::TIMED {
+        model.append(label);
+    }
+    let current = crate::dates::default_reminder(false);
+    let pos = crate::dates::TIMED.iter().position(|(_, o)| *o == current);
+    default.set_selected(pos.unwrap_or(0) as u32);
+    default.connect_selected_notify(|r| {
+        let offset = crate::dates::TIMED[r.selected() as usize].1;
+        let _ = core().set_setting("reminder_default".into(), offset.to_string());
+    });
+
+    let (hour, minute): (gtk::SpinButton, gtk::SpinButton) =
+        (get(b, "reminder_hour"), get(b, "reminder_minute"));
+    let t = crate::dates::all_day_time();
+    hour.set_value((t / 3600) as f64);
+    minute.set_value((t / 60 % 60) as f64);
+    for spin in [&hour, &minute] {
+        crate::window::two_digits(spin);
+        crate::window::scroll_past(spin.upcast_ref());
+        let (h, m) = (hour.clone(), minute.clone());
+        spin.connect_value_changed(move |_| {
+            let minutes = h.value() as i64 * 60 + m.value() as i64;
+            let _ = core().set_setting("reminder_time".into(), minutes.to_string());
+        });
+    }
+}
+
 pub fn present(parent: &impl IsA<gtk::Widget>) {
     let b = view!("settings");
     let dialog: adw::PreferencesDialog = get(&b, "dialog");
@@ -141,6 +173,7 @@ pub fn present(parent: &impl IsA<gtk::Widget>) {
     });
     connect_order(&b, "task", None);
     connect_order(&b, "sub", Some("Also places the “Add subtask” field"));
+    connect_reminders(&b);
     set_url(&server, &old_server);
     set_url(&ntfy, &old_ntfy);
 

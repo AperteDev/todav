@@ -40,7 +40,11 @@ impl Row {
     /// time span.
     fn fill(&self, all_day: bool, offset: i64, custom: bool) {
         let presets = dates::reminders(all_day);
-        let labels: Vec<&str> = presets.iter().map(|(l, _)| *l).chain(["Custom…"]).collect();
+        let labels: Vec<&str> = presets
+            .iter()
+            .map(|(l, _)| l.as_str())
+            .chain(["Custom…"])
+            .collect();
         // A date alone counts from the start of its day.
         let dirs = if all_day {
             ["before the day", "into the day"]
@@ -86,11 +90,15 @@ impl Reminders {
         }
         let weak = Rc::downgrade(&r);
         r.add.connect_activated(move |_| {
-            // The first preset not in use yet, so a second reminder is not a duplicate.
+            // The default, else the first preset not in use yet, so it is not a duplicate.
             if let Some(r) = weak.upgrade() {
-                let (used, presets) = (r.offsets(), dates::reminders(r.all_day.get()));
-                let free = presets.iter().find(|(_, o)| !used.contains(o));
-                r.add(free.unwrap_or(&presets[0]).1);
+                let all_day = r.all_day.get();
+                let (used, first) = (r.offsets(), dates::default_reminder(all_day));
+                let presets = dates::reminders(all_day).into_iter().map(|(_, o)| o);
+                let free = std::iter::once(first)
+                    .chain(presets)
+                    .find(|o| !used.contains(o));
+                r.add(free.unwrap_or(first));
             }
         });
         r
@@ -133,7 +141,7 @@ impl Reminders {
     }
 
     /// The due date switched between a date and a time: custom reminders keep their span, a
-    /// preset that does not fit the new kind becomes its first one.
+    /// preset that does not fit the new kind becomes the default one.
     pub fn set_all_day(&self, all_day: bool) {
         self.all_day.set(all_day);
         let presets = dates::reminders(all_day);
@@ -142,7 +150,11 @@ impl Reminders {
             let fits = presets.iter().any(|(_, p)| *p == o);
             row.fill(
                 all_day,
-                if custom || fits { o } else { presets[0].1 },
+                if custom || fits {
+                    o
+                } else {
+                    dates::default_reminder(all_day)
+                },
                 custom,
             );
         }

@@ -1619,6 +1619,14 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
     dialog.present(Some(&ui.window));
 }
 
+/// Show a spin button's value as two digits, as in times ("09").
+pub fn two_digits(spin: &gtk::SpinButton) {
+    spin.connect_output(|s| {
+        s.set_text(&format!("{:02}", s.value() as i64));
+        glib::Propagation::Stop
+    });
+}
+
 /// The wheel over `w` scrolls the dialog instead: a calendar would change the month and a spin
 /// button its value, and with them the due date, while the user only scrolls past.
 pub fn scroll_past(w: &gtk::Widget) {
@@ -1646,10 +1654,7 @@ fn due_dialog(b: &gtk::Builder, t: &Task) -> impl Fn() -> TaskPatch + 'static {
     let has_time: adw::SwitchRow = get(b, "has_time");
     let (hour, minute): (gtk::SpinButton, gtk::SpinButton) = (get(b, "hour"), get(b, "minute"));
     for spin in [&hour, &minute] {
-        spin.connect_output(|s| {
-            s.set_text(&format!("{:02}", s.value() as i64));
-            glib::Propagation::Stop
-        });
+        two_digits(spin);
     }
 
     let now = core().local_now();
