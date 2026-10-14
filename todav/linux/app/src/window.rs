@@ -1534,9 +1534,11 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
     let summary: adw::EntryRow = get(&b, "summary");
     let category: adw::ComboRow = get(&b, "category");
     let cats: gtk::StringList = get(&b, "cats");
-    let description: adw::EntryRow = get(&b, "description");
+    let description: gtk::TextView = get(&b, "description");
     summary.set_text(&t.summary);
-    description.set_text(t.description.as_deref().unwrap_or_default());
+    description
+        .buffer()
+        .set_text(t.description.as_deref().unwrap_or_default());
 
     // Same choices as the new-task picker, plus the task's own category if that lacks it.
     let items: Vec<glib::GString> = (0..ui.cats.n_items())
@@ -1582,7 +1584,7 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
     let save: gtk::Button = get(&b, "save");
     let (task, d) = (t.clone(), dialog.downgrade());
     save.connect_clicked(move |_| {
-        // Only send what changed: a one-line entry would flatten a multi-line note.
+        // Only send what changed.
         let changed =
             |new: String, old: Option<&str>| (new != old.unwrap_or_default()).then_some(new);
         let patch = TaskPatch {
@@ -1600,7 +1602,10 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
                     )
                 })
                 .flatten(),
-            description: changed(description.text().to_string(), task.description.as_deref()),
+            description: changed(
+                description.buffer().property::<String>("text"),
+                task.description.as_deref(),
+            ),
             ..due_at()
         };
         let uid = task.uid.clone();
@@ -1661,7 +1666,8 @@ fn due_dialog(b: &gtk::Builder, t: &Task) -> impl Fn() -> TaskPatch + 'static {
         scroll_past(w);
     }
     due.set_enable_expansion(t.due.is_some());
-    due.set_expanded(false); // enabling expands it; it opens on a click or the switch
+    // Open next to the note when there is a date; the one-column layout collapses it again.
+    due.set_expanded(t.due.is_some());
     has_time.set_active(t.due.is_some() && !t.due_all_day);
     hour.set_value(f.hour() as f64);
     minute.set_value(f.minute() as f64);

@@ -6,7 +6,7 @@ Adw.Dialog dialog {
   title: "Edit Task";
   content-width: 760;
   // Room for the expanded due date; smaller windows shrink it.
-  content-height: 640;
+  content-height: 600;
   default-widget: save;
 
   child: Adw.ToolbarView {
@@ -32,6 +32,7 @@ Adw.Dialog dialog {
       propagate-natural-height: true;
 
       Gtk.Box columns {
+        vexpand: true;
         spacing: 18;
         homogeneous: true;
         margin-top: 12;
@@ -39,22 +40,42 @@ Adw.Dialog dialog {
         margin-start: 18;
         margin-end: 18;
 
-        Adw.PreferencesGroup {
-          valign: start;
+        // The note fills what the title and category leave.
+        Gtk.Box {
+          orientation: vertical;
+          spacing: 18;
 
-          Adw.EntryRow summary {
-            title: "Title";
-            activates-default: true;
+          Adw.PreferencesGroup {
+            Adw.EntryRow summary {
+              title: "Title";
+              activates-default: true;
+            }
+
+            Adw.ComboRow category {
+              title: "Category";
+              model: Gtk.StringList cats {};
+            }
           }
 
-          Adw.ComboRow category {
-            title: "Category";
-            model: Gtk.StringList cats {};
-          }
-
-          Adw.EntryRow description {
+          Adw.PreferencesGroup {
             title: "Note";
-            activates-default: true;
+            vexpand: true;
+
+            Gtk.ScrolledWindow {
+              vexpand: true;
+              height-request: 160;
+              hscrollbar-policy: never;
+              styles ["card"]
+
+              Gtk.TextView description {
+                wrap-mode: word_char;
+                top-margin: 12;
+                bottom-margin: 12;
+                left-margin: 12;
+                right-margin: 12;
+                styles ["inline"]
+              }
+            }
           }
         }
 
@@ -139,9 +160,11 @@ Adw.Dialog dialog {
   Adw.Breakpoint {
     condition ("max-width: 560sp")
 
+    // One column: the due date opens collapsed, so the task's own fields come first.
     setters {
       columns.orientation: vertical;
       columns.homogeneous: false;
+      due.expanded: false;
     }
   }
 }
