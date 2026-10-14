@@ -1,4 +1,4 @@
-# Per-user install for development; Flatpak packaging comes later.
+# Per-user install for development; `make flatpak` builds and installs the Flatpak instead.
 PREFIX ?= $(HOME)/.local
 BINDIR = $(PREFIX)/bin
 DATADIR = $(PREFIX)/share
@@ -8,13 +8,26 @@ ID = io.github.selfref.Todav
 
 install:
 	cargo build --release -p todav-linux
+	$(MAKE) install-data
+	install -Dm644 data/$(ID)-autostart.desktop $(AUTOSTART)/$(ID).desktop
+
+# Binary and data files of an already built release; the Flatpak build uses this too (it asks
+# the Background portal for autostart instead).
+install-data:
 	install -Dm755 ../../target/release/todav-linux $(BINDIR)/todav-linux
 	install -Dm644 data/$(ID).desktop $(DATADIR)/applications/$(ID).desktop
+	install -Dm644 data/$(ID).metainfo.xml $(DATADIR)/metainfo/$(ID).metainfo.xml
 	mkdir -p $(DATADIR)/dbus-1/services
 	sed 's|@bindir@|$(BINDIR)|' data/$(ID).service.in > $(DATADIR)/dbus-1/services/$(ID).service
-	install -Dm644 data/$(ID)-autostart.desktop $(AUTOSTART)/$(ID).desktop
 	install -Dm644 data/$(ID).svg $(ICONS)/scalable/apps/$(ID).svg
 	install -Dm644 data/$(ID)-symbolic.svg $(ICONS)/symbolic/apps/$(ID)-symbolic.svg
+
+# Needs flatpak-builder (or the org.flatpak.Builder Flatpak); the build fetches crates over the
+# network. ponytail: Flathub builds offline, add a generated cargo-sources.json when submitting.
+FLATPAK_BUILDER ?= $(shell command -v flatpak-builder || echo flatpak run org.flatpak.Builder)
+flatpak:
+	$(FLATPAK_BUILDER) --user --install --force-clean --install-deps-from=flathub \
+	  --state-dir=../../target/flatpak-builder ../../target/flatpak flatpak/$(ID).json
 
 # GTK's Broadway backend draws into a web page; drag and drop crashes there.
 # The page opens once the app has drawn: a browser connecting earlier aborts broadwayd
@@ -45,7 +58,8 @@ sandbox-reset:
 
 uninstall:
 	rm -f $(BINDIR)/todav-linux $(DATADIR)/applications/$(ID).desktop \
+	  $(DATADIR)/metainfo/$(ID).metainfo.xml \
 	  $(DATADIR)/dbus-1/services/$(ID).service $(AUTOSTART)/$(ID).desktop \
 	  $(ICONS)/scalable/apps/$(ID).svg $(ICONS)/symbolic/apps/$(ID)-symbolic.svg
 
-.PHONY: install uninstall broadway sandbox sandbox-reset
+.PHONY: install install-data flatpak uninstall broadway sandbox sandbox-reset

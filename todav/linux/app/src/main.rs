@@ -80,7 +80,7 @@ impl ChangeListener for Listener {
 
 // --- keyring -----------------------------------------------------------------
 
-/// `TODAV_SANDBOX` set: a separate copy for testing other connections (`make -C linux
+/// `TODAV_SANDBOX` set: a separate copy for testing other connections (`make -C todav/linux
 /// sandbox`). It runs next to the normal app, keeps its data where XDG_DATA_HOME says and its
 /// passwords apart, so logging out there leaves the normal app signed in.
 pub fn sandbox() -> bool {
@@ -304,6 +304,32 @@ pub fn start_background() {
     });
 }
 
+/// The Flatpak cannot reach the host's autostart folder: ask the Background portal to start the
+/// service at login instead (GNOME may ask the user once).
+fn request_autostart(conn: &gio::DBusConnection) {
+    let opts = glib::VariantDict::new(None);
+    opts.insert("reason", "Sync tasks and receive changes in the background");
+    opts.insert("autostart", true);
+    opts.insert("commandline", vec!["todav-linux", "--gapplication-service"]);
+    let args = glib::Variant::tuple_from_iter(["".to_variant(), opts.end()]);
+    conn.call(
+        Some("org.freedesktop.portal.Desktop"),
+        "/org/freedesktop/portal/desktop",
+        "org.freedesktop.portal.Background",
+        "RequestBackground",
+        Some(&args),
+        None,
+        gio::DBusCallFlags::NONE,
+        -1,
+        gio::Cancellable::NONE,
+        |r| {
+            if let Err(e) = r {
+                eprintln!("Background portal: {e}");
+            }
+        },
+    );
+}
+
 fn main() -> glib::ExitCode {
     let data = glib::user_data_dir().join("todav");
     let client = Client::open(data.to_string_lossy().into()).expect("open local database");
@@ -324,6 +350,9 @@ fn main() -> glib::ExitCode {
         // First: the bus name is already ours, so calls arriving before this would fail.
         if let (Some(conn), Some(path)) = (app.dbus_connection(), app.dbus_object_path()) {
             dbus::register(&conn, &path);
+            if std::path::Path::new("/.flatpak-info").exists() {
+                request_autostart(&conn);
+            }
         }
         window::setup_actions(app);
         if restore_account() {

@@ -425,10 +425,10 @@ Deviation: no docker stack (`infra/`) for now — integration runs against the r
 - [x] `config` module: `todav/config.json` (ETag, created from categories in use if missing), `categories()`, `grouped()` (unknown categories get their own group after configured ones; uncategorised last as "Other")
 - [x] Core: Login Flow v2 (`login_flow_start/poll`), `logout`, `setting/set_setting`; hand-written `json.rs` (no serde)
 - [x] Integration fixture reuses `it-<name>` calendars (Nextcloud rate-limits MKCALENDAR: 10/h per user) — verified
-- [ ] M3 migration script
+- [x] ~~M3 migration script~~ — dropped: existing tasks are rewritten by hand
 - [x] M4 Linux app (`todav/linux/app`): login via browser (Login Flow v2), app password in Secret Service (libsecret), lists sidebar, grouped tasks, add with category (Ctrl+K), tick, delete, edit dialog, Done expander, F5/Ctrl+Q, hide on close, `--gapplication-service`, sync worker + ntfy listener + 60 s/30 min fallback timer, D-Bus API. `make -C todav/linux install` (desktop file, D-Bus activation, autostart). No GSettings: settings live in the core's kv. Verified via Broadway + D-Bus
 - [x] Drag-and-drop reorder, app icon (`todav/linux/data/*.svg`, also the extension's panel icon)
-- [ ] M4 leftovers: undo for delete, Flatpak
+- [x] M4 leftovers: undo for delete (toast; a delete already on the server is re-created), Flatpak (`todav/linux/flatpak/`, GNOME 51, `make -C todav/linux flatpak`; autostart through the Background portal; builds with network, Flathub needs a generated `cargo-sources.json`)
 - [x] M5 GNOME extension (`todav/gnome-extension/`, ESM, Shell 48–51): pinned list, category sections, tick keeps menu open, add entry, list switcher, open app, warning on sync error. `make -C todav/gnome-extension install`. Verified in a nested headless Shell
 - [ ] M6 Android (+ UniFFI exports) → M7 Pebble
 - [ ] Non-functional (last): README, `docs/`, CI, Flatpak
