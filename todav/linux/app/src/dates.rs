@@ -27,6 +27,25 @@ pub fn reminders(all_day: bool) -> &'static [(&'static str, i64)] {
     }
 }
 
+/// Units of a custom reminder, in the order of its unit picker.
+const UNITS: [i64; 4] = [60, 3600, DAY, 7 * DAY];
+
+/// A reminder offset as (amount, index in `UNITS`, before): the largest unit it fits exactly.
+pub fn span(offset: i64) -> (i64, u32, bool) {
+    let n = offset.abs();
+    let unit = (0..UNITS.len())
+        .rev()
+        .find(|&u| n % UNITS[u] == 0 && n > 0)
+        .unwrap_or(0);
+    (n / UNITS[unit], unit as u32, offset < 0)
+}
+
+/// Inverse of `span`.
+pub fn offset(amount: i64, unit: u32, before: bool) -> i64 {
+    let o = amount * UNITS[unit as usize];
+    if before { -o } else { o }
+}
+
 pub fn fields(t: i64) -> glib::DateTime {
     glib::DateTime::from_unix_utc(t).unwrap_or_else(|_| glib::DateTime::now_utc().unwrap())
 }
@@ -137,5 +156,19 @@ mod tests {
         assert!(overdue(&task("20261014T120000", false), now));
         assert_eq!(section(&task("20261016", true), now), "Friday");
         assert_eq!(section(&task("20261030", true), now), "Later");
+    }
+
+    #[test]
+    fn spans_use_the_largest_exact_unit() {
+        assert_eq!(span(-900), (15, 0, true));
+        assert_eq!(span(9 * 3600), (9, 1, false));
+        assert_eq!(span(-2 * DAY), (2, 2, true));
+        assert_eq!(span(-14 * DAY), (2, 3, true));
+        assert_eq!(span(0), (0, 0, false));
+        assert_eq!(span(90), (1, 0, false), "whole minutes");
+        for o in [-900, 32400, -54000, 0, -604800] {
+            let (a, u, b) = span(o);
+            assert_eq!(offset(a, u, b), o);
+        }
     }
 }

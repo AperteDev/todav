@@ -1624,60 +1624,98 @@ fn due_dialog(b: &gtk::Builder, t: &Task) -> impl Fn() -> TaskPatch + 'static {
     calendar.select_day(
         &glib::DateTime::from_utc(f.year(), f.month(), f.day_of_month(), 0, 0, 0.0).unwrap(),
     );
+    // The wheel over the calendar scrolls the dialog: GtkCalendar would change the month, and
+    // with it the due date, while the user only scrolls past.
+    let wheel = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::VERTICAL);
+    wheel.set_propagation_phase(gtk::PropagationPhase::Capture);
+    wheel.connect_scroll(|c, _, dy| {
+        let sw = c
+            .widget()
+            .and_then(|w| w.ancestor(gtk::ScrolledWindow::static_type()));
+        if let Some(adj) = sw
+            .and_downcast::<gtk::ScrolledWindow>()
+            .map(|s| s.vadjustment())
+        {
+            adj.set_value(adj.value() + dy * adj.step_increment().max(40.0));
+        }
+        glib::Propagation::Stop
+    });
+    calendar.add_controller(wheel);
     due.set_enable_expansion(t.due.is_some());
+    due.set_expanded(false); // enabling expands it; it opens on a click or the switch
     has_time.set_active(t.due.is_some() && !t.due_all_day);
     hour.set_value(f.hour() as f64);
     minute.set_value(f.minute() as f64);
 
-    // Reminder choices: None, the offsets for the due kind, and "Unchanged" for an alarm Todav
-    // does not offer. Values: Some(offset or None) to set, None to keep the alarm as it is.
-    let old = t.remind_at.map(|r| r - t.due.unwrap_or(r));
-    let custom = t.remind_at.is_some()
-        && (t.due.is_none()
-            || !dates::reminders(t.due_all_day)
-                .iter()
-                .any(|(_, o)| Some(*o) == old));
-    let choices: Rc<RefCell<Vec<Option<Option<i64>>>>> = Rc::default();
+    // Reminder choices: None, the offsets for the due kind, then "Custom…" with its own row.
+    // As the custom row shows it (whole minutes), so an untouched reminder is not rewritten.
+    let old = t.remind_at.map(|r| {
+        let (a, u, before) = dates::span(r - t.due.unwrap_or(r));
+        dates::offset(a, u, before)
+    });
+    let custom_row: gtk::ListBoxRow = get(b, "custom_row");
+    let amount: gtk::SpinButton = get(b, "custom_amount");
+    let unit: gtk::DropDown = get(b, "custom_unit");
+    let dir: gtk::DropDown = get(b, "custom_dir");
+    let dirs: gtk::StringList = get(b, "custom_dirs");
+    let presets: Rc<RefCell<Vec<Option<i64>>>> = Rc::default();
+    // Selected reminder: None, or seconds after the due time.
+    let picked = {
+        let (presets, reminder) = (presets.clone(), reminder.clone());
+        let (amount, unit, dir) = (amount.clone(), unit.clone(), dir.clone());
+        move || match presets.borrow().get(reminder.selected() as usize) {
+            Some(p) => *p,
+            None => Some(dates::offset(
+                amount.value() as i64,
+                unit.selected(),
+                dir.selected() == 0,
+            )),
+        }
+    };
+    // `custom`: keep the custom row for `pick` even if a preset matches it.
     let fill = {
-        let (choices, reminder) = (choices.clone(), reminder.clone());
-        move |all_day: bool, pick: Option<Option<i64>>| {
-            let mut items: Vec<(&str, Option<Option<i64>>)> = vec![("None", Some(None))];
+        let (presets, reminder) = (presets.clone(), reminder.clone());
+        let (amount, unit, dir) = (amount.clone(), unit.clone(), dir.clone());
+        move |all_day: bool, pick: Option<i64>, custom: bool| {
+            let mut items: Vec<(&str, Option<i64>)> = vec![("None", None)];
             items.extend(
                 dates::reminders(all_day)
                     .iter()
-                    .map(|(l, o)| (*l, Some(Some(*o)))),
+                    .map(|(l, o)| (*l, Some(*o))),
             );
-            if custom {
-                items.push(("Unchanged", None));
-            }
-            let labels: Vec<&str> = items.iter().map(|(l, _)| *l).collect();
+            let labels: Vec<&str> = items.iter().map(|(l, _)| *l).chain(["Custom…"]).collect();
             reminders.splice(0, reminders.n_items(), &labels);
-            // A reminder that does not fit the new kind becomes its first choice.
-            let pos = items
+            // A date alone counts from the start of its day.
+            let d = if all_day {
+                ["before the day", "into the day"]
+            } else {
+                ["before", "after"]
+            };
+            dirs.splice(0, dirs.n_items(), &d);
+            let preset = items
                 .iter()
                 .position(|(_, v)| *v == pick)
-                .unwrap_or(match pick {
-                    Some(Some(_)) => 1,
-                    _ => 0,
-                });
-            reminder.set_selected(pos as u32);
-            *choices.borrow_mut() = items.into_iter().map(|(_, v)| v).collect();
+                .filter(|_| !custom);
+            if let (None, Some(o)) = (preset, pick) {
+                let (a, u, before) = dates::span(o);
+                amount.set_value(a as f64);
+                unit.set_selected(u);
+                dir.set_selected(if before { 0 } else { 1 });
+            }
+            *presets.borrow_mut() = items.into_iter().map(|(_, v)| v).collect();
+            let custom_pos = labels.len() - 1;
+            reminder
+                .set_selected(preset.unwrap_or(if pick.is_some() { custom_pos } else { 0 }) as u32);
         }
     };
-    fill(
-        t.due_all_day || t.due.is_none(),
-        if custom { None } else { Some(old) },
-    );
-    let picked = {
-        let (choices, reminder) = (choices.clone(), reminder.clone());
-        move || {
-            choices
-                .borrow()
-                .get(reminder.selected() as usize)
-                .copied()
-                .flatten()
-        }
+    let custom = {
+        let (presets, reminder) = (presets.clone(), reminder.clone());
+        move || reminder.selected() as usize >= presets.borrow().len()
     };
+    fill(t.due_all_day || t.due.is_none(), old, false);
+    custom_row.set_visible(custom());
+    let c = custom.clone();
+    reminder.connect_selected_notify(move |_| custom_row.set_visible(c()));
 
     let read = {
         let (due, calendar, has_time) = (due.clone(), calendar.clone(), has_time.clone());
@@ -1718,7 +1756,18 @@ fn due_dialog(b: &gtk::Builder, t: &Task) -> impl Fn() -> TaskPatch + 'static {
     let p = picked.clone();
     has_time.connect_active_notify(move |h| {
         show();
-        fill(!h.is_active(), p());
+        // A custom reminder stays custom; a preset that does not fit the new kind becomes its
+        // first one.
+        let (pick, all_day) = (p(), !h.is_active());
+        let fits = dates::reminders(all_day)
+            .iter()
+            .any(|(_, o)| Some(*o) == pick);
+        let first = Some(dates::reminders(all_day)[0].1);
+        match pick {
+            Some(_) if custom() => fill(all_day, pick, true),
+            Some(_) if !fits => fill(all_day, first, false),
+            _ => fill(all_day, pick, false),
+        }
     });
 
     let old_due = t.due.map(|at| Due {
@@ -1729,12 +1778,7 @@ fn due_dialog(b: &gtk::Builder, t: &Task) -> impl Fn() -> TaskPatch + 'static {
         let new_due = read();
         TaskPatch {
             due: (new_due != old_due).then_some(new_due),
-            reminder: choices
-                .borrow()
-                .get(reminder.selected() as usize)
-                .copied()
-                .flatten()
-                .filter(|r| *r != old || new_due != old_due),
+            reminder: Some(picked()).filter(|r| *r != old || new_due != old_due),
             ..Default::default()
         }
     }
