@@ -398,7 +398,7 @@ mod tests {
     /// and patching SUMMARY changes nothing else. Skips when there are no exports.
     #[test]
     fn real_exports_round_trip() {
-        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../tmp");
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../tmp");
         let files = std::fs::read_dir(dir).into_iter().flatten().flatten();
         for f in files.filter(|f| f.path().extension().is_some_and(|e| e == "ics")) {
             let text = std::fs::read_to_string(f.path()).unwrap();

@@ -6,6 +6,8 @@ Oct 8, 2026 · @Kris
 
 Todav is a personal, local-first task list synced through Nextcloud CalDAV (VTODO) with near-instant push via WebDAV-Push (`dav_push`) and a self-hosted ntfy server. One Rust core drives four front-ends: a GTK4/libadwaita app on Linux, a GNOME Shell extension for quick preview, an Android app, and a Pebble watchapp fed by the Android app.
 
+Todav is meant to become a tasks + calendar app (VEVENT next to VTODO, same CalDAV calendars). Notes and journal go in a sibling app, [Notav](#notav-notes--journal-planned), in the same repository.
+
 **Goals**
 
 - Same lists, same behaviour, same categories on every device; changes visible on other devices within seconds.
@@ -96,34 +98,36 @@ Tasks whose category is not in config.json are grouped under "Other" at the end,
 
 ## Repository layout
 
-One monorepo, one Cargo workspace at the root, platform projects beside it.
+One monorepo, one Cargo workspace at the root. Each app has its own top-level directory with its core and front-ends; `notav/` (see [Notav](#notav-notes--journal-planned)) will sit next to `todav/`. Code both apps need moves into a shared crate at the root when Notav starts, not before.
 
 ```text
-todav/
-  Cargo.toml                 # workspace: core, cli, linux
-  core/                      # todav-core (library)
-    src/
-      lib.rs                 # public API + UniFFI exports
-      caldav/                # PROPFIND/REPORT/PUT/DELETE, XML builders + parsers
-      ical/                  # minimal VTODO reader/writer
-      store/                 # SQLite schema, migrations, queries
-      sync/                  # engine: pull (sync-token), push (dirty queue), conflicts
-      push/                  # WebDAV-Push registration, ntfy transport (Linux), message decode
-      config/                # todav/config.json fetch/parse
-      model.rs               # List, Task, Category, Change events
-    tests/                   # integration tests against docker Nextcloud
-    todav.udl                # UniFFI interface (or proc-macro exports)
-  cli/                       # todav-cli: thin debugging/scripting front-end
-  linux/
-    app/                     # GTK4 + libadwaita app (Rust, gtk4-rs)
-    data/                    # .desktop, metainfo, icons, gschema
-    flatpak/                 # io.github.<you>.Todav.json
-  gnome-extension/           # GNOME Shell extension (GJS), talks D-Bus to the Linux app
-  android/
-    app/                     # Kotlin + Jetpack Compose
-    core/                    # Gradle module: UniFFI-generated Kotlin + libtodav_core.so
-    pebble/                  # PebbleKit companion code (part of app module, separate package)
-  pebble/                    # Pebble watchapp (C, Pebble SDK)
+<repo>/
+  Cargo.toml                 # workspace: todav/core, todav/cli, todav/linux/app
+  todav/
+    core/                    # todav-core (library)
+      src/
+        lib.rs               # public API + UniFFI exports
+        caldav/              # PROPFIND/REPORT/PUT/DELETE, XML builders + parsers
+        ical/                # minimal VTODO reader/writer
+        store/               # SQLite schema, migrations, queries
+        sync/                # engine: pull (sync-token), push (dirty queue), conflicts
+        push/                # WebDAV-Push registration, ntfy transport (Linux), message decode
+        config/              # todav/config.json fetch/parse
+        model.rs             # List, Task, Category, Change events
+      tests/                 # integration tests against docker Nextcloud
+      todav.udl              # UniFFI interface (or proc-macro exports)
+    cli/                     # todav-cli: thin debugging/scripting front-end
+    linux/
+      app/                   # GTK4 + libadwaita app (Rust, gtk4-rs)
+      data/                  # .desktop, metainfo, icons, gschema
+      flatpak/               # io.github.<you>.Todav.json
+    gnome-extension/         # GNOME Shell extension (GJS), talks D-Bus to the Linux app
+    android/
+      app/                   # Kotlin + Jetpack Compose
+      core/                  # Gradle module: UniFFI-generated Kotlin + libtodav_core.so
+      pebble/                # PebbleKit companion code (part of app module, separate package)
+    pebble/                  # Pebble watchapp (C, Pebble SDK)
+  notav/                     # Notav (planned, not started)
   infra/
     docker-compose.yml       # Nextcloud + Redis + ntfy + dav_push for tests
     nextcloud-setup.sh       # occ: enable tasks, dav_push; create test user + calendars
@@ -151,7 +155,7 @@ todav/
 | FFI | `uniffi` | Kotlin bindings generated from the Rust API |
 | ntfy stream (Linux push) | — (`ureq`) | ntfy's `/<topic>/json` NDJSON stream over plain HTTP; no WebSocket crate needed |
 | Web Push decryption | `ring` (HKDF, AES-128-GCM, RNG; already pulled in by rustls) + `p256` (static-key ECDH) | `dav_push` always encrypts (RFC 8291); `ece` drags in OpenSSL, ring can't load a stored ECDH key |
-| iCalendar | hand-written in `core/ical` | Full iCal crates are large; VTODO needs \~15 properties, line folding and escaping |
+| iCalendar | hand-written in `todav/core/src/ical.rs` | Full iCal crates are large; VTODO needs \~15 properties, line folding and escaping |
 
 Anything beyond this table needs a one-line justification in the PR.
 
@@ -381,16 +385,36 @@ Today's lists use top-level tasks as category headers (e.g. "Spożywcze/gospodar
 
 Run it once after the core's `ical` module is proven on the same data (the script reuses nothing from the core on purpose, so it can run before any Rust exists).
 
+## Notav (notes + journal, planned)
+
+Not started; nothing in the code yet. Notav (*notatka* + DAV) is a sibling app for notes and an Obsidian-style journal, with the same Nextcloud/GOA integration as Todav. It is a separate app, not a Todav view: different protocol, different UI (a Markdown editor), and each app stays small enough to finish.
+
+**Decisions so far**
+
+- Name Notav, app ID `io.github.selfref.Notav`, code in `notav/` (same shape as `todav/`: core, cli, linux, …).
+- Storage: plain Markdown files in Nextcloud Files over WebDAV, so the Nextcloud Notes app and Obsidian (through the desktop sync client) can open the same folder. No proprietary format.
+- Journal: one daily note per day in a dated folder; `[[wiki links]]`, backlinks and tags are computed locally from the files.
+- Own synced settings file (`.config/notav/settings.json`), so the two apps never write the same file.
+- Shared code: when Notav starts, move what both apps need out of `todav/core` into a shared crate at the root: login (Login Flow v2, GOA), the HTTP/WebDAV client, synced settings, `json.rs`, push keys. Task and calendar logic stays in `todav/core`.
+- Cross-app: a note mentions a task with a `todav://task/<uid>` link; Todav opens it, and Notav shows its title and state through Todav's D-Bus API. No shared database.
+
+**Open questions**
+
+- [ ] Change detection for files: Nextcloud Files has no `sync-collection`; compare folder ETags (they propagate upwards) and only descend into changed folders.
+- [ ] Push for files: `dav_push` covers CalDAV/CardDAV only; check whether Nextcloud's `notify_push` (or a small app posting to ntfy) can signal file changes. Polling as the fallback, as in Todav.
+- [ ] Folder layout and name of the notes root (reuse the Nextcloud Notes folder or a separate one), daily note format, attachments.
+- [ ] Editor: GtkSourceView with Markdown highlighting vs. a rendered/WYSIWYG view.
+
 ## Progress
 
 Deviation: no docker stack (`infra/`) for now — integration runs against the real instance (`cloud.aperte.dev`, user `Test`; ntfy at `ntfy.aperte.dev`, anonymous topics). Credentials live in a gitignored `.env`.
 
 - [x] Cargo workspace (`core`, `cli`)
-- [x] `core/src/ical.rs` — VTODO reader/writer, folding, escaping, unknown props + VALARM preserved (unit tests)
-- [x] `core/src/caldav.rs` — XML tree, multistatus, discovery, `sync-collection` (incl. empty-token full sync), PUT/DELETE/GET with preconditions
-- [x] `core/src/store.rs` — schema + migrations by `user_version`
-- [x] `core/src/sync.rs` — push dirty queue, pull, conflict rule (unit test), `sync_topic`
-- [x] `core/src/push.rs` — p256dh keys in `kv`, registration/refresh/unregister, aes128gcm decryption, ntfy JSON-stream listener
+- [x] `todav/core/src/ical.rs` — VTODO reader/writer, folding, escaping, unknown props + VALARM preserved (unit tests)
+- [x] `todav/core/src/caldav.rs` — XML tree, multistatus, discovery, `sync-collection` (incl. empty-token full sync), PUT/DELETE/GET with preconditions
+- [x] `todav/core/src/store.rs` — schema + migrations by `user_version`
+- [x] `todav/core/src/sync.rs` — push dirty queue, pull, conflict rule (unit test), `sync_topic`
+- [x] `todav/core/src/push.rs` — p256dh keys in `kv`, registration/refresh/unregister, aes128gcm decryption, ntfy JSON-stream listener
 - [x] `todav` CLI: `lists`, `ls`, `add`, `done`, `undo`, `rm`, `sync`, `push-register`, `listen`
 - [x] Auth: server is behind Authelia, so DAV needs an app password (in `.env`). Test user has task lists `Shopping` and `Work` (created via MKCALENDAR)
 - [x] CLI round-trip against the server (add, done, edit on server → pull)
@@ -402,10 +426,10 @@ Deviation: no docker stack (`infra/`) for now — integration runs against the r
 - [x] Core: Login Flow v2 (`login_flow_start/poll`), `logout`, `setting/set_setting`; hand-written `json.rs` (no serde)
 - [x] Integration fixture reuses `it-<name>` calendars (Nextcloud rate-limits MKCALENDAR: 10/h per user) — verified
 - [ ] M3 migration script
-- [x] M4 Linux app (`linux/app`): login via browser (Login Flow v2), app password in Secret Service (libsecret), lists sidebar, grouped tasks, add with category (Ctrl+K), tick, delete, edit dialog, Done expander, F5/Ctrl+Q, hide on close, `--gapplication-service`, sync worker + ntfy listener + 60 s/30 min fallback timer, D-Bus API. `make -C linux install` (desktop file, D-Bus activation, autostart). No GSettings: settings live in the core's kv. Verified via Broadway + D-Bus
-- [x] Drag-and-drop reorder, app icon (`linux/data/*.svg`, also the extension's panel icon)
+- [x] M4 Linux app (`todav/linux/app`): login via browser (Login Flow v2), app password in Secret Service (libsecret), lists sidebar, grouped tasks, add with category (Ctrl+K), tick, delete, edit dialog, Done expander, F5/Ctrl+Q, hide on close, `--gapplication-service`, sync worker + ntfy listener + 60 s/30 min fallback timer, D-Bus API. `make -C todav/linux install` (desktop file, D-Bus activation, autostart). No GSettings: settings live in the core's kv. Verified via Broadway + D-Bus
+- [x] Drag-and-drop reorder, app icon (`todav/linux/data/*.svg`, also the extension's panel icon)
 - [ ] M4 leftovers: undo for delete, Flatpak
-- [x] M5 GNOME extension (`gnome-extension/`, ESM, Shell 48–51): pinned list, category sections, tick keeps menu open, add entry, list switcher, open app, warning on sync error. `make -C gnome-extension install`. Verified in a nested headless Shell
+- [x] M5 GNOME extension (`todav/gnome-extension/`, ESM, Shell 48–51): pinned list, category sections, tick keeps menu open, add entry, list switcher, open app, warning on sync error. `make -C todav/gnome-extension install`. Verified in a nested headless Shell
 - [ ] M6 Android (+ UniFFI exports) → M7 Pebble
 - [ ] Non-functional (last): README, `docs/`, CI, Flatpak
 
@@ -427,7 +451,7 @@ Each milestone ends with something you can use daily; nothing is started before 
 
 ## Open questions and risks
 
-- [x] **dav\_push encryption** — resolved: `dav_push` (v1.0.3) *requires* `subscription-public-key type="p256dh"` + `auth-secret` and always sends aes128gcm. Namespace is `https://bitfire.at/webdav-push` (props `transports`, `topic`), registration is `POST <calendar>` with `push-register`, `201` + `Location`, max expiry 1 week, unregister = `DELETE <Location>`, echo suppression via `Push-Dont-Notify: "<Location>"`. Implemented in `core/src/push.rs`, verified against the RFC 8291 test vector. Original note: the WebDAV-Push draft leaves RFC 8291 message encryption as TODO, while DAVx5 states its pushes are end-to-end encrypted. Before writing `core/push`, read `nc_ext_dav_push`'s registration handler and capture one real DAVx5 ↔ Nextcloud exchange (dav\_push debug log). If keys are required: add `client-public-key`/`auth-secret` to the registration XML, generate P-256 keys in the core, store them in `kv`, and pull in `ece`. If not: skip encryption on this private server and note it in `docs/PUSH.md`.
+- [x] **dav\_push encryption** — resolved: `dav_push` (v1.0.3) *requires* `subscription-public-key type="p256dh"` + `auth-secret` and always sends aes128gcm. Namespace is `https://bitfire.at/webdav-push` (props `transports`, `topic`), registration is `POST <calendar>` with `push-register`, `201` + `Location`, max expiry 1 week, unregister = `DELETE <Location>`, echo suppression via `Push-Dont-Notify: "<Location>"`. Implemented in `todav/core/src/push.rs`, verified against the RFC 8291 test vector. Original note: the WebDAV-Push draft leaves RFC 8291 message encryption as TODO, while DAVx5 states its pushes are end-to-end encrypted. Before writing `core/push`, read `nc_ext_dav_push`'s registration handler and capture one real DAVx5 ↔ Nextcloud exchange (dav\_push debug log). If keys are required: add `client-public-key`/`auth-secret` to the registration XML, generate P-256 keys in the core, store them in `kv`, and pull in `ece`. If not: skip encryption on this private server and note it in `docs/PUSH.md`.
 - [ ] **dav\_push stability**: app-store build may lag GitHub; pin a git commit in `infra/` and in the server. Fallback if it misbehaves: a 50-line Nextcloud app that listens to `CalendarObject{Created,Updated,Deleted}Event` and `POST`s the topic to ntfy directly (the core's listener code stays identical).
 - [ ] **ntfy topic security**: topics must be random (22+ chars) and the ntfy server should have ACLs so only the owner can subscribe; the Linux app authenticates with an ntfy token stored in the Secret Service.
 - [ ] **Pebble SDK toolchain**: confirm the current open-source SDK builds for the user's watch model and that the Core Devices Pebble app forwards PebbleKit intents; otherwise fall back to the legacy Pebble app for the companion test.

@@ -5,7 +5,7 @@
 set -eu
 
 uuid=todav@selfref.dev
-app=$(dirname "$0")/../target/debug/todav-linux
+app=$(dirname "$0")/../../target/debug/todav-linux
 display=todav-nested
 
 if [ -z "${DBUS_RUN_SESSION:-}" ]; then

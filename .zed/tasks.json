@@ -34,7 +34,7 @@
   {
     "label": "linux: run in browser (Broadway)",
     // In make, not here: Zed runs commands through the user's shell (fish), not sh.
-    "command": "make -C linux broadway",
+    "command": "make -C todav/linux broadway",
     "use_new_terminal": false,
     "allow_concurrent_runs": false,
     "reveal": "always"
@@ -42,14 +42,14 @@
   {
     "label": "linux: run in sandbox",
     // Own data and keyring entries, next to the normal app: for testing other connections.
-    "command": "make -C linux sandbox",
+    "command": "make -C todav/linux sandbox",
     "use_new_terminal": false,
     "allow_concurrent_runs": false,
     "reveal": "always"
   },
   {
     "label": "linux: reset sandbox",
-    "command": "make -C linux sandbox-reset",
+    "command": "make -C todav/linux sandbox-reset",
     "use_new_terminal": false,
     "reveal": "no_focus",
     "hide": "on_success"
@@ -66,7 +66,7 @@
   {
     "label": "extension: link into GNOME Shell",
     // Symlinks the source dir; changes load on the next shell start (log out/in on Wayland).
-    "command": "make -C gnome-extension link",
+    "command": "make -C todav/gnome-extension link",
     "use_new_terminal": false,
     "reveal": "no_focus",
     "hide": "on_success"
@@ -74,7 +74,7 @@
   {
     "label": "extension: run in nested shell",
     // Separate session bus, so it uses the dev app build even if Todav is installed or running.
-    "command": "cargo build -p todav-linux && make -C gnome-extension nested",
+    "command": "cargo build -p todav-linux && make -C todav/gnome-extension nested",
     "use_new_terminal": false,
     "allow_concurrent_runs": false,
     "reveal": "always"
