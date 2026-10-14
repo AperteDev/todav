@@ -372,18 +372,7 @@ The watch is a remote control for the phone's local database: it never talks to 
 
 ## Migration of existing tasks
 
-Today's lists use top-level tasks as category headers (e.g. "Spożywcze/gospodarcze", "Do mieszkania") with the real items as subtasks, and some headers are duplicated. A one-off script turns headers into `CATEGORIES` and removes them.
-
-`scripts/migrate-categories.py` (stdlib only: `urllib`, `xml.etree`, `uuid`):
-
-1. Discover calendars; for each, `calendar-query` all VTODO, parse `UID`, `SUMMARY`, `RELATED-TO`, `STATUS`.
-2. A task is a header if it has at least one child and is itself not a child. Normalise its summary (trim, case-fold, collapse `/` and whitespace) → category name; merge duplicates ("Spożywcze/gospodarcze" and "Spożywcze/Gospodarcze" → one).
-3. For each child: set `CATEGORIES:<name>`, drop its `RELATED-TO` to the header, `PUT` with `If-Match`.
-4. `DELETE` the header. Headers with no children are kept as ordinary tasks (they may be real to-dos) unless listed in `--drop-empty`.
-5. Write the discovered categories into `todav/config.json` in the order they appeared.
-6. `--dry-run` prints the plan; the real run writes a backup of every touched `.ics` to `./backup/<calendar>/<uid>.ics` first.
-
-Run it once after the core's `ical` module is proven on the same data (the script reuses nothing from the core on purpose, so it can run before any Rust exists).
+Dropped: existing tasks are rewritten by hand into categories.
 
 ## Notav (notes + journal, planned)
 
@@ -442,7 +431,7 @@ Each milestone ends with something you can use daily; nothing is started before 
 | 0 | Infra | `docker compose up` in `infra/` gives Nextcloud + Tasks + dav\_push + ntfy; `nextcloud-setup.sh` seeds a user and three lists; a push from a web edit reaches `test_client`-style listener |
 | 1 | Core read/write | `todav-cli ls/add/done/sync` round-trips against the docker stack; `ical` round-trip tests pass on exports from Nextcloud Tasks, Tasks.org, Errands |
 | 2 | Core push | `todav-cli listen` registers WebDAV-Push with an ntfy topic and syncs within 5 s of a web edit; registration refresh works across expiry |
-| 3 | Migration | Script run in dry-run on the real account shows the expected plan; real run done; Nextcloud Tasks web shows categories as tags |
+| 3 | Migration | Dropped: tasks are rewritten by hand |
 | 4 | Linux app | GTK app replaces Errands for daily use; survives window close; D-Bus interface answers `GetTasks`; Flatpak builds |
 | 5 | GNOME extension | Popup shows the pinned list, ticks and adds; count label updates on `Changed` |
 | 6 | Android app | Replaces Tasks.org for daily use; UnifiedPush via ntfy delivers in background; widget works |
