@@ -28,6 +28,15 @@ CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT);
 ALTER TABLE tasks ADD COLUMN due_all_day INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE tasks ADD COLUMN remind_at INTEGER;
 "#,
+    r#"
+CREATE TABLE alarms (
+  uid TEXT NOT NULL REFERENCES tasks(uid) ON DELETE CASCADE,
+  at INTEGER NOT NULL                   -- local time, see `to_local`
+);
+CREATE INDEX alarms_uid ON alarms(uid);
+CREATE INDEX alarms_at ON alarms(at);
+ALTER TABLE tasks DROP COLUMN remind_at;
+"#,
 ];
 
 pub const CLEAN: i64 = 0;
@@ -44,8 +53,9 @@ pub fn open(path: &str) -> Result<Connection> {
         tx.pragma_update(None, "user_version", i as i64 + 1)?;
         tx.commit()?;
     }
-    if version == 1 {
-        rederive(&db)?; // `due` became local time; all-day and reminders are new
+    // Derived columns changed since version 1: `due` became local time, reminders are new.
+    if version > 0 && (version as usize) < MIGRATIONS.len() {
+        rederive(&db)?;
     }
     Ok(db)
 }
@@ -103,21 +113,26 @@ fn local_time(db: &Connection, l: Option<&Line>) -> Result<Option<(i64, bool)>> 
     }))
 }
 
-/// When the first alarm goes off, in local time: an absolute TRIGGER, or one relative to DUE
+/// When each alarm goes off, in local time: an absolute TRIGGER, or one relative to DUE
 /// (RELATED=END) or DTSTART (the default; DUE when there is no DTSTART).
-fn remind_at(db: &Connection, cal: &Calendar, due: Option<i64>) -> Result<Option<i64>> {
-    let Some(t) = cal.alarm_trigger() else {
-        return Ok(None);
-    };
-    if let Some(d) = ical::parse_duration(&t.value) {
-        let end = t
-            .param("RELATED")
-            .is_some_and(|r| r.eq_ignore_ascii_case("END"));
-        let start = local_time(db, cal.prop("DTSTART"))?.map(|(s, _)| s);
-        let base = if end { due } else { start.or(due) };
-        return Ok(base.map(|b| b + d));
+fn alarm_times(db: &Connection, cal: &Calendar, due: Option<i64>) -> Result<Vec<i64>> {
+    let start = local_time(db, cal.prop("DTSTART"))?.map(|(s, _)| s);
+    let mut out = Vec::new();
+    for t in cal.alarm_triggers() {
+        let at = match ical::parse_duration(&t.value) {
+            Some(d) => {
+                let end = t
+                    .param("RELATED")
+                    .is_some_and(|r| r.eq_ignore_ascii_case("END"));
+                let base = if end { due } else { start.or(due) };
+                base.map(|b| b + d)
+            }
+            None => local_time(db, Some(t))?.map(|(t, _)| t),
+        };
+        out.extend(at);
     }
-    Ok(local_time(db, Some(t))?.map(|(t, _)| t))
+    out.sort();
+    Ok(out)
 }
 
 pub fn kv_get(db: &Connection, key: &str) -> Result<Option<String>> {
@@ -152,7 +167,9 @@ pub fn lists(db: &Connection) -> Result<Vec<List>> {
     Ok(rows.collect::<rusqlite::Result<_>>()?)
 }
 
-const TASK_COLS: &str = "uid, list_href, summary, description, status, completed_at, category, parent_uid, priority, due, due_all_day, remind_at, sort_order, created, last_modified";
+const TASK_COLS: &str = "uid, list_href, summary, description, status, completed_at, category, parent_uid, priority, due, due_all_day,
+  (SELECT group_concat(at) FROM (SELECT at FROM alarms a WHERE a.uid = tasks.uid ORDER BY at)),
+  sort_order, created, last_modified";
 
 fn task_row(r: &rusqlite::Row) -> rusqlite::Result<Task> {
     let status: String = r.get(4)?;
@@ -169,7 +186,12 @@ fn task_row(r: &rusqlite::Row) -> rusqlite::Result<Task> {
         priority: r.get(8)?,
         due: r.get(9)?,
         due_all_day: r.get(10)?,
-        remind_at: r.get(11)?,
+        reminders: r
+            .get::<_, Option<String>>(11)?
+            .unwrap_or_default()
+            .split(',')
+            .filter_map(|v| v.parse().ok())
+            .collect(),
         sort_order: r.get(12)?,
         created: r.get(13)?,
         last_modified: r.get(14)?,
@@ -197,12 +219,13 @@ pub fn upcoming(db: &Connection) -> Result<Vec<Task>> {
     Ok(rows.collect::<rusqlite::Result<_>>()?)
 }
 
-/// Open tasks whose reminder goes off after `from` and at `to` at the latest (local times).
+/// Open tasks with a reminder going off after `from` and at `to` at the latest (local times).
 pub fn reminders(db: &Connection, from: i64, to: i64) -> Result<Vec<Task>> {
     let mut st = db.prepare(&format!(
-        "SELECT {TASK_COLS} FROM tasks WHERE dirty != 2 AND remind_at > ?1 AND remind_at <= ?2
+        "SELECT {TASK_COLS} FROM tasks WHERE dirty != 2
+           AND uid IN (SELECT uid FROM alarms WHERE at > ?1 AND at <= ?2)
            AND status NOT IN ('COMPLETED', 'CANCELLED')
-         ORDER BY remind_at"
+         ORDER BY due"
     ))?;
     let rows = st.query_map([from, to], task_row)?;
     Ok(rows.collect::<rusqlite::Result<_>>()?)
@@ -279,12 +302,12 @@ pub fn save(
     let uid = cal.text("UID").unwrap_or_default();
     let status = cal.text("STATUS").unwrap_or_else(|| "NEEDS-ACTION".into());
     let due = local_time(db, cal.prop("DUE"))?;
-    let remind = remind_at(db, cal, due.map(|(d, _)| d))?;
+    let alarms = alarm_times(db, cal, due.map(|(d, _)| d))?;
     db.execute(
         "INSERT OR REPLACE INTO tasks (uid, list_href, etag, href, raw_ics, summary, description, status,
            completed_at, category, parent_uid, priority, due, sort_order, created, last_modified, dirty,
-           due_all_day, remind_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)",
+           due_all_day)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
         params![
             uid,
             list_href,
@@ -306,9 +329,15 @@ pub fn save(
             cal.time("LAST-MODIFIED"),
             dirty,
             due.is_some_and(|(_, all_day)| all_day),
-            remind,
         ],
     )?;
+    db.execute("DELETE FROM alarms WHERE uid = ?", [&uid])?;
+    for at in alarms {
+        db.execute(
+            "INSERT INTO alarms (uid, at) VALUES (?, ?)",
+            params![uid, at],
+        )?;
+    }
     Ok(uid)
 }
 

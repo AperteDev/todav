@@ -224,24 +224,30 @@ impl Calendar {
             .filter(|v| !v.is_empty())
     }
 
-    /// TRIGGER of the VTODO's first VALARM.
-    pub fn alarm_trigger(&self) -> Option<&Line> {
-        let (b, e) = self.todo_range()?;
+    /// TRIGGER of each VALARM in the VTODO.
+    pub fn alarm_triggers(&self) -> Vec<&Line> {
+        let Some((b, e)) = self.todo_range() else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
         let mut in_alarm = false;
         for l in &self.lines[b + 1..e] {
             match l.name.as_str() {
                 "BEGIN" | "END" if l.value.eq_ignore_ascii_case("VALARM") => {
                     in_alarm = l.name == "BEGIN"
                 }
-                "TRIGGER" if in_alarm => return Some(l),
+                "TRIGGER" if in_alarm => {
+                    out.push(l);
+                    in_alarm = false; // one trigger per alarm
+                }
                 _ => {}
             }
         }
-        None
+        out
     }
 
-    /// Replace every VALARM with one display alarm at `trigger` (params, raw value), or none.
-    pub fn set_alarm(&mut self, trigger: Option<(&str, &str)>) {
+    /// Replace every VALARM with one display alarm per trigger (params, raw value).
+    pub fn set_alarms(&mut self, triggers: &[(&str, &str)]) {
         let (b, mut e) = self.todo_range().unwrap();
         let mut i = b + 1;
         while i < e {
@@ -257,9 +263,6 @@ impl Calendar {
                 i += 1;
             }
         }
-        let Some((params, value)) = trigger else {
-            return;
-        };
         let summary = self
             .prop("SUMMARY")
             .map_or(String::new(), |l| l.value.clone());
@@ -268,14 +271,17 @@ impl Calendar {
             params: params.into(),
             value: value.into(),
         };
-        let alarm = [
-            line("BEGIN", "", "VALARM"),
-            line("ACTION", "", "DISPLAY"),
-            line("DESCRIPTION", "", &summary),
-            line("TRIGGER", params, value),
-            line("END", "", "VALARM"),
-        ];
-        self.lines.splice(e..e, alarm);
+        let alarms = triggers.iter().flat_map(|(params, value)| {
+            [
+                line("BEGIN", "", "VALARM"),
+                line("ACTION", "", "DISPLAY"),
+                line("DESCRIPTION", "", &summary),
+                line("TRIGGER", params, value),
+                line("END", "", "VALARM"),
+            ]
+        });
+        let alarms: Vec<Line> = alarms.collect();
+        self.lines.splice(e..e, alarms);
     }
 }
 
@@ -556,21 +562,24 @@ mod tests {
     }
 
     #[test]
-    fn set_alarm_replaces_every_alarm() {
+    fn set_alarms_replaces_every_alarm() {
         let mut c = Calendar::parse(SAMPLE).unwrap();
-        assert_eq!(c.alarm_trigger().unwrap().value, "-PT15M");
-        c.set_alarm(Some((";RELATED=END", "-PT1H")));
+        let values = |c: &Calendar| {
+            c.alarm_triggers()
+                .iter()
+                .map(|t| t.value.clone())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(values(&c), ["-PT15M"]);
+        c.set_alarms(&[(";RELATED=END", "-PT1H"), (";RELATED=END", "PT0S")]);
         let c = Calendar::parse(&c.to_ics()).unwrap();
-        let t = c.alarm_trigger().unwrap();
-        assert_eq!(
-            (t.param("RELATED"), t.value.as_str()),
-            (Some("END"), "-PT1H")
-        );
-        assert_eq!(c.to_ics().matches("BEGIN:VALARM").count(), 1);
+        assert_eq!(values(&c), ["-PT1H", "PT0S"]);
+        assert_eq!(c.alarm_triggers()[0].param("RELATED"), Some("END"));
+        assert_eq!(c.to_ics().matches("BEGIN:VALARM").count(), 2);
         assert!(c.to_ics().contains("END:VALARM\r\nEND:VTODO"));
         let mut c = c;
-        c.set_alarm(None);
-        assert!(c.alarm_trigger().is_none() && !c.to_ics().contains("VALARM"));
+        c.set_alarms(&[]);
+        assert!(c.alarm_triggers().is_empty() && !c.to_ics().contains("VALARM"));
         assert_eq!(c.text("UID").unwrap(), "abc-123");
     }
 

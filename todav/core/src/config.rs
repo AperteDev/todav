@@ -356,7 +356,7 @@ mod tests {
             priority: None,
             due: None,
             due_all_day: false,
-            remind_at: None,
+            reminders: Vec::new(),
             sort_order: None,
             created: None,
             last_modified: None,
