@@ -4,6 +4,7 @@ mod connection;
 mod dates;
 mod dbus;
 mod goa;
+mod reminders;
 mod settings;
 mod window;
 

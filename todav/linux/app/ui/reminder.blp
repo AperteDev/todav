@@ -1,0 +1,50 @@
+using Gtk 4.0;
+using Adw 1;
+
+// One reminder in the edit dialog: its choice, and the time span when it is "Custom…".
+Adw.ComboRow choice {
+  title: "Remind";
+  model: Gtk.StringList choices {};
+
+  [suffix]
+  Gtk.Button remove {
+    icon-name: "user-trash-symbolic";
+    tooltip-text: "Remove Reminder";
+    valign: center;
+    styles ["flat"]
+  }
+}
+
+Gtk.ListBoxRow custom {
+  activatable: false;
+  visible: false;
+
+  Gtk.Box {
+    halign: center;
+    spacing: 6;
+    margin-top: 8;
+    margin-bottom: 8;
+    margin-start: 8;
+    margin-end: 8;
+
+    Gtk.SpinButton amount {
+      valign: center;
+      numeric: true;
+      adjustment: Gtk.Adjustment {
+        lower: 0;
+        upper: 999;
+        step-increment: 1;
+      };
+    }
+
+    Gtk.DropDown unit {
+      valign: center;
+      model: Gtk.StringList { strings ["minutes", "hours", "days", "weeks"] };
+    }
+
+    Gtk.DropDown dir {
+      valign: center;
+      model: Gtk.StringList dirs {};
+    }
+  }
+}

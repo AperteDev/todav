@@ -73,43 +73,16 @@ Adw.AlertDialog dialog {
         }
       }
 
-      Adw.ComboRow reminder {
-        title: "Reminder";
-        model: Gtk.StringList reminders {};
-      }
+      // Each reminder adds its rows (ui/reminder.blp) after this one.
+      Adw.ActionRow reminders_header {
+        title: "Reminders";
 
-      // Shown for the "Custom…" reminder.
-      Gtk.ListBoxRow custom_row {
-        activatable: false;
-        visible: false;
-
-        Gtk.Box {
-          halign: center;
-          spacing: 6;
-          margin-top: 8;
-          margin-bottom: 8;
-          margin-start: 8;
-          margin-end: 8;
-
-          Gtk.SpinButton custom_amount {
-            valign: center;
-            numeric: true;
-            adjustment: Gtk.Adjustment {
-              lower: 0;
-              upper: 999;
-              step-increment: 1;
-            };
-          }
-
-          Gtk.DropDown custom_unit {
-            valign: center;
-            model: Gtk.StringList { strings ["minutes", "hours", "days", "weeks"] };
-          }
-
-          Gtk.DropDown custom_dir {
-            valign: center;
-            model: Gtk.StringList custom_dirs {};
-          }
+        [suffix]
+        Gtk.Button add_reminder {
+          icon-name: "list-add-symbolic";
+          tooltip-text: "Add Reminder";
+          valign: center;
+          styles ["flat"]
         }
       }
     }

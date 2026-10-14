@@ -1609,8 +1609,6 @@ fn due_dialog(b: &gtk::Builder, t: &Task) -> impl Fn() -> TaskPatch + 'static {
     let calendar: gtk::Calendar = get(b, "calendar");
     let has_time: adw::SwitchRow = get(b, "has_time");
     let (hour, minute): (gtk::SpinButton, gtk::SpinButton) = (get(b, "hour"), get(b, "minute"));
-    let reminder: adw::ComboRow = get(b, "reminder");
-    let reminders: gtk::StringList = get(b, "reminders");
     for spin in [&hour, &minute] {
         spin.connect_output(|s| {
             s.set_text(&format!("{:02}", s.value() as i64));
@@ -1647,75 +1645,24 @@ fn due_dialog(b: &gtk::Builder, t: &Task) -> impl Fn() -> TaskPatch + 'static {
     hour.set_value(f.hour() as f64);
     minute.set_value(f.minute() as f64);
 
-    // Reminder choices: None, the offsets for the due kind, then "Custom…" with its own row.
-    // As the custom row shows it (whole minutes), so an untouched reminder is not rewritten.
-    let old = t.remind_at.map(|r| {
-        let (a, u, before) = dates::span(r - t.due.unwrap_or(r));
-        dates::offset(a, u, before)
-    });
-    let custom_row: gtk::ListBoxRow = get(b, "custom_row");
-    let amount: gtk::SpinButton = get(b, "custom_amount");
-    let unit: gtk::DropDown = get(b, "custom_unit");
-    let dir: gtk::DropDown = get(b, "custom_dir");
-    let dirs: gtk::StringList = get(b, "custom_dirs");
-    let presets: Rc<RefCell<Vec<Option<i64>>>> = Rc::default();
-    // Selected reminder: None, or seconds after the due time.
-    let picked = {
-        let (presets, reminder) = (presets.clone(), reminder.clone());
-        let (amount, unit, dir) = (amount.clone(), unit.clone(), dir.clone());
-        move || match presets.borrow().get(reminder.selected() as usize) {
-            Some(p) => *p,
-            None => Some(dates::offset(
-                amount.value() as i64,
-                unit.selected(),
-                dir.selected() == 0,
-            )),
-        }
-    };
-    // `custom`: keep the custom row for `pick` even if a preset matches it.
-    let fill = {
-        let (presets, reminder) = (presets.clone(), reminder.clone());
-        let (amount, unit, dir) = (amount.clone(), unit.clone(), dir.clone());
-        move |all_day: bool, pick: Option<i64>, custom: bool| {
-            let mut items: Vec<(&str, Option<i64>)> = vec![("None", None)];
-            items.extend(
-                dates::reminders(all_day)
-                    .iter()
-                    .map(|(l, o)| (*l, Some(*o))),
-            );
-            let labels: Vec<&str> = items.iter().map(|(l, _)| *l).chain(["Custom…"]).collect();
-            reminders.splice(0, reminders.n_items(), &labels);
-            // A date alone counts from the start of its day.
-            let d = if all_day {
-                ["before the day", "into the day"]
-            } else {
-                ["before", "after"]
-            };
-            dirs.splice(0, dirs.n_items(), &d);
-            let preset = items
+    // Seconds after the due time, as the rows show them (whole minutes), so untouched
+    // reminders are not rewritten.
+    let old: Vec<i64> = t
+        .due
+        .map(|d| {
+            let mut o: Vec<i64> = t
+                .reminders
                 .iter()
-                .position(|(_, v)| *v == pick)
-                .filter(|_| !custom);
-            if let (None, Some(o)) = (preset, pick) {
-                let (a, u, before) = dates::span(o);
-                amount.set_value(a as f64);
-                unit.set_selected(u);
-                dir.set_selected(if before { 0 } else { 1 });
-            }
-            *presets.borrow_mut() = items.into_iter().map(|(_, v)| v).collect();
-            let custom_pos = labels.len() - 1;
-            reminder
-                .set_selected(preset.unwrap_or(if pick.is_some() { custom_pos } else { 0 }) as u32);
-        }
-    };
-    let custom = {
-        let (presets, reminder) = (presets.clone(), reminder.clone());
-        move || reminder.selected() as usize >= presets.borrow().len()
-    };
-    fill(t.due_all_day || t.due.is_none(), old, false);
-    custom_row.set_visible(custom());
-    let c = custom.clone();
-    reminder.connect_selected_notify(move |_| custom_row.set_visible(c()));
+                .map(|r| {
+                    let (a, u, before) = dates::span(r - d);
+                    dates::offset(a, u, before)
+                })
+                .collect();
+            o.dedup();
+            o
+        })
+        .unwrap_or_default();
+    let reminders = crate::reminders::Reminders::new(b, t.due_all_day || t.due.is_none(), &old);
 
     let read = {
         let (due, calendar, has_time) = (due.clone(), calendar.clone(), has_time.clone());
@@ -1753,21 +1700,10 @@ fn due_dialog(b: &gtk::Builder, t: &Task) -> impl Fn() -> TaskPatch + 'static {
     hour.connect_value_changed(move |_| s());
     let s = show.clone();
     minute.connect_value_changed(move |_| s());
-    let p = picked.clone();
+    let r = reminders.clone();
     has_time.connect_active_notify(move |h| {
         show();
-        // A custom reminder stays custom; a preset that does not fit the new kind becomes its
-        // first one.
-        let (pick, all_day) = (p(), !h.is_active());
-        let fits = dates::reminders(all_day)
-            .iter()
-            .any(|(_, o)| Some(*o) == pick);
-        let first = Some(dates::reminders(all_day)[0].1);
-        match pick {
-            Some(_) if custom() => fill(all_day, pick, true),
-            Some(_) if !fits => fill(all_day, first, false),
-            _ => fill(all_day, pick, false),
-        }
+        r.set_all_day(!h.is_active());
     });
 
     let old_due = t.due.map(|at| Due {
@@ -1778,7 +1714,7 @@ fn due_dialog(b: &gtk::Builder, t: &Task) -> impl Fn() -> TaskPatch + 'static {
         let new_due = read();
         TaskPatch {
             due: (new_due != old_due).then_some(new_due),
-            reminder: Some(picked()).filter(|r| *r != old || new_due != old_due),
+            reminders: Some(reminders.offsets()).filter(|r| *r != old || new_due != old_due),
             ..Default::default()
         }
     }
@@ -1802,7 +1738,7 @@ pub(crate) mod tests {
             priority: None,
             due: None,
             due_all_day: false,
-            remind_at: None,
+            reminders: Vec::new(),
             sort_order: None,
             created: None,
             last_modified: None,

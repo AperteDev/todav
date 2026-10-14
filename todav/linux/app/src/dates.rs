@@ -118,7 +118,7 @@ pub fn tag(t: &Task, now: i64) -> Option<gtk::Box> {
         .valign(gtk::Align::Center)
         .build();
     b.add_css_class("tag");
-    if t.remind_at.is_some() {
+    if !t.reminders.is_empty() {
         b.append(&gtk::Image::from_icon_name("alarm-symbolic"));
     }
     b.append(&gtk::Label::new(Some(&label(at, t.due_all_day, now))));
