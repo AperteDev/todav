@@ -1,6 +1,7 @@
 //! Todav for Linux: GTK UI + background service (sync worker, ntfy push listener, D-Bus API).
 
 mod connection;
+mod dates;
 mod dbus;
 mod goa;
 mod settings;
@@ -293,6 +294,12 @@ pub fn start_background() {
 
     restart_push();
 
+    notify_reminders();
+    glib::timeout_add_seconds_local(30, || {
+        notify_reminders();
+        glib::ControlFlow::Continue
+    });
+
     // Safety net for lost pushes: every minute while the window is focused, every 30 min otherwise.
     let mut ticks = 0u32;
     glib::timeout_add_seconds_local(60, move || {
@@ -302,6 +309,35 @@ pub fn start_background() {
         }
         glib::ControlFlow::Continue
     });
+}
+
+/// Notify about reminders that went off since the last check: at most a day back, so a device
+/// that was off does not replay old ones.
+fn notify_reminders() {
+    let Some(app) = gio::Application::default() else {
+        return;
+    };
+    let now = core().local_now();
+    let from = core()
+        .setting("reminded_until".into())
+        .and_then(|v| v.parse::<i64>().ok())
+        .unwrap_or(now)
+        .max(now - 86400);
+    for t in core().reminders(from, now) {
+        let n = gio::Notification::new(&t.summary);
+        if let Some(d) = t.due {
+            n.set_body(Some(&format!(
+                "Due {}",
+                dates::label(d, t.due_all_day, now)
+            )));
+        }
+        n.set_default_action_and_target_value("app.show-list", Some(&t.list_href.to_variant()));
+        n.add_button_with_target_value("Mark as Done", "app.complete", Some(&t.uid.to_variant()));
+        app.send_notification(Some(&format!("reminder-{}", t.uid)), &n);
+    }
+    if from != now {
+        let _ = core().set_setting("reminded_until".into(), now.to_string());
+    }
 }
 
 /// The Flatpak cannot reach the host's autostart folder: ask the Background portal to start the

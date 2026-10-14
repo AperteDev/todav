@@ -18,6 +18,66 @@ Adw.AlertDialog dialog {
     Adw.EntryRow description {
       title: "Note";
     }
+
+    Adw.ExpanderRow due {
+      title: "Due Date";
+      show-enable-switch: true;
+      enable-expansion: false;
+
+      Gtk.ListBoxRow {
+        activatable: false;
+
+        Gtk.Calendar calendar {
+          margin-top: 6;
+          margin-bottom: 6;
+          margin-start: 6;
+          margin-end: 6;
+        }
+      }
+
+      Adw.SwitchRow has_time {
+        title: "Time";
+      }
+
+      Adw.ActionRow time_row {
+        title: "At";
+        visible: bind has_time.active;
+
+        [suffix]
+        Gtk.SpinButton hour {
+          valign: center;
+          numeric: true;
+          wrap: true;
+          adjustment: Gtk.Adjustment {
+            lower: 0;
+            upper: 23;
+            step-increment: 1;
+          };
+        }
+
+        [suffix]
+        Gtk.Label {
+          label: ":";
+        }
+
+        [suffix]
+        Gtk.SpinButton minute {
+          valign: center;
+          numeric: true;
+          wrap: true;
+          adjustment: Gtk.Adjustment {
+            lower: 0;
+            upper: 59;
+            step-increment: 5;
+          };
+        }
+      }
+
+      Adw.ComboRow reminder {
+        title: "Reminder";
+        model: Gtk.StringList reminders {};
+      }
+    }
   };
 
   responses [

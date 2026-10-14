@@ -1,13 +1,13 @@
 //! Main window: login page, list sidebar, grouped task page.
 
-use crate::{Event, core, request_sync};
+use crate::{Event, core, dates, request_sync};
 use adw::prelude::*;
 use gtk::{gio, glib};
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use todav_core::{CategoryGroup, Sort, Task, TaskPatch};
+use todav_core::{CategoryGroup, Due, Sort, Task, TaskPatch};
 
 /// Libadwaita only styles plain buttons as pills; round the ends of the sign-in split button to match.
 /// The category section header turns its arrow like an expander row, without a "pressed" look.
@@ -24,6 +24,8 @@ splitbutton.pill > menubutton > button { padding: 10px 16px 10px 12px; border-ra
 row.task-done > box.header > box.title > label.title,
 row.expander.task-done > box > list > row.header > box.header > box.title > label.title { text-decoration-line: line-through; opacity: 0.55; }
 .tag { padding: 2px 10px; border-radius: 9999px; font-size: smaller; color: @accent_color; background: alpha(@accent_bg_color, 0.15); }
+.tag.date { color: @window_fg_color; background: alpha(@window_fg_color, 0.08); }
+.tag.overdue { color: @error_color; background: alpha(@error_bg_color, 0.15); }
 :drop(active) { box-shadow: none; outline: none; }
 button.drop-hint { outline: 2px solid @accent_bg_color; outline-offset: -2px; }
 button.drop-hint:drop(active) { background: alpha(@accent_bg_color, 0.2); }
@@ -38,6 +40,10 @@ const INDENT: i32 = 24;
 
 /// Header and sidebar name for tasks without a category.
 const OTHER: &str = "Other";
+
+/// Sidebar entry for the Upcoming page (tasks with a due date in every list), kept among the
+/// list hrefs.
+const UPCOMING: &str = "upcoming";
 
 /// Completed tasks shown in the "Completed" expander, newest first.
 const DONE_SHOWN: usize = 50;
@@ -113,8 +119,25 @@ pub fn setup_actions(app: &adw::Application) {
         app,
         move |_, _| app.quit()
     ));
+    // From reminder notifications.
+    let show = gio::SimpleAction::new("show-list", Some(glib::VariantTy::STRING));
+    show.connect_activate(|_, href| {
+        if let Some(href) = href.and_then(|h| h.str()) {
+            show_list(href);
+        }
+    });
+    let complete = gio::SimpleAction::new("complete", Some(glib::VariantTy::STRING));
+    complete.connect_activate(|_, uid| {
+        if let Some(uid) = uid.and_then(|u| u.str())
+            && core().set_done(uid.into(), true).is_ok()
+        {
+            request_sync();
+        }
+    });
     app.add_action(&sync);
     app.add_action(&quit);
+    app.add_action(&show);
+    app.add_action(&complete);
     app.set_accels_for_action("app.sync", &["F5"]);
     app.set_accels_for_action("app.quit", &["<Control>q"]);
     app.set_accels_for_action("window.close", &["<Control>w"]);
@@ -187,7 +210,8 @@ pub fn on_event(ev: &Event) {
             // Rebuild outside the signal handler that caused the change.
             glib::idle_add_local_once(move || {
                 refresh_sidebar_counts(&ui);
-                if ui.current.borrow().as_deref() == Some(&list) {
+                let current = ui.current.borrow().clone();
+                if current.as_deref() == Some(&list) || current.as_deref() == Some(UPCOMING) {
                     refresh_tasks(&ui);
                 }
             });
@@ -521,21 +545,31 @@ pub async fn browser_login(
 
 fn refresh_lists(ui: &Rc<Ui>) {
     let lists = core().lists();
-    if ui
-        .current
-        .borrow()
-        .as_ref()
-        .is_none_or(|c| !lists.iter().any(|l| &l.href == c))
-    {
-        let last = core().setting("last_list".into());
-        let pick = lists
-            .iter()
-            .find(|l| Some(&l.href) == last.as_ref())
-            .or(lists.first());
-        *ui.current.borrow_mut() = pick.map(|l| l.href.clone());
+    let valid = |h: &str| !lists.is_empty() && (h == UPCOMING || lists.iter().any(|l| l.href == h));
+    if ui.current.borrow().as_deref().is_none_or(|c| !valid(c)) {
+        let last = core().setting("last_list".into()).filter(|l| valid(l));
+        *ui.current.borrow_mut() = last.or_else(|| lists.first().map(|l| l.href.clone()));
     }
     ui.sidebar.remove_all();
-    *ui.hrefs.borrow_mut() = lists.iter().map(|l| l.href.clone()).collect();
+    *ui.hrefs.borrow_mut() = (!lists.is_empty())
+        .then(|| UPCOMING.to_string())
+        .into_iter()
+        .chain(lists.iter().map(|l| l.href.clone()))
+        .collect();
+    if !lists.is_empty() {
+        let row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+        row.append(&gtk::Image::from_icon_name("x-office-calendar-symbolic"));
+        let name = gtk::Label::builder()
+            .label("Upcoming")
+            .xalign(0.0)
+            .hexpand(true)
+            .build();
+        let count = gtk::Label::new(Some(&upcoming_count().to_string()));
+        count.add_css_class("dim-label");
+        row.append(&name);
+        row.append(&count);
+        ui.sidebar.append(&row);
+    }
     for l in &lists {
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
         let name = gtk::Label::builder()
@@ -550,7 +584,12 @@ fn refresh_lists(ui: &Rc<Ui>) {
         ui.sidebar.append(&row);
     }
     let current = ui.current.borrow().clone();
-    if let Some(i) = lists.iter().position(|l| Some(&l.href) == current.as_ref()) {
+    if let Some(i) = ui
+        .hrefs
+        .borrow()
+        .iter()
+        .position(|h| Some(h) == current.as_ref())
+    {
         ui.sidebar
             .select_row(ui.sidebar.row_at_index(i as i32).as_ref());
     }
@@ -559,10 +598,16 @@ fn refresh_lists(ui: &Rc<Ui>) {
 
 fn refresh_sidebar_counts(ui: &Rc<Ui>) {
     let lists = core().lists();
-    if lists.iter().map(|l| &l.href).ne(ui.hrefs.borrow().iter()) {
+    if lists
+        .iter()
+        .map(|l| &l.href)
+        .ne(ui.hrefs.borrow().iter().skip(1))
+    {
         return refresh_lists(ui);
     }
-    for (i, l) in lists.iter().enumerate() {
+    let counts =
+        std::iter::once(upcoming_count()).chain(lists.iter().map(|l| l.open_count as usize));
+    for (i, n) in counts.take(ui.hrefs.borrow().len()).enumerate() {
         let count = ui
             .sidebar
             .row_at_index(i as i32)
@@ -570,9 +615,19 @@ fn refresh_sidebar_counts(ui: &Rc<Ui>) {
             .and_then(|b| b.last_child())
             .and_downcast::<gtk::Label>();
         if let Some(c) = count {
-            c.set_label(&l.open_count.to_string());
+            c.set_label(&n.to_string());
         }
     }
+}
+
+/// Open tasks due today or earlier.
+fn upcoming_count() -> usize {
+    let now = core().local_now();
+    core()
+        .upcoming()
+        .iter()
+        .filter(|t| dates::pressing(t, now))
+        .count()
 }
 
 /// Rebuild the task page where it is scrolled to. The rebuild destroys the focused widget when
@@ -603,6 +658,13 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
         ui.title.set_title("");
         return;
     };
+    // The new-task entry and its category picker.
+    let add_box = ui.entry.parent();
+    add_box.iter().for_each(|b| b.set_visible(href != UPCOMING));
+    if href == UPCOMING {
+        ui.cat_section.set_visible(false);
+        return rebuild_upcoming(ui);
+    }
     let list = core().lists().into_iter().find(|l| l.href == href);
     ui.title
         .set_title(list.as_ref().map_or("", |l| &l.display_name));
@@ -781,6 +843,41 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
     }
 }
 
+/// Open tasks with a due date in every list, by day: overdue, today, tomorrow, the week ahead,
+/// later. Rows show their list instead of their note.
+fn rebuild_upcoming(ui: &Rc<Ui>) {
+    let tasks = core().upcoming();
+    let now = core().local_now();
+    let names: HashMap<String, String> = core()
+        .lists()
+        .into_iter()
+        .map(|l| (l.href, l.display_name))
+        .collect();
+    ui.title.set_title("Upcoming");
+    ui.title.set_subtitle(&format!("{} open", tasks.len()));
+    let mut section: Option<(String, adw::PreferencesGroup)> = None;
+    for t in &tasks {
+        let s = dates::section(t, now);
+        if section.as_ref().is_none_or(|(cur, _)| *cur != s) {
+            let group = adw::PreferencesGroup::builder().title(&s).build();
+            ui.groups.append(&group);
+            section = Some((s, group));
+        }
+        let row = task_row(ui, t, 0, None);
+        row.set_subtitle(names.get(&t.list_href).map_or("", String::as_str));
+        section.as_ref().unwrap().1.add(&row);
+    }
+    if tasks.is_empty() {
+        let empty = adw::StatusPage::builder()
+            .icon_name("x-office-calendar-symbolic")
+            .title("Nothing Scheduled")
+            .description("Tasks with a due date show up here")
+            .build();
+        empty.add_css_class("compact");
+        ui.groups.append(&empty);
+    }
+}
+
 /// Split a group's depth-first task list into root tasks, each with its (depth, subtask) list.
 fn trees(tasks: &[Task]) -> Vec<(&Task, Vec<(usize, &Task)>)> {
     let mut depth = HashMap::new();
@@ -821,9 +918,14 @@ fn task_row(ui: &Rc<Ui>, t: &Task, indent: usize, slot: Option<Slot>) -> adw::Ac
     if let Some(d) = subtitle(t) {
         row.set_subtitle(d);
     }
-    // Subtasks have no category of their own: the top-level task's decides.
-    let sub = indent > 0;
-    if let Some(tag) = tag(ui, t).filter(|_| !sub) {
+    if let Some(due) = dates::tag(t, core().local_now()) {
+        row.add_suffix(&due);
+    }
+    // Subtasks have no category of their own: the top-level task's decides. The Upcoming page
+    // mixes lists, so it leaves categories alone.
+    let upcoming = ui.current.borrow().as_deref() == Some(UPCOMING);
+    let sub = indent > 0 || upcoming;
+    if let Some(tag) = tag(ui, t).filter(|_| indent == 0) {
         row.add_suffix(&tag);
     }
     row.add_suffix(&delete_button(t));
@@ -895,6 +997,9 @@ fn tree_row(
     // ExpanderRow puts each new suffix to the left of the previous ones.
     if let Some(tag) = tag(ui, root) {
         row.add_suffix(&tag);
+    }
+    if let Some(due) = dates::tag(root, core().local_now()) {
+        row.add_suffix(&due);
     }
     let (weak, uid) = (Rc::downgrade(ui), root.uid.clone());
     let empty = subs.is_empty();
@@ -1466,6 +1571,7 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
             c.set_selected(list.n_items() - 2);
         }
     });
+    let due_at = due_dialog(&b, t);
     let task = t.clone();
     dialog.connect_response(Some("save"), move |_, _| {
         // Only send what changed: a one-line entry would flatten a multi-line note.
@@ -1487,6 +1593,7 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
                 })
                 .flatten(),
             description: changed(description.text().to_string(), task.description.as_deref()),
+            ..due_at()
         };
         let uid = task.uid.clone();
         if core().update_task(uid.clone(), patch).is_ok() {
@@ -1496,11 +1603,148 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
     dialog.present(Some(&ui.window));
 }
 
+/// Fill the dialog's due date rows from `t`; the returned function reads what changed.
+fn due_dialog(b: &gtk::Builder, t: &Task) -> impl Fn() -> TaskPatch + 'static {
+    let due: adw::ExpanderRow = get(b, "due");
+    let calendar: gtk::Calendar = get(b, "calendar");
+    let has_time: adw::SwitchRow = get(b, "has_time");
+    let (hour, minute): (gtk::SpinButton, gtk::SpinButton) = (get(b, "hour"), get(b, "minute"));
+    let reminder: adw::ComboRow = get(b, "reminder");
+    let reminders: gtk::StringList = get(b, "reminders");
+    for spin in [&hour, &minute] {
+        spin.connect_output(|s| {
+            s.set_text(&format!("{:02}", s.value() as i64));
+            glib::Propagation::Stop
+        });
+    }
+
+    let now = core().local_now();
+    let at = t.due.unwrap_or(now - now.rem_euclid(86400) + 9 * 3600); // default: today at 9:00
+    let f = dates::fields(at);
+    calendar.select_day(
+        &glib::DateTime::from_utc(f.year(), f.month(), f.day_of_month(), 0, 0, 0.0).unwrap(),
+    );
+    due.set_enable_expansion(t.due.is_some());
+    has_time.set_active(t.due.is_some() && !t.due_all_day);
+    hour.set_value(f.hour() as f64);
+    minute.set_value(f.minute() as f64);
+
+    // Reminder choices: None, the offsets for the due kind, and "Unchanged" for an alarm Todav
+    // does not offer. Values: Some(offset or None) to set, None to keep the alarm as it is.
+    let old = t.remind_at.map(|r| r - t.due.unwrap_or(r));
+    let custom = t.remind_at.is_some()
+        && (t.due.is_none()
+            || !dates::reminders(t.due_all_day)
+                .iter()
+                .any(|(_, o)| Some(*o) == old));
+    let choices: Rc<RefCell<Vec<Option<Option<i64>>>>> = Rc::default();
+    let fill = {
+        let (choices, reminder) = (choices.clone(), reminder.clone());
+        move |all_day: bool, pick: Option<Option<i64>>| {
+            let mut items: Vec<(&str, Option<Option<i64>>)> = vec![("None", Some(None))];
+            items.extend(
+                dates::reminders(all_day)
+                    .iter()
+                    .map(|(l, o)| (*l, Some(Some(*o)))),
+            );
+            if custom {
+                items.push(("Unchanged", None));
+            }
+            let labels: Vec<&str> = items.iter().map(|(l, _)| *l).collect();
+            reminders.splice(0, reminders.n_items(), &labels);
+            // A reminder that does not fit the new kind becomes its first choice.
+            let pos = items
+                .iter()
+                .position(|(_, v)| *v == pick)
+                .unwrap_or(match pick {
+                    Some(Some(_)) => 1,
+                    _ => 0,
+                });
+            reminder.set_selected(pos as u32);
+            *choices.borrow_mut() = items.into_iter().map(|(_, v)| v).collect();
+        }
+    };
+    fill(
+        t.due_all_day || t.due.is_none(),
+        if custom { None } else { Some(old) },
+    );
+    let picked = {
+        let (choices, reminder) = (choices.clone(), reminder.clone());
+        move || {
+            choices
+                .borrow()
+                .get(reminder.selected() as usize)
+                .copied()
+                .flatten()
+        }
+    };
+
+    let read = {
+        let (due, calendar, has_time) = (due.clone(), calendar.clone(), has_time.clone());
+        let (hour, minute) = (hour.clone(), minute.clone());
+        move || {
+            due.enables_expansion().then(|| {
+                let all_day = !has_time.is_active();
+                let time = if all_day {
+                    0
+                } else {
+                    hour.value() as i64 * 3600 + minute.value() as i64 * 60
+                };
+                Due {
+                    at: dates::midnight(&calendar.date()) + time,
+                    all_day,
+                }
+            })
+        }
+    };
+    // The row's subtitle shows the date picked.
+    let show = {
+        let (due, read) = (due.clone(), read.clone());
+        move || {
+            let label = read().map(|d| dates::label(d.at, d.all_day, now));
+            due.set_subtitle(label.as_deref().unwrap_or(""));
+        }
+    };
+    show();
+    let s = show.clone();
+    // Day, month or year: scrolling over the calendar changes the month, keeping the day.
+    calendar.connect_notify_local(None, move |_, _| s());
+    let s = show.clone();
+    due.connect_enable_expansion_notify(move |_| s());
+    let s = show.clone();
+    hour.connect_value_changed(move |_| s());
+    let s = show.clone();
+    minute.connect_value_changed(move |_| s());
+    let p = picked.clone();
+    has_time.connect_active_notify(move |h| {
+        show();
+        fill(!h.is_active(), p());
+    });
+
+    let old_due = t.due.map(|at| Due {
+        at,
+        all_day: t.due_all_day,
+    });
+    move || {
+        let new_due = read();
+        TaskPatch {
+            due: (new_due != old_due).then_some(new_due),
+            reminder: choices
+                .borrow()
+                .get(reminder.selected() as usize)
+                .copied()
+                .flatten()
+                .filter(|r| *r != old || new_due != old_due),
+            ..Default::default()
+        }
+    }
+}
+
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
-    fn task(uid: &str, parent: Option<&str>) -> Task {
+    pub(crate) fn task(uid: &str, parent: Option<&str>) -> Task {
         Task {
             uid: uid.into(),
             list_href: String::new(),
@@ -1513,6 +1757,8 @@ mod tests {
             parent_uid: parent.map(Into::into),
             priority: None,
             due: None,
+            due_all_day: false,
+            remind_at: None,
             sort_order: None,
             created: None,
             last_modified: None,
