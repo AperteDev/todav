@@ -223,6 +223,99 @@ impl Calendar {
             .map(|l| unescape(&l.value))
             .filter(|v| !v.is_empty())
     }
+
+    /// TRIGGER of the VTODO's first VALARM.
+    pub fn alarm_trigger(&self) -> Option<&Line> {
+        let (b, e) = self.todo_range()?;
+        let mut in_alarm = false;
+        for l in &self.lines[b + 1..e] {
+            match l.name.as_str() {
+                "BEGIN" | "END" if l.value.eq_ignore_ascii_case("VALARM") => {
+                    in_alarm = l.name == "BEGIN"
+                }
+                "TRIGGER" if in_alarm => return Some(l),
+                _ => {}
+            }
+        }
+        None
+    }
+
+    /// Replace every VALARM with one display alarm at `trigger` (params, raw value), or none.
+    pub fn set_alarm(&mut self, trigger: Option<(&str, &str)>) {
+        let (b, mut e) = self.todo_range().unwrap();
+        let mut i = b + 1;
+        while i < e {
+            let l = &self.lines[i];
+            if l.name == "BEGIN" && l.value.eq_ignore_ascii_case("VALARM") {
+                let len = self.lines[i..e]
+                    .iter()
+                    .position(|l| l.name == "END" && l.value.eq_ignore_ascii_case("VALARM"))
+                    .map_or(e - i, |j| j + 1);
+                self.lines.drain(i..i + len);
+                e -= len;
+            } else {
+                i += 1;
+            }
+        }
+        let Some((params, value)) = trigger else {
+            return;
+        };
+        let summary = self
+            .prop("SUMMARY")
+            .map_or(String::new(), |l| l.value.clone());
+        let line = |name: &str, params: &str, value: &str| Line {
+            name: name.into(),
+            params: params.into(),
+            value: value.into(),
+        };
+        let alarm = [
+            line("BEGIN", "", "VALARM"),
+            line("ACTION", "", "DISPLAY"),
+            line("DESCRIPTION", "", &summary),
+            line("TRIGGER", params, value),
+            line("END", "", "VALARM"),
+        ];
+        self.lines.splice(e..e, alarm);
+    }
+}
+
+/// RFC 5545 duration (`-PT15M`, `P1DT2H`, `-P1W`) in seconds.
+pub fn parse_duration(v: &str) -> Option<i64> {
+    let (sign, rest) = match v.strip_prefix('-') {
+        Some(r) => (-1, r),
+        None => (1, v.strip_prefix('+').unwrap_or(v)),
+    };
+    let (mut total, mut n, mut time) = (0i64, String::new(), false);
+    for c in rest.strip_prefix('P')?.chars() {
+        match c {
+            '0'..='9' => n.push(c),
+            'T' => time = true,
+            _ => {
+                let unit = match (c, time) {
+                    ('W', false) => 604800,
+                    ('D', false) => 86400,
+                    ('H', true) => 3600,
+                    ('M', true) => 60,
+                    ('S', true) => 1,
+                    _ => return None,
+                };
+                total += n.parse::<i64>().ok()? * unit;
+                n.clear();
+            }
+        }
+    }
+    n.is_empty().then_some(sign * total)
+}
+
+pub fn fmt_duration(secs: i64) -> String {
+    let sign = if secs < 0 { "-" } else { "" };
+    match secs.abs() {
+        0 => "PT0S".into(),
+        s if s % 86400 == 0 => format!("{sign}P{}D", s / 86400),
+        s if s % 3600 == 0 => format!("{sign}PT{}H", s / 3600),
+        s if s % 60 == 0 => format!("{sign}PT{}M", s / 60),
+        s => format!("{sign}PT{s}S"),
+    }
 }
 
 fn fold_into(out: &mut String, line: &str) {
@@ -444,6 +537,41 @@ mod tests {
         c.set_parent("q");
         assert_eq!(c.parent_uid().as_deref(), Some("q"));
         assert!(c.to_ics().contains("RELATED-TO;RELTYPE=SIBLING:s"));
+    }
+
+    #[test]
+    fn durations() {
+        for (v, secs) in [
+            ("-PT15M", -900),
+            ("P1DT2H", 93600),
+            ("-P1W", -604800),
+            ("PT0S", 0),
+        ] {
+            assert_eq!(parse_duration(v), Some(secs), "{v}");
+        }
+        assert_eq!(parse_duration("PT5"), None);
+        for secs in [-900, 32400, -86400, 0, -54000, 61] {
+            assert_eq!(parse_duration(&fmt_duration(secs)), Some(secs));
+        }
+    }
+
+    #[test]
+    fn set_alarm_replaces_every_alarm() {
+        let mut c = Calendar::parse(SAMPLE).unwrap();
+        assert_eq!(c.alarm_trigger().unwrap().value, "-PT15M");
+        c.set_alarm(Some((";RELATED=END", "-PT1H")));
+        let c = Calendar::parse(&c.to_ics()).unwrap();
+        let t = c.alarm_trigger().unwrap();
+        assert_eq!(
+            (t.param("RELATED"), t.value.as_str()),
+            (Some("END"), "-PT1H")
+        );
+        assert_eq!(c.to_ics().matches("BEGIN:VALARM").count(), 1);
+        assert!(c.to_ics().contains("END:VALARM\r\nEND:VTODO"));
+        let mut c = c;
+        c.set_alarm(None);
+        assert!(c.alarm_trigger().is_none() && !c.to_ics().contains("VALARM"));
+        assert_eq!(c.text("UID").unwrap(), "abc-123");
     }
 
     #[test]

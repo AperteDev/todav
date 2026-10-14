@@ -349,6 +349,8 @@ mod tests {
             parent_uid: parent.map(Into::into),
             priority: None,
             due: None,
+            due_all_day: false,
+            remind_at: None,
             sort_order: None,
             created: None,
             last_modified: None,

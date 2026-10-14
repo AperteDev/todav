@@ -40,7 +40,11 @@ pub struct Task {
     pub category: Option<String>,
     pub parent_uid: Option<String>,
     pub priority: Option<i64>,
+    /// Local time (see `store::to_local`); midnight for a date without a time.
     pub due: Option<i64>,
+    pub due_all_day: bool,
+    /// When the reminder goes off, in local time.
+    pub remind_at: Option<i64>,
     pub sort_order: Option<i64>,
     pub created: Option<i64>,
     pub last_modified: Option<i64>,
@@ -52,6 +56,17 @@ pub struct TaskPatch {
     pub summary: Option<String>,
     pub description: Option<String>,
     pub category: Option<String>,
+    /// Some(None) clears the due date, and its reminder with it.
+    pub due: Option<Option<Due>>,
+    /// Reminder, in seconds after the due time (negative: before); Some(None) removes it.
+    pub reminder: Option<Option<i64>>,
+}
+
+/// A due date in local time; `all_day`: a date without a time (`at` is its midnight).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Due {
+    pub at: i64,
+    pub all_day: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -173,6 +188,21 @@ impl Client {
         store::task(&self.db.lock().unwrap(), &uid).ok()?
     }
 
+    /// Open tasks with a due date in every list, soonest first.
+    pub fn upcoming(&self) -> Vec<Task> {
+        store::upcoming(&self.db.lock().unwrap()).unwrap_or_default()
+    }
+
+    /// Open tasks whose reminder goes off after `from` and at `to` at the latest (local times).
+    pub fn reminders(&self, from: i64, to: i64) -> Vec<Task> {
+        store::reminders(&self.db.lock().unwrap(), from, to).unwrap_or_default()
+    }
+
+    /// Now in local time, as task dates are.
+    pub fn local_now(&self) -> i64 {
+        store::to_local(&self.db.lock().unwrap(), now()).unwrap_or_else(|_| now())
+    }
+
     pub fn subscribe(&self, listener: Box<dyn ChangeListener>) {
         self.listeners.lock().unwrap().push(listener);
     }
@@ -272,7 +302,27 @@ impl Client {
     }
 
     pub fn update_task(&self, uid: String, patch: TaskPatch) -> Result<()> {
+        // Times go out in UTC, dates as dates.
+        let due_utc = match patch.due {
+            Some(Some(d)) if !d.all_day => Some(store::to_utc(&self.db.lock().unwrap(), d.at)?),
+            _ => None,
+        };
         self.modify(&uid, |cal| {
+            match patch.due {
+                Some(None) => {
+                    cal.set("DUE", "", None);
+                    cal.set_alarm(None);
+                }
+                Some(Some(d)) if d.all_day => {
+                    cal.set("DUE", ";VALUE=DATE", Some(&ical::fmt_utc(d.at)[..8]))
+                }
+                Some(Some(_)) => cal.set_time("DUE", due_utc),
+                None => {}
+            }
+            if let Some(r) = patch.reminder.filter(|_| patch.due != Some(None)) {
+                let v = r.map(ical::fmt_duration);
+                cal.set_alarm(v.as_deref().map(|v| (";RELATED=END", v)));
+            }
             if let Some(s) = &patch.summary {
                 cal.set_text("SUMMARY", Some(s));
             }
@@ -487,7 +537,8 @@ mod tests {
 
     #[test]
     fn set_parent_moves_trees_but_refuses_loops() {
-        let dir = std::env::temp_dir().join(format!("todav-test-parent-{}", now()));
+        let dir = std::env::temp_dir().join(format!("todav-test-parent-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
         let c = Client::open(dir.to_string_lossy().into()).unwrap();
         let l = "/l/".to_string();
         c.db.lock()
@@ -514,8 +565,82 @@ mod tests {
     }
 
     #[test]
+    fn due_dates_and_reminders_round_trip_in_local_time() {
+        let dir = std::env::temp_dir().join(format!("todav-test-due-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let l = "/l/".to_string();
+        c.db.lock()
+            .unwrap()
+            .execute(
+                "INSERT INTO lists (href, display_name) VALUES (?1, 'L')",
+                [&l],
+            )
+            .unwrap();
+        let uid = c
+            .add_task(l.clone(), "a".into(), None, None, false)
+            .unwrap()
+            .uid;
+        let day = ical::parse_time("20261020").unwrap();
+        let set = |due, reminder| {
+            let patch = TaskPatch {
+                due: Some(due),
+                reminder,
+                ..Default::default()
+            };
+            c.update_task(uid.clone(), patch).unwrap();
+            c.task(uid.clone()).unwrap()
+        };
+
+        let t = set(
+            Some(Due {
+                at: day,
+                all_day: true,
+            }),
+            Some(Some(9 * 3600)),
+        );
+        assert_eq!(
+            (t.due, t.due_all_day, t.remind_at),
+            (Some(day), true, Some(day + 9 * 3600))
+        );
+        let raw = store::raw(&c.db.lock().unwrap(), &uid)
+            .unwrap()
+            .unwrap()
+            .raw_ics;
+        assert!(
+            raw.contains("DUE;VALUE=DATE:20261020") && raw.contains("TRIGGER;RELATED=END:PT9H")
+        );
+
+        // A time goes out in UTC and comes back as the same local time; the reminder follows it.
+        let at = day + 14 * 3600 + 30 * 60;
+        let t = set(Some(Due { at, all_day: false }), None);
+        assert_eq!(
+            (t.due, t.due_all_day, t.remind_at),
+            (Some(at), false, Some(at + 9 * 3600))
+        );
+        assert_eq!(c.upcoming().len(), 1);
+        assert_eq!(c.reminders(at, at + 9 * 3600).len(), 1);
+        assert!(
+            c.reminders(at + 9 * 3600, at + 10 * 3600).is_empty(),
+            "fires once"
+        );
+
+        let t = set(None, None);
+        assert_eq!((t.due, t.remind_at), (None, None));
+        assert!(
+            !store::raw(&c.db.lock().unwrap(), &uid)
+                .unwrap()
+                .unwrap()
+                .raw_ics
+                .contains("VALARM")
+        );
+        assert!(c.upcoming().is_empty());
+    }
+
+    #[test]
     fn restore_brings_a_deleted_task_back() {
-        let dir = std::env::temp_dir().join(format!("todav-test-restore-{}", now()));
+        let dir = std::env::temp_dir().join(format!("todav-test-restore-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
         let c = Client::open(dir.to_string_lossy().into()).unwrap();
         let l = "/l/".to_string();
         c.db.lock()

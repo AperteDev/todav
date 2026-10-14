@@ -1,10 +1,11 @@
 //! SQLite schema and row mapping. Every derived column is recomputed from `raw_ics`.
 
-use crate::ical::Calendar;
+use crate::ical::{self, Calendar, Line};
 use crate::{List, Result, Task};
 use rusqlite::{Connection, OptionalExtension, params};
 
-const MIGRATIONS: &[&str] = &[r#"
+const MIGRATIONS: &[&str] = &[
+    r#"
 CREATE TABLE lists (
   href TEXT PRIMARY KEY, display_name TEXT NOT NULL, color TEXT,
   ctag TEXT, sync_token TEXT, push_topic TEXT,
@@ -22,7 +23,12 @@ CREATE TABLE tasks (
 CREATE INDEX tasks_list_cat ON tasks(list_href, category, status);
 CREATE INDEX tasks_href ON tasks(href);
 CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT);
-"#];
+"#,
+    r#"
+ALTER TABLE tasks ADD COLUMN due_all_day INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE tasks ADD COLUMN remind_at INTEGER;
+"#,
+];
 
 pub const CLEAN: i64 = 0;
 pub const MODIFIED: i64 = 1;
@@ -38,7 +44,80 @@ pub fn open(path: &str) -> Result<Connection> {
         tx.pragma_update(None, "user_version", i as i64 + 1)?;
         tx.commit()?;
     }
+    if version == 1 {
+        rederive(&db)?; // `due` became local time; all-day and reminders are new
+    }
     Ok(db)
+}
+
+/// Recompute every task's derived columns from its calendar data.
+fn rederive(db: &Connection) -> Result<()> {
+    let all: Vec<RawTask> = db
+        .prepare(&format!("SELECT {RAW_COLS} FROM tasks"))?
+        .query_map([], raw_row)?
+        .collect::<rusqlite::Result<_>>()?;
+    for t in all {
+        if let Some(cal) = Calendar::parse(&t.raw_ics) {
+            save(
+                db,
+                &t.list_href,
+                t.href.as_deref(),
+                t.etag.as_deref(),
+                &cal,
+                t.dirty,
+            )?;
+        }
+    }
+    Ok(())
+}
+
+/// Local wall-clock time of a UTC timestamp, in the system time zone (as seconds since the
+/// epoch, as if local time were UTC). Dates and times shown to the user use this.
+pub fn to_local(db: &Connection, utc: i64) -> Result<i64> {
+    Ok(db.query_row(
+        "SELECT unixepoch(?1, 'unixepoch', 'localtime')",
+        [utc],
+        |r| r.get(0),
+    )?)
+}
+
+/// Inverse of `to_local`.
+pub fn to_utc(db: &Connection, local: i64) -> Result<i64> {
+    Ok(
+        db.query_row("SELECT unixepoch(?1, 'unixepoch', 'utc')", [local], |r| {
+            r.get(0)
+        })?,
+    )
+}
+
+/// A DATE / DATE-TIME value as local time, and whether it is a date only.
+/// ponytail: TZID times are taken as local; off by the difference for another zone than the system's.
+fn local_time(db: &Connection, l: Option<&Line>) -> Result<Option<(i64, bool)>> {
+    let Some((l, t)) = l.and_then(|l| Some((l, ical::parse_time(&l.value)?))) else {
+        return Ok(None);
+    };
+    Ok(Some(if l.value.ends_with('Z') {
+        (to_local(db, t)?, false)
+    } else {
+        (t, l.value.len() == 8)
+    }))
+}
+
+/// When the first alarm goes off, in local time: an absolute TRIGGER, or one relative to DUE
+/// (RELATED=END) or DTSTART (the default; DUE when there is no DTSTART).
+fn remind_at(db: &Connection, cal: &Calendar, due: Option<i64>) -> Result<Option<i64>> {
+    let Some(t) = cal.alarm_trigger() else {
+        return Ok(None);
+    };
+    if let Some(d) = ical::parse_duration(&t.value) {
+        let end = t
+            .param("RELATED")
+            .is_some_and(|r| r.eq_ignore_ascii_case("END"));
+        let start = local_time(db, cal.prop("DTSTART"))?.map(|(s, _)| s);
+        let base = if end { due } else { start.or(due) };
+        return Ok(base.map(|b| b + d));
+    }
+    Ok(local_time(db, Some(t))?.map(|(t, _)| t))
 }
 
 pub fn kv_get(db: &Connection, key: &str) -> Result<Option<String>> {
@@ -73,7 +152,7 @@ pub fn lists(db: &Connection) -> Result<Vec<List>> {
     Ok(rows.collect::<rusqlite::Result<_>>()?)
 }
 
-const TASK_COLS: &str = "uid, list_href, summary, description, status, completed_at, category, parent_uid, priority, due, sort_order, created, last_modified";
+const TASK_COLS: &str = "uid, list_href, summary, description, status, completed_at, category, parent_uid, priority, due, due_all_day, remind_at, sort_order, created, last_modified";
 
 fn task_row(r: &rusqlite::Row) -> rusqlite::Result<Task> {
     let status: String = r.get(4)?;
@@ -89,9 +168,11 @@ fn task_row(r: &rusqlite::Row) -> rusqlite::Result<Task> {
         parent_uid: r.get(7)?,
         priority: r.get(8)?,
         due: r.get(9)?,
-        sort_order: r.get(10)?,
-        created: r.get(11)?,
-        last_modified: r.get(12)?,
+        due_all_day: r.get(10)?,
+        remind_at: r.get(11)?,
+        sort_order: r.get(12)?,
+        created: r.get(13)?,
+        last_modified: r.get(14)?,
     })
 }
 
@@ -102,6 +183,28 @@ pub fn tasks(db: &Connection, list_href: &str, include_done: bool) -> Result<Vec
          ORDER BY COALESCE(sort_order, created, 0), created, uid"
     ))?;
     let rows = st.query_map(params![list_href, include_done], task_row)?;
+    Ok(rows.collect::<rusqlite::Result<_>>()?)
+}
+
+/// Open tasks with a due date in every list, soonest first.
+pub fn upcoming(db: &Connection) -> Result<Vec<Task>> {
+    let mut st = db.prepare(&format!(
+        "SELECT {TASK_COLS} FROM tasks WHERE dirty != 2 AND due IS NOT NULL
+           AND status NOT IN ('COMPLETED', 'CANCELLED')
+         ORDER BY due, COALESCE(sort_order, created, 0), uid"
+    ))?;
+    let rows = st.query_map([], task_row)?;
+    Ok(rows.collect::<rusqlite::Result<_>>()?)
+}
+
+/// Open tasks whose reminder goes off after `from` and at `to` at the latest (local times).
+pub fn reminders(db: &Connection, from: i64, to: i64) -> Result<Vec<Task>> {
+    let mut st = db.prepare(&format!(
+        "SELECT {TASK_COLS} FROM tasks WHERE dirty != 2 AND remind_at > ?1 AND remind_at <= ?2
+           AND status NOT IN ('COMPLETED', 'CANCELLED')
+         ORDER BY remind_at"
+    ))?;
+    let rows = st.query_map([from, to], task_row)?;
     Ok(rows.collect::<rusqlite::Result<_>>()?)
 }
 
@@ -175,10 +278,13 @@ pub fn save(
 ) -> Result<String> {
     let uid = cal.text("UID").unwrap_or_default();
     let status = cal.text("STATUS").unwrap_or_else(|| "NEEDS-ACTION".into());
+    let due = local_time(db, cal.prop("DUE"))?;
+    let remind = remind_at(db, cal, due.map(|(d, _)| d))?;
     db.execute(
         "INSERT OR REPLACE INTO tasks (uid, list_href, etag, href, raw_ics, summary, description, status,
-           completed_at, category, parent_uid, priority, due, sort_order, created, last_modified, dirty)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
+           completed_at, category, parent_uid, priority, due, sort_order, created, last_modified, dirty,
+           due_all_day, remind_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)",
         params![
             uid,
             list_href,
@@ -192,13 +298,15 @@ pub fn save(
             cal.categories().into_iter().next(),
             cal.parent_uid(),
             cal.text("PRIORITY").and_then(|p| p.parse::<i64>().ok()).filter(|&p| p != 0), // 0 = undefined
-            cal.time("DUE"),
+            due.map(|(d, _)| d),
             cal.text("X-APPLE-SORT-ORDER")
                 .or_else(|| cal.text("X-TODAV-ORDER"))
                 .and_then(|p| p.parse::<i64>().ok()),
             cal.time("CREATED"),
             cal.time("LAST-MODIFIED"),
             dirty,
+            due.is_some_and(|(_, all_day)| all_day),
+            remind,
         ],
     )?;
     Ok(uid)

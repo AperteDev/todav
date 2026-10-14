@@ -15,6 +15,7 @@ pub const DEVICE_ONLY: &[&str] = &[
     "goa_account",
     "manual_url",
     "manual_user",
+    "reminded_until",
 ];
 
 /// key → (value, unix time of the last change)
