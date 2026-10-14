@@ -2,8 +2,8 @@
 //! Each test owns a calendar `it-<name>` (created once: Nextcloud rate-limits MKCALENDAR) and empties it first.
 #![cfg(feature = "integration")]
 
-use todav_core::caldav::{Dav, SyncResult};
 use std::time::Duration;
+use todav_core::caldav::{Dav, SyncResult};
 use todav_core::{Client, now};
 
 fn get(k: &str) -> Option<String> {
@@ -78,7 +78,13 @@ impl Fixture {
             (c, format!("{dir}/core.sqlite"))
         };
         let ((a, a_db), (b, _)) = (client("a"), client("b"));
-        Fixture { dav, href, a, b, a_db }
+        Fixture {
+            dav,
+            href,
+            a,
+            b,
+            a_db,
+        }
     }
 }
 
@@ -221,7 +227,8 @@ fn push_delivers_changes_and_refreshes_registration() {
     rx.recv_timeout(Duration::from_secs(30)).unwrap().unwrap();
     let pulled_within = |secs| {
         let end = std::time::Instant::now() + Duration::from_secs(secs);
-        while let Ok(r) = rx.recv_timeout(end.saturating_duration_since(std::time::Instant::now())) {
+        while let Ok(r) = rx.recv_timeout(end.saturating_duration_since(std::time::Instant::now()))
+        {
             if r.unwrap() > 0 {
                 return true;
             }
@@ -236,7 +243,10 @@ fn push_delivers_changes_and_refreshes_registration() {
 
     // An unexpired registration is kept; one close to expiry is renewed on the server.
     let resource = |regs: &[todav_core::push::PushRegistration]| {
-        regs.iter().find(|r| r.list_href == f.href).cloned().unwrap()
+        regs.iter()
+            .find(|r| r.list_href == f.href)
+            .cloned()
+            .unwrap()
     };
     let topic = rusqlite::Connection::open(&f.a_db)
         .unwrap()
@@ -244,13 +254,25 @@ fn push_delivers_changes_and_refreshes_registration() {
             r.get::<_, String>(0)
         })
         .unwrap();
-    let push_resource = format!("{}/{topic}?up=1", get("NTFY_URL").unwrap().trim_end_matches('/'));
+    let push_resource = format!(
+        "{}/{topic}?up=1",
+        get("NTFY_URL").unwrap().trim_end_matches('/')
+    );
     let before = resource(&a.push_register(push_resource.clone(), 7 * 86400).unwrap());
     let same = resource(&a.push_register(push_resource.clone(), 7 * 86400).unwrap());
-    assert_eq!(same.expires, before.expires, "fresh registration was redone");
-    sql(&f.a_db, "UPDATE lists SET push_expires = strftime('%s','now') + 60");
+    assert_eq!(
+        same.expires, before.expires,
+        "fresh registration was redone"
+    );
+    sql(
+        &f.a_db,
+        "UPDATE lists SET push_expires = strftime('%s','now') + 60",
+    );
     let renewed = resource(&a.push_register(push_resource, 7 * 86400).unwrap());
-    assert!(renewed.expires > now() + 6 * 86400, "not renewed: {renewed:?}");
+    assert!(
+        renewed.expires > now() + 6 * 86400,
+        "not renewed: {renewed:?}"
+    );
 
     let uid = format!("pushed-again-{}", now());
     put_remote(&f.dav, &f.href, &uid, "After renewal");

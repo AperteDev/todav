@@ -477,9 +477,18 @@ mod tests {
         );
 
         // In place: nothing finished. Hidden subtasks: done tasks under a shown parent go.
-        let (all, none) = split(tasks.clone(), DoneView { in_place: true, hide_subtasks: false });
+        let (all, none) = split(
+            tasks.clone(),
+            DoneView {
+                in_place: true,
+                hide_subtasks: false,
+            },
+        );
         assert_eq!((all.len(), none.len()), (tasks.len(), 0));
-        let hide = |in_place| DoneView { in_place, hide_subtasks: true };
+        let hide = |in_place| DoneView {
+            in_place,
+            hide_subtasks: true,
+        };
         let (tree, finished) = split(tasks.clone(), hide(false));
         assert_eq!(uids(&tree), ["root", "open_under_closed"]);
         assert_eq!(uids(&finished), ["closed"]); // the loop has no top: both hide each other

@@ -54,7 +54,10 @@ fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
             }
             if args.iter().any(|a| a == "-a") {
                 println!("Completed");
-                client.finished(list.href, Default::default()).iter().for_each(line);
+                client
+                    .finished(list.href, Default::default())
+                    .iter()
+                    .for_each(line);
             }
         }
         Some("add") => {
