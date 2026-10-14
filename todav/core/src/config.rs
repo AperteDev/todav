@@ -11,13 +11,17 @@ pub struct CategoryMeta {
 }
 
 /// Display order of top-level tasks or of subtasks among their siblings.
-/// `Manual` is the stored order (X-APPLE-SORT-ORDER, shared with Nextcloud Tasks); the others sort by creation time.
+/// `Manual` is the stored order (X-APPLE-SORT-ORDER, shared with Nextcloud Tasks); `Newest` and
+/// `Oldest` sort by creation time, `DueSoonest` and `DueLatest` by due date with undated tasks
+/// last, in manual order.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum Sort {
     #[default]
     Manual,
     Newest,
     Oldest,
+    DueSoonest,
+    DueLatest,
 }
 
 impl Sort {
@@ -27,6 +31,8 @@ impl Sort {
             Sort::Manual => {}
             Sort::Newest => tasks.sort_by_key(|t| std::cmp::Reverse(t.created.unwrap_or(0))),
             Sort::Oldest => tasks.sort_by_key(|t| t.created.unwrap_or(0)),
+            Sort::DueSoonest => tasks.sort_by_key(|t| (t.due.is_none(), t.due)),
+            Sort::DueLatest => tasks.sort_by_key(|t| (t.due.is_none(), std::cmp::Reverse(t.due))),
         }
     }
 }
@@ -402,6 +408,25 @@ mod tests {
             ]
         );
         assert_eq!(g[0].icon.as_deref(), Some("house"));
+    }
+
+    #[test]
+    fn due_sorts_put_undated_tasks_last_in_manual_order() {
+        let due = |uid, due| Task {
+            due,
+            ..task(uid, None, None)
+        };
+        let mut tasks = vec![
+            due("x", None),
+            due("late", Some(9)),
+            due("y", None),
+            due("soon", Some(1)),
+        ];
+        let ids = |t: &[Task]| t.iter().map(|t| t.uid.clone()).collect::<Vec<_>>();
+        Sort::DueSoonest.apply(&mut tasks);
+        assert_eq!(ids(&tasks), ["soon", "late", "x", "y"]);
+        Sort::DueLatest.apply(&mut tasks);
+        assert_eq!(ids(&tasks), ["late", "soon", "x", "y"]);
     }
 
     #[test]

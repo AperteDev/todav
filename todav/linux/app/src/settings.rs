@@ -12,10 +12,12 @@ use todav_core::Sort;
 type UrlRow = (gtk::DropDown, adw::EntryRow);
 
 /// Setting values for the "Sort" rows, in row order.
-const SORTS: [(&str, Sort); 3] = [
+const SORTS: [(&str, Sort); 5] = [
     ("manual", Sort::Manual),
     ("newest", Sort::Newest),
     ("oldest", Sort::Oldest),
+    ("due_soonest", Sort::DueSoonest),
+    ("due_latest", Sort::DueLatest),
 ];
 
 fn sort_index(key: &str) -> u32 {
@@ -56,7 +58,8 @@ pub fn order() -> Order {
     let start = |sort, key: &str| match sort {
         Sort::Newest => true,
         Sort::Oldest => false,
-        Sort::Manual => core().setting(key.into()).as_deref() == Some("start"),
+        // New tasks have no due date: they go among the undated ones, as in manual order.
+        _ => core().setting(key.into()).as_deref() == Some("start"),
     };
     let (tasks, subtasks) = (sort("task_sort"), sort("sub_sort"));
     Order {
@@ -67,8 +70,9 @@ pub fn order() -> Order {
     }
 }
 
-/// Tie a "Sort" row to its "Add new …" row: date sorting shows (and locks) where new items go,
-/// manual sorting lets the user pick. `hint` is the "Add new …" subtitle in manual mode.
+/// Tie a "Sort" row to its "Add new …" row: sorting by creation date shows (and locks) where
+/// new items go; manual and due date sorting let the user pick (by due date: among the undated
+/// ones). `hint` is the "Add new …" subtitle when the user picks.
 fn connect_order(b: &gtk::Builder, which: &'static str, hint: Option<&'static str>) {
     let (sort_key, new_key) = (format!("{which}_sort"), format!("{which}_new"));
     let sort: adw::ComboRow = get(b, &sort_key);
@@ -76,7 +80,7 @@ fn connect_order(b: &gtk::Builder, which: &'static str, hint: Option<&'static st
     let show = {
         let (sort, new, new_key) = (sort.clone(), new.clone(), new_key.clone());
         move || {
-            let manual = sort.selected() == 0;
+            let manual = !matches!(sort.selected(), 1 | 2);
             let start = match sort.selected() {
                 1 => true,
                 2 => false,
