@@ -1,95 +1,147 @@
 using Gtk 4.0;
 using Adw 1;
 
-Adw.AlertDialog dialog {
-  heading: "Edit Task";
-  default-response: "save";
+// Two columns (the task, then its due date and reminders); one below the other when narrow.
+Adw.Dialog dialog {
+  title: "Edit Task";
+  content-width: 760;
+  // Room for the expanded due date; smaller windows shrink it.
+  content-height: 640;
+  default-widget: save;
 
-  extra-child: Adw.PreferencesGroup {
-    Adw.EntryRow summary {
-      title: "Title";
-    }
+  child: Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {
+      show-start-title-buttons: false;
+      show-end-title-buttons: false;
 
-    Adw.ComboRow category {
-      title: "Category";
-      model: Gtk.StringList cats {};
-    }
-
-    Adw.EntryRow description {
-      title: "Note";
-    }
-
-    Adw.ExpanderRow due {
-      title: "Due Date";
-      show-enable-switch: true;
-      enable-expansion: false;
-
-      Gtk.ListBoxRow {
-        activatable: false;
-
-        Gtk.Calendar calendar {
-          margin-top: 6;
-          margin-bottom: 6;
-          margin-start: 6;
-          margin-end: 6;
-        }
+      [start]
+      Gtk.Button cancel {
+        label: "Cancel";
       }
 
-      Adw.SwitchRow has_time {
-        title: "Time";
-      }
-
-      Adw.ActionRow time_row {
-        title: "At";
-        visible: bind has_time.active;
-
-        [suffix]
-        Gtk.SpinButton hour {
-          valign: center;
-          numeric: true;
-          wrap: true;
-          adjustment: Gtk.Adjustment {
-            lower: 0;
-            upper: 23;
-            step-increment: 1;
-          };
-        }
-
-        [suffix]
-        Gtk.Label {
-          label: ":";
-        }
-
-        [suffix]
-        Gtk.SpinButton minute {
-          valign: center;
-          numeric: true;
-          wrap: true;
-          adjustment: Gtk.Adjustment {
-            lower: 0;
-            upper: 59;
-            step-increment: 5;
-          };
-        }
-      }
-
-      // Each reminder adds its rows (ui/reminder.blp) after this one.
-      Adw.ActionRow reminders_header {
-        title: "Reminders";
-
-        [suffix]
-        Gtk.Button add_reminder {
-          icon-name: "list-add-symbolic";
-          tooltip-text: "Add Reminder";
-          valign: center;
-          styles ["flat"]
-        }
+      [end]
+      Gtk.Button save {
+        label: "Save";
+        styles ["suggested-action"]
       }
     }
+
+    content: Gtk.ScrolledWindow {
+      hscrollbar-policy: never;
+      propagate-natural-height: true;
+
+      Gtk.Box columns {
+        spacing: 18;
+        homogeneous: true;
+        margin-top: 12;
+        margin-bottom: 18;
+        margin-start: 18;
+        margin-end: 18;
+
+        Adw.PreferencesGroup {
+          valign: start;
+
+          Adw.EntryRow summary {
+            title: "Title";
+            activates-default: true;
+          }
+
+          Adw.ComboRow category {
+            title: "Category";
+            model: Gtk.StringList cats {};
+          }
+
+          Adw.EntryRow description {
+            title: "Note";
+            activates-default: true;
+          }
+        }
+
+        Gtk.Box {
+          orientation: vertical;
+          spacing: 18;
+          valign: start;
+
+          Adw.PreferencesGroup {
+            Adw.ExpanderRow due {
+              title: "Due Date";
+              show-enable-switch: true;
+              enable-expansion: false;
+
+              Gtk.ListBoxRow {
+                activatable: false;
+
+                Gtk.Calendar calendar {
+                  margin-top: 6;
+                  margin-bottom: 6;
+                  margin-start: 6;
+                  margin-end: 6;
+                }
+              }
+
+              Adw.SwitchRow has_time {
+                title: "Time";
+              }
+
+              Adw.ActionRow time_row {
+                title: "At";
+                visible: bind has_time.active;
+
+                [suffix]
+                Gtk.SpinButton hour {
+                  valign: center;
+                  numeric: true;
+                  wrap: true;
+                  adjustment: Gtk.Adjustment {
+                    lower: 0;
+                    upper: 23;
+                    step-increment: 1;
+                  };
+                }
+
+                [suffix]
+                Gtk.Label {
+                  label: ":";
+                }
+
+                [suffix]
+                Gtk.SpinButton minute {
+                  valign: center;
+                  numeric: true;
+                  wrap: true;
+                  adjustment: Gtk.Adjustment {
+                    lower: 0;
+                    upper: 59;
+                    step-increment: 5;
+                  };
+                }
+              }
+            }
+          }
+
+          // Reminders (ui/reminder.blp) go above the button.
+          Gtk.ListBox reminders {
+            selection-mode: none;
+            visible: bind due.enable-expansion;
+            styles ["boxed-list"]
+
+            Adw.ButtonRow add_reminder {
+              title: "Add Reminder";
+              start-icon-name: "list-add-symbolic";
+            }
+          }
+        }
+      }
+    };
   };
 
-  responses [
-    cancel: "Cancel",
-    save: "Save" suggested,
-  ]
+  Adw.Breakpoint {
+    condition ("max-width: 560sp")
+
+    setters {
+      columns.orientation: vertical;
+      columns.homogeneous: false;
+    }
+  }
 }

@@ -65,25 +65,27 @@ impl Row {
 }
 
 pub struct Reminders {
-    due: adw::ExpanderRow,
+    /// Each reminder's rows, then the "Add Reminder" button.
+    list: gtk::ListBox,
+    add: adw::ButtonRow,
     rows: RefCell<Vec<Rc<Row>>>,
     all_day: Cell<bool>,
 }
 
 impl Reminders {
-    /// Show `offsets` in the dialog `b`; its "+" adds one more.
+    /// Show `offsets` in the dialog `b`; its "Add Reminder" adds one more.
     pub fn new(b: &gtk::Builder, all_day: bool, offsets: &[i64]) -> Rc<Reminders> {
         let r = Rc::new(Reminders {
-            due: get(b, "due"),
+            list: get(b, "reminders"),
+            add: get(b, "add_reminder"),
             rows: RefCell::default(),
             all_day: Cell::new(all_day),
         });
         for o in offsets {
             r.add(*o);
         }
-        let add: gtk::Button = get(b, "add_reminder");
         let weak = Rc::downgrade(&r);
-        add.connect_clicked(move |_| {
+        r.add.connect_activated(move |_| {
             // The first preset not in use yet, so a second reminder is not a duplicate.
             if let Some(r) = weak.upgrade() {
                 let (used, presets) = (r.offsets(), dates::reminders(r.all_day.get()));
@@ -106,6 +108,7 @@ impl Reminders {
             dirs: get(&b, "dirs"),
             presets: RefCell::default(),
         });
+        crate::window::scroll_past(row.amount.upcast_ref());
         row.fill(self.all_day.get(), offset, false);
         let weak = Rc::downgrade(&row);
         row.choice.connect_selected_notify(move |_| {
@@ -119,12 +122,13 @@ impl Reminders {
             let (Some(r), Some(row)) = (weak.upgrade(), gone.upgrade()) else {
                 return;
             };
-            r.due.remove(&row.choice);
-            r.due.remove(&row.custom);
+            r.list.remove(&row.choice);
+            r.list.remove(&row.custom);
             r.rows.borrow_mut().retain(|x| !Rc::ptr_eq(x, &row));
         });
-        self.due.add_row(&row.choice);
-        self.due.add_row(&row.custom);
+        let at = self.add.index();
+        self.list.insert(&row.choice, at);
+        self.list.insert(&row.custom, at + 1);
         self.rows.borrow_mut().push(row);
     }
 

@@ -1530,7 +1530,7 @@ fn select_name(picker: &impl IsA<glib::Object>, model: &gtk::StringList, name: &
 /// `sub`: a subtask, which has no category to edit.
 fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
     let b = view!("edit-dialog");
-    let dialog: adw::AlertDialog = get(&b, "dialog");
+    let dialog: adw::Dialog = get(&b, "dialog");
     let summary: adw::EntryRow = get(&b, "summary");
     let category: adw::ComboRow = get(&b, "category");
     let cats: gtk::StringList = get(&b, "cats");
@@ -1572,8 +1572,16 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
         }
     });
     let due_at = due_dialog(&b, t);
-    let task = t.clone();
-    dialog.connect_response(Some("save"), move |_, _| {
+    let cancel: gtk::Button = get(&b, "cancel");
+    let d = dialog.downgrade();
+    cancel.connect_clicked(move |_| {
+        if let Some(d) = d.upgrade() {
+            d.close();
+        }
+    });
+    let save: gtk::Button = get(&b, "save");
+    let (task, d) = (t.clone(), dialog.downgrade());
+    save.connect_clicked(move |_| {
         // Only send what changed: a one-line entry would flatten a multi-line note.
         let changed =
             |new: String, old: Option<&str>| (new != old.unwrap_or_default()).then_some(new);
@@ -1599,8 +1607,31 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
         if core().update_task(uid.clone(), patch).is_ok() {
             request_sync();
         }
+        if let Some(d) = d.upgrade() {
+            d.close();
+        }
     });
     dialog.present(Some(&ui.window));
+}
+
+/// The wheel over `w` scrolls the dialog instead: a calendar would change the month and a spin
+/// button its value, and with them the due date, while the user only scrolls past.
+pub fn scroll_past(w: &gtk::Widget) {
+    let wheel = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::VERTICAL);
+    wheel.set_propagation_phase(gtk::PropagationPhase::Capture);
+    wheel.connect_scroll(|c, _, dy| {
+        let sw = c
+            .widget()
+            .and_then(|w| w.ancestor(gtk::ScrolledWindow::static_type()));
+        if let Some(adj) = sw
+            .and_downcast::<gtk::ScrolledWindow>()
+            .map(|s| s.vadjustment())
+        {
+            adj.set_value(adj.value() + dy * adj.step_increment().max(40.0));
+        }
+        glib::Propagation::Stop
+    });
+    w.add_controller(wheel);
 }
 
 /// Fill the dialog's due date rows from `t`; the returned function reads what changed.
@@ -1622,23 +1653,13 @@ fn due_dialog(b: &gtk::Builder, t: &Task) -> impl Fn() -> TaskPatch + 'static {
     calendar.select_day(
         &glib::DateTime::from_utc(f.year(), f.month(), f.day_of_month(), 0, 0, 0.0).unwrap(),
     );
-    // The wheel over the calendar scrolls the dialog: GtkCalendar would change the month, and
-    // with it the due date, while the user only scrolls past.
-    let wheel = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::VERTICAL);
-    wheel.set_propagation_phase(gtk::PropagationPhase::Capture);
-    wheel.connect_scroll(|c, _, dy| {
-        let sw = c
-            .widget()
-            .and_then(|w| w.ancestor(gtk::ScrolledWindow::static_type()));
-        if let Some(adj) = sw
-            .and_downcast::<gtk::ScrolledWindow>()
-            .map(|s| s.vadjustment())
-        {
-            adj.set_value(adj.value() + dy * adj.step_increment().max(40.0));
-        }
-        glib::Propagation::Stop
-    });
-    calendar.add_controller(wheel);
+    for w in [
+        calendar.upcast_ref::<gtk::Widget>(),
+        hour.upcast_ref(),
+        minute.upcast_ref(),
+    ] {
+        scroll_past(w);
+    }
     due.set_enable_expansion(t.due.is_some());
     due.set_expanded(false); // enabling expands it; it opens on a click or the switch
     has_time.set_active(t.due.is_some() && !t.due_all_day);
