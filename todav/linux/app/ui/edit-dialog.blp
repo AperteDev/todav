@@ -7,6 +7,9 @@ Adw.Dialog dialog {
   content-width: 760;
   // Room for the expanded due date; smaller windows shrink it.
   content-height: 600;
+  // Breakpoints need a minimum size; the smallest GNOME supports.
+  width-request: 360;
+  height-request: 294;
   default-widget: save;
 
   child: Adw.ToolbarView {
