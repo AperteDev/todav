@@ -127,6 +127,14 @@ Adw.PreferencesDialog dialog {
         }
 
         [suffix]
+        Gtk.Button cancel_sign_in {
+          label: "Cancel";
+          valign: center;
+          visible: false;
+          styles ["flat"]
+        }
+
+        [suffix]
         Adw.SplitButton sign_out {
           label: "Sign Out";
           menu-model: sign_out_menu;

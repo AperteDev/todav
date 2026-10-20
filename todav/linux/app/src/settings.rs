@@ -296,6 +296,27 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
         });
     });
 
+    // Back from "Waiting for …" once a sign-in ends or is cancelled.
+    let cancel: gtk::Button = get(b, "cancel_sign_in");
+    let reset = {
+        let (sign_in, sign_out, cancel) = (sign_in.clone(), sign_out.clone(), cancel.clone());
+        let labels = (sign_in.label(), sign_out.label());
+        let describe = describe.clone();
+        move || {
+            for (button, label) in [(&sign_in, &labels.0), (&sign_out, &labels.1)] {
+                button.set_sensitive(true);
+                button.set_label(label.as_deref().unwrap_or_default());
+            }
+            cancel.set_visible(false);
+            describe();
+        }
+    };
+    let r = reset.clone();
+    cancel.connect_clicked(move |_| {
+        crate::window::cancel_login();
+        r();
+    });
+
     // Sign in with the browser (or by a copied link): renews the account signed in to here, or
     // replaces the GOA one.
     let start = {
@@ -305,7 +326,6 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
             sign_in.clone(),
             sign_out.clone(),
         );
-        let describe = describe.clone();
         move |copy: bool| {
             let server = url_text(&c.server);
             if server.is_empty() {
@@ -317,35 +337,22 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
             } else {
                 &sign_out
             };
-            let label = button.label().unwrap_or_default();
             button.set_sensitive(false);
             button.set_label(if copy {
                 "Waiting for Sign-In…"
             } else {
                 "Waiting for Browser…"
             });
-            let (d, button, show) = (d.clone(), button.clone(), describe.clone());
+            cancel.set_visible(true);
+            let (d, reset) = (d.clone(), reset.clone());
             glib::spawn_future_local(async move {
                 let msg = match crate::window::browser_login(server, copy).await {
-                    Ok(Some(c)) => {
-                        let who = c.login_name.clone();
-                        match crate::switch_account(crate::Target::Manual(c)).await {
-                            Ok(()) => {
-                                crate::window::account_changed();
-                                Some(format!("Signed in as {who}"))
-                            }
-                            Err(e) => Some(e),
-                        }
-                    }
-                    Ok(None) => None,
-                    Err(e) => Some(e),
+                    Ok(Some(c)) => use_sign_in(c).await,
+                    Ok(None) => return, // cancelled: Cancel or closing the dialog reset it
+                    Err(e) => e,
                 };
-                button.set_sensitive(true);
-                button.set_label(&label);
-                show();
-                if let Some(msg) = msg {
-                    d.add_toast(adw::Toast::new(&msg));
-                }
+                reset();
+                d.add_toast(adw::Toast::new(&msg));
             });
         }
     };
@@ -375,6 +382,18 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
     // A sign-in still waiting for the browser stops with the dialog.
     dialog.connect_closed(|_| crate::window::cancel_login());
     conn
+}
+
+/// Connect with credentials from a sign-in here; the message for a toast.
+async fn use_sign_in(c: todav_core::Credentials) -> String {
+    let who = c.login_name.clone();
+    match crate::switch_account(crate::Target::Manual(c)).await {
+        Ok(()) => {
+            crate::window::account_changed();
+            format!("Signed in as {who}")
+        }
+        Err(e) => e,
+    }
 }
 
 /// Fill a scheme picker and host entry from a full URL.

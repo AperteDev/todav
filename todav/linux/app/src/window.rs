@@ -453,7 +453,8 @@ fn start_login(ui: &Rc<Ui>, copy: bool) {
     glib::spawn_future_local(async move {
         match browser_login(server, copy).await {
             Ok(Some(c)) => connect_with(&ui, crate::Target::Manual(c)).await,
-            Ok(None) => {} // cancelled or superseded
+            // Cancelled: Cancel already reset the page, which may be waiting for a new sign-in.
+            Ok(None) => return,
             Err(e) => ui.toasts.add_toast(adw::Toast::new(&e)),
         }
         reset_login(&ui);
