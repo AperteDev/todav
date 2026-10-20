@@ -33,6 +33,7 @@ const CSS: &str = "
 .day.selected { background: alpha(@accent_bg_color, 0.08); }
 .chip { padding: 0 6px; min-height: 22px; border-radius: 6px; font-size: smaller; }
 .chip button, .more button { font-weight: normal; }
+menubutton.chip > button, menubutton.more > button, .chip.task button { min-height: 0; min-width: 0; padding: 0; }
 .chip.task check { min-width: 14px; min-height: 14px; margin: 0 4px 0 0; padding: 0; }
 .chip.task button { padding: 0; min-height: 0; }
 .chip.done label { text-decoration-line: line-through; opacity: 0.55; }
@@ -201,6 +202,26 @@ pub fn build(views: &adw::ViewStack, tasks: &adw::NavigationSplitView) {
 
     week::setup(&c);
     plan_drop(&c);
+    // Narrow: the Month / Week / Agenda choice moves from the header to a bar at the bottom.
+    let narrow: adw::ToggleGroup = get(&b, "mode_narrow");
+    c.mode
+        .bind_property("active-name", &narrow, "active-name")
+        .bidirectional()
+        .sync_create()
+        .build();
+    let bar: gtk::ActionBar = get(&b, "mode_bar");
+    let sync: gtk::Button = get(&b, "sync");
+    let place = {
+        let (mode, bar) = (c.mode.clone(), bar.clone());
+        move |collapsed: bool| {
+            mode.set_visible(!collapsed);
+            bar.set_revealed(collapsed);
+            sync.set_visible(!collapsed); // F5 still syncs
+        }
+    };
+    place(c.split.is_collapsed());
+    c.split
+        .connect_collapsed_notify(move |s| place(s.is_collapsed()));
     let mode = core().setting("calendar_mode".into()).unwrap_or_default();
     c.mode.set_active_name(Some(match mode.as_str() {
         "week" | "agenda" => mode.as_str(),
@@ -903,6 +924,7 @@ fn more(c: &Rc<Cal>, day: i64, rest: Vec<Item>) -> gtk::MenuButton {
     let label = gtk::Label::builder()
         .label(format!("+{} more", rest.len()))
         .xalign(0.0)
+        .ellipsize(gtk::pango::EllipsizeMode::End)
         .build();
     let b = gtk::MenuButton::builder()
         .child(&label)

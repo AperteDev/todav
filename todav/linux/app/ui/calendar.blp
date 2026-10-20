@@ -128,7 +128,7 @@ Adw.NavigationSplitView split {
         }
 
         [end]
-        Gtk.Button {
+        Gtk.Button sync {
           icon-name: "view-refresh-symbolic";
           tooltip-text: "Sync (F5)";
           action-name: "app.sync";
@@ -141,6 +141,30 @@ Adw.NavigationSplitView split {
 
         [end]
         Adw.ToggleGroup mode {
+          Adw.Toggle {
+            name: "month";
+            label: "Month";
+          }
+
+          Adw.Toggle {
+            name: "week";
+            label: "Week";
+          }
+
+          Adw.Toggle {
+            name: "agenda";
+            label: "Agenda";
+          }
+        }
+      }
+
+      // The same choice at the bottom when the window is narrow (the header has no room).
+      [bottom]
+      Gtk.ActionBar mode_bar {
+        revealed: false;
+
+        [center]
+        Adw.ToggleGroup mode_narrow {
           Adw.Toggle {
             name: "month";
             label: "Month";
