@@ -394,6 +394,31 @@ Not started; nothing in the code yet. Notav (*notatka* + DAV) is a sibling app f
 - [ ] Folder layout and name of the notes root (reuse the Nextcloud Notes folder or a separate one), daily note format, attachments.
 - [ ] Editor: GtkSourceView with Markdown highlighting vs. a rendered/WYSIWYG view.
 
+## Calendar (in Todav)
+
+Events next to tasks in the same app, from the same CalDAV account: a full calendar view like GNOME Calendar, with tasks living on it. Decided 2026-10-20.
+
+**Decisions**
+
+- Sync: our own CalDAV in the core (not evolution-data-server), so Android gets it too. Every calendar collection is synced; a collection is a task list if it supports VTODO and a calendar if it supports VEVENT (Nextcloud's "Personal" is both).
+- Events are stored like tasks (raw iCalendar plus derived columns, one row per resource, keyed by calendar and UID), through the same push/pull/conflict code.
+- Time zones come from the `VTIMEZONE` inside each object (always present for a `TZID`; covers Windows zone names too), so no tz database dependency. A `TZID` without one is read as local time. Task due times use the same code.
+- Recurrence: hand-written `RRULE` subset, enough for real data (Nextcloud, Thunderbird, Outlook exports in `tmp/events/`): `DAILY`/`WEEKLY`/`MONTHLY`/`YEARLY`, `INTERVAL`, `COUNT`, `UNTIL`, `BYDAY` (with ordinals), `BYMONTHDAY`, `BYMONTH`, `BYSETPOS`, `WKST`; plus `RDATE`, `EXDATE` and `RECURRENCE-ID` overrides. Other parts (`BYYEARDAY`, `BYWEEKNO`, `BYHOUR`…) show only the first occurrence. Expansion jumps to the requested range (time zone rules start in 1601).
+- Occurrences are expanded on demand for the visible range; the table keeps each event's first start and last end so a range query only parses events that can overlap.
+- Time-blocking: a task scheduled into a time slot gets `DTSTART` (and `DUE` as its end) on the VTODO itself, no linked event.
+- Tasks for an event: `RELATED-TO` on the task pointing at the event's UID.
+
+**UI**: a Tasks | Calendar switcher in the header. Calendar page: sidebar with a mini month, the calendars (colour, show/hide) and unscheduled tasks; Month, Week and Agenda views (custom-drawn grids); an event dialog like the task edit dialog. Tasks with dates show on the calendar, can be ticked there and dragged to another day or into a time slot.
+
+**Steps**
+
+- [ ] Core: `VEVENT` objects in `ical`, `RRULE` expansion, `VTIMEZONE` offsets (TZID-aware task times too)
+- [ ] Core: event calendars in discovery, `events` table, sync of events, `events(from, to)`, event reminders
+- [ ] Linux: Tasks | Calendar switcher, month view, agenda, calendars sidebar, tasks on the calendar
+- [ ] Linux: week view (hour grid), time-blocking by dragging tasks, rescheduling by drag
+- [ ] Core + Linux: create, edit and delete events (this / this and following / all occurrences for recurring ones), event reminders as notifications
+- [ ] Integration: tasks linked to events, Today agenda, next event in the GNOME extension
+
 ## Progress
 
 Deviation: no docker stack (`infra/`) for now — integration runs against the real instance (`cloud.aperte.dev`, user `Test`; ntfy at `ntfy.aperte.dev`, anonymous topics). Credentials live in a gitignored `.env`.
@@ -420,7 +445,7 @@ Deviation: no docker stack (`infra/`) for now — integration runs against the r
 - [x] M4 leftovers: undo for delete (toast; a delete already on the server is re-created), Flatpak (`todav/linux/flatpak/`, GNOME 51, `make -C todav/linux flatpak`; autostart through the Background portal; builds with network, Flathub needs a generated `cargo-sources.json`)
 - [x] M5 GNOME extension (`todav/gnome-extension/`, ESM, Shell 48–51): pinned list, category sections, tick keeps menu open, add entry, list switcher, open app, warning on sync error. `make -C todav/gnome-extension install`. Verified in a nested headless Shell
 - [x] Dates: due date (+ optional time) and reminders (one `VALARM` each, `TRIGGER;RELATED=END`; presets or a custom time span; synced settings for the default new reminder and the time all-day reminders go off; local times in an `alarms` table) in the edit dialog; due tag on rows (red when overdue, bell with a reminder); "Upcoming" sidebar page across lists (Overdue, Today, Tomorrow, weekdays, Later); notifications for each reminder from the background service with "Mark as Done". Times are local wall-clock in the core (`to_local`/`to_utc` through SQLite's `localtime`); TZID times are read as local
-- [ ] Calendar: events (VEVENT) next to tasks — month/week view, then read-only events, then editing
+- [ ] Calendar: events (VEVENT) next to tasks — see the Calendar section for the steps
 - [ ] M6 Android (+ UniFFI exports) → M7 Pebble
 - [ ] Non-functional (last): README, `docs/`, CI, Flatpak
 
