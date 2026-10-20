@@ -2,6 +2,7 @@
 //! with the calendars (and task lists) to show and the tasks still to plan in the sidebar.
 //! Times are local wall-clock seconds, as in the core.
 
+mod dialog;
 mod week;
 
 use crate::window::{get, view};
@@ -11,7 +12,7 @@ use gtk::{gdk, glib};
 use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
 use std::rc::Rc;
-use todav_core::{Due, Event, List, Task, TaskPatch};
+use todav_core::{Due, Event, EventPatch, EventTime, List, Scope, Task, TaskPatch};
 
 const DAY: i64 = 86400;
 
@@ -216,6 +217,29 @@ pub fn build(views: &adw::ViewStack, tasks: &adw::NavigationSplitView) {
     get::<gtk::Button>(&b, "today").connect_clicked(|_| go(|_| today()));
     get::<gtk::Button>(&b, "prev").connect_clicked(|_| step(-1));
     get::<gtk::Button>(&b, "next").connect_clicked(|_| step(1));
+    // A new event on the selected day, at the next full hour when that is today, else at 9:00.
+    let actions = gtk::gio::SimpleActionGroup::new();
+    let new_event = gtk::gio::SimpleAction::new("new-event", None);
+    new_event.connect_activate(|_, _| {
+        let Some(c) = cal() else { return };
+        let day = c.anchor.get();
+        let now = core().local_now();
+        let start = if day == today() {
+            (now / 3600 + 1) * 3600
+        } else {
+            day + 9 * 3600
+        };
+        let time = EventTime {
+            start,
+            end: start + 3600,
+            all_day: false,
+        };
+        dialog::open(&c, None, time);
+    });
+    actions.add_action(&new_event);
+    c.split.insert_action_group("cal", Some(&actions));
+    // New events are written in the system's zone.
+    core().set_local_zone(glib::TimeZone::local().identifier().to_string());
 
     // Shown when it was left open.
     if core().setting("last_view".into()).as_deref() == Some("calendar") {
@@ -362,27 +386,29 @@ fn render_plan(c: &Rc<Cal>, until: i64) {
     }
 }
 
-// --- moving tasks by drag and drop -------------------------------------------
+// --- moving tasks and events by drag and drop --------------------------------
 
 thread_local! {
-    /// The task being dragged.
-    static DRAGGING: RefCell<Option<Task>> = const { RefCell::new(None) };
+    /// The task or event being dragged.
+    static DRAGGING: RefCell<Option<Item>> = const { RefCell::new(None) };
 }
 
-fn dragging() -> Option<Task> {
+fn dragging() -> Option<Item> {
     DRAGGING.with(|d| d.borrow().clone())
 }
 
-/// Make `w` drag task `t`: onto a day, an hour of the week, or back to "To Plan".
-fn drag_task(w: &impl IsA<gtk::Widget>, t: &Task) {
+/// Make `w` drag `i`: onto a day or an hour of the week; a task also back to "To Plan".
+fn drag_item(w: &impl IsA<gtk::Widget>, i: Item) {
     let src = gtk::DragSource::new();
     src.set_actions(gdk::DragAction::MOVE);
-    let uid = t.uid.clone();
-    src.connect_prepare(move |_, _, _| Some(gdk::ContentProvider::for_value(&uid.to_value())));
-    let task = t.clone();
+    src.connect_prepare(|_, _, _| Some(gdk::ContentProvider::for_value(&"todav-item".to_value())));
     src.connect_drag_begin(move |_, drag| {
-        DRAGGING.with(|d| *d.borrow_mut() = Some(task.clone()));
-        let card = gtk::Label::new(Some(&task.summary));
+        let title = match &i {
+            Item::Task(t) => t.summary.clone(),
+            Item::Event(e) => e.summary.clone(),
+        };
+        DRAGGING.with(|d| *d.borrow_mut() = Some(i.clone()));
+        let card = gtk::Label::new(Some(&title));
         card.add_css_class("drag-card");
         if let Ok(icon) = gtk::DragIcon::for_drag(drag).downcast::<gtk::DragIcon>() {
             icon.set_child(Some(&card));
@@ -398,17 +424,100 @@ fn drag_task(w: &impl IsA<gtk::Widget>, t: &Task) {
     w.add_controller(src);
 }
 
-/// A drop target taking dragged tasks; `dropped` gets the task.
-fn task_drop(w: &impl IsA<gtk::Widget>, dropped: impl Fn(&Task) + 'static) -> gtk::DropTarget {
+fn drag_task(w: &impl IsA<gtk::Widget>, t: &Task) {
+    drag_item(w, Item::Task(t.clone()));
+}
+
+/// An event in a calendar we may change can be dragged.
+fn drag_event(c: &Cal, w: &impl IsA<gtk::Widget>, e: &Event) {
+    if writable(c, &e.list_href) {
+        drag_item(w, Item::Event(e.clone()));
+    }
+}
+
+fn writable(c: &Cal, list: &str) -> bool {
+    c.lists
+        .borrow()
+        .iter()
+        .any(|l| l.href == list && l.writable)
+}
+
+/// A drop target taking dragged items (only tasks with `tasks_only`); `dropped` gets the item.
+fn item_drop(
+    w: &impl IsA<gtk::Widget>,
+    tasks_only: bool,
+    dropped: impl Fn(&Item) + 'static,
+) -> gtk::DropTarget {
     let drop = gtk::DropTarget::new(glib::Type::STRING, gdk::DragAction::MOVE);
-    drop.connect_accept(|_, _| dragging().is_some());
+    drop.connect_accept(move |_, _| match dragging() {
+        Some(Item::Task(_)) => true,
+        Some(Item::Event(_)) => !tasks_only,
+        None => false,
+    });
     drop.connect_drop(move |_, _, _, _| {
-        let Some(t) = dragging() else { return false };
-        dropped(&t);
+        let Some(i) = dragging() else { return false };
+        dropped(&i);
         true
     });
     w.add_controller(drop.clone());
     drop
+}
+
+/// Drop target for a day (a month cell, the week's all-day row): tasks move there; events move
+/// there keeping their time, or (`all_day`) become all-day events of that day.
+fn day_drop(w: &impl IsA<gtk::Widget>, day: i64, all_day: bool) {
+    item_drop(w, false, move |i| match i {
+        Item::Task(t) => move_to_day(t, day),
+        Item::Event(e) if all_day && !e.all_day => move_event(
+            e,
+            EventTime {
+                start: day,
+                end: day + DAY,
+                all_day: true,
+            },
+        ),
+        Item::Event(e) => {
+            let start = day + e.start.rem_euclid(DAY);
+            move_event(
+                e,
+                EventTime {
+                    start,
+                    end: start + e.end - e.start,
+                    all_day: e.all_day,
+                },
+            )
+        }
+    });
+}
+
+/// Give an occurrence a new time; for a repeating event, ask which occurrences move.
+fn move_event(e: &Event, time: EventTime) {
+    if (time.start, time.end, time.all_day) == (e.start, e.end, e.all_day) {
+        return;
+    }
+    let e = e.clone();
+    let apply = move |scope: Scope| {
+        let patch = EventPatch {
+            time: Some(time),
+            ..Default::default()
+        };
+        match core().update_event(
+            e.list_href.clone(),
+            e.uid.clone(),
+            e.recurrence_id,
+            scope,
+            patch,
+        ) {
+            Ok(()) => request_sync(),
+            Err(err) => crate::window::toast(&err.to_string()),
+        }
+    };
+    match cal() {
+        Some(c) if e.recurring => {
+            dialog::ask_scope(&c.split, "Move Repeating Event?", false, apply)
+        }
+        _ => apply(Scope::All),
+    }
 }
 
 fn save(uid: &str, patch: TaskPatch) {
@@ -501,7 +610,11 @@ fn unplan(t: &Task) {
 
 fn plan_drop(c: &Rc<Cal>) {
     c.plan.add_css_class("plan");
-    task_drop(&c.plan, unplan);
+    item_drop(&c.plan, true, |i| {
+        if let Item::Task(t) = i {
+            unplan(t);
+        }
+    });
 }
 
 pub fn set_syncing(on: bool) {
@@ -728,11 +841,29 @@ fn render_month(c: &Rc<Cal>) -> i64 {
                 here[shown..].iter().map(|i| (*i).clone()).collect(),
             ));
         }
-        // Clicking a day selects it; a task dropped on it moves there.
+        // Clicking a day selects it, a double click adds an event that day; what is dropped
+        // on it moves there.
         let click = gtk::GestureClick::new();
-        click.connect_released(move |_, _, _, _| go(|_| day));
+        let weak = Rc::downgrade(c);
+        click.connect_released(move |_, n, _, _| {
+            if n == 2 {
+                if let Some(c) = weak.upgrade() {
+                    dialog::open(
+                        &c,
+                        None,
+                        EventTime {
+                            start: day,
+                            end: day + DAY,
+                            all_day: true,
+                        },
+                    );
+                }
+            } else {
+                go(|_| day);
+            }
+        });
         cell.add_controller(click);
-        task_drop(&cell, move |t| move_to_day(t, day));
+        day_drop(&cell, day, false);
         c.month.attach(&cell, (n % 7) as i32, (n / 7) as i32, 1, 1);
     }
     end
@@ -795,6 +926,7 @@ fn chip(c: &Rc<Cal>, i: &Item) -> gtk::Widget {
             if e.cancelled {
                 b.add_css_class("cancelled");
             }
+            drag_event(c, &b, e);
             let (weak, e) = (Rc::downgrade(c), e.clone());
             b.set_create_popup_func(move |b| {
                 if let Some(c) = weak.upgrade() {
@@ -911,13 +1043,13 @@ fn details(c: &Cal, e: &Event) -> gtk::Popover {
     if let Some(l) = &e.location {
         b.append(&line("mark-location-symbolic", l));
     }
-    let cal = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let which = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     let dot = gtk::Box::builder().valign(gtk::Align::Center).build();
     dot.add_css_class("dot");
     dot.add_css_class(&class(c, &e.list_href));
-    cal.append(&dot);
-    cal.append(&gtk::Label::new(Some(&list_name(c, &e.list_href))));
-    b.append(&cal);
+    which.append(&dot);
+    which.append(&gtk::Label::new(Some(&list_name(c, &e.list_href))));
+    b.append(&which);
     if !e.reminders.is_empty() {
         let at: Vec<String> = e
             .reminders
@@ -929,7 +1061,59 @@ fn details(c: &Cal, e: &Event) -> gtk::Popover {
     if let Some(d) = &e.description {
         b.append(&line("text-x-generic-symbolic", d));
     }
-    gtk::Popover::builder().child(&b).build()
+    let pop = gtk::Popover::builder().child(&b).build();
+    if writable(c, &e.list_href) {
+        let buttons = gtk::Box::builder()
+            .spacing(6)
+            .halign(gtk::Align::End)
+            .margin_top(4)
+            .build();
+        let delete = gtk::Button::builder()
+            .icon_name("user-trash-symbolic")
+            .tooltip_text("Delete")
+            .build();
+        delete.add_css_class("flat");
+        let edit = gtk::Button::builder().label("Edit…").build();
+        let (p, ev) = (pop.downgrade(), e.clone());
+        edit.connect_clicked(move |_| {
+            if let Some(p) = p.upgrade() {
+                p.popdown();
+            }
+            if let Some(c) = cal() {
+                let time = EventTime {
+                    start: ev.start,
+                    end: ev.end,
+                    all_day: ev.all_day,
+                };
+                dialog::open(&c, Some(ev.clone()), time);
+            }
+        });
+        let (p, ev) = (pop.downgrade(), e.clone());
+        delete.connect_clicked(move |_| {
+            let Some(p) = p.upgrade() else { return };
+            p.popdown();
+            let ev = ev.clone();
+            let del = move |scope: Scope| match core().delete_event(
+                ev.list_href.clone(),
+                ev.uid.clone(),
+                ev.recurrence_id,
+                scope,
+            ) {
+                Ok(()) => request_sync(),
+                Err(err) => crate::window::toast(&err.to_string()),
+            };
+            match cal() {
+                Some(c) if ev.recurring => {
+                    dialog::ask_scope(&c.split, "Delete Repeating Event?", true, del)
+                }
+                _ => del(Scope::All),
+            }
+        });
+        buttons.append(&delete);
+        buttons.append(&edit);
+        b.append(&buttons);
+    }
+    pop
 }
 
 fn render_agenda(c: &Rc<Cal>) {

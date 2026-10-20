@@ -3,6 +3,16 @@ using Adw 1;
 
 // The Calendar page: a mini month and the calendars beside the Month / Week / Agenda views.
 Adw.NavigationSplitView split {
+  // Ctrl+N while the page has the focus (the Tasks page adds tasks from its entry).
+  Gtk.ShortcutController {
+    scope: managed;
+
+    Gtk.Shortcut {
+      trigger: "<Control>n";
+      action: "action(cal.new-event)";
+    }
+  }
+
   sidebar: Adw.NavigationPage {
     title: "Calendar";
 
@@ -108,6 +118,13 @@ Adw.NavigationSplitView split {
             icon-name: "go-next-symbolic";
             tooltip-text: "Next";
           }
+        }
+
+        [start]
+        Gtk.Button {
+          icon-name: "list-add-symbolic";
+          tooltip-text: "New Event (Ctrl+N)";
+          action-name: "cal.new-event";
         }
 
         [end]

@@ -67,15 +67,48 @@ pub(super) fn setup(c: &Rc<Cal>) {
             ))
         });
 
-    // Dragging a task over the hours shows where it lands; dropping plans it there.
-    let drop = task_drop(&c.week_grid, |t| {
+    // Dragging over the hours shows where it lands: a task is planned there, an event moves.
+    let drop = item_drop(&c.week_grid, false, |i| {
         let Some(c) = cal() else { return };
         if let Some((day, minute)) = c.hover.take() {
-            let start = week_start(c.anchor.get());
-            plan_at(t, start + day * DAY + minute * 60);
+            let at = week_start(c.anchor.get()) + day * DAY + minute * 60;
+            match i {
+                Item::Task(t) => plan_at(t, at),
+                Item::Event(e) => move_event(
+                    e,
+                    EventTime {
+                        start: at,
+                        end: at + drop_length(i) * 60,
+                        all_day: false,
+                    },
+                ),
+            }
         }
         c.week_lines.queue_draw();
     });
+    // A double click on a free hour adds an event there.
+    let click = gtk::GestureClick::new();
+    let weak = Rc::downgrade(c);
+    click.connect_pressed(move |g, n, x, y| {
+        let Some(c) = weak.upgrade() else { return };
+        if n != 2 {
+            return;
+        }
+        if let Some((day, minute)) = slot(&c, x, y) {
+            g.set_state(gtk::EventSequenceState::Claimed);
+            let at = week_start(c.anchor.get()) + day * DAY + minute / 30 * 30 * 60;
+            dialog::open(
+                &c,
+                None,
+                EventTime {
+                    start: at,
+                    end: at + 3600,
+                    all_day: false,
+                },
+            );
+        }
+    });
+    c.week_grid.add_controller(click);
     let weak = Rc::downgrade(c);
     drop.connect_motion(move |_, x, y| {
         if let Some(c) = weak.upgrade() {
@@ -114,10 +147,14 @@ fn slot(c: &Cal, x: f64, y: f64) -> Option<(i64, i64)> {
 }
 
 /// Length in minutes of what a dropped task becomes (for the drop preview).
-fn drop_length(t: &Task) -> i64 {
-    match (t.start, t.due) {
-        (Some(s), Some(d)) if !t.start_all_day && !t.due_all_day && d > s => (d - s) / 60,
-        _ => 60,
+fn drop_length(i: &Item) -> i64 {
+    match i {
+        Item::Task(t) => match (t.start, t.due) {
+            (Some(s), Some(d)) if !t.start_all_day && !t.due_all_day && d > s => (d - s) / 60,
+            _ => 60,
+        },
+        Item::Event(e) if !e.all_day && e.end > e.start => (e.end - e.start) / 60,
+        Item::Event(_) => 60,
     }
 }
 
@@ -271,7 +308,7 @@ pub(super) fn render(c: &Rc<Cal>) -> i64 {
         {
             cell.append(&chip(c, i));
         }
-        task_drop(&cell, move |t| move_to_day(t, day));
+        day_drop(&cell, day, true);
         all_day.append(&cell);
     }
 
@@ -364,6 +401,7 @@ fn block(c: &Rc<Cal>, i: &Item, geo: Geo) -> gtk::Widget {
             if e.cancelled {
                 b.add_css_class("cancelled");
             }
+            drag_event(c, &b, e);
             let (weak, e) = (Rc::downgrade(c), e.clone());
             b.set_create_popup_func(move |b| {
                 if let Some(c) = weak.upgrade() {

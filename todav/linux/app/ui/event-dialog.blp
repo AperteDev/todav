@@ -1,0 +1,229 @@
+using Gtk 4.0;
+using Adw 1;
+
+// A new event or an existing one: what, where, which calendar, when, how it repeats, notes and
+// reminders.
+Adw.Dialog dialog {
+  title: "Event";
+  content-width: 520;
+  content-height: 680;
+  default-widget: save;
+  focus-widget: summary;
+
+  child: Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {
+      show-start-title-buttons: false;
+      show-end-title-buttons: false;
+
+      [start]
+      Gtk.Button cancel {
+        label: "Cancel";
+      }
+
+      [end]
+      Gtk.Button save {
+        label: "Save";
+        styles ["suggested-action"]
+      }
+    }
+
+    content: Gtk.ScrolledWindow {
+      hscrollbar-policy: never;
+      propagate-natural-height: true;
+
+      Adw.Clamp {
+        maximum-size: 560;
+
+        Gtk.Box {
+          orientation: vertical;
+          spacing: 18;
+          margin-top: 12;
+          margin-bottom: 18;
+          margin-start: 12;
+          margin-end: 12;
+
+          Adw.PreferencesGroup {
+            Adw.EntryRow summary {
+              title: "Title";
+              activates-default: true;
+            }
+
+            Adw.EntryRow location {
+              title: "Location";
+              activates-default: true;
+            }
+
+            Adw.ComboRow calendar {
+              title: "Calendar";
+              model: Gtk.StringList calendars {};
+            }
+          }
+
+          Adw.PreferencesGroup {
+            Adw.SwitchRow all_day {
+              title: "All Day";
+            }
+
+            Adw.ActionRow start_row {
+              title: "Starts";
+
+              [suffix]
+              Gtk.MenuButton start_date {
+                valign: center;
+                popover: Gtk.Popover {
+                  Gtk.Calendar start_cal {}
+                };
+              }
+
+              [suffix]
+              Gtk.Box start_time {
+                valign: center;
+                spacing: 4;
+
+                Gtk.SpinButton start_hour {
+                  numeric: true;
+                  wrap: true;
+                  adjustment: Gtk.Adjustment {
+                    lower: 0;
+                    upper: 23;
+                    step-increment: 1;
+                  };
+                }
+
+                Gtk.Label {
+                  label: ":";
+                }
+
+                Gtk.SpinButton start_minute {
+                  numeric: true;
+                  wrap: true;
+                  adjustment: Gtk.Adjustment {
+                    lower: 0;
+                    upper: 59;
+                    step-increment: 5;
+                  };
+                }
+              }
+            }
+
+            Adw.ActionRow end_row {
+              title: "Ends";
+
+              [suffix]
+              Gtk.MenuButton end_date {
+                valign: center;
+                popover: Gtk.Popover {
+                  Gtk.Calendar end_cal {}
+                };
+              }
+
+              [suffix]
+              Gtk.Box end_time {
+                valign: center;
+                spacing: 4;
+
+                Gtk.SpinButton end_hour {
+                  numeric: true;
+                  wrap: true;
+                  adjustment: Gtk.Adjustment {
+                    lower: 0;
+                    upper: 23;
+                    step-increment: 1;
+                  };
+                }
+
+                Gtk.Label {
+                  label: ":";
+                }
+
+                Gtk.SpinButton end_minute {
+                  numeric: true;
+                  wrap: true;
+                  adjustment: Gtk.Adjustment {
+                    lower: 0;
+                    upper: 59;
+                    step-increment: 5;
+                  };
+                }
+              }
+            }
+          }
+
+          Adw.PreferencesGroup {
+            Adw.ComboRow repeat {
+              title: "Repeat";
+              model: Gtk.StringList repeats { strings ["Does Not Repeat", "Daily", "Weekly", "Monthly", "Yearly"] };
+            }
+
+            Adw.SpinRow interval {
+              title: "Every";
+              adjustment: Gtk.Adjustment {
+                lower: 1;
+                upper: 99;
+                step-increment: 1;
+              };
+            }
+
+            Adw.ExpanderRow until {
+              title: "Until";
+              show-enable-switch: true;
+              enable-expansion: false;
+
+              Gtk.ListBoxRow {
+                activatable: false;
+
+                Gtk.Calendar until_cal {
+                  margin-top: 6;
+                  margin-bottom: 6;
+                  margin-start: 6;
+                  margin-end: 6;
+                }
+              }
+            }
+          }
+
+          Adw.PreferencesGroup {
+            title: "Notes";
+
+            Gtk.ScrolledWindow {
+              height-request: 100;
+              hscrollbar-policy: never;
+              styles ["card"]
+
+              Gtk.TextView description {
+                wrap-mode: word_char;
+                top-margin: 12;
+                bottom-margin: 12;
+                left-margin: 12;
+                right-margin: 12;
+                styles ["inline"]
+              }
+            }
+          }
+
+          // Reminders (ui/reminder.blp) go above the button.
+          Gtk.ListBox reminders {
+            selection-mode: none;
+            styles ["boxed-list"]
+
+            Adw.ButtonRow add_reminder {
+              title: "Add Reminder";
+              start-icon-name: "list-add-symbolic";
+            }
+          }
+
+          Gtk.ListBox delete_box {
+            selection-mode: none;
+            styles ["boxed-list"]
+
+            Adw.ButtonRow delete {
+              title: "Delete Event";
+              styles ["destructive-action"]
+            }
+          }
+        }
+      }
+    };
+  };
+}
