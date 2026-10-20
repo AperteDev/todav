@@ -354,6 +354,61 @@ fn events_sync_with_their_zone_and_recurrence() {
         ]
     );
 
+    // Edits from here: one occurrence, then the rest of the series, reach device b.
+    let rid = local("20261019T130000");
+    let only = todav_core::EventPatch {
+        summary: Some("Only this one".into()),
+        ..Default::default()
+    };
+    f.a.update_event(
+        f.href.clone(),
+        "it-weekly".into(),
+        Some(rid),
+        todav_core::Scope::This,
+        only,
+    )
+    .unwrap();
+    f.a.sync().unwrap();
+    let (_, server) = f.dav.get(&href).unwrap().unwrap();
+    assert!(
+        server.contains("SUMMARY:Only this one") && server.matches("RECURRENCE-ID").count() == 2,
+        "{server}"
+    );
+    f.b.sync().unwrap();
+    let on_b = f.b.events(rid, rid + 1);
+    assert_eq!(
+        on_b.iter().map(|e| e.summary.as_str()).collect::<Vec<_>>(),
+        ["Only this one"]
+    );
+
+    // A new event borrows the zone of the stored one.
+    f.a.set_local_zone("America/New_York".into());
+    let time = todav_core::EventTime {
+        start: local("20261020T160000"),
+        end: local("20261020T170000"),
+        all_day: false,
+    };
+    let uid =
+        f.a.add_event(f.href.clone(), "Lunch".into(), time, vec![-600])
+            .unwrap();
+    f.a.sync().unwrap();
+    let (_, lunch) = f.dav.get(&format!("{}{uid}.ics", f.href)).unwrap().unwrap();
+    assert!(
+        lunch.contains("DTSTART;TZID=America/New_York:20261020T120000")
+            && lunch.contains("BEGIN:VTIMEZONE")
+            && lunch.contains("TRIGGER:-PT10M"),
+        "{lunch}"
+    );
+    f.a.delete_event(f.href.clone(), uid.clone(), None, todav_core::Scope::All)
+        .unwrap();
+    f.a.sync().unwrap();
+    assert!(
+        f.dav
+            .get(&format!("{}{uid}.ics", f.href))
+            .unwrap()
+            .is_none()
+    );
+
     // Deleted on the server: gone here too.
     f.dav.delete(&href, None, None).unwrap();
     f.a.sync_list(f.href.clone()).unwrap();

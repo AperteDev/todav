@@ -529,6 +529,27 @@ pub fn events(db: &Connection, from: i64, to: i64) -> Result<Vec<Event>> {
     Ok(out)
 }
 
+/// A VTIMEZONE for `tzid` from any stored event, to write new times in that zone.
+pub fn vtimezone(db: &Connection, tzid: &str) -> Result<Option<Vec<Line>>> {
+    let rows: Vec<String> = db
+        .prepare("SELECT raw_ics FROM events WHERE instr(raw_ics, ?1) > 0 LIMIT 20")?
+        .query_map([format!("TZID:{tzid}")], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    for ics in rows {
+        let Some(cal) = Calendar::parse(&ics) else {
+            continue;
+        };
+        let comps = cal.comps();
+        let found = comps.iter().position(|c| {
+            c.kind.eq_ignore_ascii_case("VTIMEZONE") && c.text("TZID").as_deref() == Some(tzid)
+        });
+        if let Some(i) = found {
+            return Ok(Some(cal.comp_lines(i)));
+        }
+    }
+    Ok(None)
+}
+
 pub fn set_sync_state(
     db: &Connection,
     o: &RawObject,

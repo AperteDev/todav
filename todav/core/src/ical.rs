@@ -199,29 +199,38 @@ impl Calendar {
         }
     }
 
-    /// (BEGIN, END) line indexes of the main VTODO or VEVENT: the first without RECURRENCE-ID
+    /// (BEGIN, END) line indexes of the components inside the VCALENDAR, in `comps()` order.
+    fn ranges(&self) -> Vec<(usize, usize)> {
+        comp_ranges(&self.lines, self.top_depth())
+    }
+
+    /// Index (in `comps()`) of the main VTODO or VEVENT: the first without RECURRENCE-ID
     /// (overrides of single occurrences of a recurring event come with it), or else the first.
-    fn main_range(&self) -> Option<(usize, usize)> {
-        let mains: Vec<(usize, usize)> = comp_ranges(&self.lines, self.top_depth())
-            .into_iter()
-            .filter(|&(b, _)| {
-                let k = &self.lines[b].value;
+    pub fn main_index(&self) -> Option<usize> {
+        let ranges = self.ranges();
+        let mains: Vec<usize> = (0..ranges.len())
+            .filter(|&i| {
+                let k = &self.lines[ranges[i].0].value;
                 k.eq_ignore_ascii_case("VTODO") || k.eq_ignore_ascii_case("VEVENT")
             })
             .collect();
-        let own = |&(b, e): &(usize, usize)| Comp {
+        let own = |i: usize| Comp {
             kind: "",
-            lines: &self.lines[b + 1..e],
+            lines: &self.lines[ranges[i].0 + 1..ranges[i].1],
         };
         let master = mains
             .iter()
-            .find(|r| own(r).prop("RECURRENCE-ID").is_none());
+            .find(|&&i| own(i).prop("RECURRENCE-ID").is_none());
         master.or(mains.first()).copied()
     }
 
-    /// Top-level properties of the main component (nested VALARM etc. skipped), with their line index.
-    fn todo_props(&self) -> impl Iterator<Item = (usize, &Line)> {
-        let (b, e) = self.main_range().unwrap();
+    fn main_range(&self) -> Option<(usize, usize)> {
+        Some(self.ranges()[self.main_index()?])
+    }
+
+    /// Top-level properties of component `comp` (nested VALARM etc. skipped), with their line index.
+    fn props_of(&self, comp: usize) -> Vec<(usize, &Line)> {
+        let (b, e) = self.ranges()[comp];
         let mut depth = 0;
         self.lines[b + 1..e]
             .iter()
@@ -235,6 +244,61 @@ impl Calendar {
                 }
                 None
             })
+            .collect()
+    }
+
+    /// Top-level properties of the main component, with their line index.
+    fn todo_props(&self) -> impl Iterator<Item = (usize, &Line)> {
+        self.props_of(self.main_index().unwrap()).into_iter()
+    }
+
+    /// The lines of component `comp`, BEGIN and END included, to copy it.
+    pub fn comp_lines(&self, comp: usize) -> Vec<Line> {
+        let (b, e) = self.ranges()[comp];
+        self.lines[b..=e].to_vec()
+    }
+
+    /// Insert a component (its lines from BEGIN to END) so that it becomes component `at`.
+    pub fn insert_comp(&mut self, at: usize, lines: Vec<Line>) {
+        let ranges = self.ranges();
+        let line = match ranges.get(at) {
+            Some(r) => r.0,
+            None => ranges.last().map_or(self.top_depth() as usize, |r| r.1 + 1),
+        };
+        self.lines.splice(line..line, lines);
+    }
+
+    pub fn remove_comp(&mut self, comp: usize) {
+        let (b, e) = self.ranges()[comp];
+        self.lines.drain(b..=e);
+    }
+
+    /// `set` on component `comp` instead of the main one.
+    pub fn set_in(&mut self, comp: usize, name: &str, params: &str, value: Option<&str>) {
+        let props = self.props_of(comp);
+        let idx: Vec<usize> = props
+            .iter()
+            .filter(|(_, l)| l.name == name)
+            .map(|(i, _)| *i)
+            .collect();
+        let after_last = props
+            .last()
+            .map(|(i, _)| i + 1)
+            .unwrap_or(self.ranges()[comp].0 + 1);
+        let insert_at = idx.first().copied().unwrap_or(after_last);
+        for i in idx.into_iter().rev() {
+            self.lines.remove(i);
+        }
+        if let Some(v) = value {
+            self.lines.insert(
+                insert_at,
+                Line {
+                    name: name.to_string(),
+                    params: params.to_string(),
+                    value: v.to_string(),
+                },
+            );
+        }
     }
 
     pub fn prop(&self, name: &str) -> Option<&Line> {
@@ -257,24 +321,7 @@ impl Calendar {
     /// Replace all occurrences of `name` with one line, or remove it when `value` is None.
     /// `value` is raw (already escaped where needed).
     pub fn set(&mut self, name: &str, params: &str, value: Option<&str>) {
-        let idx: Vec<usize> = self
-            .todo_props()
-            .filter(|(_, l)| l.name == name)
-            .map(|(i, _)| i)
-            .collect();
-        let line = value.map(|v| Line {
-            name: name.to_string(),
-            params: params.to_string(),
-            value: v.to_string(),
-        });
-        let after_last = self.todo_props().last().map(|(i, _)| i + 1);
-        let insert_at = idx.first().copied().or(after_last).unwrap();
-        for i in idx.into_iter().rev() {
-            self.lines.remove(i);
-        }
-        if let Some(line) = line {
-            self.lines.insert(insert_at, line);
-        }
+        self.set_in(self.main_index().unwrap(), name, params, value);
     }
 
     pub fn set_text(&mut self, name: &str, value: Option<&str>) {
@@ -345,7 +392,12 @@ impl Calendar {
 
     /// Replace every VALARM with one display alarm per trigger (params, raw value).
     pub fn set_alarms(&mut self, triggers: &[(&str, &str)]) {
-        let (b, mut e) = self.main_range().unwrap();
+        self.set_alarms_in(self.main_index().unwrap(), triggers);
+    }
+
+    /// `set_alarms` on component `comp`.
+    pub fn set_alarms_in(&mut self, comp: usize, triggers: &[(&str, &str)]) {
+        let (b, mut e) = self.ranges()[comp];
         let mut i = b + 1;
         while i < e {
             let l = &self.lines[i];
@@ -360,7 +412,7 @@ impl Calendar {
                 i += 1;
             }
         }
-        let summary = self
+        let summary = self.comps()[comp]
             .prop("SUMMARY")
             .map_or(String::new(), |l| l.value.clone());
         let line = |name: &str, params: &str, value: &str| Line {

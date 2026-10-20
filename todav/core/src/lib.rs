@@ -19,7 +19,7 @@ use std::sync::{Arc, Mutex};
 use store::Kind;
 
 pub use config::{CategoryGroup, CategoryMeta, DoneView, Sort};
-pub use event::Event;
+pub use event::{Event, EventPatch, EventTime, Repeat, Scope};
 pub use login::{Credentials, LoginFlow, login_flow_poll, login_flow_start, password_login};
 pub use push::{PushRegistration, ntfy_check};
 pub use settings::DEVICE_ONLY;
@@ -103,6 +103,8 @@ pub struct Client {
     sync_lock: Mutex<()>,
     /// Bumped by `stop_listening`; a `listen` call returns once it differs from the value it started with.
     listen_gen: AtomicU64,
+    /// The system's zone ("Europe/Warsaw"), for writing new event times; see `set_local_zone`.
+    local_zone: Mutex<Option<String>>,
 }
 
 pub fn now() -> i64 {
@@ -146,7 +148,160 @@ impl Client {
             listeners: Mutex::new(Vec::new()),
             sync_lock: Mutex::new(()),
             listen_gen: AtomicU64::new(0),
+            local_zone: Mutex::new(None),
         })
+    }
+
+    /// The system's time zone name. New event times are written in it when some stored event
+    /// carries its VTIMEZONE, else as floating local times.
+    pub fn set_local_zone(&self, tzid: String) {
+        *self.local_zone.lock().unwrap() = Some(tzid).filter(|z| !z.is_empty());
+    }
+
+    /// How new times in `cal` are written: in the local zone (its VTIMEZONE added to `cal`
+    /// when missing) if one is known, else floating.
+    fn local_like(&self, db: &Connection, cal: &mut Calendar) -> tz::Stamp {
+        let Some(z) = self.local_zone.lock().unwrap().clone() else {
+            return tz::Stamp::Floating(0);
+        };
+        if cal.zone(&z).is_none() {
+            match store::vtimezone(db, &z) {
+                Ok(Some(lines)) => cal.insert_comp(0, lines),
+                _ => return tz::Stamp::Floating(0),
+            }
+        }
+        tz::Stamp::Zoned(0, z)
+    }
+
+    /// A new event; returns its UID.
+    pub fn add_event(
+        &self,
+        list_href: String,
+        summary: String,
+        time: EventTime,
+        reminders: Vec<i64>,
+    ) -> Result<String> {
+        let uid = new_uid();
+        let t = ical::fmt_utc(now());
+        let mut cal = Calendar::parse(&format!(
+            "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Todav//EN\nBEGIN:VEVENT\nUID:{uid}\nCREATED:{t}\nDTSTAMP:{t}\nEND:VEVENT\nEND:VCALENDAR\n"
+        ))
+        .ok_or_else(|| Error::Parse(uid.clone()))?;
+        {
+            let db = self.db.lock().unwrap();
+            let like = self.local_like(&db, &mut cal);
+            let patch = EventPatch {
+                summary: Some(summary),
+                time: Some(time),
+                reminders: Some(reminders),
+                ..Default::default()
+            };
+            event::edit(&db, &mut cal, None, Scope::All, &patch, &like)?;
+            cal.set("SEQUENCE", "", Some("0"));
+            store::save(&db, &list_href, None, None, &cal, store::MODIFIED)?;
+        }
+        self.emit(&list_href, vec![uid.clone()]);
+        Ok(uid)
+    }
+
+    /// Change occurrence `recurrence_id` (None: an event that does not repeat) of an event, or
+    /// the occurrences `scope` says.
+    pub fn update_event(
+        &self,
+        list_href: String,
+        uid: String,
+        recurrence_id: Option<i64>,
+        scope: Scope,
+        patch: EventPatch,
+    ) -> Result<()> {
+        {
+            let db = self.db.lock().unwrap();
+            let raw = store::raw(&db, Kind::Event, &list_href, &uid)?
+                .ok_or_else(|| Error::NotFound(uid.clone()))?;
+            let mut cal = Calendar::parse(&raw.raw_ics).ok_or_else(|| Error::Parse(uid.clone()))?;
+            let like = self.local_like(&db, &mut cal);
+            let next = event::edit(&db, &mut cal, recurrence_id, scope, &patch, &like)?;
+            store::save(
+                &db,
+                &list_href,
+                raw.href.as_deref(),
+                raw.etag.as_deref(),
+                &cal,
+                store::MODIFIED,
+            )?;
+            if let Some(next) = next {
+                store::save(&db, &list_href, None, None, &next, store::MODIFIED)?;
+            }
+        }
+        self.emit(&list_href, vec![uid]);
+        Ok(())
+    }
+
+    /// Delete occurrence `recurrence_id` (None: the event), or the occurrences `scope` says.
+    pub fn delete_event(
+        &self,
+        list_href: String,
+        uid: String,
+        recurrence_id: Option<i64>,
+        scope: Scope,
+    ) -> Result<()> {
+        {
+            let db = self.db.lock().unwrap();
+            let raw = store::raw(&db, Kind::Event, &list_href, &uid)?
+                .ok_or_else(|| Error::NotFound(uid.clone()))?;
+            let mut cal = Calendar::parse(&raw.raw_ics).ok_or_else(|| Error::Parse(uid.clone()))?;
+            let like = self.local_like(&db, &mut cal);
+            if !event::delete(&db, &mut cal, recurrence_id, scope, &like)? {
+                store::save(
+                    &db,
+                    &list_href,
+                    raw.href.as_deref(),
+                    raw.etag.as_deref(),
+                    &cal,
+                    store::MODIFIED,
+                )?;
+            } else if raw.href.is_none() {
+                store::delete(&db, &raw)?; // never reached the server
+            } else {
+                store::set_sync_state(
+                    &db,
+                    &raw,
+                    raw.href.as_deref(),
+                    raw.etag.as_deref(),
+                    store::DELETED,
+                )?;
+            }
+        }
+        self.emit(&list_href, vec![uid]);
+        Ok(())
+    }
+
+    /// Move an event (all of it) to another calendar.
+    pub fn move_event(&self, from: String, uid: String, to: String) -> Result<()> {
+        if from == to {
+            return Ok(());
+        }
+        {
+            let db = self.db.lock().unwrap();
+            let raw = store::raw(&db, Kind::Event, &from, &uid)?
+                .ok_or_else(|| Error::NotFound(uid.clone()))?;
+            let cal = Calendar::parse(&raw.raw_ics).ok_or_else(|| Error::Parse(uid.clone()))?;
+            store::save(&db, &to, None, None, &cal, store::MODIFIED)?;
+            if raw.href.is_none() {
+                store::delete(&db, &raw)?;
+            } else {
+                store::set_sync_state(
+                    &db,
+                    &raw,
+                    raw.href.as_deref(),
+                    raw.etag.as_deref(),
+                    store::DELETED,
+                )?;
+            }
+        }
+        self.emit(&from, vec![uid.clone()]);
+        self.emit(&to, vec![uid]);
+        Ok(())
     }
 
     /// The password is kept in memory only; front-ends keep it in the platform keyring.
