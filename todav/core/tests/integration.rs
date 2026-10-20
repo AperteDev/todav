@@ -282,3 +282,13 @@ fn push_delivers_changes_and_refreshes_registration() {
     a.stop_listening();
     a.push_unregister().unwrap();
 }
+
+#[test]
+fn password_login_checks_the_credentials() {
+    let (url, user, pass) = env();
+    let host = url.trim_start_matches("https://").to_string() + "/";
+    let c = todav_core::password_login(host, user.clone(), pass.clone()).unwrap();
+    assert_eq!((c.server, c.login_name), (url.clone(), user.clone()));
+    let wrong = todav_core::password_login(url, user, format!("{pass}x"));
+    assert!(matches!(wrong, Err(todav_core::Error::Auth)), "{wrong:?}");
+}

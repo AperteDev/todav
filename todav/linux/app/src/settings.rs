@@ -363,6 +363,26 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
         action.connect_activate(move |_, _| start(copy));
         actions.add_action(&action);
     }
+    // Or with a login name and app password typed in.
+    let password = gio::SimpleAction::new("sign-in-password", None);
+    let (d, c, describe_) = (dialog.clone(), conn.clone(), describe.clone());
+    password.connect_activate(move |_, _| {
+        let server = url_text(&c.server);
+        if server.is_empty() {
+            d.add_toast(adw::Toast::new("Enter the Nextcloud server first"));
+            return;
+        }
+        let (dd, show) = (d.clone(), describe_.clone());
+        crate::window::password_login(&d, server, move |c| {
+            let (d, show) = (dd.clone(), show.clone());
+            glib::spawn_future_local(async move {
+                let msg = use_sign_in(c).await;
+                show();
+                d.add_toast(adw::Toast::new(&msg));
+            });
+        });
+    });
+    actions.add_action(&password);
     dialog.insert_action_group("account", Some(&actions));
     sign_in.connect_clicked(move |_| start(false));
     // Only offered for a browser sign-in; a GOA account is managed in GNOME Settings.

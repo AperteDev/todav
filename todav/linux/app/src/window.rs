@@ -407,6 +407,25 @@ fn connect(ui: &Rc<Ui>) {
     ui.window.add_action(&copy);
 
     let weak = Rc::downgrade(ui);
+    let password = gio::SimpleAction::new("password-login", None);
+    password.connect_activate(move |_, _| {
+        let Some(ui) = weak.upgrade() else { return };
+        let server = url_text(&ui.conn.server);
+        if server.is_empty() {
+            toast("Enter the Nextcloud server first");
+            return;
+        }
+        let u = ui.clone();
+        password_login(&ui.window, server, move |c| {
+            let ui = u.clone();
+            glib::spawn_future_local(async move {
+                connect_with(&ui, crate::Target::Manual(c)).await;
+            });
+        });
+    });
+    ui.window.add_action(&password);
+
+    let weak = Rc::downgrade(ui);
     let prefs = gio::SimpleAction::new("preferences", None);
     prefs.connect_activate(move |_, _| {
         if let Some(ui) = weak.upgrade().filter(|_| crate::logged_in()) {
@@ -542,6 +561,64 @@ pub async fn browser_login(
         }
     }
     Err("Login timed out".into())
+}
+
+/// Ask for a login name and (app) password for `server` and check them there; `done` gets the
+/// credentials once they work.
+pub fn password_login(
+    parent: &impl IsA<gtk::Widget>,
+    server: String,
+    done: impl Fn(todav_core::Credentials) + 'static,
+) {
+    let b = view!("password-login");
+    let dialog: adw::Dialog = get(&b, "dialog");
+    let user: adw::EntryRow = get(&b, "user");
+    let password: adw::PasswordEntryRow = get(&b, "password");
+    let sign_in: gtk::Button = get(&b, "sign_in");
+    let error: adw::Banner = get(&b, "error");
+    // Signing in again usually keeps the login name.
+    if let Some(a) = core().account().filter(|a| a.url == server) {
+        user.set_text(&a.user);
+    }
+    let filled = {
+        let (user, password, sign_in) = (user.clone(), password.clone(), sign_in.clone());
+        let error = error.clone();
+        move || {
+            error.set_revealed(false);
+            sign_in.set_sensitive(!user.text().trim().is_empty() && !password.text().is_empty())
+        }
+    };
+    let f = filled.clone();
+    user.connect_changed(move |_| f());
+    password.connect_changed(move |_| filled());
+    let d = dialog.clone();
+    get::<gtk::Button>(&b, "cancel").connect_clicked(move |_| {
+        d.close();
+    });
+    let (d, done) = (dialog.clone(), Rc::new(done));
+    sign_in.connect_clicked(move |button| {
+        let (login, pw) = (user.text().trim().to_string(), password.text().to_string());
+        let server = server.clone();
+        button.set_sensitive(false);
+        let (d, done, error, button) = (d.clone(), done.clone(), error.clone(), button.clone());
+        glib::spawn_future_local(async move {
+            let r =
+                gio::spawn_blocking(move || todav_core::password_login(server, login, pw)).await;
+            let msg = match r {
+                Ok(Ok(c)) => {
+                    d.close();
+                    return done(c);
+                }
+                Ok(Err(todav_core::Error::Auth)) => "Wrong login name or password".to_string(),
+                Ok(Err(e)) => format!("Sign-in failed: {e}"),
+                Err(_) => "Sign-in failed".to_string(),
+            };
+            error.set_title(&msg);
+            error.set_revealed(true);
+            button.set_sensitive(true);
+        });
+    });
+    dialog.present(Some(parent));
 }
 
 fn refresh_lists(ui: &Rc<Ui>) {

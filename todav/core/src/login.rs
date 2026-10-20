@@ -39,13 +39,30 @@ fn post(url: &str, form: &[(&str, &str)]) -> Result<(u16, Option<Json>)> {
     Ok((r.status().as_u16(), Json::parse(&body)))
 }
 
-pub fn login_flow_start(server: String) -> Result<LoginFlow> {
+/// A typed server address as a base URL: no trailing slash, https unless a scheme is given.
+fn base_url(server: &str) -> String {
     let server = server.trim().trim_end_matches('/');
-    let server = if server.starts_with("http") {
+    if server.starts_with("http") {
         server.to_string()
     } else {
         format!("https://{server}")
-    };
+    }
+}
+
+/// A login name and password typed in (an app password, or the account password without 2FA),
+/// checked against the server's CalDAV.
+pub fn password_login(server: String, login_name: String, password: String) -> Result<Credentials> {
+    let server = base_url(&server);
+    crate::caldav::Dav::new(&server, &login_name, &password).principal()?;
+    Ok(Credentials {
+        server,
+        login_name,
+        app_password: password,
+    })
+}
+
+pub fn login_flow_start(server: String) -> Result<LoginFlow> {
+    let server = base_url(&server);
     let (status, json) = post(&format!("{server}/index.php/login/v2"), &[])?;
     let field = |j: &Json, k: &str| j.get(k).and_then(Json::str).map(str::to_string);
     let bad = || Error::Http(status, "not a Nextcloud login flow response".into());
