@@ -1,6 +1,7 @@
 //! SQLite schema and row mapping. Every derived column is recomputed from `raw_ics`.
 
 use crate::ical::{self, Calendar, Line};
+use crate::tz::{self, Stamp};
 use crate::{List, Result, Task};
 use rusqlite::{Connection, OptionalExtension, params};
 
@@ -100,23 +101,30 @@ pub fn to_utc(db: &Connection, local: i64) -> Result<i64> {
     )
 }
 
+/// A stamp as local time: a zoned time through its VTIMEZONE; dates, floating times (and a TZID
+/// without a VTIMEZONE) as they read.
+pub fn local_stamp(db: &Connection, cal: &Calendar, s: &Stamp) -> Result<i64> {
+    match cal.utc(s) {
+        Some(u) => to_local(db, u),
+        None => Ok(s.wall()),
+    }
+}
+
 /// A DATE / DATE-TIME value as local time, and whether it is a date only.
-/// ponytail: TZID times are taken as local; off by the difference for another zone than the system's.
-fn local_time(db: &Connection, l: Option<&Line>) -> Result<Option<(i64, bool)>> {
-    let Some((l, t)) = l.and_then(|l| Some((l, ical::parse_time(&l.value)?))) else {
+fn local_time(db: &Connection, cal: &Calendar, l: Option<&Line>) -> Result<Option<(i64, bool)>> {
+    let Some(s) = l.and_then(tz::stamp) else {
         return Ok(None);
     };
-    Ok(Some(if l.value.ends_with('Z') {
-        (to_local(db, t)?, false)
-    } else {
-        (t, l.value.len() == 8)
-    }))
+    Ok(Some((
+        local_stamp(db, cal, &s)?,
+        matches!(s, Stamp::Date(_)),
+    )))
 }
 
 /// When each alarm goes off, in local time: an absolute TRIGGER, or one relative to DUE
 /// (RELATED=END) or DTSTART (the default; DUE when there is no DTSTART).
 fn alarm_times(db: &Connection, cal: &Calendar, due: Option<i64>) -> Result<Vec<i64>> {
-    let start = local_time(db, cal.prop("DTSTART"))?.map(|(s, _)| s);
+    let start = local_time(db, cal, cal.prop("DTSTART"))?.map(|(s, _)| s);
     let mut out = Vec::new();
     for t in cal.alarm_triggers() {
         let at = match ical::parse_duration(&t.value) {
@@ -127,7 +135,7 @@ fn alarm_times(db: &Connection, cal: &Calendar, due: Option<i64>) -> Result<Vec<
                 let base = if end { due } else { start.or(due) };
                 base.map(|b| b + d)
             }
-            None => local_time(db, Some(t))?.map(|(t, _)| t),
+            None => local_time(db, cal, Some(t))?.map(|(t, _)| t),
         };
         out.extend(at);
     }
@@ -301,7 +309,7 @@ pub fn save(
 ) -> Result<String> {
     let uid = cal.text("UID").unwrap_or_default();
     let status = cal.text("STATUS").unwrap_or_else(|| "NEEDS-ACTION".into());
-    let due = local_time(db, cal.prop("DUE"))?;
+    let due = local_time(db, cal, cal.prop("DUE"))?;
     let alarms = alarm_times(db, cal, due.map(|(d, _)| d))?;
     db.execute(
         "INSERT OR REPLACE INTO tasks (uid, list_href, etag, href, raw_ics, summary, description, status,
@@ -358,4 +366,28 @@ pub fn set_sync_state(
 pub fn delete(db: &Connection, uid: &str) -> Result<()> {
     db.execute("DELETE FROM tasks WHERE uid = ?", [uid])?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn zoned_due_times_go_through_their_vtimezone() {
+        let db = open(":memory:").unwrap();
+        db.execute(
+            "INSERT INTO lists (href, display_name) VALUES ('/l/', 'L')",
+            [],
+        )
+        .unwrap();
+        // 09:00 in New York (UTC-4 in October) is 13:00 UTC, whatever zone this machine is in.
+        let cal = Calendar::parse("BEGIN:VCALENDAR\r\nBEGIN:VTIMEZONE\r\nTZID:America/New_York\r\nBEGIN:DAYLIGHT\r\nTZOFFSETFROM:-0500\r\nTZOFFSETTO:-0400\r\nDTSTART:20070311T020000\r\nRRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU\r\nEND:DAYLIGHT\r\nBEGIN:STANDARD\r\nTZOFFSETFROM:-0400\r\nTZOFFSETTO:-0500\r\nDTSTART:20071104T020000\r\nRRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU\r\nEND:STANDARD\r\nEND:VTIMEZONE\r\nBEGIN:VTODO\r\nUID:u\r\nSUMMARY:s\r\nDUE;TZID=America/New_York:20261020T090000\r\nEND:VTODO\r\nEND:VCALENDAR\r\n").unwrap();
+        save(&db, "/l/", None, None, &cal, CLEAN).unwrap();
+        let utc = ical::parse_time("20261020T130000").unwrap();
+        let t = task(&db, "u").unwrap().unwrap();
+        assert_eq!(
+            (t.due, t.due_all_day),
+            (Some(to_local(&db, utc).unwrap()), false)
+        );
+    }
 }

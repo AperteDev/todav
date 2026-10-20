@@ -1,4 +1,5 @@
-//! Minimal VCALENDAR/VTODO reader-writer. Keeps every line it does not touch verbatim.
+//! Minimal VCALENDAR reader-writer for a VTODO or VEVENT object. Keeps every line it does not
+//! touch verbatim.
 
 /// One unfolded content line: `NAME;PARAMS:VALUE` (params and value stay raw/escaped).
 #[derive(Debug, Clone, PartialEq)]
@@ -42,13 +43,120 @@ impl Line {
     }
 }
 
-/// A calendar object holding (at least) one VTODO.
+/// A component of a calendar object (VEVENT, VTIMEZONE, STANDARD, VALARM, …): the lines between
+/// its BEGIN and END.
+#[derive(Debug, Clone, Copy)]
+pub struct Comp<'a> {
+    pub kind: &'a str,
+    lines: &'a [Line],
+}
+
+impl<'a> Comp<'a> {
+    /// Its own properties, not those of components nested in it.
+    pub fn own(&self) -> impl Iterator<Item = &'a Line> + use<'a> {
+        let mut depth = 0;
+        self.lines.iter().filter(move |l| {
+            match l.name.as_str() {
+                "BEGIN" => depth += 1,
+                "END" => depth -= 1,
+                _ => return depth == 0,
+            }
+            false
+        })
+    }
+
+    pub fn prop(&self, name: &str) -> Option<&'a Line> {
+        self.own().find(|l| l.name == name)
+    }
+
+    pub fn props(&self, name: &str) -> Vec<&'a Line> {
+        self.own().filter(|l| l.name == name).collect()
+    }
+
+    /// Unescaped value; empty values (`DESCRIPTION:`) read as absent.
+    pub fn text(&self, name: &str) -> Option<String> {
+        self.prop(name)
+            .map(|l| unescape(&l.value))
+            .filter(|v| !v.is_empty())
+    }
+
+    /// Components directly inside this one.
+    pub fn subs(&self) -> Vec<Comp<'a>> {
+        comp_ranges(self.lines, 0)
+            .into_iter()
+            .map(|(b, e)| Comp {
+                kind: &self.lines[b].value,
+                lines: &self.lines[b + 1..e],
+            })
+            .collect()
+    }
+
+    /// TRIGGER of each VALARM in it.
+    pub fn alarm_triggers(&self) -> Vec<&'a Line> {
+        self.subs()
+            .iter()
+            .filter(|c| c.kind.eq_ignore_ascii_case("VALARM"))
+            .filter_map(|c| c.prop("TRIGGER"))
+            .collect()
+    }
+}
+
+/// (BEGIN, END) line indexes of the components `depth` levels down in `lines`.
+fn comp_ranges(lines: &[Line], depth: i32) -> Vec<(usize, usize)> {
+    let (mut out, mut d, mut begin) = (Vec::new(), 0, 0);
+    for (i, l) in lines.iter().enumerate() {
+        match l.name.as_str() {
+            "BEGIN" => {
+                if d == depth {
+                    begin = i;
+                }
+                d += 1;
+            }
+            "END" => {
+                d -= 1;
+                if d == depth {
+                    out.push((begin, i));
+                }
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
+/// A calendar object holding a VTODO or a VEVENT (a recurring event with overrides of some of
+/// its occurrences holds several VEVENTs), maybe with VTIMEZONEs.
 #[derive(Debug, Clone)]
 pub struct Calendar {
     lines: Vec<Line>,
 }
 
 impl Calendar {
+    /// The components directly inside the VCALENDAR.
+    pub fn comps(&self) -> Vec<Comp<'_>> {
+        comp_ranges(&self.lines, self.top_depth())
+            .into_iter()
+            .map(|(b, e)| Comp {
+                kind: &self.lines[b].value,
+                lines: &self.lines[b + 1..e],
+            })
+            .collect()
+    }
+
+    /// The VTODO or VEVENT this object is about.
+    pub fn main(&self) -> Comp<'_> {
+        let (b, e) = self.main_range().unwrap();
+        Comp {
+            kind: &self.lines[b].value,
+            lines: &self.lines[b + 1..e],
+        }
+    }
+
+    /// "VTODO" or "VEVENT".
+    pub fn kind(&self) -> String {
+        self.main().kind.to_ascii_uppercase()
+    }
+
     pub fn parse(text: &str) -> Option<Calendar> {
         let mut unfolded: Vec<String> = Vec::new();
         for raw in text.split('\n') {
@@ -62,7 +170,7 @@ impl Calendar {
         let cal = Calendar {
             lines: unfolded.iter().map(|s| Line::parse(s)).collect(),
         };
-        cal.todo_range()?;
+        cal.main_range()?;
         Some(cal)
     }
 
@@ -83,31 +191,37 @@ impl Calendar {
         out
     }
 
-    /// (index of BEGIN:VTODO, index of its END:VTODO)
-    fn todo_range(&self) -> Option<(usize, usize)> {
-        let begin = self
-            .lines
-            .iter()
-            .position(|l| l.name == "BEGIN" && l.value.eq_ignore_ascii_case("VTODO"))?;
-        let mut depth = 0;
-        for (i, l) in self.lines.iter().enumerate().skip(begin) {
-            match l.name.as_str() {
-                "BEGIN" => depth += 1,
-                "END" => {
-                    depth -= 1;
-                    if depth == 0 {
-                        return Some((begin, i));
-                    }
-                }
-                _ => {}
-            }
+    /// Nesting depth of the components inside the VCALENDAR (0 for a bare component).
+    fn top_depth(&self) -> i32 {
+        match self.lines.first() {
+            Some(l) if l.name == "BEGIN" && l.value.eq_ignore_ascii_case("VCALENDAR") => 1,
+            _ => 0,
         }
-        None
     }
 
-    /// Top-level VTODO properties (nested VALARM etc. skipped), with their line index.
+    /// (BEGIN, END) line indexes of the main VTODO or VEVENT: the first without RECURRENCE-ID
+    /// (overrides of single occurrences of a recurring event come with it), or else the first.
+    fn main_range(&self) -> Option<(usize, usize)> {
+        let mains: Vec<(usize, usize)> = comp_ranges(&self.lines, self.top_depth())
+            .into_iter()
+            .filter(|&(b, _)| {
+                let k = &self.lines[b].value;
+                k.eq_ignore_ascii_case("VTODO") || k.eq_ignore_ascii_case("VEVENT")
+            })
+            .collect();
+        let own = |&(b, e): &(usize, usize)| Comp {
+            kind: "",
+            lines: &self.lines[b + 1..e],
+        };
+        let master = mains
+            .iter()
+            .find(|r| own(r).prop("RECURRENCE-ID").is_none());
+        master.or(mains.first()).copied()
+    }
+
+    /// Top-level properties of the main component (nested VALARM etc. skipped), with their line index.
     fn todo_props(&self) -> impl Iterator<Item = (usize, &Line)> {
-        let (b, e) = self.todo_range().unwrap();
+        let (b, e) = self.main_range().unwrap();
         let mut depth = 0;
         self.lines[b + 1..e]
             .iter()
@@ -224,31 +338,14 @@ impl Calendar {
             .filter(|v| !v.is_empty())
     }
 
-    /// TRIGGER of each VALARM in the VTODO.
+    /// TRIGGER of each VALARM in the main component.
     pub fn alarm_triggers(&self) -> Vec<&Line> {
-        let Some((b, e)) = self.todo_range() else {
-            return Vec::new();
-        };
-        let mut out = Vec::new();
-        let mut in_alarm = false;
-        for l in &self.lines[b + 1..e] {
-            match l.name.as_str() {
-                "BEGIN" | "END" if l.value.eq_ignore_ascii_case("VALARM") => {
-                    in_alarm = l.name == "BEGIN"
-                }
-                "TRIGGER" if in_alarm => {
-                    out.push(l);
-                    in_alarm = false; // one trigger per alarm
-                }
-                _ => {}
-            }
-        }
-        out
+        self.main().alarm_triggers()
     }
 
     /// Replace every VALARM with one display alarm per trigger (params, raw value).
     pub fn set_alarms(&mut self, triggers: &[(&str, &str)]) {
-        let (b, mut e) = self.todo_range().unwrap();
+        let (b, mut e) = self.main_range().unwrap();
         let mut i = b + 1;
         while i < e {
             let l = &self.lines[i];
@@ -384,7 +481,8 @@ fn split_unescaped(s: &str, sep: char) -> Vec<String> {
     parts
 }
 
-// ponytail: TZID/floating times read as UTC (off by the zone offset); fine for sorting, revisit if DUE shows times.
+/// The wall-clock reading of a DATE / DATE-TIME value (seconds as if it were UTC); `tz::stamp`
+/// gives it its zone.
 pub fn parse_time(v: &str) -> Option<i64> {
     let d = v.get(..8)?;
     let (y, m, day) = (
@@ -413,7 +511,7 @@ pub fn fmt_utc(t: i64) -> String {
 }
 
 // Howard Hinnant's civil date algorithms.
-fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
+pub(crate) fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
     let y = if m <= 2 { y - 1 } else { y };
     let era = y.div_euclid(400);
     let yoe = y - era * 400;
@@ -422,7 +520,7 @@ fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
     era * 146097 + doe - 719468
 }
 
-fn civil_from_days(z: i64) -> (i64, i64, i64) {
+pub(crate) fn civil_from_days(z: i64) -> (i64, i64, i64) {
     let z = z + 719468;
     let era = z.div_euclid(146097);
     let doe = z - era * 146097;

@@ -4,9 +4,11 @@ pub mod ical;
 pub mod json;
 mod login;
 pub mod push;
+pub mod rrule;
 mod settings;
 pub mod store;
 mod sync;
+pub mod tz;
 
 use caldav::Dav;
 use ical::Calendar;
