@@ -24,7 +24,7 @@ splitbutton.pill > menubutton > button { padding: 10px 16px 10px 12px; border-ra
 row.task-done > box.header > box.title > label.title,
 row.expander.task-done > box > list > row.header > box.header > box.title > label.title { text-decoration-line: line-through; opacity: 0.55; }
 .tag { padding: 2px 10px; border-radius: 9999px; font-size: smaller; color: @accent_color; background: alpha(@accent_bg_color, 0.15); }
-.tag.date { color: @window_fg_color; background: alpha(@window_fg_color, 0.08); }
+.tag.date, .tag.count { color: @window_fg_color; background: alpha(@window_fg_color, 0.08); }
 .tag.overdue { color: @error_color; background: alpha(@error_bg_color, 0.15); }
 :drop(active) { box-shadow: none; outline: none; }
 button.drop-hint { outline: 2px solid @accent_bg_color; outline-offset: -2px; }
@@ -78,6 +78,8 @@ struct Ui {
     adding: RefCell<Option<String>>,
     /// Rows show their category as a tag (the "Show as tags" category view).
     tags: Cell<bool>,
+    /// (open, done) subtasks of each task on the page, for the "done/all" tag.
+    counts: RefCell<HashMap<String, (usize, usize)>>,
     /// Tasks are dragged by a handle (touchscreens) instead of the whole row.
     handles: Cell<bool>,
     /// The task being dragged and where it came from.
@@ -287,6 +289,7 @@ fn build(app: &adw::Application) -> Rc<Ui> {
         expanded: RefCell::new(HashSet::new()),
         adding: RefCell::new(None),
         tags: Cell::new(false),
+        counts: RefCell::default(),
         handles: Cell::new(false),
         dragging: RefCell::new(None),
         drop_mark: RefCell::new(None),
@@ -736,6 +739,14 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
         ui.title.set_title("");
         return;
     };
+    // Upcoming mixes lists: count subtasks in all of them.
+    let all: Vec<Task> = if href == UPCOMING {
+        let lists = core().lists().into_iter();
+        lists.flat_map(|l| core().tasks(l.href, true)).collect()
+    } else {
+        core().tasks(href.clone(), true)
+    };
+    *ui.counts.borrow_mut() = subtask_counts(&all);
     // The new-task entry and its category picker.
     let add_box = ui.entry.parent();
     add_box.iter().for_each(|b| b.set_visible(href != UPCOMING));
@@ -975,6 +986,45 @@ fn trees(tasks: &[Task]) -> Vec<(&Task, Vec<(usize, &Task)>)> {
     out
 }
 
+/// (open, done) subtasks below each task, at any depth, hidden ones included.
+fn subtask_counts(tasks: &[Task]) -> HashMap<String, (usize, usize)> {
+    let parent: HashMap<&str, &str> = tasks
+        .iter()
+        .filter_map(|t| Some((t.uid.as_str(), t.parent_uid.as_deref()?)))
+        .collect();
+    let mut counts: HashMap<String, (usize, usize)> = HashMap::new();
+    for t in tasks {
+        let mut up = t.parent_uid.as_deref();
+        // Bounded: RELATED-TO from a server can form a cycle.
+        for _ in 0..tasks.len() {
+            let Some(uid) = up else { break };
+            let c = counts.entry(uid.to_string()).or_default();
+            if t.done {
+                c.1 += 1;
+            } else {
+                c.0 += 1;
+            }
+            up = parent.get(uid).copied();
+        }
+    }
+    counts
+}
+
+/// "done/all" pill for a task with subtasks.
+fn count_tag(ui: &Ui, t: &Task) -> Option<gtk::Label> {
+    let (open, done) = *ui.counts.borrow().get(&t.uid)?;
+    let all = open + done;
+    let l = gtk::Label::builder()
+        .label(format!("{done}/{all}"))
+        .tooltip_text(format!("{done} of {all} subtasks done"))
+        .valign(gtk::Align::Center)
+        .build();
+    l.add_css_class("tag");
+    l.add_css_class("count");
+    l.add_css_class("numeric");
+    Some(l)
+}
+
 /// `indent` levels of left margin on the whole row, for subtasks; `slot` makes it draggable.
 fn task_row(ui: &Rc<Ui>, t: &Task, indent: usize, slot: Option<Slot>) -> adw::ActionRow {
     let row = adw::ActionRow::builder()
@@ -995,6 +1045,9 @@ fn task_row(ui: &Rc<Ui>, t: &Task, indent: usize, slot: Option<Slot>) -> adw::Ac
     }
     if let Some(d) = subtitle(t) {
         row.set_subtitle(d);
+    }
+    if let Some(n) = count_tag(ui, t) {
+        row.add_suffix(&n);
     }
     if let Some(due) = dates::tag(t, core().local_now()) {
         row.add_suffix(&due);
@@ -1078,6 +1131,9 @@ fn tree_row(
     }
     if let Some(due) = dates::tag(root, core().local_now()) {
         row.add_suffix(&due);
+    }
+    if let Some(n) = count_tag(ui, root) {
+        row.add_suffix(&n);
     }
     let (weak, uid) = (Rc::downgrade(ui), root.uid.clone());
     let empty = subs.is_empty();
@@ -1871,6 +1927,28 @@ pub(crate) mod tests {
             created: None,
             last_modified: None,
         }
+    }
+
+    #[test]
+    fn counts_open_and_done_subtasks_at_any_depth() {
+        let done = |uid, parent| Task {
+            done: true,
+            ..task(uid, parent)
+        };
+        let tasks = [
+            task("a", None),
+            task("a1", Some("a")),
+            done("a1x", Some("a1")),
+            done("a2", Some("a")),
+            task("b", None),
+            done("loop1", Some("loop2")),
+            task("loop2", Some("loop1")),
+        ];
+        let c = subtask_counts(&tasks);
+        assert_eq!(c.get("a"), Some(&(1, 2)));
+        assert_eq!(c.get("a1"), Some(&(0, 1)));
+        assert_eq!(c.get("b"), None);
+        assert!(c.contains_key("loop1")); // a cycle ends
     }
 
     #[test]
