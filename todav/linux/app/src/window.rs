@@ -13,7 +13,8 @@ use todav_core::{CategoryGroup, Due, Sort, Task, TaskPatch};
 /// The category section header turns its arrow like an expander row, without a "pressed" look.
 /// Completed tasks shown among open ones are struck through (only their own title, not their
 /// subtasks'); drop targets show a line where the task will land
-/// instead of GTK's frame around the target, and "+" buttons taking the dragged task are outlined.
+/// instead of GTK's frame around the target, and "+" buttons taking the dragged task are outlined,
+/// as is the sidebar category it is over.
 const CSS: &str = "
 splitbutton.pill { border-radius: 9999px; }
 splitbutton.pill > button { padding: 10px 20px 10px 32px; border-radius: 9999px 0 0 9999px; }
@@ -29,6 +30,7 @@ row.expander.task-done > box > list > row.header > box.header > box.title > labe
 :drop(active) { box-shadow: none; outline: none; }
 button.drop-hint { outline: 2px solid @accent_bg_color; outline-offset: -2px; }
 button.drop-hint:drop(active) { background: alpha(@accent_bg_color, 0.2); }
+row.cat-drop:drop(active) { outline: 2px solid @accent_bg_color; outline-offset: -2px; background: alpha(@accent_bg_color, 0.2); }
 row.dragged { opacity: 0.4; }
 .drag-card { margin: 8px; padding: 12px 18px; border-radius: 12px; background: @card_bg_color; color: @card_fg_color; box-shadow: 0 2px 8px alpha(black, 0.25); }
 row.drop-above { box-shadow: inset 0 2px 0 0 @accent_bg_color; }
@@ -826,6 +828,7 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
                 true
             });
             if let Some(row) = ui.cat_list.row_at_index(i as i32) {
+                row.add_css_class("cat-drop");
                 row.add_controller(drop);
             }
         }
