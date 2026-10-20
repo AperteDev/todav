@@ -42,5 +42,13 @@
     scrolling abort it the same way: wait for a sync to finish before interacting. Use it for quick looks; to change a setting, write it to the stopped app's
     database (`kv`: `setting_<key>` plus `settime_<key>` = now) instead of using Preferences.
   - After a while some icons are no longer drawn; cosmetic, Broadway only.
+- For drag and drop, popovers and animations, use a headless nested GNOME Shell instead: copy
+  `todav/gnome-extension/run-nested.sh` with another `display`, `gnome-shell --headless
+  --unsafe-mode --virtual-monitor WxH` instead of `--devkit`, and absolute paths. Drive it through
+  `org.gnome.Shell.Eval` on its bus: a Clutter virtual pointer/keyboard
+  (`seat.create_virtual_device`) for input (turn hot corners off first: the pointer starts at
+  0,0), `org.gnome.Shell.Screenshot` for screenshots. Give the app its own `XDG_DATA_HOME` (a copy
+  of the database made with `sqlite3 .backup`) so the migration and test edits stay off the real
+  one.
 - In the real GNOME Wayland session, xdotool and synthetic uinput input do not reach the window,
   and screenshots of it are not available.
