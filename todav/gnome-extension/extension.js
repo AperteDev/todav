@@ -102,8 +102,8 @@ class TodavIndicator extends PanelMenu.Button {
         const [href, name, open] = pinned;
         this._count.text = open > 0 ? `${open}` : '';
 
-        // The event on now or next, opening the calendar on its day.
-        const [[title, when, start]] = await this._proxy.GetNextEventAsync();
+        // The event on now or next, opening the calendar on its day (an older app has none).
+        const [[title, when, start]] = await this._proxy.GetNextEventAsync().catch(() => [['', '', 0]]);
         if (title) {
             const next = new PopupMenu.PopupImageMenuItem(`${when} · ${title}`, 'x-office-calendar-symbolic');
             next.connect('activate', () => {
