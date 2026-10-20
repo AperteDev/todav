@@ -80,6 +80,14 @@
     "reveal": "always"
   },
   {
+    "label": "linux: run in nested shell with extension",
+    "command": "cargo build -p todav-linux && make -C todav/gnome-extension nested",
+    "env": { "TODAV_WINDOW": "1" },
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
     "label": "extension: follow shell log",
     "command": "journalctl --user -f -o cat /usr/bin/gnome-shell",
     "use_new_terminal": false,

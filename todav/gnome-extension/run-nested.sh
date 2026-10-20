@@ -10,12 +10,27 @@ display=todav-nested
 
 if [ -z "${DBUS_RUN_SESSION:-}" ]; then
   # Own bus: the host's app instance and installed D-Bus service stay out of the way.
-  DBUS_RUN_SESSION=1 exec dbus-run-session -- "$0" "$@"
+  HOST_BUS=$DBUS_SESSION_BUS_ADDRESS DBUS_RUN_SESSION=1 exec dbus-run-session -- "$0" "$@"
 fi
+
+# The keyring stays on the host bus; without this the app waits 25 s for it, then asks to sign in.
+# Exits with the bus.
+python3 "$(dirname "$0")/secrets-forward.py" "$HOST_BUS" &
+gdbus wait --session --timeout 5 org.freedesktop.secrets
+
+# Settings in memory: a fresh GNOME (default theme, no other extension enabled) each run,
+# nothing written to the user's dconf. The app skips the portal, which reads the user's settings.
+export GSETTINGS_BACKEND=memory GDK_DEBUG=no-portals
+
+# The normal session minus the welcome tour, which would come back every run without settings.
+modes=$(realpath "$(dirname "$0")/../..")/target/nested
+mkdir -p "$modes/gnome-shell/modes"
+echo '{"parentMode": "user", "showWelcomeDialog": false}' > "$modes/gnome-shell/modes/nested.json"
 
 MUTTER_DEBUG_DUMMY_MODE_SPECS=${MUTTER_DEBUG_DUMMY_MODE_SPECS:-1600x900} \
 SHELL_DEBUG=${SHELL_DEBUG:-all} \
-  gnome-shell --devkit --wayland --wayland-display=$display &
+XDG_DATA_DIRS=$modes:${XDG_DATA_DIRS:-/usr/local/share:/usr/share} \
+  gnome-shell --devkit --wayland --wayland-display=$display --mode=nested &
 shell=$!
 
 while [ ! -S "$XDG_RUNTIME_DIR/$display" ]; do
@@ -23,9 +38,22 @@ while [ ! -S "$XDG_RUNTIME_DIR/$display" ]; do
   sleep 0.2
 done
 
-gnome-extensions enable $uuid || true
-WAYLAND_DISPLAY=$display "$app" --gapplication-service &
+# TODAV_WINDOW=1 opens the app's window too; otherwise it only runs as the background service.
+args=--gapplication-service
+[ -n "${TODAV_WINDOW:-}" ] && args=
+# No accessibility: its registry is a systemd unit, which this bus cannot start.
+WAYLAND_DISPLAY=$display GTK_A11Y=none "$app" $args &
 app_pid=$!
+
+# The extension asks the app for lists right away: enable it once the app's interface is up.
+# Waiting for the name first: introspecting a free name would D-Bus-activate an installed copy.
+gdbus wait --session --timeout 10 io.github.selfref.Todav || true
+until gdbus introspect --session --dest io.github.selfref.Todav \
+  --object-path /io/github/selfref/Todav 2>/dev/null | grep -q Todav1; do
+  kill -0 $app_pid 2>/dev/null || break
+  sleep 0.1
+done
+gnome-extensions enable $uuid || true
 
 wait $shell || true
 kill $app_pid 2>/dev/null || true
