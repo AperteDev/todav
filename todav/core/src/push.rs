@@ -32,10 +32,10 @@ impl Client {
         let (lists, old_resource) = {
             let db = self.db.lock().unwrap();
             let mut st = db.prepare(
-                "SELECT href, push_registration_href, push_expires FROM lists WHERE push_topic IS NOT NULL",
+                "SELECT href, push_registration_href, push_expires, writable FROM lists WHERE push_topic IS NOT NULL",
             )?;
-            let lists: Vec<(String, Option<String>, Option<i64>)> = st
-                .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+            let lists: Vec<(String, Option<String>, Option<i64>, bool)> = st
+                .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?
                 .collect::<rusqlite::Result<_>>()?;
             (lists, store::kv_get(&db, "push_resource")?)
         };
@@ -45,7 +45,7 @@ impl Client {
         }
         let now = crate::now();
         let mut out = Vec::new();
-        for (href, reg, expires) in lists {
+        for (href, reg, expires, writable) in lists {
             if let (Some(reg), Some(exp)) = (&reg, expires)
                 && exp - now > lifetime / 4
             {
@@ -64,6 +64,9 @@ impl Client {
             );
             let r = dav.request("POST", &href, &[], &body)?;
             let Some(location) = r.location.filter(|_| (200..300).contains(&r.status)) else {
+                if !writable {
+                    continue; // read-only calendars (Birthdays) may refuse; the fallback timer covers them
+                }
                 return Err(Error::Http(r.status, r.body));
             };
             let db = self.db.lock().unwrap();

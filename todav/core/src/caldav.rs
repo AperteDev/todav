@@ -214,6 +214,11 @@ pub struct RemoteList {
     pub push_topic: Option<String>,
     /// VAPID key advertised by the server; Some only when web-push is supported.
     pub push_vapid: Option<String>,
+    /// Holds tasks (VTODO) and/or events (VEVENT).
+    pub tasks: bool,
+    pub events: bool,
+    /// We may change it (shared read-only calendars and Birthdays may not).
+    pub writable: bool,
 }
 
 pub enum SyncResult {
@@ -336,7 +341,7 @@ impl Dav {
             .and_then(|r| r.props.find_text(DAV, "href"))
             .ok_or_else(|| Error::Parse("no calendar-home-set".into()))?;
         let props = format!(
-            r#"<d:resourcetype/><d:displayname/><d:sync-token/><cs:getctag/><a:calendar-color/><c:supported-calendar-component-set/><p:transports xmlns:p="{PUSH}"/><p:topic xmlns:p="{PUSH}"/>"#
+            r#"<d:resourcetype/><d:displayname/><d:sync-token/><cs:getctag/><a:calendar-color/><c:supported-calendar-component-set/><d:current-user-privilege-set/><p:transports xmlns:p="{PUSH}"/><p:topic xmlns:p="{PUSH}"/>"#
         );
         let mut lists = Vec::new();
         for r in self.propfind(&home, "1", &props)? {
@@ -344,12 +349,21 @@ impl Dav {
             let is_cal = p
                 .child(DAV, "resourcetype")
                 .is_some_and(|t| t.child(CALDAV, "calendar").is_some());
-            let todo = p
-                .child(CALDAV, "supported-calendar-component-set")
-                .is_some_and(|s| s.children.iter().any(|c| c.attr("name") == Some("VTODO")));
-            if !is_cal || !todo {
+            // Without a component set a calendar takes every kind.
+            let has = |kind: &str| {
+                p.child(CALDAV, "supported-calendar-component-set")
+                    .is_none_or(|s| s.children.iter().any(|c| c.attr("name") == Some(kind)))
+            };
+            let (tasks, events) = (has("VTODO"), has("VEVENT"));
+            if !is_cal || !(tasks || events) {
                 continue;
             }
+            // Without a privilege set, assume we may write (and let the server refuse).
+            let writable = p.child(DAV, "current-user-privilege-set").is_none_or(|s| {
+                ["write", "write-content", "all"]
+                    .iter()
+                    .any(|w| s.find(DAV, w).is_some())
+            });
             lists.push(RemoteList {
                 display_name: p
                     .find_text(DAV, "displayname")
@@ -363,6 +377,9 @@ impl Dav {
                     .and_then(|t| t.child(PUSH, "web-push"))
                     .map(|w| w.find_text(PUSH, "vapid-public-key").unwrap_or_default()),
                 href: r.href,
+                tasks,
+                events,
+                writable,
             });
         }
         Ok(lists)

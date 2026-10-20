@@ -412,8 +412,8 @@ Events next to tasks in the same app, from the same CalDAV account: a full calen
 
 **Steps**
 
-- [ ] Core: `VEVENT` objects in `ical`, `RRULE` expansion, `VTIMEZONE` offsets (TZID-aware task times too)
-- [ ] Core: event calendars in discovery, `events` table, sync of events, `events(from, to)`, event reminders
+- [x] Core: `VEVENT` objects in `ical`, `RRULE` expansion (`rrule.rs`), `VTIMEZONE` offsets (`tz.rs`; TZID-aware task times too). Tested on the TM account's exports (birthdays, weekly series, Windows zones, overrides)
+- [x] Core: event calendars in discovery (with `writable` from the privilege set), `events` table keyed by calendar + UID, events through the same push/pull/conflict code, `events(from, to)` and `event_reminders` (`event.rs`), task `DTSTART`; integration test with a zoned weekly series and a moved occurrence. Push registration skips read-only calendars that refuse it
 - [ ] Linux: Tasks | Calendar switcher, month view, agenda, calendars sidebar, tasks on the calendar
 - [ ] Linux: week view (hour grid), time-blocking by dragging tasks, rescheduling by drag
 - [ ] Core + Linux: create, edit and delete events (this / this and following / all occurrences for recurring ones), event reminders as notifications

@@ -1,5 +1,6 @@
 pub mod caldav;
 mod config;
+mod event;
 pub mod ical;
 pub mod json;
 mod login;
@@ -15,19 +16,26 @@ use ical::Calendar;
 use rusqlite::Connection;
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
+use store::Kind;
 
 pub use config::{CategoryGroup, CategoryMeta, DoneView, Sort};
+pub use event::Event;
 pub use login::{Credentials, LoginFlow, login_flow_poll, login_flow_start, password_login};
 pub use push::{PushRegistration, ntfy_check};
 pub use settings::DEVICE_ONLY;
 pub use sync::SyncReport;
 
+/// A calendar collection: a task list, a calendar of events, or both (Nextcloud's "Personal").
 #[derive(Debug, Clone, PartialEq)]
 pub struct List {
     pub href: String,
     pub display_name: String,
     pub color: Option<String>,
     pub open_count: u32,
+    pub holds_tasks: bool,
+    pub holds_events: bool,
+    /// We may change it (shared read-only calendars and Birthdays may not).
+    pub writable: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -50,6 +58,9 @@ pub struct Task {
     pub sort_order: Option<i64>,
     pub created: Option<i64>,
     pub last_modified: Option<i64>,
+    /// DTSTART in local time (a task scheduled into a time slot starts then and ends at `due`).
+    pub start: Option<i64>,
+    pub start_all_day: bool,
 }
 
 /// Fields left `None` are untouched; `Some("")` clears description/category.
@@ -178,8 +189,30 @@ impl Client {
         self.dav.lock().unwrap().clone().ok_or(Error::NoAccount)
     }
 
+    /// Task lists.
     pub fn lists(&self) -> Vec<List> {
-        store::lists(&self.db.lock().unwrap()).unwrap_or_default()
+        let all = store::lists(&self.db.lock().unwrap()).unwrap_or_default();
+        all.into_iter().filter(|l| l.holds_tasks).collect()
+    }
+
+    /// Calendars of events.
+    pub fn calendars(&self) -> Vec<List> {
+        let all = store::lists(&self.db.lock().unwrap()).unwrap_or_default();
+        all.into_iter().filter(|l| l.holds_events).collect()
+    }
+
+    /// Occurrences of every event overlapping `[from, to)` (local times), soonest first.
+    pub fn events(&self, from: i64, to: i64) -> Vec<Event> {
+        store::events(&self.db.lock().unwrap(), from, to).unwrap_or_default()
+    }
+
+    /// Event occurrences with a reminder going off after `from` and at `to` at the latest
+    /// (local times). ponytail: looks a week ahead, so reminders set further before an event
+    /// are missed; widen if someone uses them.
+    pub fn event_reminders(&self, from: i64, to: i64) -> Vec<Event> {
+        let mut all = self.events(from, to + 8 * 86400);
+        all.retain(|e| !e.cancelled && e.reminders.iter().any(|r| *r > from && *r <= to));
+        all
     }
 
     pub fn tasks(&self, list_href: String, include_done: bool) -> Vec<Task> {
@@ -253,7 +286,8 @@ impl Client {
     fn modify(&self, uid: &str, f: impl FnOnce(&mut Calendar)) -> Result<()> {
         let list = {
             let db = self.db.lock().unwrap();
-            let raw = store::raw(&db, uid)?.ok_or_else(|| Error::NotFound(uid.into()))?;
+            let raw =
+                store::raw(&db, Kind::Task, "", uid)?.ok_or_else(|| Error::NotFound(uid.into()))?;
             let mut cal = Calendar::parse(&raw.raw_ics).ok_or_else(|| Error::Parse(uid.into()))?;
             f(&mut cal);
             touch(&mut cal);
@@ -357,9 +391,10 @@ impl Client {
     pub fn delete_task(&self, uid: String) -> Result<String> {
         let raw = {
             let db = self.db.lock().unwrap();
-            let raw = store::raw(&db, &uid)?.ok_or_else(|| Error::NotFound(uid.clone()))?;
+            let raw = store::raw(&db, Kind::Task, "", &uid)?
+                .ok_or_else(|| Error::NotFound(uid.clone()))?;
             if raw.href.is_none() {
-                store::delete(&db, &uid)?; // never reached the server
+                store::delete(&db, &raw)?; // never reached the server
             } else {
                 db.execute("UPDATE tasks SET dirty = 2 WHERE uid = ?", [&uid])?;
             }
@@ -376,7 +411,8 @@ impl Client {
         touch(&mut cal); // newer than the deleted copy, should another device still have it
         let uid = {
             let db = self.db.lock().unwrap();
-            let (href, etag) = match store::raw(&db, &cal.text("UID").unwrap_or_default())? {
+            let uid = cal.text("UID").unwrap_or_default();
+            let (href, etag) = match store::raw(&db, Kind::Task, "", &uid)? {
                 Some(r) => (r.href, r.etag), // delete not pushed yet
                 None => (None, None),
             };
@@ -595,7 +631,7 @@ mod tests {
             c.task(uid.clone()).unwrap()
         };
         let raw = || {
-            store::raw(&c.db.lock().unwrap(), &uid)
+            store::raw(&c.db.lock().unwrap(), Kind::Task, "", &uid)
                 .unwrap()
                 .unwrap()
                 .raw_ics
@@ -658,17 +694,23 @@ mod tests {
             .unwrap()
             .uid;
         // On the server: the delete is only marked until pushed, and undo clears the mark.
-        store::set_sync_state(&c.db.lock().unwrap(), &uid, Some("/l/a.ics"), Some("e"), 0).unwrap();
+        let raw = || {
+            store::raw(&c.db.lock().unwrap(), Kind::Task, "", &uid)
+                .unwrap()
+                .unwrap()
+        };
+        let row = raw();
+        store::set_sync_state(&c.db.lock().unwrap(), &row, Some("/l/a.ics"), Some("e"), 0).unwrap();
         let ics = c.delete_task(uid.clone()).unwrap();
         assert!(c.tasks(l.clone(), true).is_empty());
         c.restore_task(l.clone(), ics.clone()).unwrap();
-        let raw = store::raw(&c.db.lock().unwrap(), &uid).unwrap().unwrap();
         assert_eq!(
-            (raw.href.as_deref(), raw.dirty),
+            (raw().href.as_deref(), raw().dirty),
             (Some("/l/a.ics"), store::MODIFIED)
         );
         // Delete already pushed (row gone): re-created as new.
-        store::delete(&c.db.lock().unwrap(), &uid).unwrap();
+        let row = raw();
+        store::delete(&c.db.lock().unwrap(), &row).unwrap();
         c.restore_task(l.clone(), ics).unwrap();
         assert_eq!(c.task(uid).unwrap().summary, "a");
     }

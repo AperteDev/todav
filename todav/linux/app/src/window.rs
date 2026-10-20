@@ -1929,6 +1929,8 @@ pub(crate) mod tests {
             sort_order: None,
             created: None,
             last_modified: None,
+            start: None,
+            start_all_day: false,
         }
     }
 

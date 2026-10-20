@@ -2,6 +2,7 @@
 
 use crate::caldav::{RemoteList, SyncResult};
 use crate::ical::Calendar;
+use crate::store::Kind;
 use crate::{Client, Error, Result, store};
 use rusqlite::params;
 use std::collections::HashSet;
@@ -58,9 +59,20 @@ impl Client {
         let tx = db.unchecked_transaction()?;
         for l in remote {
             tx.execute(
-                "INSERT INTO lists (href, display_name, color, ctag, push_topic) VALUES (?1, ?2, ?3, ?4, ?5)
-                 ON CONFLICT(href) DO UPDATE SET display_name = ?2, color = ?3, ctag = ?4, push_topic = ?5",
-                params![l.href, l.display_name, l.color, l.ctag, l.push_topic],
+                "INSERT INTO lists (href, display_name, color, ctag, push_topic, has_tasks, has_events, writable)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                 ON CONFLICT(href) DO UPDATE SET display_name = ?2, color = ?3, ctag = ?4, push_topic = ?5,
+                   has_tasks = ?6, has_events = ?7, writable = ?8",
+                params![
+                    l.href,
+                    l.display_name,
+                    l.color,
+                    l.ctag,
+                    l.push_topic,
+                    l.tasks,
+                    l.events,
+                    l.writable
+                ],
             )?;
         }
         let keep: HashSet<&str> = remote.iter().map(|l| l.href.as_str()).collect();
@@ -88,10 +100,11 @@ impl Client {
                     Ok(()) | Err(Error::Conflict) => {
                         let db = self.db.lock().unwrap();
                         // Restored (undo) while the DELETE was on its way: upload it anew.
-                        if store::raw(&db, &t.uid)?.is_some_and(|r| r.dirty == store::MODIFIED) {
-                            store::set_sync_state(&db, &t.uid, None, None, store::MODIFIED)?
+                        let now = store::raw(&db, t.kind, &t.list_href, &t.uid)?;
+                        if now.is_some_and(|r| r.dirty == store::MODIFIED) {
+                            store::set_sync_state(&db, &t, None, None, store::MODIFIED)?
                         } else {
-                            store::delete(&db, &t.uid)?
+                            store::delete(&db, &t)?
                         }
                     }
                     Err(e) => return Err(e),
@@ -114,13 +127,14 @@ impl Client {
             };
             let db = self.db.lock().unwrap();
             // Only clear the flag if nobody edited the row while we were uploading.
-            let still_same = store::raw(&db, &t.uid)?.is_some_and(|r| r.raw_ics == t.raw_ics);
+            let now = store::raw(&db, t.kind, &t.list_href, &t.uid)?;
+            let still_same = now.is_some_and(|r| r.raw_ics == t.raw_ics);
             let dirty = if still_same {
                 store::CLEAN
             } else {
                 store::MODIFIED
             };
-            store::set_sync_state(&db, &t.uid, Some(&href), etag.as_deref(), dirty)?;
+            store::set_sync_state(&db, &t, Some(&href), etag.as_deref(), dirty)?;
             report.pushed += 1;
         }
         Ok(report)
@@ -139,7 +153,7 @@ impl Client {
     /// 412 on PUT: fetch the server copy, merge by the conflict rule, upload the result once.
     fn resolve_conflict(
         &self,
-        local: &store::RawTask,
+        local: &store::RawObject,
         href: &str,
         reg: Option<&str>,
     ) -> Result<()> {
@@ -229,7 +243,7 @@ impl Client {
             };
             let uid = server.text("UID").unwrap_or_default();
             seen.insert(uid.clone());
-            let local = store::raw(&tx, &uid)?;
+            let local = store::raw(&tx, Kind::of(&server), list_href, &uid)?;
             if local
                 .as_ref()
                 .is_some_and(|l| l.etag.as_deref() == Some(&etag) && l.dirty == store::CLEAN)
@@ -252,10 +266,7 @@ impl Client {
                     )?;
                 }
                 Some(l) if l.dirty == store::DELETED => {
-                    tx.execute(
-                        "UPDATE tasks SET etag = ?2, href = ?3 WHERE uid = ?1",
-                        params![uid, etag, href],
-                    )?;
+                    store::set_sync_state(&tx, &l, Some(&href), Some(&etag), store::DELETED)?;
                 }
                 _ => {
                     store::save(
@@ -271,28 +282,21 @@ impl Client {
             report.pulled += 1;
             uids.push(uid);
         }
-        let mut gone: Vec<store::RawTask> = Vec::new();
+        let mut gone: Vec<store::RawObject> = Vec::new();
         for href in removed {
             gone.extend(store::raw_by_href(&tx, &href)?);
         }
         if full {
-            // Full resync: anything clean we did not see no longer exists.
-            let mut st =
-                tx.prepare("SELECT uid FROM tasks WHERE list_href = ? AND href IS NOT NULL")?;
-            let all: Vec<String> = st
-                .query_map([list_href], |r| r.get(0))?
-                .collect::<rusqlite::Result<_>>()?;
-            drop(st);
-            for uid in all.into_iter().filter(|u| !seen.contains(u)) {
-                gone.extend(store::raw(&tx, &uid)?);
-            }
+            // Full resync: anything the server had that we did not see no longer exists.
+            let all = store::synced(&tx, list_href)?;
+            gone.extend(all.into_iter().filter(|o| !seen.contains(&o.uid)));
         }
         for t in gone {
             if t.dirty == store::MODIFIED {
                 // Deleted remotely but edited here: re-push as a new resource.
-                store::set_sync_state(&tx, &t.uid, None, None, store::MODIFIED)?;
+                store::set_sync_state(&tx, &t, None, None, store::MODIFIED)?;
             } else {
-                store::delete(&tx, &t.uid)?;
+                store::delete(&tx, &t)?;
                 report.deleted += 1;
             }
             uids.push(t.uid);

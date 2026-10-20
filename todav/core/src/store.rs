@@ -1,5 +1,6 @@
 //! SQLite schema and row mapping. Every derived column is recomputed from `raw_ics`.
 
+use crate::event::{self, Event};
 use crate::ical::{self, Calendar, Line};
 use crate::tz::{self, Stamp};
 use crate::{List, Result, Task};
@@ -38,7 +39,62 @@ CREATE INDEX alarms_uid ON alarms(uid);
 CREATE INDEX alarms_at ON alarms(at);
 ALTER TABLE tasks DROP COLUMN remind_at;
 "#,
+    r#"
+ALTER TABLE lists ADD COLUMN has_tasks INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE lists ADD COLUMN has_events INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE lists ADD COLUMN writable INTEGER NOT NULL DEFAULT 1;
+-- Pull everything again: events in calendars that also hold tasks were skipped so far.
+UPDATE lists SET sync_token = NULL;
+ALTER TABLE tasks ADD COLUMN start INTEGER;
+ALTER TABLE tasks ADD COLUMN start_all_day INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE events (
+  list_href TEXT NOT NULL REFERENCES lists(href) ON DELETE CASCADE,
+  uid TEXT NOT NULL,
+  etag TEXT, href TEXT, raw_ics TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  first_start INTEGER NOT NULL,         -- local time, see `to_local`
+  last_end INTEGER,                     -- NULL: repeats forever
+  last_modified INTEGER,
+  dirty INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (list_href, uid)
+);
+CREATE INDEX events_href ON events(href);
+CREATE INDEX events_span ON events(first_start, last_end);
+"#,
 ];
+
+/// What a stored calendar object is. Tasks are keyed by UID, events by calendar and UID (the
+/// same invitation can sit in two calendars).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Kind {
+    Task,
+    Event,
+}
+
+impl Kind {
+    pub fn of(cal: &Calendar) -> Kind {
+        if cal.kind() == "VEVENT" {
+            Kind::Event
+        } else {
+            Kind::Task
+        }
+    }
+
+    fn table(self) -> &'static str {
+        match self {
+            Kind::Task => "tasks",
+            Kind::Event => "events",
+        }
+    }
+
+    /// WHERE clause for a row, with the calendar as ?1 and the UID as ?2.
+    fn key(self) -> &'static str {
+        match self {
+            Kind::Task => "uid = ?2",
+            Kind::Event => "list_href = ?1 AND uid = ?2",
+        }
+    }
+}
 
 pub const CLEAN: i64 = 0;
 pub const MODIFIED: i64 = 1;
@@ -54,19 +110,24 @@ pub fn open(path: &str) -> Result<Connection> {
         tx.pragma_update(None, "user_version", i as i64 + 1)?;
         tx.commit()?;
     }
-    // Derived columns changed since version 1: `due` became local time, reminders are new.
+    // Derived columns changed with every migration so far (local times, reminders, zones, start).
     if version > 0 && (version as usize) < MIGRATIONS.len() {
         rederive(&db)?;
     }
     Ok(db)
 }
 
-/// Recompute every task's derived columns from its calendar data.
+/// Recompute every object's derived columns from its calendar data.
 fn rederive(db: &Connection) -> Result<()> {
-    let all: Vec<RawTask> = db
-        .prepare(&format!("SELECT {RAW_COLS} FROM tasks"))?
-        .query_map([], raw_row)?
-        .collect::<rusqlite::Result<_>>()?;
+    let mut all = Vec::new();
+    for kind in [Kind::Task, Kind::Event] {
+        let sql = format!("SELECT {RAW_COLS} FROM {}", kind.table());
+        let rows = db
+            .prepare(&sql)?
+            .query_map([], |r| raw_row(r, kind))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        all.extend(rows);
+    }
     for t in all {
         if let Some(cal) = Calendar::parse(&t.raw_ics) {
             save(
@@ -161,7 +222,8 @@ pub fn lists(db: &Connection) -> Result<Vec<List>> {
     let mut st = db.prepare(
         "SELECT l.href, l.display_name, l.color,
            (SELECT COUNT(*) FROM tasks t WHERE t.list_href = l.href AND t.dirty != 2
-              AND t.status NOT IN ('COMPLETED', 'CANCELLED'))
+              AND t.status NOT IN ('COMPLETED', 'CANCELLED')),
+           l.has_tasks, l.has_events, l.writable
          FROM lists l ORDER BY l.display_name COLLATE NOCASE",
     )?;
     let rows = st.query_map([], |r| {
@@ -170,6 +232,9 @@ pub fn lists(db: &Connection) -> Result<Vec<List>> {
             display_name: r.get(1)?,
             color: r.get(2)?,
             open_count: r.get(3)?,
+            holds_tasks: r.get(4)?,
+            holds_events: r.get(5)?,
+            writable: r.get(6)?,
         })
     })?;
     Ok(rows.collect::<rusqlite::Result<_>>()?)
@@ -177,7 +242,7 @@ pub fn lists(db: &Connection) -> Result<Vec<List>> {
 
 const TASK_COLS: &str = "uid, list_href, summary, description, status, completed_at, category, parent_uid, priority, due, due_all_day,
   (SELECT group_concat(at) FROM (SELECT at FROM alarms a WHERE a.uid = tasks.uid ORDER BY at)),
-  sort_order, created, last_modified";
+  sort_order, created, last_modified, start, start_all_day";
 
 fn task_row(r: &rusqlite::Row) -> rusqlite::Result<Task> {
     let status: String = r.get(4)?;
@@ -203,6 +268,8 @@ fn task_row(r: &rusqlite::Row) -> rusqlite::Result<Task> {
         sort_order: r.get(12)?,
         created: r.get(13)?,
         last_modified: r.get(14)?,
+        start: r.get(15)?,
+        start_all_day: r.get(16)?,
     })
 }
 
@@ -249,8 +316,9 @@ pub fn task(db: &Connection, uid: &str) -> Result<Option<Task>> {
         .optional()?)
 }
 
-/// Raw row state needed by sync: (list_href, href, etag, raw_ics, dirty).
-pub struct RawTask {
+/// Raw row state of a task or event, as sync needs it.
+pub struct RawObject {
+    pub kind: Kind,
     pub uid: String,
     pub list_href: String,
     pub href: Option<String>,
@@ -259,8 +327,9 @@ pub struct RawTask {
     pub dirty: i64,
 }
 
-fn raw_row(r: &rusqlite::Row) -> rusqlite::Result<RawTask> {
-    Ok(RawTask {
+fn raw_row(r: &rusqlite::Row, kind: Kind) -> rusqlite::Result<RawObject> {
+    Ok(RawObject {
+        kind,
         uid: r.get(0)?,
         list_href: r.get(1)?,
         href: r.get(2)?,
@@ -272,33 +341,63 @@ fn raw_row(r: &rusqlite::Row) -> rusqlite::Result<RawTask> {
 
 const RAW_COLS: &str = "uid, list_href, href, etag, raw_ics, dirty";
 
-pub fn raw(db: &Connection, uid: &str) -> Result<Option<RawTask>> {
+/// A task by UID (`list_href` is not needed), or an event by calendar and UID.
+pub fn raw(db: &Connection, kind: Kind, list_href: &str, uid: &str) -> Result<Option<RawObject>> {
+    let sql = format!(
+        "SELECT {RAW_COLS} FROM {} WHERE {}",
+        kind.table(),
+        kind.key()
+    );
     Ok(db
-        .query_row(
-            &format!("SELECT {RAW_COLS} FROM tasks WHERE uid = ?"),
-            [uid],
-            raw_row,
-        )
+        .query_row(&sql, [list_href, uid], |r| raw_row(r, kind))
         .optional()?)
 }
 
-pub fn raw_by_href(db: &Connection, href: &str) -> Result<Option<RawTask>> {
-    Ok(db
-        .query_row(
-            &format!("SELECT {RAW_COLS} FROM tasks WHERE href = ?"),
-            [href],
-            raw_row,
-        )
-        .optional()?)
+pub fn raw_by_href(db: &Connection, href: &str) -> Result<Option<RawObject>> {
+    for kind in [Kind::Task, Kind::Event] {
+        let sql = format!("SELECT {RAW_COLS} FROM {} WHERE href = ?", kind.table());
+        if let Some(o) = db
+            .query_row(&sql, [href], |r| raw_row(r, kind))
+            .optional()?
+        {
+            return Ok(Some(o));
+        }
+    }
+    Ok(None)
 }
 
-pub fn dirty(db: &Connection) -> Result<Vec<RawTask>> {
-    let mut st = db.prepare(&format!("SELECT {RAW_COLS} FROM tasks WHERE dirty != 0"))?;
-    let rows = st.query_map([], raw_row)?;
-    Ok(rows.collect::<rusqlite::Result<_>>()?)
+/// Clean objects that the server has, in one calendar.
+pub fn synced(db: &Connection, list_href: &str) -> Result<Vec<RawObject>> {
+    let mut out = Vec::new();
+    for kind in [Kind::Task, Kind::Event] {
+        let sql = format!(
+            "SELECT {RAW_COLS} FROM {} WHERE list_href = ? AND href IS NOT NULL",
+            kind.table()
+        );
+        let rows = db
+            .prepare(&sql)?
+            .query_map([list_href], |r| raw_row(r, kind))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        out.extend(rows);
+    }
+    Ok(out)
 }
 
-/// Insert or replace a task from its calendar data, recomputing every derived column.
+pub fn dirty(db: &Connection) -> Result<Vec<RawObject>> {
+    let mut out = Vec::new();
+    for kind in [Kind::Task, Kind::Event] {
+        let sql = format!("SELECT {RAW_COLS} FROM {} WHERE dirty != 0", kind.table());
+        let rows = db
+            .prepare(&sql)?
+            .query_map([], |r| raw_row(r, kind))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        out.extend(rows);
+    }
+    Ok(out)
+}
+
+/// Insert or replace a task or event from its calendar data, recomputing every derived column.
+/// Returns its UID.
 pub fn save(
     db: &Connection,
     list_href: &str,
@@ -307,15 +406,19 @@ pub fn save(
     cal: &Calendar,
     dirty: i64,
 ) -> Result<String> {
+    if Kind::of(cal) == Kind::Event {
+        return save_event(db, list_href, href, etag, cal, dirty);
+    }
     let uid = cal.text("UID").unwrap_or_default();
     let status = cal.text("STATUS").unwrap_or_else(|| "NEEDS-ACTION".into());
     let due = local_time(db, cal, cal.prop("DUE"))?;
+    let start = local_time(db, cal, cal.prop("DTSTART"))?;
     let alarms = alarm_times(db, cal, due.map(|(d, _)| d))?;
     db.execute(
         "INSERT OR REPLACE INTO tasks (uid, list_href, etag, href, raw_ics, summary, description, status,
            completed_at, category, parent_uid, priority, due, sort_order, created, last_modified, dirty,
-           due_all_day)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
+           due_all_day, start, start_all_day)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)",
         params![
             uid,
             list_href,
@@ -337,6 +440,8 @@ pub fn save(
             cal.time("LAST-MODIFIED"),
             dirty,
             due.is_some_and(|(_, all_day)| all_day),
+            start.map(|(s, _)| s),
+            start.is_some_and(|(_, all_day)| all_day),
         ],
     )?;
     db.execute("DELETE FROM alarms WHERE uid = ?", [&uid])?;
@@ -349,22 +454,75 @@ pub fn save(
     Ok(uid)
 }
 
+fn save_event(
+    db: &Connection,
+    list_href: &str,
+    href: Option<&str>,
+    etag: Option<&str>,
+    cal: &Calendar,
+    dirty: i64,
+) -> Result<String> {
+    let uid = cal.text("UID").unwrap_or_default();
+    let (first, last) = event::span(db, cal)?;
+    db.execute(
+        "INSERT OR REPLACE INTO events (list_href, uid, etag, href, raw_ics, summary, first_start, last_end,
+           last_modified, dirty)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        params![
+            list_href,
+            uid,
+            etag,
+            href,
+            cal.to_ics(),
+            cal.text("SUMMARY").unwrap_or_default(),
+            first,
+            last,
+            cal.time("LAST-MODIFIED"),
+            dirty,
+        ],
+    )?;
+    Ok(uid)
+}
+
+/// Occurrences of every event overlapping `[from, to)` (local times), soonest first.
+pub fn events(db: &Connection, from: i64, to: i64) -> Result<Vec<Event>> {
+    // A day of slack: the stored span is in the zone the machine had when it was saved.
+    let rows: Vec<(String, String)> = db
+        .prepare(
+            "SELECT list_href, raw_ics FROM events WHERE dirty != 2
+               AND first_start < ?2 + 86400 AND (last_end IS NULL OR last_end > ?1 - 86400)",
+        )?
+        .query_map([from, to], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    let mut out = Vec::new();
+    for (list, ics) in rows {
+        if let Some(cal) = Calendar::parse(&ics) {
+            out.extend(event::occurrences(db, &cal, &list, from, to)?);
+        }
+    }
+    out.sort_by(|a, b| (a.start, a.end, &a.summary).cmp(&(b.start, b.end, &b.summary)));
+    Ok(out)
+}
+
 pub fn set_sync_state(
     db: &Connection,
-    uid: &str,
+    o: &RawObject,
     href: Option<&str>,
     etag: Option<&str>,
     dirty: i64,
 ) -> Result<()> {
-    db.execute(
-        "UPDATE tasks SET href = ?2, etag = ?3, dirty = ?4 WHERE uid = ?1",
-        params![uid, href, etag, dirty],
-    )?;
+    let sql = format!(
+        "UPDATE {} SET href = ?3, etag = ?4, dirty = ?5 WHERE {}",
+        o.kind.table(),
+        o.kind.key()
+    );
+    db.execute(&sql, params![o.list_href, o.uid, href, etag, dirty])?;
     Ok(())
 }
 
-pub fn delete(db: &Connection, uid: &str) -> Result<()> {
-    db.execute("DELETE FROM tasks WHERE uid = ?", [uid])?;
+pub fn delete(db: &Connection, o: &RawObject) -> Result<()> {
+    let sql = format!("DELETE FROM {} WHERE {}", o.kind.table(), o.kind.key());
+    db.execute(&sql, [&o.list_href, &o.uid])?;
     Ok(())
 }
 

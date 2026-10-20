@@ -51,11 +51,20 @@ struct Fixture {
 
 impl Fixture {
     fn new(name: &str) -> Fixture {
+        Fixture::with(name, &["VTODO"])
+    }
+
+    /// A calendar for components `comps` (VTODO, VEVENT).
+    fn with(name: &str, comps: &[&str]) -> Fixture {
         let (url, user, pass) = env();
         let dav = Dav::new(&url, &user, &pass);
         let href = format!("/remote.php/dav/calendars/{user}/it-{name}/");
+        let comps: String = comps
+            .iter()
+            .map(|c| format!(r#"<c:comp name="{c}"/>"#))
+            .collect();
         let body = format!(
-            r#"<?xml version="1.0"?><c:mkcalendar xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:set><d:prop><d:displayname>it-{name}</d:displayname><c:supported-calendar-component-set><c:comp name="VTODO"/></c:supported-calendar-component-set></d:prop></d:set></c:mkcalendar>"#
+            r#"<?xml version="1.0"?><c:mkcalendar xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:set><d:prop><d:displayname>it-{name}</d:displayname><c:supported-calendar-component-set>{comps}</c:supported-calendar-component-set></d:prop></d:set></c:mkcalendar>"#
         );
         let existing = match dav.sync_collection(&href, "") {
             Ok(SyncResult::Changes { changed, .. }) => changed,
@@ -291,4 +300,66 @@ fn password_login_checks_the_credentials() {
     assert_eq!((c.server, c.login_name), (url.clone(), user.clone()));
     let wrong = todav_core::password_login(url, user, format!("{pass}x"));
     assert!(matches!(wrong, Err(todav_core::Error::Auth)), "{wrong:?}");
+}
+
+#[test]
+fn events_sync_with_their_zone_and_recurrence() {
+    let f = Fixture::with("events", &["VEVENT", "VTODO"]);
+    let cal =
+        f.a.calendars()
+            .into_iter()
+            .find(|c| c.href == f.href)
+            .expect("calendar discovered");
+    assert!(cal.holds_events && cal.holds_tasks && cal.writable);
+    assert!(
+        f.a.lists().iter().any(|l| l.href == f.href),
+        "also a task list"
+    );
+
+    // From "another client": weekly at 9:00 in New York, three times, the second moved to 15:00.
+    let ics = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//it//EN\r\nBEGIN:VTIMEZONE\r\nTZID:America/New_York\r\nBEGIN:DAYLIGHT\r\nTZOFFSETFROM:-0500\r\nTZOFFSETTO:-0400\r\nDTSTART:20070311T020000\r\nRRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU\r\nEND:DAYLIGHT\r\nBEGIN:STANDARD\r\nTZOFFSETFROM:-0400\r\nTZOFFSETTO:-0500\r\nDTSTART:20071104T020000\r\nRRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU\r\nEND:STANDARD\r\nEND:VTIMEZONE\r\nBEGIN:VEVENT\r\nUID:it-weekly\r\nDTSTAMP:20261001T000000Z\r\nSUMMARY:Weekly\r\nDTSTART;TZID=America/New_York:20261005T090000\r\nDTEND;TZID=America/New_York:20261005T100000\r\nRRULE:FREQ=WEEKLY;COUNT=3\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:it-weekly\r\nDTSTAMP:20261001T000000Z\r\nRECURRENCE-ID;TZID=America/New_York:20261012T090000\r\nSUMMARY:Moved\r\nDTSTART;TZID=America/New_York:20261012T150000\r\nDTEND;TZID=America/New_York:20261012T160000\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
+    let href = format!("{}it-weekly.ics", f.href);
+    f.dav.put(&href, ics, None, None).unwrap();
+    f.a.sync_list(f.href.clone()).unwrap();
+
+    let db = rusqlite::Connection::open(&f.a_db).unwrap();
+    let local = |utc: &str| {
+        let t = todav_core::ical::parse_time(utc).unwrap();
+        todav_core::store::to_local(&db, t).unwrap()
+    };
+    let got: Vec<(i64, i64, String)> =
+        f.a.events(local("20261001T000000"), local("20261101T000000"))
+            .into_iter()
+            .filter(|e| e.list_href == f.href)
+            .map(|e| (e.start, e.end, e.summary))
+            .collect();
+    assert_eq!(
+        got,
+        [
+            (
+                local("20261005T130000"),
+                local("20261005T140000"),
+                "Weekly".into()
+            ),
+            (
+                local("20261012T190000"),
+                local("20261012T200000"),
+                "Moved".into()
+            ),
+            (
+                local("20261019T130000"),
+                local("20261019T140000"),
+                "Weekly".into()
+            ),
+        ]
+    );
+
+    // Deleted on the server: gone here too.
+    f.dav.delete(&href, None, None).unwrap();
+    f.a.sync_list(f.href.clone()).unwrap();
+    assert!(
+        f.a.events(local("20261001T000000"), local("20261101T000000"))
+            .iter()
+            .all(|e| e.list_href != f.href)
+    );
 }
