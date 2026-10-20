@@ -223,17 +223,18 @@ fn draw(c: &Cal, area: &gtk::DrawingArea, cr: &gtk::cairo::Context, w: i32, h: i
 fn segments(i: &Item, start: i64) -> Vec<(i64, i64, i64)> {
     let (from, to) = match i {
         Item::Event(e) if !e.all_day => (e.start, e.end.max(e.start + 15 * 60)),
-        Item::Task(t) => {
-            let (at, all_day) = when(t);
-            if all_day {
-                return Vec::new();
+        // Only tasks planned into a slot (a start time) take hours; one just due at a time goes
+        // above with the day's other items, its chip showing the time.
+        Item::Task(t) => match t.start {
+            Some(s) if !t.start_all_day => {
+                let end = match t.due {
+                    Some(d) if !t.due_all_day && d > s => d,
+                    _ => s + 30 * 60,
+                };
+                (s, end)
             }
-            let end = match (t.start, t.due) {
-                (Some(s), Some(d)) if !t.start_all_day && !t.due_all_day && d > s => d,
-                _ => at + 30 * 60,
-            };
-            (at, end)
-        }
+            _ => return Vec::new(),
+        },
         _ => return Vec::new(),
     };
     (0..7)

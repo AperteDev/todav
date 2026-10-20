@@ -15,6 +15,8 @@ const XML: &str = r#"<node>
   <method name="SetDone"><arg direction="in" name="uid" type="s"/><arg direction="in" name="done" type="b"/></method>
   <method name="AddTask"><arg direction="in" name="list" type="s"/><arg direction="in" name="summary" type="s"/><arg direction="out" type="s"/></method>
   <method name="ShowList"><arg direction="in" name="list" type="s"/></method>
+  <method name="GetNextEvent"><arg direction="out" type="(ssx)"/></method>
+  <method name="ShowDay"><arg direction="in" name="at" type="x"/></method>
   <method name="Sync"/>
   <signal name="Changed"><arg name="list" type="s"/></signal>
   <property name="SyncState" type="s" access="read"/>
@@ -102,6 +104,32 @@ fn call(method: &str, params: &glib::Variant) -> Result<Option<glib::Variant>, S
         "ShowList" => {
             let (list,) = params.get::<(String,)>().ok_or_else(bad)?;
             window::show_list(&list);
+            None
+        }
+        // (title, when in words, start in local time for ShowDay); an empty title: none.
+        "GetNextEvent" => {
+            let next = crate::calendar::next_event().map(|e| {
+                let now = c.local_now();
+                let when = if e.start <= now {
+                    let until = crate::dates::fields(e.end)
+                        .format("%H:%M")
+                        .map(String::from);
+                    format!("Now, until {}", until.unwrap_or_default())
+                } else if e.start - now < 3600 {
+                    format!("In {} min", (e.start - now + 59) / 60)
+                } else {
+                    crate::dates::label(e.start, false, now)
+                };
+                (e.summary, when, e.start)
+            });
+            Some((next.unwrap_or_default(),).to_variant())
+        }
+        "ShowDay" => {
+            let (at,) = params.get::<(i64,)>().ok_or_else(bad)?;
+            if let Some(app) = gio::Application::default().and_downcast::<adw::Application>() {
+                window::present(&app);
+            }
+            crate::calendar::show_day(at);
             None
         }
         "Sync" => {

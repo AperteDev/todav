@@ -61,7 +61,15 @@ CREATE TABLE events (
 CREATE INDEX events_href ON events(href);
 CREATE INDEX events_span ON events(first_start, last_end);
 "#,
+    r#"
+ALTER TABLE tasks ADD COLUMN event_uid TEXT;
+CREATE INDEX tasks_event ON tasks(event_uid);
+"#,
 ];
+
+/// RELTYPE of the RELATED-TO linking a task to the event it is for (a custom type: PARENT would
+/// make the event a parent task to other clients, SIBLING means something else).
+pub const EVENT_LINK: &str = "X-TODAV-EVENT";
 
 /// What a stored calendar object is. Tasks are keyed by UID, events by calendar and UID (the
 /// same invitation can sit in two calendars).
@@ -242,7 +250,7 @@ pub fn lists(db: &Connection) -> Result<Vec<List>> {
 
 const TASK_COLS: &str = "uid, list_href, summary, description, status, completed_at, category, parent_uid, priority, due, due_all_day,
   (SELECT group_concat(at) FROM (SELECT at FROM alarms a WHERE a.uid = tasks.uid ORDER BY at)),
-  sort_order, created, last_modified, start, start_all_day";
+  sort_order, created, last_modified, start, start_all_day, event_uid";
 
 fn task_row(r: &rusqlite::Row) -> rusqlite::Result<Task> {
     let status: String = r.get(4)?;
@@ -270,7 +278,18 @@ fn task_row(r: &rusqlite::Row) -> rusqlite::Result<Task> {
         last_modified: r.get(14)?,
         start: r.get(15)?,
         start_all_day: r.get(16)?,
+        event_uid: r.get(17)?,
     })
+}
+
+/// Tasks (done ones too) for the event with this UID.
+pub fn event_tasks(db: &Connection, event_uid: &str) -> Result<Vec<Task>> {
+    let mut st = db.prepare(&format!(
+        "SELECT {TASK_COLS} FROM tasks WHERE event_uid = ?1 AND dirty != 2
+         ORDER BY COALESCE(sort_order, created, 0), created, uid"
+    ))?;
+    let rows = st.query_map([event_uid], task_row)?;
+    Ok(rows.collect::<rusqlite::Result<_>>()?)
 }
 
 pub fn tasks(db: &Connection, list_href: &str, include_done: bool) -> Result<Vec<Task>> {
@@ -442,8 +461,8 @@ pub fn save(
     db.execute(
         "INSERT OR REPLACE INTO tasks (uid, list_href, etag, href, raw_ics, summary, description, status,
            completed_at, category, parent_uid, priority, due, sort_order, created, last_modified, dirty,
-           due_all_day, start, start_all_day)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)",
+           due_all_day, start, start_all_day, event_uid)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)",
         params![
             uid,
             list_href,
@@ -467,6 +486,7 @@ pub fn save(
             due.is_some_and(|(_, all_day)| all_day),
             start.map(|(s, _)| s),
             start.is_some_and(|(_, all_day)| all_day),
+            cal.related(EVENT_LINK),
         ],
     )?;
     db.execute("DELETE FROM alarms WHERE uid = ?", [&uid])?;
@@ -527,6 +547,32 @@ pub fn events(db: &Connection, from: i64, to: i64) -> Result<Vec<Event>> {
     }
     out.sort_by(|a, b| (a.start, a.end, &a.summary).cmp(&(b.start, b.end, &b.summary)));
     Ok(out)
+}
+
+/// The event with this UID as of `from`: its next occurrence within a year, else its first.
+pub fn event_by_uid(db: &Connection, uid: &str, from: i64) -> Result<Option<Event>> {
+    let row: Option<(String, String)> = db
+        .query_row(
+            "SELECT list_href, raw_ics FROM events WHERE uid = ? AND dirty != 2 LIMIT 1",
+            [uid],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .optional()?;
+    let Some((list, ics)) = row else {
+        return Ok(None);
+    };
+    let Some(cal) = Calendar::parse(&ics) else {
+        return Ok(None);
+    };
+    let next = event::occurrences(db, &cal, &list, from, from + 366 * 86400)?;
+    match next.into_iter().next() {
+        Some(e) => Ok(Some(e)),
+        None => Ok(
+            event::occurrences(db, &cal, &list, i64::MIN / 4, i64::MAX / 4)?
+                .into_iter()
+                .next(),
+        ),
+    }
 }
 
 /// A VTIMEZONE for `tzid` from any stored event, to write new times in that zone.

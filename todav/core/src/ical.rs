@@ -385,6 +385,42 @@ impl Calendar {
             .filter(|v| !v.is_empty())
     }
 
+    /// The UID a RELATED-TO with RELTYPE `reltype` points at.
+    pub fn related(&self, reltype: &str) -> Option<String> {
+        self.props("RELATED-TO")
+            .find(|l| {
+                l.param("RELTYPE")
+                    .is_some_and(|r| r.eq_ignore_ascii_case(reltype))
+            })
+            .map(|l| unescape(&l.value))
+            .filter(|v| !v.is_empty())
+    }
+
+    /// Replace (or with None drop) the RELATED-TO with RELTYPE `reltype`; other relations stay.
+    pub fn set_related(&mut self, reltype: &str, uid: Option<&str>) {
+        let idx: Vec<usize> = self
+            .todo_props()
+            .filter(|(_, l)| {
+                l.name == "RELATED-TO"
+                    && l.param("RELTYPE")
+                        .is_some_and(|r| r.eq_ignore_ascii_case(reltype))
+            })
+            .map(|(i, _)| i)
+            .collect();
+        for i in idx.into_iter().rev() {
+            self.lines.remove(i);
+        }
+        if let Some(uid) = uid {
+            let at = self.todo_props().last().map(|(i, _)| i + 1).unwrap();
+            let line = Line {
+                name: "RELATED-TO".into(),
+                params: format!(";RELTYPE={reltype}"),
+                value: escape(uid),
+            };
+            self.lines.insert(at, line);
+        }
+    }
+
     /// TRIGGER of each VALARM in the main component.
     pub fn alarm_triggers(&self) -> Vec<&Line> {
         self.main().alarm_triggers()

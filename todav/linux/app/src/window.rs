@@ -26,6 +26,7 @@ row.task-done > box.header > box.title > label.title,
 row.expander.task-done > box > list > row.header > box.header > box.title > label.title { text-decoration-line: line-through; opacity: 0.55; }
 .tag { padding: 2px 10px; border-radius: 9999px; font-size: smaller; color: @accent_color; background: alpha(@accent_bg_color, 0.15); }
 .tag.date, .tag.count { color: @window_fg_color; background: alpha(@window_fg_color, 0.08); }
+button.tag.event { min-height: 0; padding: 2px 10px; font-weight: normal; }
 .tag.overdue { color: @error_color; background: alpha(@error_bg_color, 0.15); }
 :drop(active) { box-shadow: none; outline: none; }
 button.drop-hint { outline: 2px solid @accent_bg_color; outline-offset: -2px; }
@@ -968,6 +969,40 @@ fn rebuild_upcoming(ui: &Rc<Ui>) {
         .collect();
     ui.title.set_title("Upcoming");
     ui.title.set_subtitle(&format!("{} open", tasks.len()));
+    // Today's events first: the day's plan next to what is due.
+    let events = crate::calendar::today_events();
+    if !events.is_empty() {
+        let group = adw::PreferencesGroup::builder()
+            .title("Today’s Events")
+            .build();
+        for e in &events {
+            let time = if e.all_day {
+                "All day".to_string()
+            } else {
+                let at = |t: i64| {
+                    dates::fields(t)
+                        .format("%H:%M")
+                        .map(String::from)
+                        .unwrap_or_default()
+                };
+                format!("{} – {}", at(e.start), at(e.end))
+            };
+            let row = adw::ActionRow::builder()
+                .title(&e.summary)
+                .subtitle(&time)
+                .use_markup(false)
+                .activatable(true)
+                .build();
+            row.add_prefix(&gtk::Image::from_icon_name("x-office-calendar-symbolic"));
+            if now >= e.start && now < e.end && !e.all_day {
+                row.add_css_class("accent"); // happening now
+            }
+            let start = e.start;
+            row.connect_activated(move |_| crate::calendar::show_day(start));
+            group.add(&row);
+        }
+        ui.groups.append(&group);
+    }
     let mut section: Option<(String, adw::PreferencesGroup)> = None;
     for t in &tasks {
         let s = dates::section(t, now);
@@ -1034,6 +1069,24 @@ fn subtask_counts(tasks: &[Task]) -> HashMap<String, (usize, usize)> {
     counts
 }
 
+/// The event a task is for, as a pill opening the calendar on its (next) day.
+fn event_tag(t: &Task) -> Option<gtk::Button> {
+    let e = core().event(t.event_uid.clone()?)?;
+    let content = adw::ButtonContent::builder()
+        .icon_name("x-office-calendar-symbolic")
+        .label(&e.summary)
+        .build();
+    let b = gtk::Button::builder()
+        .child(&content)
+        .valign(gtk::Align::Center)
+        .tooltip_text(dates::label(e.start, e.all_day, core().local_now()))
+        .build();
+    b.add_css_class("tag");
+    b.add_css_class("event");
+    b.connect_clicked(move |_| crate::calendar::show_day(e.start));
+    Some(b)
+}
+
 /// "done/all" pill for a task with subtasks.
 fn count_tag(ui: &Ui, t: &Task) -> Option<gtk::Label> {
     let (open, done) = *ui.counts.borrow().get(&t.uid)?;
@@ -1075,6 +1128,9 @@ fn task_row(ui: &Rc<Ui>, t: &Task, indent: usize, slot: Option<Slot>) -> adw::Ac
     }
     if let Some(due) = dates::tag(t, core().local_now()) {
         row.add_suffix(&due);
+    }
+    if let Some(e) = event_tag(t) {
+        row.add_suffix(&e);
     }
     // Subtasks have no category of their own: the top-level task's decides. The Upcoming page
     // mixes lists, so it leaves categories alone.
@@ -1952,6 +2008,7 @@ pub(crate) mod tests {
             last_modified: None,
             start: None,
             start_all_day: false,
+            event_uid: None,
         }
     }
 

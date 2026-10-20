@@ -111,6 +111,9 @@ struct Cal {
     hover: Cell<Option<(i64, i64)>>,
     /// The week view scrolled to the morning once.
     scrolled: Cell<bool>,
+    /// An event's details are open: redraws wait (`pending`) until it closes.
+    holding: Cell<bool>,
+    pending: Cell<bool>,
     /// Midnight of the day the views are around (the selected day).
     anchor: Cell<i64>,
     /// Set while the mini month is moved in code, so its handler ignores that.
@@ -187,6 +190,8 @@ pub fn build(views: &adw::ViewStack, tasks: &adw::NavigationSplitView) {
         blocks: RefCell::new(Vec::new()),
         hover: Cell::new(None),
         scrolled: Cell::new(false),
+        holding: Cell::new(false),
+        pending: Cell::new(false),
         anchor: Cell::new(today()),
         busy: Cell::new(false),
         colors,
@@ -299,6 +304,26 @@ fn step(by: i64) {
     }
 }
 
+/// The timed event on now or next within a week, in the calendars shown (for the extension).
+pub fn next_event() -> Option<Event> {
+    let hidden = hidden();
+    let now = core().local_now();
+    core()
+        .events(now, now + 7 * DAY)
+        .into_iter()
+        .filter(|e| !e.all_day && !e.cancelled && e.end > now && !hidden.contains(&e.list_href))
+        .min_by_key(|e| e.start)
+}
+
+/// Today's events in the calendars shown, for the Tasks page's Upcoming.
+pub fn today_events() -> Vec<Event> {
+    let hidden = hidden();
+    let mut all = core().events(today(), today() + DAY);
+    all.retain(|e| !hidden.contains(&e.list_href) && !e.cancelled);
+    all.sort_by_key(|e| (!e.all_day, e.start));
+    all
+}
+
 /// Switch to the calendar on the day holding `t` (local time).
 pub fn show_day(t: i64) {
     let Some(c) = cal() else { return };
@@ -311,6 +336,10 @@ pub fn show_day(t: i64) {
 /// Redraw the page if it is built; cheap enough to call on every change.
 pub fn refresh() {
     let Some(c) = cal() else { return };
+    if c.holding.get() {
+        c.pending.set(true);
+        return;
+    }
     refresh_calendars(&c);
     let anchor = c.anchor.get();
     // Keep the mini month on the selected day.
@@ -1007,7 +1036,93 @@ fn span_text(e: &Event) -> String {
     }
 }
 
-/// An event's details: what, when, where, which calendar, notes.
+/// The tasks for an event: tick them, add one (to the task list used last, due when the event
+/// starts).
+fn event_tasks(e: &Event) -> gtk::Box {
+    let b = gtk::Box::new(gtk::Orientation::Vertical, 2);
+    let head = gtk::Label::builder().xalign(0.0).margin_top(4).build();
+    head.add_css_class("heading");
+    head.set_label(&tasks_heading(&e.uid));
+    b.append(&head);
+    let list = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    for t in core().event_tasks(e.uid.clone()) {
+        list.append(&task_check(&t, &head));
+    }
+    b.append(&list);
+    let entry = gtk::Entry::builder()
+        .placeholder_text("Add a task for this event")
+        .build();
+    let ev = e.clone();
+    entry.connect_activate(move |entry| {
+        let text = entry.text().trim().to_string();
+        let lists = core().lists();
+        let last = core().setting("last_list".into());
+        let Some(list_href) = lists
+            .iter()
+            .find(|l| Some(&l.href) == last.as_ref())
+            .or(lists.first())
+            .map(|l| l.href.clone())
+        else {
+            return;
+        };
+        if text.is_empty() {
+            return;
+        }
+        let start = crate::settings::order().task_start;
+        let Ok(t) = core().add_task(list_href, text, None, None, start) else {
+            return;
+        };
+        let patch = TaskPatch {
+            event: Some(Some(ev.uid.clone())),
+            due: Some(Some(Due {
+                at: ev.start,
+                all_day: ev.all_day,
+            })),
+            ..Default::default()
+        };
+        if core().update_task(t.uid.clone(), patch).is_ok() {
+            entry.set_text("");
+            if let Some(t) = core().task(t.uid) {
+                list.append(&task_check(&t, &head));
+            }
+            head.set_label(&tasks_heading(&ev.uid));
+            request_sync();
+        }
+    });
+    b.append(&entry);
+    b
+}
+
+/// "Tasks · done/all" for an event.
+fn tasks_heading(event_uid: &str) -> String {
+    let tasks = core().event_tasks(event_uid.into());
+    match tasks.len() {
+        0 => "Tasks".into(),
+        n => format!("Tasks · {}/{n}", tasks.iter().filter(|t| t.done).count()),
+    }
+}
+
+/// A task of an event, to tick; `head` shows the count.
+fn task_check(t: &Task, head: &gtk::Label) -> gtk::CheckButton {
+    let check = gtk::CheckButton::builder()
+        .label(&t.summary)
+        .active(t.done)
+        .build();
+    let (uid, event, head) = (
+        t.uid.clone(),
+        t.event_uid.clone().unwrap_or_default(),
+        head.clone(),
+    );
+    check.connect_toggled(move |c| {
+        if core().set_done(uid.clone(), c.is_active()).is_ok() {
+            head.set_label(&tasks_heading(&event));
+            request_sync();
+        }
+    });
+    check
+}
+
+/// An event's details: what, when, where, which calendar, notes, tasks.
 fn details(c: &Cal, e: &Event) -> gtk::Popover {
     let b = gtk::Box::new(gtk::Orientation::Vertical, 8);
     b.set_margin_start(6);
@@ -1061,7 +1176,22 @@ fn details(c: &Cal, e: &Event) -> gtk::Popover {
     if let Some(d) = &e.description {
         b.append(&line("text-x-generic-symbolic", d));
     }
+    b.append(&event_tasks(e));
     let pop = gtk::Popover::builder().child(&b).build();
+    // Changes made here (a task ticked or added) redraw the views once it closes, not under it.
+    pop.connect_show(|_| {
+        if let Some(c) = cal() {
+            c.holding.set(true);
+        }
+    });
+    pop.connect_closed(|_| {
+        if let Some(c) = cal() {
+            c.holding.set(false);
+            if c.pending.replace(false) {
+                glib::idle_add_local_once(refresh);
+            }
+        }
+    });
     if writable(c, &e.list_href) {
         let buttons = gtk::Box::builder()
             .spacing(6)

@@ -61,6 +61,8 @@ pub struct Task {
     /// DTSTART in local time (a task scheduled into a time slot starts then and ends at `due`).
     pub start: Option<i64>,
     pub start_all_day: bool,
+    /// UID of the event this task is for (RELATED-TO, see `store::EVENT_LINK`).
+    pub event_uid: Option<String>,
 }
 
 /// Fields left `None` are untouched; `Some("")` clears description/category.
@@ -75,6 +77,8 @@ pub struct TaskPatch {
     pub reminders: Option<Vec<i64>>,
     /// DTSTART, when the task is planned; Some(None) clears it.
     pub start: Option<Option<Due>>,
+    /// The event (UID) the task is for; Some(None) unlinks it.
+    pub event: Option<Option<String>>,
 }
 
 /// A due date in local time; `all_day`: a date without a time (`at` is its midnight).
@@ -390,6 +394,18 @@ impl Client {
         store::scheduled(&self.db.lock().unwrap(), from, to).unwrap_or_default()
     }
 
+    /// The event with this UID: its next occurrence from now (within a year), else its first.
+    pub fn event(&self, uid: String) -> Option<Event> {
+        let db = self.db.lock().unwrap();
+        let now = store::to_local(&db, now()).unwrap_or_else(|_| now());
+        store::event_by_uid(&db, &uid, now).ok()?
+    }
+
+    /// Tasks (done ones too) for the event with this UID.
+    pub fn event_tasks(&self, event_uid: String) -> Vec<Task> {
+        store::event_tasks(&self.db.lock().unwrap(), &event_uid).unwrap_or_default()
+    }
+
     /// Open tasks with no time slot yet: undated, or due by a date before `until`.
     pub fn unscheduled(&self, until: i64) -> Vec<Task> {
         store::unscheduled(&self.db.lock().unwrap(), until).unwrap_or_default()
@@ -529,6 +545,9 @@ impl Client {
             }
             if let Some(s) = patch.start {
                 set_date(cal, "DTSTART", s, start_utc);
+            }
+            if let Some(e) = &patch.event {
+                cal.set_related(store::EVENT_LINK, e.as_deref());
             }
             if let Some(r) = patch.reminders.as_ref().filter(|_| patch.due != Some(None)) {
                 let v: Vec<String> = r.iter().map(|o| ical::fmt_duration(*o)).collect();
@@ -904,6 +923,41 @@ mod tests {
         assert_eq!(c.task(uid).unwrap().start, None);
         assert_eq!(c.unscheduled(week).len(), 1);
         assert!(c.unscheduled(day).is_empty(), "due later than asked");
+    }
+
+    #[test]
+    fn tasks_link_to_an_event() {
+        let dir = std::env::temp_dir().join(format!("todav-test-link-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        c.db.lock()
+            .unwrap()
+            .execute(
+                "INSERT INTO lists (href, display_name) VALUES ('/l/', 'L')",
+                [],
+            )
+            .unwrap();
+        let uid = c
+            .add_task("/l/".into(), "Slides".into(), None, None, false)
+            .unwrap()
+            .uid;
+        let link = |e: Option<&str>| {
+            let patch = TaskPatch {
+                event: Some(e.map(String::from)),
+                ..Default::default()
+            };
+            c.update_task(uid.clone(), patch).unwrap();
+        };
+        link(Some("meeting-1"));
+        let t = c.task(uid.clone()).unwrap();
+        assert_eq!(
+            (t.event_uid.as_deref(), t.parent_uid),
+            (Some("meeting-1"), None),
+            "not a parent"
+        );
+        assert_eq!(c.event_tasks("meeting-1".into()).len(), 1);
+        link(None);
+        assert!(c.event_tasks("meeting-1".into()).is_empty());
     }
 
     #[test]

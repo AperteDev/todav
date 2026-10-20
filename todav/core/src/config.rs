@@ -383,6 +383,7 @@ mod tests {
             last_modified: None,
             start: None,
             start_all_day: false,
+            event_uid: None,
         }
     }
 

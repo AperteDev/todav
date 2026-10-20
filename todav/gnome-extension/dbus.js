@@ -11,6 +11,8 @@ const XML = `<node>
   <method name="SetDone"><arg direction="in" name="uid" type="s"/><arg direction="in" name="done" type="b"/></method>
   <method name="AddTask"><arg direction="in" name="list" type="s"/><arg direction="in" name="summary" type="s"/><arg direction="out" type="s"/></method>
   <method name="ShowList"><arg direction="in" name="list" type="s"/></method>
+  <method name="GetNextEvent"><arg direction="out" type="(ssx)"/></method>
+  <method name="ShowDay"><arg direction="in" name="at" type="x"/></method>
   <method name="Sync"/>
   <signal name="Changed"><arg name="list" type="s"/></signal>
   <property name="SyncState" type="s" access="read"/>

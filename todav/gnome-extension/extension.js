@@ -102,6 +102,17 @@ class TodavIndicator extends PanelMenu.Button {
         const [href, name, open] = pinned;
         this._count.text = open > 0 ? `${open}` : '';
 
+        // The event on now or next, opening the calendar on its day.
+        const [[title, when, start]] = await this._proxy.GetNextEventAsync();
+        if (title) {
+            const next = new PopupMenu.PopupImageMenuItem(`${when} · ${title}`, 'x-office-calendar-symbolic');
+            next.connect('activate', () => {
+                this._proxy?.ShowDayAsync(start).catch(e => logError(e, 'Todav: ShowDay failed'));
+            });
+            this.menu.addMenuItem(next);
+            this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+        }
+
         const switcher = new PopupMenu.PopupSubMenuMenuItem(name);
         for (const [h, n, c] of lists) {
             const item = new PopupMenu.PopupMenuItem(`${n} (${c})`);
