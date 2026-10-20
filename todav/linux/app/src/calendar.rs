@@ -1,14 +1,17 @@
-//! The Calendar page: events and dated tasks in a month grid or an agenda, with the calendars
-//! (and task lists) to show in the sidebar. Times are local wall-clock seconds, as in the core.
+//! The Calendar page: events and dated tasks in a month grid, a week of hours or an agenda,
+//! with the calendars (and task lists) to show and the tasks still to plan in the sidebar.
+//! Times are local wall-clock seconds, as in the core.
+
+mod week;
 
 use crate::window::{get, view};
 use crate::{core, dates, request_sync};
 use adw::prelude::*;
-use gtk::glib;
+use gtk::{gdk, glib};
 use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
 use std::rc::Rc;
-use todav_core::{Event, List, Task};
+use todav_core::{Due, Event, List, Task, TaskPatch};
 
 const DAY: i64 = 86400;
 
@@ -35,6 +38,15 @@ const CSS: &str = "
 .chip.cancelled label { text-decoration-line: line-through; }
 .more { padding: 0 6px; min-height: 20px; font-size: smaller; }
 .dot { min-width: 10px; min-height: 10px; border-radius: 9999px; }
+.day:drop(active), .all-day-cell:drop(active), list.plan:drop(active) { box-shadow: inset 0 0 0 2px @accent_bg_color; background: alpha(@accent_bg_color, 0.12); }
+.week .weekdays label.today { color: @accent_color; font-weight: bold; opacity: 1; }
+.all-day-row { border-bottom: 1px solid alpha(currentColor, 0.15); }
+.all-day-cell { padding: 2px; min-height: 26px; }
+.hours label { font-size: smaller; opacity: 0.6; font-feature-settings: 'tnum'; }
+.block { border-radius: 6px; padding: 2px 6px; font-size: smaller; }
+.block label { font-weight: normal; }
+.block.task { border-left: 3px solid alpha(currentColor, 0.5); }
+.drag-card { margin: 8px; padding: 8px 14px; border-radius: 10px; background: @card_bg_color; color: @card_fg_color; box-shadow: 0 2px 8px alpha(black, 0.25); }
 ";
 
 /// Something on the calendar.
@@ -84,6 +96,20 @@ struct Cal {
     weekdays: gtk::Box,
     month: gtk::Grid,
     agenda: gtk::Box,
+    plan_heading: gtk::Label,
+    plan: gtk::ListBox,
+    week_head: gtk::Box,
+    week_all_day: gtk::Box,
+    week_scroll: gtk::ScrolledWindow,
+    week_grid: gtk::Overlay,
+    week_lines: gtk::DrawingArea,
+    hours: gtk::Box,
+    /// The week grid's blocks and where they go.
+    blocks: RefCell<Vec<(gtk::Widget, week::Geo)>>,
+    /// Week-grid slot a dragged task would land in: (day of the week, minute of the day).
+    hover: Cell<Option<(i64, i64)>>,
+    /// The week view scrolled to the morning once.
+    scrolled: Cell<bool>,
     /// Midnight of the day the views are around (the selected day).
     anchor: Cell<i64>,
     /// Set while the mini month is moved in code, so its handler ignores that.
@@ -149,6 +175,17 @@ pub fn build(views: &adw::ViewStack, tasks: &adw::NavigationSplitView) {
         weekdays: get(&b, "weekdays"),
         month: get(&b, "month"),
         agenda: get(&b, "agenda"),
+        plan_heading: get(&b, "plan_heading"),
+        plan: get(&b, "plan"),
+        week_head: get(&b, "week_head"),
+        week_all_day: get(&b, "week_all_day"),
+        week_scroll: get(&b, "week_scroll"),
+        week_grid: get(&b, "week_grid"),
+        week_lines: get(&b, "week_lines"),
+        hours: get(&b, "hours"),
+        blocks: RefCell::new(Vec::new()),
+        hover: Cell::new(None),
+        scrolled: Cell::new(false),
         anchor: Cell::new(today()),
         busy: Cell::new(false),
         colors,
@@ -156,9 +193,13 @@ pub fn build(views: &adw::ViewStack, tasks: &adw::NavigationSplitView) {
     });
     CAL.with(|cell| *cell.borrow_mut() = Some(c.clone()));
 
+    week::setup(&c);
+    plan_drop(&c);
     let mode = core().setting("calendar_mode".into()).unwrap_or_default();
-    c.mode
-        .set_active_name(Some(if mode == "agenda" { "agenda" } else { "month" }));
+    c.mode.set_active_name(Some(match mode.as_str() {
+        "week" | "agenda" => mode.as_str(),
+        _ => "month",
+    }));
     c.mode.connect_active_name_notify(|m| {
         let name = m.active_name().map(|n| n.to_string()).unwrap_or_default();
         let _ = core().set_setting("calendar_mode".into(), name);
@@ -193,8 +234,19 @@ pub fn build(views: &adw::ViewStack, tasks: &adw::NavigationSplitView) {
     });
 }
 
-fn month_mode(c: &Cal) -> bool {
-    c.mode.active_name().as_deref() != Some("agenda")
+#[derive(PartialEq)]
+enum Mode {
+    Month,
+    Week,
+    Agenda,
+}
+
+fn mode(c: &Cal) -> Mode {
+    match c.mode.active_name().as_deref() {
+        Some("week") => Mode::Week,
+        Some("agenda") => Mode::Agenda,
+        _ => Mode::Month,
+    }
 }
 
 /// Move to the day `f` picks from the current one.
@@ -205,19 +257,21 @@ fn go(f: impl FnOnce(i64) -> i64) {
     }
 }
 
-/// A month (or the agenda's step) back or forward.
+/// A month, a week or the agenda's step back or forward.
 fn step(by: i64) {
     let Some(c) = cal() else { return };
-    if month_mode(&c) {
-        let d = dates::fields(c.anchor.get());
-        let first = d
-            .add_days(1 - d.day_of_month())
-            .and_then(|f| f.add_months(by as i32));
-        if let Ok(f) = first {
-            go(|_| dates::midnight(&f));
+    match mode(&c) {
+        Mode::Month => {
+            let d = dates::fields(c.anchor.get());
+            let first = d
+                .add_days(1 - d.day_of_month())
+                .and_then(|f| f.add_months(by as i32));
+            if let Ok(f) = first {
+                go(|_| dates::midnight(&f));
+            }
         }
-    } else {
-        go(|a| a + by * AGENDA_STEP * DAY);
+        Mode::Week => go(|a| a + by * 7 * DAY),
+        Mode::Agenda => go(|a| a + by * AGENDA_STEP * DAY),
     }
 }
 
@@ -239,13 +293,215 @@ pub fn refresh() {
     c.busy.set(true);
     c.mini.select_day(&dates::fields(anchor));
     c.busy.set(false);
-    if month_mode(&c) {
-        c.views.set_visible_child_name("month");
-        render_month(&c);
+    let until = match mode(&c) {
+        Mode::Month => {
+            c.views.set_visible_child_name("month");
+            render_month(&c)
+        }
+        Mode::Week => {
+            c.views.set_visible_child_name("week");
+            week::render(&c)
+        }
+        Mode::Agenda => {
+            c.views.set_visible_child_name("agenda");
+            render_agenda(&c);
+            0
+        }
+    };
+    render_plan(&c, until);
+}
+
+/// "To Plan": open tasks without a time slot, due before `until` (the end of the shown month or
+/// week) or undated, to drag onto the calendar. Not in the agenda (`until` 0).
+fn render_plan(c: &Rc<Cal>, until: i64) {
+    c.plan.remove_all();
+    let hidden = hidden();
+    let tasks: Vec<Task> = if until == 0 {
+        Vec::new()
     } else {
-        c.views.set_visible_child_name("agenda");
-        render_agenda(&c);
+        core()
+            .unscheduled(until)
+            .into_iter()
+            .filter(|t| !hidden.contains(&t.list_href))
+            .collect()
+    };
+    c.plan_heading.set_visible(until != 0);
+    c.plan.set_visible(until != 0);
+    // ponytail: capped; a search or a list picker if the cut matters.
+    for t in tasks.iter().take(40) {
+        let row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        let dot = gtk::Box::builder().valign(gtk::Align::Center).build();
+        dot.add_css_class("dot");
+        dot.add_css_class(&class(c, &t.list_href));
+        row.append(&dot);
+        let name = gtk::Label::builder()
+            .label(&t.summary)
+            .xalign(0.0)
+            .hexpand(true)
+            .ellipsize(gtk::pango::EllipsizeMode::End)
+            .build();
+        row.append(&name);
+        if let Some(d) = t.due {
+            let due = gtk::Label::new(Some(&fmt(d, "%-d %b")));
+            due.add_css_class("dim-label");
+            if dates::overdue(t, core().local_now()) {
+                due.add_css_class("error");
+            }
+            row.append(&due);
+        }
+        drag_task(&row, t);
+        c.plan.append(&row);
     }
+    if tasks.is_empty() && until != 0 {
+        let none = gtk::Label::builder()
+            .label("Nothing to plan")
+            .xalign(0.0)
+            .build();
+        none.add_css_class("dim-label");
+        c.plan.append(&none);
+    }
+}
+
+// --- moving tasks by drag and drop -------------------------------------------
+
+thread_local! {
+    /// The task being dragged.
+    static DRAGGING: RefCell<Option<Task>> = const { RefCell::new(None) };
+}
+
+fn dragging() -> Option<Task> {
+    DRAGGING.with(|d| d.borrow().clone())
+}
+
+/// Make `w` drag task `t`: onto a day, an hour of the week, or back to "To Plan".
+fn drag_task(w: &impl IsA<gtk::Widget>, t: &Task) {
+    let src = gtk::DragSource::new();
+    src.set_actions(gdk::DragAction::MOVE);
+    let uid = t.uid.clone();
+    src.connect_prepare(move |_, _, _| Some(gdk::ContentProvider::for_value(&uid.to_value())));
+    let task = t.clone();
+    src.connect_drag_begin(move |_, drag| {
+        DRAGGING.with(|d| *d.borrow_mut() = Some(task.clone()));
+        let card = gtk::Label::new(Some(&task.summary));
+        card.add_css_class("drag-card");
+        if let Ok(icon) = gtk::DragIcon::for_drag(drag).downcast::<gtk::DragIcon>() {
+            icon.set_child(Some(&card));
+        }
+    });
+    src.connect_drag_end(|_, _, _| {
+        DRAGGING.with(|d| d.borrow_mut().take());
+        if let Some(c) = cal() {
+            c.hover.set(None);
+            c.week_lines.queue_draw();
+        }
+    });
+    w.add_controller(src);
+}
+
+/// A drop target taking dragged tasks; `dropped` gets the task.
+fn task_drop(w: &impl IsA<gtk::Widget>, dropped: impl Fn(&Task) + 'static) -> gtk::DropTarget {
+    let drop = gtk::DropTarget::new(glib::Type::STRING, gdk::DragAction::MOVE);
+    drop.connect_accept(|_, _| dragging().is_some());
+    drop.connect_drop(move |_, _, _, _| {
+        let Some(t) = dragging() else { return false };
+        dropped(&t);
+        true
+    });
+    w.add_controller(drop.clone());
+    drop
+}
+
+fn save(uid: &str, patch: TaskPatch) {
+    match core().update_task(uid.into(), patch) {
+        Ok(()) => request_sync(),
+        Err(e) => crate::window::toast(&e.to_string()),
+    }
+}
+
+/// Move a task to the day starting at `day`, keeping its times of day (and its length when
+/// it is planned into a slot); a task without a time is due that day.
+fn move_to_day(t: &Task, day: i64) {
+    let at = |t: i64, all_day| {
+        Some(Due {
+            at: day + t.rem_euclid(DAY),
+            all_day,
+        })
+    };
+    let patch = match (t.start, t.due) {
+        (Some(s), due) if !t.start_all_day => TaskPatch {
+            start: Some(at(s, false)),
+            due: due.map(|d| {
+                Some(Due {
+                    at: d - s + day + s.rem_euclid(DAY),
+                    all_day: t.due_all_day,
+                })
+            }),
+            ..Default::default()
+        },
+        (_, Some(d)) if !t.due_all_day => TaskPatch {
+            start: t.start.map(|_| None),
+            due: Some(at(d, false)),
+            ..Default::default()
+        },
+        _ => TaskPatch {
+            start: t.start.map(|_| None),
+            due: Some(Some(Due {
+                at: day,
+                all_day: true,
+            })),
+            ..Default::default()
+        },
+    };
+    save(&t.uid, patch);
+}
+
+/// Plan a task into the slot starting at `at`: as long as it was planned before, else an hour.
+fn plan_at(t: &Task, at: i64) {
+    let len = match (t.start, t.due) {
+        (Some(s), Some(d)) if !t.start_all_day && !t.due_all_day && d > s => d - s,
+        _ => 3600,
+    };
+    let time = |t| {
+        Some(Some(Due {
+            at: t,
+            all_day: false,
+        }))
+    };
+    save(
+        &t.uid,
+        TaskPatch {
+            start: time(at),
+            due: time(at + len),
+            ..Default::default()
+        },
+    );
+}
+
+/// Back to "To Plan": no slot, due on the day it was planned for.
+fn unplan(t: &Task) {
+    if t.start.is_none() && t.due_all_day {
+        return; // nothing planned
+    }
+    let (at, _) = when(t);
+    let due = t.due.map(|_| {
+        Some(Due {
+            at: at - at.rem_euclid(DAY),
+            all_day: true,
+        })
+    });
+    save(
+        &t.uid,
+        TaskPatch {
+            start: Some(None),
+            due,
+            ..Default::default()
+        },
+    );
+}
+
+fn plan_drop(c: &Rc<Cal>) {
+    c.plan.add_css_class("plan");
+    task_drop(&c.plan, unplan);
 }
 
 pub fn set_syncing(on: bool) {
@@ -416,7 +672,8 @@ fn clear(w: &impl IsA<gtk::Widget>) {
     }
 }
 
-fn render_month(c: &Rc<Cal>) {
+/// Returns the end of the shown range.
+fn render_month(c: &Rc<Cal>) -> i64 {
     let anchor = c.anchor.get();
     let d = dates::fields(anchor);
     let first = anchor - (d.day_of_month() as i64 - 1) * DAY;
@@ -471,12 +728,14 @@ fn render_month(c: &Rc<Cal>) {
                 here[shown..].iter().map(|i| (*i).clone()).collect(),
             ));
         }
-        // Clicking a day selects it.
+        // Clicking a day selects it; a task dropped on it moves there.
         let click = gtk::GestureClick::new();
         click.connect_released(move |_, _, _, _| go(|_| day));
         cell.add_controller(click);
+        task_drop(&cell, move |t| move_to_day(t, day));
         c.month.attach(&cell, (n % 7) as i32, (n / 7) as i32, 1, 1);
     }
+    end
 }
 
 /// "+N more": a popover with the rest of the day.
@@ -582,6 +841,7 @@ fn chip(c: &Rc<Cal>, i: &Item) -> gtk::Widget {
             let task = t.clone();
             open.connect_clicked(move |_| crate::window::edit_task(&task));
             row.append(&open);
+            drag_task(&row, t);
             row.upcast()
         }
     }

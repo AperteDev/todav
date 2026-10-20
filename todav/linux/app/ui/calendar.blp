@@ -21,6 +21,7 @@ Adw.NavigationSplitView split {
 
       content: Gtk.ScrolledWindow {
         vexpand: true;
+        hscrollbar-policy: never;
 
         Gtk.Box {
           orientation: vertical;
@@ -58,6 +59,23 @@ Adw.NavigationSplitView split {
           // The same for lists holding only tasks (their dated tasks are on the calendar).
           Gtk.ListBox task_lists {
             selection-mode: none;
+            styles ["navigation-sidebar"]
+          }
+
+          Gtk.Label plan_heading {
+            label: "To Plan";
+            xalign: 0;
+            margin-start: 18;
+            margin-top: 12;
+            tooltip-text: "Drag a task onto a day or an hour";
+            styles ["heading"]
+          }
+
+          // Open tasks without a time slot: undated, or due by the end of the shown range.
+          // Dropping a planned task here takes it out of its slot.
+          Gtk.ListBox plan {
+            selection-mode: none;
+            margin-bottom: 12;
             styles ["navigation-sidebar"]
           }
         }
@@ -112,6 +130,11 @@ Adw.NavigationSplitView split {
           }
 
           Adw.Toggle {
+            name: "week";
+            label: "Week";
+          }
+
+          Adw.Toggle {
             name: "agenda";
             label: "Agenda";
           }
@@ -141,6 +164,44 @@ Adw.NavigationSplitView split {
               row-homogeneous: true;
               column-homogeneous: true;
               vexpand: true;
+            }
+          };
+        }
+
+        Gtk.StackPage {
+          name: "week";
+
+          // Day names, then all-day items, then the hours; each row has the hour gutter on
+          // the left, so the columns line up.
+          child: Gtk.Box {
+            orientation: vertical;
+            styles ["week"]
+
+            Gtk.Box week_head {
+              styles ["weekdays"]
+            }
+
+            Gtk.Box week_all_day {
+              styles ["all-day-row"]
+            }
+
+            Gtk.ScrolledWindow week_scroll {
+              vexpand: true;
+              hscrollbar-policy: never;
+
+              // Blocks are overlay children, placed in code.
+              Gtk.Overlay week_grid {
+                child: Gtk.Box {
+                  Gtk.Box hours {
+                    orientation: vertical;
+                    styles ["hours"]
+                  }
+
+                  Gtk.DrawingArea week_lines {
+                    hexpand: true;
+                  }
+                };
+              }
             }
           };
         }

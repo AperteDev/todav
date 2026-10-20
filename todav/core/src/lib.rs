@@ -73,6 +73,8 @@ pub struct TaskPatch {
     pub due: Option<Option<Due>>,
     /// Reminders, in seconds after the due time (negative: before); replaces all of them.
     pub reminders: Option<Vec<i64>>,
+    /// DTSTART, when the task is planned; Some(None) clears it.
+    pub start: Option<Option<Due>>,
 }
 
 /// A due date in local time; `all_day`: a date without a time (`at` is its midnight).
@@ -233,6 +235,11 @@ impl Client {
         store::scheduled(&self.db.lock().unwrap(), from, to).unwrap_or_default()
     }
 
+    /// Open tasks with no time slot yet: undated, or due by a date before `until`.
+    pub fn unscheduled(&self, until: i64) -> Vec<Task> {
+        store::unscheduled(&self.db.lock().unwrap(), until).unwrap_or_default()
+    }
+
     /// Open tasks with a reminder going off after `from` and at `to` at the latest (local times).
     pub fn reminders(&self, from: i64, to: i64) -> Vec<Task> {
         store::reminders(&self.db.lock().unwrap(), from, to).unwrap_or_default()
@@ -344,21 +351,29 @@ impl Client {
 
     pub fn update_task(&self, uid: String, patch: TaskPatch) -> Result<()> {
         // Times go out in UTC, dates as dates.
-        let due_utc = match patch.due {
-            Some(Some(d)) if !d.all_day => Some(store::to_utc(&self.db.lock().unwrap(), d.at)?),
-            _ => None,
+        let utc = |d: Option<Option<Due>>| -> Result<Option<i64>> {
+            match d {
+                Some(Some(d)) if !d.all_day => {
+                    Ok(Some(store::to_utc(&self.db.lock().unwrap(), d.at)?))
+                }
+                _ => Ok(None),
+            }
+        };
+        let (due_utc, start_utc) = (utc(patch.due)?, utc(patch.start)?);
+        let set_date = |cal: &mut Calendar, name: &str, d: Option<Due>, utc: Option<i64>| match d {
+            None => cal.set(name, "", None),
+            Some(d) if d.all_day => cal.set(name, ";VALUE=DATE", Some(&ical::fmt_utc(d.at)[..8])),
+            Some(_) => cal.set_time(name, utc),
         };
         self.modify(&uid, |cal| {
-            match patch.due {
-                Some(None) => {
-                    cal.set("DUE", "", None);
+            if let Some(d) = patch.due {
+                set_date(cal, "DUE", d, due_utc);
+                if d.is_none() {
                     cal.set_alarms(&[]);
                 }
-                Some(Some(d)) if d.all_day => {
-                    cal.set("DUE", ";VALUE=DATE", Some(&ical::fmt_utc(d.at)[..8]))
-                }
-                Some(Some(_)) => cal.set_time("DUE", due_utc),
-                None => {}
+            }
+            if let Some(s) = patch.start {
+                set_date(cal, "DTSTART", s, start_utc);
             }
             if let Some(r) = patch.reminders.as_ref().filter(|_| patch.due != Some(None)) {
                 let v: Vec<String> = r.iter().map(|o| ical::fmt_duration(*o)).collect();
@@ -679,6 +694,61 @@ mod tests {
         assert_eq!((t.due, t.reminders.len()), (None, 0));
         assert!(!raw().contains("VALARM"), "no due date, no reminders");
         assert!(c.upcoming().is_empty());
+    }
+
+    #[test]
+    fn planning_a_task_into_a_time_slot() {
+        let dir = std::env::temp_dir().join(format!("todav-test-plan-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        c.db.lock()
+            .unwrap()
+            .execute(
+                "INSERT INTO lists (href, display_name) VALUES ('/l/', 'L')",
+                [],
+            )
+            .unwrap();
+        let uid = c
+            .add_task("/l/".into(), "a".into(), None, None, false)
+            .unwrap()
+            .uid;
+        let day = ical::parse_time("20261021").unwrap();
+        let week = day + 7 * 86400;
+        assert_eq!(c.unscheduled(week).len(), 1, "undated: to plan");
+        let at = |t: i64| {
+            Some(Due {
+                at: t,
+                all_day: false,
+            })
+        };
+        let (from, to) = (day + 10 * 3600, day + 11 * 3600);
+        let patch = TaskPatch {
+            start: Some(at(from)),
+            due: Some(at(to)),
+            ..Default::default()
+        };
+        c.update_task(uid.clone(), patch).unwrap();
+        let t = c.task(uid.clone()).unwrap();
+        assert_eq!(
+            (t.start, t.start_all_day, t.due),
+            (Some(from), false, Some(to))
+        );
+        assert_eq!(c.scheduled(day, day + 86400).len(), 1);
+        assert!(c.unscheduled(week).is_empty(), "planned");
+        // Back to a plain due date: to plan again.
+        let all_day = Some(Due {
+            at: day,
+            all_day: true,
+        });
+        let patch = TaskPatch {
+            start: Some(None),
+            due: Some(all_day),
+            ..Default::default()
+        };
+        c.update_task(uid.clone(), patch).unwrap();
+        assert_eq!(c.task(uid).unwrap().start, None);
+        assert_eq!(c.unscheduled(week).len(), 1);
+        assert!(c.unscheduled(day).is_empty(), "due later than asked");
     }
 
     #[test]
