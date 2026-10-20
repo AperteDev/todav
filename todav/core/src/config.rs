@@ -192,7 +192,13 @@ impl Client {
         subtasks: Sort,
         done: DoneView,
     ) -> Vec<Task> {
-        forest(split(self.tasks(list_href, true), done).0, tasks, subtasks).concat()
+        forest(
+            split(self.tasks(list_href, true), done).0,
+            tasks,
+            subtasks,
+            done,
+        )
+        .concat()
     }
 
     /// `grouped` with top-level tasks and subtasks (among siblings) in the given orders, and
@@ -210,6 +216,7 @@ impl Client {
             &meta,
             tasks,
             subtasks,
+            done,
         )
     }
 
@@ -226,8 +233,12 @@ impl Client {
 pub struct DoneView {
     /// Completed top-level tasks stay in place among the open ones; `finished` is empty.
     pub in_place: bool,
+    /// With `in_place`: completed top-level tasks go after the open ones.
+    pub tasks_last: bool,
     /// Completed subtasks are left out everywhere.
     pub hide_subtasks: bool,
+    /// Completed subtasks go after their open siblings.
+    pub subtasks_last: bool,
 }
 
 /// (shown in the groups, finished) for `view`.
@@ -271,8 +282,9 @@ fn split_done(tasks: Vec<Task>) -> (Vec<Task>, Vec<Task>) {
     tasks.into_iter().partition(|t| keep.contains(&t.uid))
 }
 
-/// Each top-level task followed by its (flattened, depth-first) subtasks.
-fn forest(tasks: Vec<Task>, sort: Sort, sub_sort: Sort) -> Vec<Vec<Task>> {
+/// Each top-level task followed by its (flattened, depth-first) subtasks; completed ones last on
+/// a level if `view` says so.
+fn forest(tasks: Vec<Task>, sort: Sort, sub_sort: Sort, view: DoneView) -> Vec<Vec<Task>> {
     let uids: HashSet<String> = tasks.iter().map(|t| t.uid.clone()).collect();
     let mut children: HashMap<String, Vec<Task>> = HashMap::new();
     let mut top = Vec::new();
@@ -283,7 +295,15 @@ fn forest(tasks: Vec<Task>, sort: Sort, sub_sort: Sort) -> Vec<Vec<Task>> {
         }
     }
     sort.apply(&mut top);
-    children.values_mut().for_each(|kids| sub_sort.apply(kids));
+    if view.tasks_last {
+        top.sort_by_key(|t| t.done); // stable: keeps the sort within open and completed
+    }
+    for kids in children.values_mut() {
+        sub_sort.apply(kids);
+        if view.subtasks_last {
+            kids.sort_by_key(|t| t.done);
+        }
+    }
     top.into_iter()
         .map(|t| {
             let mut flat = Vec::new();
@@ -305,6 +325,7 @@ fn group(
     meta: &[CategoryMeta],
     sort: Sort,
     sub_sort: Sort,
+    view: DoneView,
 ) -> Vec<CategoryGroup> {
     let mut groups: Vec<CategoryGroup> = meta
         .iter()
@@ -315,7 +336,7 @@ fn group(
         })
         .collect();
     let mut unknown: BTreeMap<Option<String>, Vec<Task>> = BTreeMap::new();
-    for flat in forest(tasks, sort, sub_sort) {
+    for flat in forest(tasks, sort, sub_sort, view) {
         let cat = flat[0].category.clone();
         match groups.iter_mut().find(|g| g.name == cat && cat.is_some()) {
             Some(g) => g.tasks.extend(flat),
@@ -388,7 +409,13 @@ mod tests {
             task("orphan", Some("Car"), Some("gone")), // parent not open → top level
             task("tyres", Some("Car"), None),
         ];
-        let g = group(tasks, &meta, Sort::Manual, Sort::Manual);
+        let g = group(
+            tasks,
+            &meta,
+            Sort::Manual,
+            Sort::Manual,
+            DoneView::default(),
+        );
         let shape: Vec<(Option<&str>, Vec<&str>)> = g
             .iter()
             .map(|g| {
@@ -443,7 +470,7 @@ mod tests {
             at("new", None, 9),
         ];
         let order = |s, sub| {
-            group(tasks.clone(), &[], s, sub)[0]
+            group(tasks.clone(), &[], s, sub, DoneView::default())[0]
                 .tasks
                 .iter()
                 .map(|t| t.uid.clone())
@@ -471,7 +498,7 @@ mod tests {
             task("a1_sub", None, Some("a1")),
             task("b2", Some("B"), None),
         ];
-        let flat: Vec<String> = forest(tasks, Sort::Manual, Sort::Manual)
+        let flat: Vec<String> = forest(tasks, Sort::Manual, Sort::Manual, DoneView::default())
             .concat()
             .into_iter()
             .map(|t| t.uid)
@@ -508,18 +535,53 @@ mod tests {
             tasks.clone(),
             DoneView {
                 in_place: true,
-                hide_subtasks: false,
+                ..Default::default()
             },
         );
         assert_eq!((all.len(), none.len()), (tasks.len(), 0));
         let hide = |in_place| DoneView {
             in_place,
             hide_subtasks: true,
+            ..Default::default()
         };
         let (tree, finished) = split(tasks.clone(), hide(false));
         assert_eq!(uids(&tree), ["root", "open_under_closed"]);
         assert_eq!(uids(&finished), ["closed"]); // the loop has no top: both hide each other
         let (tree, _) = split(tasks, hide(true));
         assert_eq!(uids(&tree), ["root", "closed", "open_under_closed"]);
+    }
+
+    #[test]
+    fn done_tasks_and_subtasks_go_last_on_their_level() {
+        let done = |uid, parent| Task {
+            done: true,
+            ..task(uid, None, parent)
+        };
+        let tasks = vec![
+            done("a", None),
+            done("a1", Some("a")),
+            task("a2", None, Some("a")),
+            task("b", None, None),
+            done("b1", Some("b")),
+            task("b2", None, Some("b")),
+            task("c", None, None),
+        ];
+        let order = |tasks_last, subtasks_last| {
+            let view = DoneView {
+                in_place: true,
+                tasks_last,
+                subtasks_last,
+                ..Default::default()
+            };
+            forest(tasks.clone(), Sort::Manual, Sort::Manual, view)
+                .concat()
+                .into_iter()
+                .map(|t| t.uid)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(order(false, false), ["a", "a1", "a2", "b", "b1", "b2", "c"]);
+        assert_eq!(order(true, false), ["b", "b1", "b2", "c", "a", "a1", "a2"]);
+        assert_eq!(order(false, true), ["a", "a2", "a1", "b", "b2", "b1", "c"]);
+        assert_eq!(order(true, true), ["b", "b2", "b1", "c", "a", "a2", "a1"]);
     }
 }

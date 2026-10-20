@@ -23,7 +23,7 @@ Adw.PreferencesDialog dialog {
 
       Adw.ComboRow done_tasks {
         title: "Completed tasks";
-        model: Gtk.StringList { strings ["In a separate group", "Keep in place"] };
+        model: Gtk.StringList { strings ["In a separate group", "Keep in place", "Move to the end"] };
       }
     }
 
@@ -42,7 +42,7 @@ Adw.PreferencesDialog dialog {
 
       Adw.ComboRow done_subtasks {
         title: "Completed subtasks";
-        model: Gtk.StringList { strings ["Show", "Hide"] };
+        model: Gtk.StringList { strings ["Show", "Hide", "Move to the end"] };
       }
     }
 

@@ -35,9 +35,13 @@ pub struct Order {
 
 /// How completed tasks are shown, from the "Completed tasks" / "Completed subtasks" rows.
 pub fn done_view() -> todav_core::DoneView {
+    let tasks = core().setting("done_tasks".into()).unwrap_or_default();
+    let subtasks = core().setting("done_subtasks".into()).unwrap_or_default();
     todav_core::DoneView {
-        in_place: core().setting("done_tasks".into()).as_deref() == Some("in_place"),
-        hide_subtasks: core().setting("done_subtasks".into()).as_deref() == Some("hide"),
+        in_place: tasks == "in_place" || tasks == "last",
+        tasks_last: tasks == "last",
+        hide_subtasks: subtasks == "hide",
+        subtasks_last: subtasks == "last",
     }
 }
 
@@ -163,8 +167,8 @@ pub fn present(parent: &impl IsA<gtk::Widget>) {
         request_sync(); // turning it on pulls the server's settings right away
     });
     connect_choice(&b, "category_view", &["group", "tags", "none"]);
-    connect_choice(&b, "done_tasks", &["group", "in_place"]);
-    connect_choice(&b, "done_subtasks", &["show", "hide"]);
+    connect_choice(&b, "done_tasks", &["group", "in_place", "last"]);
+    connect_choice(&b, "done_subtasks", &["show", "hide", "last"]);
     let handles: adw::SwitchRow = get(&b, "drag_handles");
     handles.set_active(core().setting("drag_handles".into()).as_deref() == Some("true"));
     handles.connect_active_notify(|h| {

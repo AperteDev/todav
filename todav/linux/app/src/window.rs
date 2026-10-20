@@ -1365,13 +1365,31 @@ fn drop_task(d: &Task, ds: &Slot, t: &Task, ts: &Slot, above: bool) -> todav_cor
         }
     }
     let sort = if ts.root { order.tasks } else { order.subtasks };
-    let before = if above {
+    let mut before = if above {
         Some(t.uid.clone())
     } else {
         ts.next.clone()
     };
+    // Completed tasks shown last sit anywhere in the stored order: an open task dropped in front
+    // of them goes last, a completed one dropped among open tasks keeps its place.
+    let view = crate::settings::done_view();
+    let mut keep = false;
+    if if ts.root {
+        view.tasks_last
+    } else {
+        view.subtasks_last
+    } {
+        let done = before
+            .clone()
+            .and_then(|b| core().task(b))
+            .is_some_and(|b| b.done);
+        if done && !d.done {
+            before = None;
+        }
+        keep = d.done && !done && before.is_some();
+    }
     // Dropping right below the task above it leaves `d` where it is.
-    if sort == Sort::Manual && before.as_ref() != Some(&d.uid) {
+    if sort == Sort::Manual && !keep && before.as_ref() != Some(&d.uid) {
         core().reorder(d.uid.clone(), before)?;
     }
     request_sync();
