@@ -78,139 +78,152 @@ Adw.ApplicationWindow window {
       Gtk.StackPage {
         name: "main";
 
-        child: Adw.NavigationSplitView split {
-          sidebar: Adw.NavigationPage {
-            title: "Todav";
-
-            child: Adw.ToolbarView {
-              [top]
-              Adw.HeaderBar {
-                [end]
-                Gtk.MenuButton {
-                  icon-name: "open-menu-symbolic";
-                  menu-model: main_menu;
-                }
-              }
-
-              content: Gtk.ScrolledWindow {
-                vexpand: true;
-
-                Gtk.Box {
-                  orientation: vertical;
-
-                  Gtk.ListBox sidebar {
-                    styles ["navigation-sidebar"]
-                  }
-
-                  // Filled per list; hidden when the list has no categories.
-                  Gtk.Box cat_section {
-                    orientation: vertical;
-                    visible: false;
-                    margin-top: 6;
-
-                    Gtk.ToggleButton cat_toggle {
-                      active: true;
-                      margin-start: 6;
-                      margin-end: 6;
-                      styles ["flat", "cat-toggle"]
-
-                      Gtk.Box {
-                        spacing: 6;
-
-                        Gtk.Label {
-                          label: "Categories";
-                          xalign: 0;
-                          hexpand: true;
-                          styles ["heading"]
-                        }
-
-                        Gtk.Image {
-                          icon-name: "pan-down-symbolic";
-                        }
-                      }
-                    }
-
-                    Gtk.Revealer {
-                      reveal-child: bind cat_toggle.active;
-
-                      Gtk.ListBox cat_list {
-                        styles ["navigation-sidebar"]
-                      }
-                    }
-                  }
-                }
-              };
-            };
-          };
-
-          content: Adw.NavigationPage {
+        // Tasks and Calendar; the calendar page (ui/calendar.blp) is added in code.
+        child: Adw.ViewStack views {
+          Adw.ViewStackPage {
+            name: "tasks";
             title: "Tasks";
+            icon-name: "checkbox-checked-symbolic";
 
-            child: Adw.ToolbarView {
-              [top]
-              Adw.HeaderBar {
-                title-widget: Adw.WindowTitle title {};
+            child: Adw.NavigationSplitView split {
+              sidebar: Adw.NavigationPage {
+                title: "Todav";
 
-                [end]
-                Gtk.Button {
-                  icon-name: "view-refresh-symbolic";
-                  tooltip-text: "Sync (F5)";
-                  action-name: "app.sync";
-                }
+                child: Adw.ToolbarView {
+                  [top]
+                  Adw.HeaderBar {
+                    title-widget: Adw.InlineViewSwitcher {
+                      stack: views;
+                    };
 
-                [end]
-                Adw.Spinner spinner {
-                  visible: false;
-                }
-              }
+                    [end]
+                    Gtk.MenuButton {
+                      icon-name: "open-menu-symbolic";
+                      menu-model: main_menu;
+                    }
+                  }
 
-              content: Gtk.ScrolledWindow {
-                vexpand: true;
-
-                Adw.Clamp {
-                  maximum-size: 720;
-
-                  Gtk.Box {
-                    orientation: vertical;
-                    spacing: 18;
-                    margin-top: 12;
-                    margin-bottom: 24;
-                    margin-start: 12;
-                    margin-end: 12;
+                  content: Gtk.ScrolledWindow {
+                    vexpand: true;
 
                     Gtk.Box {
-                      spacing: 6;
+                      orientation: vertical;
 
-                      Gtk.Entry entry {
-                        placeholder-text: "Add a task";
-                        hexpand: true;
+                      Gtk.ListBox sidebar {
+                        styles ["navigation-sidebar"]
                       }
 
-                      Gtk.DropDown cat {
-                        tooltip-text: "Category (Ctrl+K)";
-                        model: Gtk.StringList cats { strings ["No category"] };
+                      // Filled per list; hidden when the list has no categories.
+                      Gtk.Box cat_section {
+                        orientation: vertical;
+                        visible: false;
+                        margin-top: 6;
 
-                        // Ctrl+K opens the category picker from anywhere in the window.
-                        Gtk.ShortcutController {
-                          scope: global;
+                        Gtk.ToggleButton cat_toggle {
+                          active: true;
+                          margin-start: 6;
+                          margin-end: 6;
+                          styles ["flat", "cat-toggle"]
 
-                          Gtk.Shortcut {
-                            trigger: "<Control>k";
-                            action: "activate";
+                          Gtk.Box {
+                            spacing: 6;
+
+                            Gtk.Label {
+                              label: "Categories";
+                              xalign: 0;
+                              hexpand: true;
+                              styles ["heading"]
+                            }
+
+                            Gtk.Image {
+                              icon-name: "pan-down-symbolic";
+                            }
+                          }
+                        }
+
+                        Gtk.Revealer {
+                          reveal-child: bind cat_toggle.active;
+
+                          Gtk.ListBox cat_list {
+                            styles ["navigation-sidebar"]
                           }
                         }
                       }
                     }
+                  };
+                };
+              };
 
-                    Gtk.Box groups {
-                      orientation: vertical;
-                      spacing: 18;
+              content: Adw.NavigationPage {
+                title: "Tasks";
+
+                child: Adw.ToolbarView {
+                  [top]
+                  Adw.HeaderBar {
+                    title-widget: Adw.WindowTitle title {};
+
+                    [end]
+                    Gtk.Button {
+                      icon-name: "view-refresh-symbolic";
+                      tooltip-text: "Sync (F5)";
+                      action-name: "app.sync";
+                    }
+
+                    [end]
+                    Adw.Spinner spinner {
+                      visible: false;
                     }
                   }
-                }
+
+                  content: Gtk.ScrolledWindow {
+                    vexpand: true;
+
+                    Adw.Clamp {
+                      maximum-size: 720;
+
+                      Gtk.Box {
+                        orientation: vertical;
+                        spacing: 18;
+                        margin-top: 12;
+                        margin-bottom: 24;
+                        margin-start: 12;
+                        margin-end: 12;
+
+                        Gtk.Box {
+                          spacing: 6;
+
+                          Gtk.Entry entry {
+                            placeholder-text: "Add a task";
+                            hexpand: true;
+                          }
+
+                          Gtk.DropDown cat {
+                            tooltip-text: "Category (Ctrl+K)";
+                            model: Gtk.StringList cats { strings ["No category"] };
+
+                            // Ctrl+K opens the category picker from anywhere in the window.
+                            Gtk.ShortcutController {
+                              scope: global;
+
+                              Gtk.Shortcut {
+                                trigger: "<Control>k";
+                                action: "activate";
+                              }
+                            }
+                          }
+                        }
+
+                        Gtk.Box groups {
+                          orientation: vertical;
+                          spacing: 18;
+                        }
+                      }
+                    }
+                  };
+                };
               };
             };
-          };
+          }
         };
       }
     }

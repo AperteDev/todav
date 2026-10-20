@@ -228,6 +228,11 @@ impl Client {
         store::upcoming(&self.db.lock().unwrap()).unwrap_or_default()
     }
 
+    /// Tasks, done ones too, due or starting in `[from, to)` (local times): what the calendar shows.
+    pub fn scheduled(&self, from: i64, to: i64) -> Vec<Task> {
+        store::scheduled(&self.db.lock().unwrap(), from, to).unwrap_or_default()
+    }
+
     /// Open tasks with a reminder going off after `from` and at `to` at the latest (local times).
     pub fn reminders(&self, from: i64, to: i64) -> Vec<Task> {
         store::reminders(&self.db.lock().unwrap(), from, to).unwrap_or_default()

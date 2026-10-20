@@ -130,6 +130,17 @@ pub fn setup_actions(app: &adw::Application) {
             show_list(href);
         }
     });
+    // From event reminders: the calendar on that day.
+    let day = gio::SimpleAction::new("show-day", Some(glib::VariantTy::INT64));
+    day.connect_activate(|_, t| {
+        if let Some(t) = t.and_then(|t| t.get::<i64>()) {
+            if let Some(app) = gio::Application::default().and_downcast::<adw::Application>() {
+                present(&app);
+            }
+            crate::calendar::show_day(t);
+        }
+    });
+    app.add_action(&day);
     let complete = gio::SimpleAction::new("complete", Some(glib::VariantTy::STRING));
     complete.connect_activate(|_, uid| {
         if let Some(uid) = uid.and_then(|u| u.str())
@@ -218,10 +229,12 @@ pub fn on_event(ev: &Event) {
                 if current.as_deref() == Some(&list) || current.as_deref() == Some(UPCOMING) {
                     refresh_tasks(&ui);
                 }
+                crate::calendar::refresh();
             });
         }
         Event::SyncState(s) => {
             ui.spinner.set_visible(s == "syncing");
+            crate::calendar::set_syncing(s == "syncing");
             if let Some(err) = s.strip_prefix("error:") {
                 if *ui.last_error.borrow() != err {
                     ui.toasts
@@ -306,7 +319,15 @@ fn build(app: &adw::Application) -> Rc<Ui> {
     });
     ui.conn.attach(&get(&b, "login_group"));
     connect(&ui);
+    crate::calendar::build(&get(&b, "views"), &ui.split);
     ui
+}
+
+/// Open a task's edit dialog (from the calendar).
+pub fn edit_task(t: &Task) {
+    if let Some(ui) = ui() {
+        edit_dialog(&ui, t, t.parent_uid.is_some());
+    }
 }
 
 fn connect(ui: &Rc<Ui>) {

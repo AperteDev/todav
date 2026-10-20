@@ -1,5 +1,6 @@
 //! Todav for Linux: GTK UI + background service (sync worker, ntfy push listener, D-Bus API).
 
+mod calendar;
 mod connection;
 mod dates;
 mod dbus;
@@ -335,6 +336,16 @@ fn notify_reminders() {
         n.set_default_action_and_target_value("app.show-list", Some(&t.list_href.to_variant()));
         n.add_button_with_target_value("Mark as Done", "app.complete", Some(&t.uid.to_variant()));
         app.send_notification(Some(&format!("reminder-{}", t.uid)), &n);
+    }
+    for e in core().event_reminders(from, now) {
+        let n = gio::Notification::new(&e.summary);
+        let when = dates::label(e.start, e.all_day, now);
+        n.set_body(Some(&match &e.location {
+            Some(l) => format!("{when} · {l}"),
+            None => when,
+        }));
+        n.set_default_action_and_target_value("app.show-day", Some(&e.start.to_variant()));
+        app.send_notification(Some(&format!("event-{}-{}", e.uid, e.start)), &n);
     }
     if from != now {
         let _ = core().set_setting("reminded_until".into(), now.to_string());

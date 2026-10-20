@@ -1,0 +1,176 @@
+using Gtk 4.0;
+using Adw 1;
+
+// The Calendar page: a mini month and the calendars beside the Month / Week / Agenda views.
+Adw.NavigationSplitView split {
+  sidebar: Adw.NavigationPage {
+    title: "Calendar";
+
+    child: Adw.ToolbarView {
+      [top]
+      Adw.HeaderBar {
+        // Its stack (the window's Tasks / Calendar views) is set in code.
+        title-widget: Adw.InlineViewSwitcher switcher {};
+
+        [end]
+        Gtk.MenuButton {
+          icon-name: "open-menu-symbolic";
+          menu-model: main_menu;
+        }
+      }
+
+      content: Gtk.ScrolledWindow {
+        vexpand: true;
+
+        Gtk.Box {
+          orientation: vertical;
+          spacing: 6;
+
+          Gtk.Calendar mini {
+            margin-start: 12;
+            margin-end: 12;
+            margin-top: 6;
+            styles ["card"]
+          }
+
+          Gtk.Label {
+            label: "Calendars";
+            xalign: 0;
+            margin-start: 18;
+            margin-top: 12;
+            styles ["heading"]
+          }
+
+          // A row per calendar: colour, name, shown or not.
+          Gtk.ListBox calendars {
+            selection-mode: none;
+            styles ["navigation-sidebar"]
+          }
+
+          Gtk.Label task_heading {
+            label: "Task lists";
+            xalign: 0;
+            margin-start: 18;
+            margin-top: 12;
+            styles ["heading"]
+          }
+
+          // The same for lists holding only tasks (their dated tasks are on the calendar).
+          Gtk.ListBox task_lists {
+            selection-mode: none;
+            styles ["navigation-sidebar"]
+          }
+        }
+      };
+    };
+  };
+
+  content: Adw.NavigationPage {
+    title: "Calendar";
+
+    child: Adw.ToolbarView {
+      [top]
+      Adw.HeaderBar {
+        title-widget: Adw.WindowTitle title {};
+
+        [start]
+        Gtk.Box {
+          styles ["linked"]
+
+          Gtk.Button prev {
+            icon-name: "go-previous-symbolic";
+            tooltip-text: "Previous";
+          }
+
+          Gtk.Button today {
+            label: "Today";
+          }
+
+          Gtk.Button next {
+            icon-name: "go-next-symbolic";
+            tooltip-text: "Next";
+          }
+        }
+
+        [end]
+        Gtk.Button {
+          icon-name: "view-refresh-symbolic";
+          tooltip-text: "Sync (F5)";
+          action-name: "app.sync";
+        }
+
+        [end]
+        Adw.Spinner spinner {
+          visible: false;
+        }
+
+        [end]
+        Adw.ToggleGroup mode {
+          Adw.Toggle {
+            name: "month";
+            label: "Month";
+          }
+
+          Adw.Toggle {
+            name: "agenda";
+            label: "Agenda";
+          }
+        }
+      }
+
+      content: Gtk.Stack views {
+        transition-type: crossfade;
+
+        Gtk.StackPage {
+          name: "month";
+
+          // Weekday names over six rows of seven days, filled in code.
+          child: Gtk.Box {
+            orientation: vertical;
+            margin-start: 6;
+            margin-end: 6;
+            margin-bottom: 6;
+            styles ["month"]
+
+            Gtk.Box weekdays {
+              homogeneous: true;
+              styles ["weekdays"]
+            }
+
+            Gtk.Grid month {
+              row-homogeneous: true;
+              column-homogeneous: true;
+              vexpand: true;
+            }
+          };
+        }
+
+        Gtk.StackPage {
+          name: "agenda";
+
+          child: Gtk.ScrolledWindow {
+            vexpand: true;
+
+            Adw.Clamp {
+              maximum-size: 720;
+
+              Gtk.Box agenda {
+                orientation: vertical;
+                spacing: 18;
+                margin-top: 12;
+                margin-bottom: 24;
+                margin-start: 12;
+                margin-end: 12;
+              }
+            }
+          };
+        }
+      };
+    };
+  };
+}
+
+menu main_menu {
+  item ("Preferences", "win.preferences")
+  item ("Quit", "app.quit")
+}

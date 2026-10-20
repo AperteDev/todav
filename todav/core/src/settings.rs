@@ -16,6 +16,9 @@ pub const DEVICE_ONLY: &[&str] = &[
     "manual_url",
     "manual_user",
     "reminded_until",
+    // UI state: which view (tasks, calendar) and calendar layout (month, week, agenda) is open.
+    "last_view",
+    "calendar_mode",
 ];
 
 /// key → (value, unix time of the last change)

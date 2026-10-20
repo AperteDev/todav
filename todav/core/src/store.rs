@@ -294,6 +294,17 @@ pub fn upcoming(db: &Connection) -> Result<Vec<Task>> {
     Ok(rows.collect::<rusqlite::Result<_>>()?)
 }
 
+/// Tasks, done ones too, due or starting in `[from, to)` (local times), in every list.
+pub fn scheduled(db: &Connection, from: i64, to: i64) -> Result<Vec<Task>> {
+    let mut st = db.prepare(&format!(
+        "SELECT {TASK_COLS} FROM tasks WHERE dirty != 2 AND status != 'CANCELLED'
+           AND ((due >= ?1 AND due < ?2) OR (start >= ?1 AND start < ?2))
+         ORDER BY COALESCE(start, due), COALESCE(sort_order, created, 0), uid"
+    ))?;
+    let rows = st.query_map([from, to], task_row)?;
+    Ok(rows.collect::<rusqlite::Result<_>>()?)
+}
+
 /// Open tasks with a reminder going off after `from` and at `to` at the latest (local times).
 pub fn reminders(db: &Connection, from: i64, to: i64) -> Result<Vec<Task>> {
     let mut st = db.prepare(&format!(
