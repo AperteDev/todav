@@ -14,7 +14,8 @@ use todav_core::{CategoryGroup, Due, Sort, Task, TaskPatch};
 /// Completed tasks shown among open ones are struck through (only their own title, not their
 /// subtasks'); drop targets show a line where the task will land
 /// instead of GTK's frame around the target, and "+" buttons taking the dragged task are outlined,
-/// as is the sidebar category it is over.
+/// as is the sidebar category it is over. A "warning" banner is tinted amber (libadwaita's are
+/// grey, from `--banner-color`).
 const CSS: &str = "
 splitbutton.pill { border-radius: 9999px; }
 splitbutton.pill > button { padding: 10px 20px 10px 32px; border-radius: 9999px 0 0 9999px; }
@@ -33,6 +34,7 @@ button.drop-hint { outline: 2px solid @accent_bg_color; outline-offset: -2px; }
 button.drop-hint:drop(active) { background: alpha(@accent_bg_color, 0.2); }
 row.cat-drop:drop(active) { outline: 2px solid @accent_bg_color; outline-offset: -2px; background: alpha(@accent_bg_color, 0.2); }
 row.dragged { opacity: 0.4; }
+banner.warning { --banner-color: var(--warning-bg-color); }
 .drag-card { margin: 8px; padding: 12px 18px; border-radius: 12px; background: @card_bg_color; color: @card_fg_color; box-shadow: 0 2px 8px alpha(black, 0.25); }
 row.drop-above { box-shadow: inset 0 2px 0 0 @accent_bg_color; }
 row.drop-below { box-shadow: inset 0 -2px 0 0 @accent_bg_color; }
