@@ -10,13 +10,15 @@ mod settings;
 pub mod store;
 mod sync;
 pub mod tz;
+mod undo;
 
 use caldav::Dav;
 use ical::Calendar;
 use rusqlite::Connection;
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
-use store::Kind;
+use store::{Kind, RawObject};
+use undo::{Before, Journal};
 
 pub use config::{CategoryGroup, CategoryMeta, DoneView, Sort};
 pub use event::{Event, EventPatch, EventTime, Repeat, Scope};
@@ -113,6 +115,8 @@ pub struct Client {
     listen_gen: AtomicU64,
     /// The system's zone ("Europe/Warsaw"), for writing new event times; see `set_local_zone`.
     local_zone: Mutex<Option<String>>,
+    /// What local edits replaced, for `undo`.
+    journal: Mutex<Journal>,
 }
 
 pub fn now() -> i64 {
@@ -157,6 +161,7 @@ impl Client {
             sync_lock: Mutex::new(()),
             listen_gen: AtomicU64::new(0),
             local_zone: Mutex::new(None),
+            journal: Mutex::new(Journal::default()),
         })
     }
 
@@ -206,6 +211,7 @@ impl Client {
             };
             event::edit(&db, &mut cal, None, Scope::All, &patch, &like)?;
             cal.set("SEQUENCE", "", Some("0"));
+            self.remember(&db, Kind::Event, &list_href, &uid)?;
             store::save(&db, &list_href, None, None, &cal, store::MODIFIED)?;
         }
         self.emit(&list_href, vec![uid.clone()]);
@@ -229,6 +235,7 @@ impl Client {
             let mut cal = Calendar::parse(&raw.raw_ics).ok_or_else(|| Error::Parse(uid.clone()))?;
             let like = self.local_like(&db, &mut cal);
             let next = event::edit(&db, &mut cal, recurrence_id, scope, &patch, &like)?;
+            self.remember(&db, Kind::Event, &list_href, &uid)?;
             store::save(
                 &db,
                 &list_href,
@@ -238,6 +245,8 @@ impl Client {
                 store::MODIFIED,
             )?;
             if let Some(next) = next {
+                let uid = next.text("UID").unwrap_or_default();
+                self.remember(&db, Kind::Event, &list_href, &uid)?;
                 store::save(&db, &list_href, None, None, &next, store::MODIFIED)?;
             }
         }
@@ -259,6 +268,7 @@ impl Client {
                 .ok_or_else(|| Error::NotFound(uid.clone()))?;
             let mut cal = Calendar::parse(&raw.raw_ics).ok_or_else(|| Error::Parse(uid.clone()))?;
             let like = self.local_like(&db, &mut cal);
+            self.remember(&db, Kind::Event, &list_href, &uid)?;
             if !event::delete(&db, &mut cal, recurrence_id, scope, &like)? {
                 store::save(
                     &db,
@@ -268,16 +278,8 @@ impl Client {
                     &cal,
                     store::MODIFIED,
                 )?;
-            } else if raw.href.is_none() {
-                store::delete(&db, &raw)?; // never reached the server
             } else {
-                store::set_sync_state(
-                    &db,
-                    &raw,
-                    raw.href.as_deref(),
-                    raw.etag.as_deref(),
-                    store::DELETED,
-                )?;
+                forget(&db, &raw)?;
             }
         }
         self.emit(&list_href, vec![uid]);
@@ -294,18 +296,12 @@ impl Client {
             let raw = store::raw(&db, Kind::Event, &from, &uid)?
                 .ok_or_else(|| Error::NotFound(uid.clone()))?;
             let cal = Calendar::parse(&raw.raw_ics).ok_or_else(|| Error::Parse(uid.clone()))?;
-            store::save(&db, &to, None, None, &cal, store::MODIFIED)?;
-            if raw.href.is_none() {
-                store::delete(&db, &raw)?;
-            } else {
-                store::set_sync_state(
-                    &db,
-                    &raw,
-                    raw.href.as_deref(),
-                    raw.etag.as_deref(),
-                    store::DELETED,
-                )?;
-            }
+            self.together(|| {
+                self.remember(&db, Kind::Event, &from, &uid)?;
+                self.remember(&db, Kind::Event, &to, &uid)?;
+                store::save(&db, &to, None, None, &cal, store::MODIFIED)?;
+                forget(&db, &raw)
+            })?;
         }
         self.emit(&from, vec![uid.clone()]);
         self.emit(&to, vec![uid]);
@@ -463,6 +459,7 @@ impl Client {
             };
             let next: i64 = db.query_row(sql, [&list_href], |r| r.get(0))?;
             set_order(&mut cal, next);
+            self.remember(&db, Kind::Task, &list_href, &uid)?;
             store::save(&db, &list_href, None, None, &cal, store::MODIFIED)?;
         }
         self.emit(&list_href, vec![uid.clone()]);
@@ -478,6 +475,7 @@ impl Client {
             let mut cal = Calendar::parse(&raw.raw_ics).ok_or_else(|| Error::Parse(uid.into()))?;
             f(&mut cal);
             touch(&mut cal);
+            self.remember(&db, Kind::Task, "", uid)?;
             store::save(
                 &db,
                 &raw.list_href,
@@ -588,45 +586,83 @@ impl Client {
         })
     }
 
-    /// Returns the task's calendar data, for `restore_task`.
-    pub fn delete_task(&self, uid: String) -> Result<String> {
-        let raw = {
+    pub fn delete_task(&self, uid: String) -> Result<()> {
+        let list = {
             let db = self.db.lock().unwrap();
             let raw = store::raw(&db, Kind::Task, "", &uid)?
                 .ok_or_else(|| Error::NotFound(uid.clone()))?;
-            if raw.href.is_none() {
-                store::delete(&db, &raw)?; // never reached the server
-            } else {
-                db.execute("UPDATE tasks SET dirty = 2 WHERE uid = ?", [&uid])?;
-            }
-            raw
+            self.remember(&db, Kind::Task, "", &uid)?;
+            forget(&db, &raw)?;
+            raw.list_href
         };
-        self.emit(&raw.list_href, vec![uid]);
-        Ok(raw.raw_ics)
+        self.emit(&list, vec![uid]);
+        Ok(())
     }
 
-    /// Undo `delete_task`: bring the task back from the data it returned. A delete the server
-    /// already has is re-created there as a new resource.
-    pub fn restore_task(&self, list_href: String, raw_ics: String) -> Result<()> {
-        let mut cal = Calendar::parse(&raw_ics).ok_or_else(|| Error::Parse(list_href.clone()))?;
-        touch(&mut cal); // newer than the deleted copy, should another device still have it
-        let uid = {
-            let db = self.db.lock().unwrap();
-            let uid = cal.text("UID").unwrap_or_default();
-            let (href, etag) = match store::raw(&db, Kind::Task, "", &uid)? {
-                Some(r) => (r.href, r.etag), // delete not pushed yet
-                None => (None, None),
-            };
-            store::save(
-                &db,
-                &list_href,
-                href.as_deref(),
-                etag.as_deref(),
-                &cal,
-                store::MODIFIED,
-            )?
+    /// Changes `f` makes are undone together, as one action.
+    pub fn together<R>(&self, f: impl FnOnce() -> R) -> R {
+        self.journal.lock().unwrap().begin();
+        let r = f();
+        self.journal.lock().unwrap().end();
+        r
+    }
+
+    /// The latest change, to undo just that one later (a toast's Undo button).
+    pub fn last_change(&self) -> Option<u64> {
+        self.journal.lock().unwrap().last()
+    }
+
+    /// Put back what change `id` (else the latest) replaced; false when there is none. A delete
+    /// the server already has comes back as a new resource there.
+    pub fn undo(&self, id: Option<u64>) -> Result<bool> {
+        let Some(before) = self.journal.lock().unwrap().take(id) else {
+            return Ok(false);
         };
-        self.emit(&list_href, vec![uid]);
+        let mut changed = Vec::new();
+        {
+            let db = self.db.lock().unwrap();
+            for b in before.into_iter().rev() {
+                let now = store::raw(&db, b.kind, &b.list_href, &b.uid)?
+                    .filter(|r| r.dirty != store::DELETED);
+                match (b.raw_ics, now) {
+                    (Some(ics), Some(r)) if r.raw_ics == ics => continue,
+                    (Some(ics), _) => {
+                        let mut cal =
+                            Calendar::parse(&ics).ok_or_else(|| Error::Parse(b.uid.clone()))?;
+                        touch(&mut cal); // newer than what it replaces, wherever that went
+                        // A pending delete still holds the resource's href.
+                        let r = store::raw(&db, b.kind, &b.list_href, &b.uid)?;
+                        let r = r.as_ref();
+                        store::save(
+                            &db,
+                            &b.list_href,
+                            r.and_then(|r| r.href.as_deref()),
+                            r.and_then(|r| r.etag.as_deref()),
+                            &cal,
+                            store::MODIFIED,
+                        )?;
+                    }
+                    (None, Some(r)) => forget(&db, &r)?,
+                    (None, None) => continue,
+                }
+                changed.push((b.list_href, b.uid));
+            }
+        }
+        for (list, uid) in changed {
+            self.emit(&list, vec![uid]);
+        }
+        Ok(true)
+    }
+
+    /// Note an item as it is before a change, for `undo`; `list_href` may be empty for a task.
+    fn remember(&self, db: &Connection, kind: Kind, list_href: &str, uid: &str) -> Result<()> {
+        let raw = store::raw(db, kind, list_href, uid)?.filter(|r| r.dirty != store::DELETED);
+        self.journal.lock().unwrap().record(Before {
+            kind,
+            list_href: raw.as_ref().map_or(list_href, |r| &r.list_href).to_string(),
+            uid: uid.to_string(),
+            raw_ics: raw.map(|r| r.raw_ics),
+        });
         Ok(())
     }
 
@@ -642,13 +678,24 @@ impl Client {
             .unwrap_or(order.len());
         order.insert(pos, task);
         // ponytail: renumbers the whole list (one PUT per moved task); use gaps if lists get long.
-        for (i, t) in order.iter().enumerate() {
-            let i = i as i64 + 1;
-            if t.sort_order != Some(i) {
-                self.modify(&t.uid, |cal| set_order(cal, i))?;
+        self.together(|| {
+            for (i, t) in order.iter().enumerate() {
+                let i = i as i64 + 1;
+                if t.sort_order != Some(i) {
+                    self.modify(&t.uid, |cal| set_order(cal, i))?;
+                }
             }
-        }
-        Ok(())
+            Ok(())
+        })
+    }
+}
+
+/// Delete `o`: at once if the server never had it, else with the next sync.
+fn forget(db: &Connection, o: &RawObject) -> Result<()> {
+    if o.href.is_none() {
+        store::delete(db, o)
+    } else {
+        store::set_sync_state(db, o, o.href.as_deref(), o.etag.as_deref(), store::DELETED)
     }
 }
 
@@ -806,6 +853,46 @@ mod tests {
         c.set_parent(b.clone(), a.clone()).unwrap();
         assert_eq!(c.task(b.clone()).unwrap().parent_uid, Some(a.clone()));
         assert!(c.within(b1, a.clone()) && !c.within(a, b));
+    }
+
+    #[test]
+    fn undo_puts_back_edits_deletes_and_additions_newest_first() {
+        let dir = std::env::temp_dir().join(format!("todav-test-undo-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let l = "/l/".to_string();
+        c.db.lock()
+            .unwrap()
+            .execute(
+                "INSERT INTO lists (href, display_name) VALUES (?1, 'L')",
+                [&l],
+            )
+            .unwrap();
+        let a = c
+            .add_task(l.clone(), "a".into(), None, None, false)
+            .unwrap();
+        let added = c.last_change();
+        let b = c
+            .add_task(l.clone(), "b".into(), None, None, false)
+            .unwrap();
+        c.set_done(a.uid.clone(), true).unwrap();
+        c.delete_task(b.uid.clone()).unwrap();
+        // Done and deleted, then the order changed in one action.
+        c.reorder(a.uid.clone(), None).unwrap();
+        c.together(|| c.set_done(a.uid.clone(), false)).unwrap();
+
+        assert!(c.undo(None).unwrap());
+        assert!(c.task(a.uid.clone()).unwrap().done);
+        c.undo(None).unwrap(); // the reorder (nothing moved: no step)
+        assert_eq!(c.task(b.uid.clone()).unwrap().summary, "b", "b is back");
+        c.undo(None).unwrap();
+        assert!(!c.task(a.uid.clone()).unwrap().done);
+        // The first addition, out of turn.
+        assert!(c.undo(added).unwrap());
+        assert!(c.task(a.uid.clone()).is_none());
+        c.undo(None).unwrap();
+        assert!(c.task(b.uid).is_none());
+        assert!(!c.undo(None).unwrap(), "nothing left");
     }
 
     #[test]
@@ -1022,17 +1109,18 @@ mod tests {
         };
         let row = raw();
         store::set_sync_state(&c.db.lock().unwrap(), &row, Some("/l/a.ics"), Some("e"), 0).unwrap();
-        let ics = c.delete_task(uid.clone()).unwrap();
+        c.delete_task(uid.clone()).unwrap();
         assert!(c.tasks(l.clone(), true).is_empty());
-        c.restore_task(l.clone(), ics.clone()).unwrap();
+        c.undo(None).unwrap();
         assert_eq!(
             (raw().href.as_deref(), raw().dirty),
             (Some("/l/a.ics"), store::MODIFIED)
         );
         // Delete already pushed (row gone): re-created as new.
+        c.delete_task(uid.clone()).unwrap();
         let row = raw();
         store::delete(&c.db.lock().unwrap(), &row).unwrap();
-        c.restore_task(l.clone(), ics).unwrap();
+        c.undo(None).unwrap();
         assert_eq!(c.task(uid).unwrap().summary, "a");
     }
 }

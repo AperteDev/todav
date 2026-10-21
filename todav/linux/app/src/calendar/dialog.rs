@@ -305,7 +305,10 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) {
                     ev.recurrence_id,
                     scope,
                 ) {
-                    Ok(()) => request_sync(),
+                    Ok(()) => {
+                        request_sync();
+                        crate::window::undo_toast(&format!("“{}” deleted", ev.summary));
+                    }
                     Err(err) => crate::window::toast(&err.to_string()),
                 }
                 done.close();
@@ -346,22 +349,21 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) {
             let title = Some(text(&summary))
                 .filter(|s| !s.is_empty())
                 .unwrap_or_else(|| "New Event".into());
-            match core().add_event(list.clone(), title, new_time, offsets) {
-                Ok(uid) => {
-                    let rest = EventPatch {
-                        location: Some(text(&location)).filter(|s| !s.is_empty()),
-                        description: Some(notes).filter(|s| !s.is_empty()),
-                        repeat: new_repeat.map(Some),
-                        ..Default::default()
-                    };
-                    if rest.location.is_some()
-                        || rest.description.is_some()
-                        || rest.repeat.is_some()
-                    {
-                        let _ = core().update_event(list, uid, None, Scope::All, rest);
-                    }
-                    request_sync();
+            let added = core().together(|| {
+                let uid = core().add_event(list.clone(), title, new_time, offsets)?;
+                let rest = EventPatch {
+                    location: Some(text(&location)).filter(|s| !s.is_empty()),
+                    description: Some(notes).filter(|s| !s.is_empty()),
+                    repeat: new_repeat.map(Some),
+                    ..Default::default()
+                };
+                if rest.location.is_some() || rest.description.is_some() || rest.repeat.is_some() {
+                    let _ = core().update_event(list, uid, None, Scope::All, rest);
                 }
+                Ok::<_, todav_core::Error>(())
+            });
+            match added {
+                Ok(()) => request_sync(),
                 Err(err) => crate::window::toast(&err.to_string()),
             }
             d.close();
@@ -407,23 +409,20 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) {
             && patch.repeat.is_none();
         let done = d.clone();
         let save = move |scope: Scope| {
-            let r = if nothing {
-                Ok(())
-            } else {
-                core().update_event(
-                    ev.list_href.clone(),
-                    ev.uid.clone(),
-                    ev.recurrence_id,
-                    scope,
-                    patch.clone(),
-                )
-            };
-            let r = r.and_then(|()| {
-                if moved {
-                    core().move_event(ev.list_href.clone(), ev.uid.clone(), list.clone())
-                } else {
-                    Ok(())
+            let r = core().together(|| {
+                if !nothing {
+                    core().update_event(
+                        ev.list_href.clone(),
+                        ev.uid.clone(),
+                        ev.recurrence_id,
+                        scope,
+                        patch.clone(),
+                    )?;
                 }
+                if moved {
+                    core().move_event(ev.list_href.clone(), ev.uid.clone(), list.clone())?;
+                }
+                Ok::<_, todav_core::Error>(())
             });
             match r {
                 Ok(()) => request_sync(),

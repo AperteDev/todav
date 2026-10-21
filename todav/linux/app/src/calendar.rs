@@ -1295,9 +1295,6 @@ fn event_tasks(e: &Event) -> gtk::Box {
             return;
         }
         let start = crate::settings::order().task_start;
-        let Ok(t) = core().add_task(list_href, text, None, None, start) else {
-            return;
-        };
         let patch = TaskPatch {
             event: Some(Some(ev.uid.clone())),
             due: Some(Some(Due {
@@ -1306,7 +1303,11 @@ fn event_tasks(e: &Event) -> gtk::Box {
             })),
             ..Default::default()
         };
-        if core().update_task(t.uid.clone(), patch).is_ok() {
+        let added = core().together(|| {
+            let t = core().add_task(list_href, text, None, None, start)?;
+            core().update_task(t.uid.clone(), patch).map(|_| t)
+        });
+        if let Ok(t) = added {
             entry.set_text("");
             if let Some(t) = core().task(t.uid) {
                 list.append(&task_check(&t, &head));
@@ -1455,7 +1456,10 @@ fn details(c: &Cal, e: &Event) -> gtk::Popover {
                 ev.recurrence_id,
                 scope,
             ) {
-                Ok(()) => request_sync(),
+                Ok(()) => {
+                    request_sync();
+                    crate::window::undo_toast(&format!("“{}” deleted", ev.summary));
+                }
                 Err(err) => crate::window::toast(&err.to_string()),
             };
             match cal() {

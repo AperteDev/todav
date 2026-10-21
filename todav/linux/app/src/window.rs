@@ -992,7 +992,7 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
                 let Some((d, ds)) = weak.upgrade().and_then(|ui| ui.dragging.take()) else {
                     return false;
                 };
-                if let Err(e) = drop_on_category(&d, &ds, cat.clone()) {
+                if let Err(e) = core().together(|| drop_on_category(&d, &ds, cat.clone())) {
                     toast(&e.to_string());
                 }
                 true
@@ -1618,7 +1618,7 @@ fn connect_dnd(
             return false;
         };
         let above = y < w.height() as f64 / 2.0;
-        if let Err(e) = drop_task(&d, &ds, &target, &slot, above) {
+        if let Err(e) = core().together(|| drop_task(&d, &ds, &target, &slot, above)) {
             ui.toasts.add_toast(note(&e.to_string()));
         }
         true
@@ -1699,7 +1699,7 @@ fn adopt_target(
         let Some((d, _)) = ui.dragging.take() else {
             return false;
         };
-        match adopt(&d, &p) {
+        match core().together(|| adopt(&d, &p)) {
             Ok(()) => {
                 ui.expanded.borrow_mut().insert(p.uid.clone()); // show where it went
                 request_sync();
@@ -1900,27 +1900,39 @@ fn delete_button(t: &Task) -> gtk::Button {
     let del = icon_button("user-trash-symbolic", "Delete");
     let task = t.clone();
     del.connect_clicked(move |_| {
-        let Ok(ics) = core().delete_task(task.uid.clone()) else {
-            return;
-        };
-        request_sync();
-        let Some(ui) = ui() else { return };
-        let toast = adw::Toast::builder()
-            .title(format!("“{}” deleted", task.summary))
-            .button_label("Undo")
-            .priority(adw::ToastPriority::High)
-            .build();
-        toast.set_use_markup(false);
-        let list = task.list_href.clone();
-        toast.connect_button_clicked(move |_| {
-            match core().restore_task(list.clone(), ics.clone()) {
-                Ok(()) => request_sync(),
-                Err(e) => self::toast(&e.to_string()),
-            }
-        });
-        ui.toasts.add_toast(toast);
+        if core().delete_task(task.uid.clone()).is_ok() {
+            request_sync();
+            undo_toast(&format!("“{}” deleted", task.summary));
+        }
     });
     del
+}
+
+/// Tell that something was deleted, with a button undoing just that (the latest change).
+pub fn undo_toast(title: &str) {
+    let Some(ui) = ui() else { return };
+    let toast = adw::Toast::builder()
+        .title(title)
+        .button_label("Undo")
+        .priority(adw::ToastPriority::High)
+        .build();
+    toast.set_use_markup(false);
+    let change = core().last_change();
+    toast.connect_button_clicked(move |_| undo(change));
+    ui.toasts.add_toast(toast);
+}
+
+/// Undo `change`, else the latest one.
+fn undo(change: Option<u64>) {
+    match core().undo(change) {
+        Ok(true) => request_sync(),
+        Ok(false) => {
+            if let Some(ui) = ui() {
+                ui.window.error_bell();
+            }
+        }
+        Err(e) => toast(&e.to_string()),
+    }
 }
 
 /// Ask for a category name; it joins this list's categories and becomes the picker's choice.

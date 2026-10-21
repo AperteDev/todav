@@ -12,6 +12,12 @@
   stored as the device-only `sync_settings` setting; on by default. The ntfy server
   (`ntfy_url`) syncs with them unless "Sync ntfy server" (`sync_ntfy`) is off.
 
+## Undo
+
+- The core records what each local change to a task or event replaced, for `Client::undo`
+  (in memory, the last 100 steps). A user action made of several core calls (add, then update)
+  goes inside `Client::together`, so one undo reverts all of it.
+
 ## Linux UI
 
 - Static views are Blueprint files in `todav/linux/app/ui/`, compiled by `build.rs`; dynamic UI
