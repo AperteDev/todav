@@ -244,6 +244,13 @@ Adw.ApplicationWindow window {
                             hexpand: true;
                           }
 
+                          // The same as Enter, for touchscreens; only with something typed.
+                          Gtk.Button add_task {
+                            icon-name: "list-add-symbolic";
+                            tooltip-text: "Add Task";
+                            sensitive: false;
+                          }
+
                           Gtk.DropDown cat {
                             tooltip-text: "Category (Ctrl+K)";
                             model: Gtk.StringList cats { strings ["No category"] };

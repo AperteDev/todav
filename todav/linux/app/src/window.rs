@@ -328,7 +328,7 @@ fn build(app: &adw::Application) -> Rc<Ui> {
         last_error: RefCell::new(String::new()),
     });
     ui.conn.attach(&get(&b, "login_group"));
-    connect(&ui);
+    connect(&ui, &b);
     let views = get(&b, "views");
     connect_search(&ui, &get(&b, "task_search"), &get(&b, "task_query"), &views);
     crate::calendar::build(&views);
@@ -394,7 +394,7 @@ pub fn edit_task(t: &Task) {
     }
 }
 
-fn connect(ui: &Rc<Ui>) {
+fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
     // Shrinking keeps the task list, as the Calendar page keeps its views.
     ui.split.connect_collapsed_notify(|s| {
         if s.is_collapsed() {
@@ -442,6 +442,20 @@ fn connect(ui: &Rc<Ui>) {
         }
         refresh_tasks(ui);
         select_name(&ui.cat, &ui.cats, &name);
+    });
+
+    // "+": accented and usable once something is typed.
+    let add: gtk::Button = get(b, "add_task");
+    let entry = ui.entry.clone();
+    add.connect_clicked(move |_| entry.emit_activate());
+    ui.entry.connect_changed(move |e| {
+        let typed = !e.text().trim().is_empty();
+        add.set_sensitive(typed);
+        if typed {
+            add.add_css_class("suggested-action");
+        } else {
+            add.remove_css_class("suggested-action");
+        }
     });
 
     let weak = Rc::downgrade(ui);
