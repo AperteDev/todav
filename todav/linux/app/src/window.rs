@@ -1950,13 +1950,15 @@ fn done_check(t: &Task) -> gtk::CheckButton {
 fn delete_button(t: &Task) -> gtk::Button {
     let del = icon_button("user-trash-symbolic", "Delete");
     let task = t.clone();
-    del.connect_clicked(move |_| {
-        if core().delete_task(task.uid.clone()).is_ok() {
-            request_sync();
-            undo_toast(&format!("“{}” deleted", task.summary));
-        }
-    });
+    del.connect_clicked(move |_| delete_task(&task));
     del
+}
+
+fn delete_task(t: &Task) {
+    if core().delete_task(t.uid.clone()).is_ok() {
+        request_sync();
+        undo_toast(&format!("“{}” deleted", t.summary));
+    }
 }
 
 /// Tell that something was deleted, with a button undoing just that (the latest change).
@@ -2151,6 +2153,13 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
         if let Some(d) = d.upgrade() {
             d.close();
         }
+    });
+    let (task, d) = (t.clone(), dialog.downgrade());
+    get::<adw::ButtonRow>(&b, "delete").connect_activated(move |_| {
+        if let Some(d) = d.upgrade() {
+            d.close();
+        }
+        delete_task(&task);
     });
     let (task, d) = (t.clone(), dialog.downgrade());
     save.connect_clicked(move |_| {

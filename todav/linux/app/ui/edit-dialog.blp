@@ -261,6 +261,17 @@ Adw.Dialog dialog {
               start-icon-name: "list-add-symbolic";
             }
           }
+
+          // As in the event dialog; a toast offers to undo it.
+          Gtk.ListBox {
+            selection-mode: none;
+            styles ["boxed-list"]
+
+            Adw.ButtonRow delete {
+              title: "Delete Task";
+              styles ["destructive-action"]
+            }
+          }
         }
       }
     };
