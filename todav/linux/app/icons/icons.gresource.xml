@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Fallbacks for icons some themes lack; GtkApplication looks in <app id path>/icons, after
+     the theme's own. -->
+<gresources>
+  <gresource prefix="/io/github/selfref/Todav/icons/scalable/actions">
+    <file>view-column-symbolic.svg</file>
+  </gresource>
+</gresources>

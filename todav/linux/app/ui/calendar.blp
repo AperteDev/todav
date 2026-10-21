@@ -165,22 +165,21 @@ Adw.NavigationSplitView split {
 
         [end]
         Adw.ToggleGroup mode {
-          // Icons only when the header is tight.
-          Adw.Toggle month_toggle {
+          Adw.Toggle {
             name: "month";
-            label: "Month";
+            icon-name: "view-grid-symbolic";
             tooltip: "Month";
           }
 
-          Adw.Toggle week_toggle {
+          Adw.Toggle {
             name: "week";
-            label: "Week";
+            icon-name: "view-column-symbolic";
             tooltip: "Week";
           }
 
-          Adw.Toggle agenda_toggle {
+          Adw.Toggle {
             name: "agenda";
-            label: "Agenda";
+            icon-name: "view-list-symbolic";
             tooltip: "Agenda";
           }
         }
@@ -195,17 +194,20 @@ Adw.NavigationSplitView split {
         Adw.ToggleGroup mode_narrow {
           Adw.Toggle {
             name: "month";
-            label: "Month";
+            icon-name: "view-grid-symbolic";
+            tooltip: "Month";
           }
 
           Adw.Toggle {
             name: "week";
-            label: "Week";
+            icon-name: "view-column-symbolic";
+            tooltip: "Week";
           }
 
           Adw.Toggle {
             name: "agenda";
-            label: "Agenda";
+            icon-name: "view-list-symbolic";
+            tooltip: "Agenda";
           }
         }
       }

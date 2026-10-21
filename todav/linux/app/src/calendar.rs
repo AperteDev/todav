@@ -151,8 +151,8 @@ pub fn build(views: &adw::ViewStack) {
     let b = view!("calendar");
     let split: adw::NavigationSplitView = get(&b, "split");
     // Its own breakpoints, the narrowest last (the last matching one wins): tight, the view
-    // switcher shows icons; narrower, it moves to a bar at the bottom and the sync button
-    // goes (F5 still syncs); narrow, one pane at a time, with the Tasks page.
+    // switcher moves to a bar at the bottom and the sync button goes (F5 still syncs); narrow,
+    // one pane at a time, with the Tasks page.
     let bin = adw::BreakpointBin::builder()
         .width_request(360)
         .height_request(294)
@@ -163,16 +163,6 @@ pub fn build(views: &adw::ViewStack) {
         bin.add_breakpoint(bp.clone());
         bp
     };
-    let tight = breakpoint("max-width: 1000sp");
-    for (toggle, icon) in [
-        ("month_toggle", "view-grid-symbolic"),
-        ("week_toggle", "view-dual-symbolic"),
-        ("agenda_toggle", "view-list-symbolic"),
-    ] {
-        let t: adw::Toggle = get(&b, toggle);
-        tight.add_setter(&t, "label", Some(&None::<String>.to_value()));
-        tight.add_setter(&t, "icon-name", Some(&icon.to_value()));
-    }
     let (mode, bar, sync): (adw::ToggleGroup, gtk::ActionBar, gtk::Button) =
         (get(&b, "mode"), get(&b, "mode_bar"), get(&b, "sync"));
     let to_bar = |bp: &adw::Breakpoint| {

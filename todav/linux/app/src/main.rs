@@ -388,6 +388,7 @@ fn request_autostart(conn: &gio::DBusConnection) {
 }
 
 fn main() -> glib::ExitCode {
+    gio::resources_register_include!("icons.gresource").expect("register icons");
     let data = glib::user_data_dir().join("todav");
     let client = Client::open(data.to_string_lossy().into()).expect("open local database");
     client.subscribe(Box::new(Listener));

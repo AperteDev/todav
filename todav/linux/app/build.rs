@@ -1,4 +1,5 @@
-//! Compiles the Blueprint views in `ui/` to GtkBuilder XML in OUT_DIR.
+//! Compiles the Blueprint views in `ui/` to GtkBuilder XML, and the icons in `icons/` to a
+//! resource bundle, in OUT_DIR.
 
 use std::process::Command;
 
@@ -17,4 +18,15 @@ fn main() {
         .expect("blueprint-compiler not found; install it to build the Linux app")
         .success();
     assert!(ok, "blueprint-compiler failed");
+
+    // Fallback icons, embedded in the binary.
+    println!("cargo::rerun-if-changed=icons");
+    let ok = Command::new("glib-compile-resources")
+        .args(["--sourcedir", "icons", "--target"])
+        .arg(format!("{out}/icons.gresource"))
+        .arg("icons/icons.gresource.xml")
+        .status()
+        .expect("glib-compile-resources not found")
+        .success();
+    assert!(ok, "glib-compile-resources failed");
 }
