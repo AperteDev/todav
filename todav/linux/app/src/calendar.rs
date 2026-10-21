@@ -93,8 +93,10 @@ struct Cal {
     split: adw::NavigationSplitView,
     mini: gtk::Calendar,
     calendars: gtk::ListBox,
-    task_heading: gtk::Label,
+    all_calendars: gtk::CheckButton,
+    task_heading: gtk::Box,
     task_lists: gtk::ListBox,
+    all_task_lists: gtk::CheckButton,
     title: adw::WindowTitle,
     spinner: adw::Spinner,
     mode: adw::ToggleGroup,
@@ -127,6 +129,8 @@ struct Cal {
     colors: gtk::CssProvider,
     /// Index of each collection's colour class (`cal-<i>`), by href.
     lists: RefCell<Vec<List>>,
+    /// The hidden ones the sidebar rows show.
+    hidden: RefCell<HashSet<String>>,
 }
 
 thread_local! {
@@ -193,8 +197,10 @@ pub fn build(views: &adw::ViewStack) {
         split,
         mini: get(&b, "mini"),
         calendars: get(&b, "calendars"),
+        all_calendars: get(&b, "all_calendars"),
         task_heading: get(&b, "task_heading"),
         task_lists: get(&b, "task_lists"),
+        all_task_lists: get(&b, "all_task_lists"),
         title: get(&b, "title"),
         spinner: get(&b, "spinner"),
         mode: get(&b, "mode"),
@@ -219,11 +225,33 @@ pub fn build(views: &adw::ViewStack) {
         busy: Cell::new(false),
         colors,
         lists: RefCell::new(Vec::new()),
+        hidden: RefCell::new(HashSet::new()),
     });
     CAL.with(|cell| *cell.borrow_mut() = Some(c.clone()));
 
     week::setup(&c);
     plan_drop(&c);
+    // Clicking a calendar's row shows or hides it, as its check does; the heading's check
+    // shows all of the section, or hides them when all are shown.
+    for (list, all, events) in [
+        (&c.calendars, &c.all_calendars, true),
+        (&c.task_lists, &c.all_task_lists, false),
+    ] {
+        list.connect_row_activated(|_, row| {
+            let check = row.child().and_then(|b| b.last_child());
+            if let Some(check) = check.and_downcast::<gtk::CheckButton>() {
+                check.set_active(!check.is_active());
+            }
+        });
+        all.connect_toggled(move |all| {
+            let Some(c) = cal() else { return };
+            let (shown, hrefs) = section(&c, events);
+            if all.is_active() != (shown == hrefs.len()) {
+                set_hidden(hrefs.iter().map(String::as_str), !all.is_active());
+                glib::idle_add_local_once(refresh);
+            }
+        });
+    }
     // Narrow: the Month / Week / Agenda choice moves from the header to a bar at the bottom.
     let narrow: adw::ToggleGroup = get(&b, "mode_narrow");
     c.mode
@@ -398,6 +426,7 @@ pub fn refresh() {
         return;
     }
     refresh_calendars(&c);
+    sync_all(&c);
     let anchor = c.anchor.get();
     // Keep the mini month on the selected day.
     c.busy.set(true);
@@ -719,12 +748,14 @@ fn hidden() -> HashSet<String> {
         .collect()
 }
 
-fn set_hidden(href: &str, hide: bool) {
+fn set_hidden<'a>(hrefs: impl IntoIterator<Item = &'a str>, hide: bool) {
     let mut h = hidden();
-    if hide {
-        h.insert(href.to_string());
-    } else {
-        h.remove(href);
+    for href in hrefs {
+        if hide {
+            h.insert(href.to_string());
+        } else {
+            h.remove(href);
+        }
     }
     let mut v: Vec<String> = h.into_iter().collect();
     v.sort();
@@ -751,7 +782,8 @@ fn refresh_calendars(c: &Rc<Cal>) {
         }
     }
     all.sort_by_key(|l| (!l.holds_events, l.display_name.to_lowercase()));
-    if *c.lists.borrow() == all {
+    let hidden = hidden();
+    if *c.lists.borrow() == all && *c.hidden.borrow() == hidden {
         return;
     }
     let css: String = all
@@ -769,7 +801,6 @@ fn refresh_calendars(c: &Rc<Cal>) {
     c.colors.load_from_string(&css);
     c.calendars.remove_all();
     c.task_lists.remove_all();
-    let hidden = hidden();
     for (i, l) in all.iter().enumerate() {
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
         let dot = gtk::Box::builder().valign(gtk::Align::Center).build();
@@ -789,7 +820,7 @@ fn refresh_calendars(c: &Rc<Cal>) {
             .build();
         let href = l.href.clone();
         shown.connect_toggled(move |s| {
-            set_hidden(&href, !s.is_active());
+            set_hidden([href.as_str()], !s.is_active());
             glib::idle_add_local_once(refresh);
         });
         row.append(&shown);
@@ -803,6 +834,30 @@ fn refresh_calendars(c: &Rc<Cal>) {
     c.task_heading.set_visible(lists_only);
     c.task_lists.set_visible(lists_only);
     *c.lists.borrow_mut() = all;
+    *c.hidden.borrow_mut() = hidden;
+}
+
+/// How many of the calendars (`events`) or task lists are shown, and all their hrefs.
+fn section(c: &Cal, events: bool) -> (usize, Vec<String>) {
+    let hidden = hidden();
+    let hrefs: Vec<String> = c
+        .lists
+        .borrow()
+        .iter()
+        .filter(|l| l.holds_events == events)
+        .map(|l| l.href.clone())
+        .collect();
+    (hrefs.iter().filter(|h| !hidden.contains(*h)).count(), hrefs)
+}
+
+/// The headings' checks: on when all are shown, mixed when some are.
+fn sync_all(c: &Cal) {
+    for (all, events) in [(&c.all_calendars, true), (&c.all_task_lists, false)] {
+        let (shown, hrefs) = section(c, events);
+        // Inconsistent first: the toggled handler then sees nothing to change.
+        all.set_inconsistent(shown > 0 && shown < hrefs.len());
+        all.set_active(shown == hrefs.len());
+    }
 }
 
 fn class(c: &Cal, list: &str) -> String {

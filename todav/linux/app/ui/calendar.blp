@@ -48,12 +48,22 @@ Adw.NavigationSplitView split {
             styles ["card"]
           }
 
-          Gtk.Label {
-            label: "Calendars";
-            xalign: 0;
+          // The heading's box shows or hides all of them.
+          Gtk.Box {
             margin-start: 18;
+            margin-end: 14;
             margin-top: 12;
-            styles ["heading"]
+
+            Gtk.Label {
+              label: "Calendars";
+              xalign: 0;
+              hexpand: true;
+              styles ["heading"]
+            }
+
+            Gtk.CheckButton all_calendars {
+              tooltip-text: "Show All";
+            }
           }
 
           // A row per calendar: colour, name, shown or not.
@@ -62,12 +72,21 @@ Adw.NavigationSplitView split {
             styles ["navigation-sidebar"]
           }
 
-          Gtk.Label task_heading {
-            label: "Task lists";
-            xalign: 0;
+          Gtk.Box task_heading {
             margin-start: 18;
+            margin-end: 14;
             margin-top: 12;
-            styles ["heading"]
+
+            Gtk.Label {
+              label: "Task lists";
+              xalign: 0;
+              hexpand: true;
+              styles ["heading"]
+            }
+
+            Gtk.CheckButton all_task_lists {
+              tooltip-text: "Show All";
+            }
           }
 
           // The same for lists holding only tasks (their dated tasks are on the calendar).
