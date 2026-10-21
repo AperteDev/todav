@@ -13,6 +13,8 @@ pub const DEVICE_ONLY: &[&str] = &[
     "sync_settings",
     "sync_ntfy",
     "drag_handles",
+    // Light, dark or the system's: each device follows its own desktop.
+    "color_scheme",
     "goa_account",
     "manual_url",
     "manual_user",

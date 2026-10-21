@@ -45,6 +45,16 @@ pub fn done_view() -> todav_core::DoneView {
     }
 }
 
+/// Light or dark as the device-only `color_scheme` says: "light", "dark", else the system's.
+pub fn apply_color_scheme() {
+    let scheme = match core().setting("color_scheme".into()).as_deref() {
+        Some("light") => adw::ColorScheme::ForceLight,
+        Some("dark") => adw::ColorScheme::ForceDark,
+        _ => adw::ColorScheme::Default,
+    };
+    adw::StyleManager::default().set_color_scheme(scheme);
+}
+
 /// Bind a ComboRow to the setting `key`, one stored value per row entry (the first is the
 /// default); changes apply at once.
 fn connect_choice(b: &gtk::Builder, key: &'static str, values: &'static [&'static str]) {
@@ -168,6 +178,18 @@ pub fn present(parent: &impl IsA<gtk::Widget>) {
             request_sync(); // turning it on pulls the server's settings right away
         });
     }
+    let style: adw::ToggleGroup = get(&b, "color_scheme");
+    let current = core().setting("color_scheme".into());
+    style.set_active_name(Some(match current.as_deref() {
+        Some("light") => "light",
+        Some("dark") => "dark",
+        _ => "system",
+    }));
+    style.connect_active_name_notify(|g| {
+        let name = g.active_name().map(|n| n.to_string()).unwrap_or_default();
+        let _ = core().set_setting("color_scheme".into(), name);
+        apply_color_scheme();
+    });
     connect_choice(&b, "start_view", &["last", "tasks", "calendar"]);
     connect_choice(
         &b,

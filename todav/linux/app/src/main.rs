@@ -413,6 +413,7 @@ fn main() -> glib::ExitCode {
             }
         }
         window::setup_actions(app);
+        settings::apply_color_scheme();
         if restore_account() {
             start_background();
         }

@@ -9,6 +9,35 @@ Adw.PreferencesDialog dialog {
     icon-name: "preferences-system-symbolic";
 
     Adw.PreferencesGroup {
+      title: "Appearance";
+
+      // Kept on this device only.
+      Adw.ActionRow {
+        title: "Style";
+
+        [suffix]
+        Adw.ToggleGroup color_scheme {
+          valign: center;
+
+          Adw.Toggle {
+            name: "system";
+            label: "System";
+          }
+
+          Adw.Toggle {
+            name: "light";
+            label: "Light";
+          }
+
+          Adw.Toggle {
+            name: "dark";
+            label: "Dark";
+          }
+        }
+      }
+    }
+
+    Adw.PreferencesGroup {
       title: "Startup";
 
       Adw.ComboRow start_view {
