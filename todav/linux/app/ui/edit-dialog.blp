@@ -107,10 +107,9 @@ Adw.Dialog dialog {
           spacing: 18;
           valign: start;
 
-          // The one rule the format has: a task is not due before it starts. Above the dates,
-          // so it shows while either is changed.
+          // What the format asks of both dates, when they break it (text set in code). Above the
+          // dates, so it shows while either is changed.
           Gtk.Label conflict {
-            label: "The task starts after it is due";
             xalign: 0;
             wrap: true;
             visible: false;

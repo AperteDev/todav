@@ -1991,16 +1991,23 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
     });
 
     let save: gtk::Button = get(&b, "save");
-    // The one rule iCalendar has here: not due before it starts (a due date lasts all day).
+    // What iCalendar (and the server, which refuses otherwise) asks of both dates: the same kind,
+    // and not due before the start.
     let conflict: gtk::Label = get(&b, "conflict");
     let check: Rc<dyn Fn()> = {
         let (start, due, save) = (start.clone(), due.clone(), save.clone());
         Rc::new(move || {
-            let end = |d: Due| d.at + if d.all_day { 86400 } else { 0 };
-            let bad = matches!((start(), due()), (Some(s), Some(d)) if end(d) < s.at);
-            save.set_sensitive(!bad);
-            save.set_tooltip_text(bad.then_some("The task starts after it is due"));
-            conflict.set_visible(bad);
+            let problem = match (start(), due()) {
+                (Some(s), Some(d)) if s.all_day != d.all_day => {
+                    Some("Start and due date need a time on both or on neither")
+                }
+                (Some(s), Some(d)) if d.at < s.at => Some("The task starts after it is due"),
+                _ => None,
+            };
+            save.set_sensitive(problem.is_none());
+            save.set_tooltip_text(problem);
+            conflict.set_label(problem.unwrap_or_default());
+            conflict.set_visible(problem.is_some());
         })
     };
     check();
