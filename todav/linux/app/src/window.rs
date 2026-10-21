@@ -2048,7 +2048,7 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
     let save: gtk::Button = get(&b, "save");
     // What iCalendar (and the server, which refuses otherwise) asks of both dates: the same kind,
     // and not due before the start.
-    let conflict: adw::ActionRow = get(&b, "conflict");
+    let conflict: adw::Banner = get(&b, "conflict");
     let check: Rc<dyn Fn()> = {
         let (start, due, save) = (start.clone(), due.clone(), save.clone());
         Rc::new(move || {
@@ -2061,8 +2061,10 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
             };
             save.set_sensitive(problem.is_none());
             save.set_tooltip_text(problem);
-            conflict.set_title(problem.unwrap_or_default());
-            conflict.set_visible(problem.is_some());
+            if let Some(p) = problem {
+                conflict.set_title(p);
+            }
+            conflict.set_revealed(problem.is_some());
         })
     };
     check();

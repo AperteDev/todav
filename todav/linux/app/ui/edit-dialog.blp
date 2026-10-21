@@ -30,6 +30,13 @@ Adw.Dialog dialog {
       }
     }
 
+    // What the format asks of both dates, when they break it (text set in code): what to
+    // change before saving.
+    [top]
+    Adw.Banner conflict {
+      use-markup: false;
+    }
+
     content: Gtk.ScrolledWindow {
       hscrollbar-policy: never;
       propagate-natural-height: true;
@@ -126,18 +133,6 @@ Adw.Dialog dialog {
 
           // Start and due are both optional and independent: planned for a time, due by one.
           Adw.PreferencesGroup {
-            // What the format asks of both dates, when they break it (text set in code). First,
-            // so it shows while either is changed.
-            Adw.ActionRow conflict {
-              visible: false;
-
-              [prefix]
-              Gtk.Image {
-                icon-name: "dialog-warning-symbolic";
-                styles ["warning"]
-              }
-            }
-
             Adw.ExpanderRow start {
               title: "Start";
               show-enable-switch: true;
