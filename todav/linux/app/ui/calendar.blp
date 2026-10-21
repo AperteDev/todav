@@ -2,7 +2,11 @@ using Gtk 4.0;
 using Adw 1;
 
 // The Calendar page: a mini month and the calendars beside the Month / Week / Agenda views.
+// Its breakpoints are set in code.
 Adw.NavigationSplitView split {
+  min-sidebar-width: 300;
+  max-sidebar-width: 340;
+
   // Ctrl+N while the page has the focus (the Tasks page adds tasks from its entry).
   Gtk.ShortcutController {
     scope: managed;

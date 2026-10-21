@@ -85,7 +85,11 @@ Adw.ApplicationWindow window {
             title: "Tasks";
             icon-name: "checkbox-checked-symbolic";
 
+            // The same sidebar width as the Calendar page, so switching does not move it.
             child: Adw.NavigationSplitView split {
+              min-sidebar-width: 300;
+              max-sidebar-width: 340;
+
               sidebar: Adw.NavigationPage {
                 title: "Todav";
 
