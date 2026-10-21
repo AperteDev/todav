@@ -269,9 +269,15 @@ pub fn build(views: &adw::ViewStack) {
             sync.set_visible(!collapsed); // F5 still syncs
         }
     };
+    // Shrinking keeps the views, as the Tasks page keeps its list; the sidebar is a Back away.
+    c.split.set_show_content(true);
     place(c.split.is_collapsed());
-    c.split
-        .connect_collapsed_notify(move |s| place(s.is_collapsed()));
+    c.split.connect_collapsed_notify(move |s| {
+        if s.is_collapsed() {
+            s.set_show_content(true);
+        }
+        place(s.is_collapsed());
+    });
     let mode = at_start("start_calendar_view", "calendar_mode");
     c.mode.set_active_name(Some(match mode.as_str() {
         "week" | "agenda" => mode.as_str(),
