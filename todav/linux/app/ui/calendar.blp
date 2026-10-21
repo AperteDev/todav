@@ -229,10 +229,16 @@ Adw.NavigationSplitView split {
               styles ["weekdays"]
             }
 
-            Gtk.Grid month {
-              row-homogeneous: true;
-              column-homogeneous: true;
+            // Scrolls when the window is too short for six rows.
+            Gtk.ScrolledWindow {
               vexpand: true;
+              hscrollbar-policy: never;
+
+              Gtk.Grid month {
+                row-homogeneous: true;
+                column-homogeneous: true;
+                vexpand: true;
+              }
             }
           };
         }
