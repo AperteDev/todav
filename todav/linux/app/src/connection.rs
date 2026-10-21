@@ -1,4 +1,4 @@
-//! The account choice shared by the welcome page and Preferences → Connection: a GNOME Online
+//! The account choice shared by the welcome page and Preferences → General: a GNOME Online
 //! Accounts account (the default when there is one) or a server to sign in to with the browser.
 
 use crate::goa;

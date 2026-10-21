@@ -5,8 +5,86 @@ Adw.PreferencesDialog dialog {
   search-enabled: false;
 
   Adw.PreferencesPage {
-    title: "Appearance";
-    icon-name: "preferences-desktop-appearance-symbolic";
+    title: "General";
+    icon-name: "preferences-system-symbolic";
+
+    // The status row, then the shared connection rows (ui/connection.blp).
+    Adw.PreferencesGroup account {
+      title: "Account";
+
+      // How Todav is connected now. Signed in here: "Sign Out", with signing in again in its
+      // menu. Not connected: "Sign In with Browser". A GOA account is managed in GNOME Settings.
+      Adw.ActionRow status {
+        [prefix]
+        Gtk.Image status_icon {
+          icon-name: "object-select-symbolic";
+          styles ["success"]
+        }
+
+        [suffix]
+        Gtk.Button cancel_sign_in {
+          label: "Cancel";
+          valign: center;
+          visible: false;
+          styles ["flat"]
+        }
+
+        [suffix]
+        Adw.SplitButton sign_out {
+          label: "Sign Out";
+          menu-model: sign_out_menu;
+          dropdown-tooltip: "Sign In Again";
+          valign: center;
+          styles ["destructive-action"]
+        }
+
+        [suffix]
+        Adw.SplitButton sign_in {
+          label: "Sign In with Browser";
+          menu-model: sign_in_menu;
+          dropdown-tooltip: "More Sign-In Options";
+          valign: center;
+        }
+      }
+    }
+
+    Adw.PreferencesGroup {
+      title: "Push";
+      description: "Changes are applied when this window closes";
+
+      Adw.EntryRow ntfy {
+        title: "ntfy server for push (optional)";
+
+        [prefix]
+        Gtk.DropDown ntfy_scheme {
+          valign: center;
+          model: Gtk.StringList { strings ["https", "http"] };
+          styles ["flat"]
+        }
+
+        [suffix]
+        Gtk.Button ntfy_test {
+          label: "Test";
+          valign: center;
+          styles ["flat"]
+        }
+      }
+    }
+
+    Adw.PreferencesGroup {
+      title: "Sync";
+
+      Adw.SwitchRow sync_settings {
+        title: "Sync settings with server";
+        subtitle: "Server addresses always stay on this device";
+        active: true;
+      }
+    }
+  }
+
+  Adw.PreferencesPage {
+    title: "Tasks";
+    icon-name: "checkbox-checked-symbolic";
 
     Adw.PreferencesGroup {
       title: "Tasks";
@@ -105,84 +183,6 @@ Adw.PreferencesDialog dialog {
       Adw.SwitchRow drag_handles {
         title: "Drag handles";
         subtitle: "Move tasks by a handle instead of the whole row, for touchscreens";
-      }
-    }
-  }
-
-  Adw.PreferencesPage {
-    title: "Connection";
-    icon-name: "network-server-symbolic";
-
-    // The status row, then the shared connection rows (ui/connection.blp).
-    Adw.PreferencesGroup account {
-      title: "Account";
-
-      // How Todav is connected now. Signed in here: "Sign Out", with signing in again in its
-      // menu. Not connected: "Sign In with Browser". A GOA account is managed in GNOME Settings.
-      Adw.ActionRow status {
-        [prefix]
-        Gtk.Image status_icon {
-          icon-name: "object-select-symbolic";
-          styles ["success"]
-        }
-
-        [suffix]
-        Gtk.Button cancel_sign_in {
-          label: "Cancel";
-          valign: center;
-          visible: false;
-          styles ["flat"]
-        }
-
-        [suffix]
-        Adw.SplitButton sign_out {
-          label: "Sign Out";
-          menu-model: sign_out_menu;
-          dropdown-tooltip: "Sign In Again";
-          valign: center;
-          styles ["destructive-action"]
-        }
-
-        [suffix]
-        Adw.SplitButton sign_in {
-          label: "Sign In with Browser";
-          menu-model: sign_in_menu;
-          dropdown-tooltip: "More Sign-In Options";
-          valign: center;
-        }
-      }
-    }
-
-    Adw.PreferencesGroup {
-      title: "Push";
-      description: "Changes are applied when this window closes";
-
-      Adw.EntryRow ntfy {
-        title: "ntfy server for push (optional)";
-
-        [prefix]
-        Gtk.DropDown ntfy_scheme {
-          valign: center;
-          model: Gtk.StringList { strings ["https", "http"] };
-          styles ["flat"]
-        }
-
-        [suffix]
-        Gtk.Button ntfy_test {
-          label: "Test";
-          valign: center;
-          styles ["flat"]
-        }
-      }
-    }
-
-    Adw.PreferencesGroup {
-      title: "Sync";
-
-      Adw.SwitchRow sync_settings {
-        title: "Sync settings with server";
-        subtitle: "Server addresses always stay on this device";
-        active: true;
       }
     }
   }

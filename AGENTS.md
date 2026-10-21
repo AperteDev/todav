@@ -8,7 +8,7 @@
 - Store settings with `Client::set_setting` / `Client::setting`. `set_setting` records the change
   time; when syncing, the newer value wins implicitly per key (the server wins ties).
 - Synced settings live in Nextcloud Files at `.config/todav/settings.json`, merged on every sync.
-- The user can turn syncing off with "Sync settings with server" (Preferences → Connection),
+- The user can turn syncing off with "Sync settings with server" (Preferences → General),
   stored as the device-only `sync_settings` setting; on by default.
 
 ## Linux UI

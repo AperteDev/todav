@@ -1,5 +1,5 @@
-//! Preferences dialog: appearance (task order, applied at once) and server addresses with
-//! connection tests (applied on close).
+//! Preferences dialog: General (account, server addresses with connection tests, applied on
+//! close; sync) and Tasks (order and display, applied at once).
 
 use crate::connection::Connection;
 use crate::window::{get, toast, url_text, view};
