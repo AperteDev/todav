@@ -160,6 +160,7 @@ pub fn on_event(ev: &Event) {
                     Some(&args),
                 )
             }
+            Event::Refused(_) => return, // the window tells the user
         };
     });
 }

@@ -265,7 +265,40 @@ pub fn on_event(ev: &Event) {
                 }
             }
         }
+        // Each refused item by name; a task opens to be fixed (its dialog says why).
+        Event::Refused(items) => {
+            for r in items {
+                let t = note(&if r.deleted {
+                    format!("“{}” could not be deleted on the server", r.summary)
+                } else if r.task {
+                    format!("“{}” was not saved on the server", r.summary)
+                } else {
+                    let why = server_reason(&r.error);
+                    format!("“{}” was not saved on the server: {why}", r.summary)
+                });
+                t.set_priority(adw::ToastPriority::High);
+                if r.task && !r.deleted {
+                    t.set_button_label(Some("Edit"));
+                    let uid = r.uid.clone();
+                    t.connect_button_clicked(move |_| {
+                        if let Some(task) = core().task(uid.clone()) {
+                            edit_task(&task);
+                        }
+                    });
+                }
+                ui.toasts.add_toast(t);
+                on_event(&Event::Changed(r.list_href.clone()));
+            }
+        }
     }
+}
+
+/// What the server said is wrong, without the "HTTP 415: " before it.
+pub fn server_reason(error: &str) -> &str {
+    error
+        .split_once(": ")
+        .filter(|(code, _)| code.starts_with("HTTP "))
+        .map_or(error, |(_, why)| why)
 }
 
 /// Loads a view compiled from `ui/<name>.blp` by build.rs.
@@ -1263,6 +1296,18 @@ fn count_tag(ui: &Ui, t: &Task) -> Option<gtk::Label> {
     Some(l)
 }
 
+/// A warning on a task the server refused, saying why; it stays until a version goes up.
+pub fn sync_warning(t: &Task) -> Option<gtk::Image> {
+    let error = t.sync_error.as_deref()?;
+    let w = gtk::Image::builder()
+        .icon_name("dialog-warning-symbolic")
+        .tooltip_text(format!("Not saved on the server: {}", server_reason(error)))
+        .valign(gtk::Align::Center)
+        .build();
+    w.add_css_class("warning");
+    Some(w)
+}
+
 /// `indent` levels of left margin on the whole row, for subtasks; `slot` makes it draggable.
 fn task_row(ui: &Rc<Ui>, t: &Task, indent: usize, slot: Option<Slot>) -> adw::ActionRow {
     let row = adw::ActionRow::builder()
@@ -1283,6 +1328,9 @@ fn task_row(ui: &Rc<Ui>, t: &Task, indent: usize, slot: Option<Slot>) -> adw::Ac
     }
     if let Some(d) = subtitle(t) {
         row.set_subtitle(d);
+    }
+    if let Some(w) = sync_warning(t) {
+        row.add_suffix(&w);
     }
     if let Some(n) = count_tag(ui, t) {
         row.add_suffix(&n);
@@ -1375,6 +1423,9 @@ fn tree_row(
     }
     if let Some(n) = count_tag(ui, root) {
         row.add_suffix(&n);
+    }
+    if let Some(w) = sync_warning(root) {
+        row.add_suffix(&w);
     }
     let (weak, uid) = (Rc::downgrade(ui), root.uid.clone());
     let empty = subs.is_empty();
@@ -1966,6 +2017,11 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
             c.set_selected(list.n_items() - 2);
         }
     });
+    if let Some(e) = &t.sync_error {
+        let refused: adw::Banner = get(&b, "refused");
+        refused.set_title(&format!("Not saved on the server: {}", server_reason(e)));
+        refused.set_revealed(true);
+    }
     let (due_at, due) = due_dialog(&b, t);
     let old_start = t.start.map(|at| Due {
         at,
@@ -2260,6 +2316,7 @@ pub(crate) mod tests {
             start: None,
             start_all_day: false,
             event_uid: None,
+            sync_error: None,
         }
     }
 

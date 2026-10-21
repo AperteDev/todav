@@ -1185,6 +1185,10 @@ fn task_chip(c: &Cal, t: &Task, label: &gtk::Label, check_align: gtk::Align) -> 
     });
     let content = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     content.append(&check);
+    if let Some(w) = crate::window::sync_warning(t) {
+        w.set_margin_end(4);
+        content.append(&w);
+    }
     content.append(label);
     let b = gtk::Button::builder()
         .child(&content)

@@ -50,6 +50,8 @@ pub fn sync_state() -> String {
 pub enum Event {
     Changed(String),
     SyncState(String),
+    /// Items the server refused in a sync that otherwise went through.
+    Refused(Vec<todav_core::Refused>),
 }
 
 fn post(ev: Event) {
@@ -62,7 +64,10 @@ fn post(ev: Event) {
     });
 }
 
-fn set_state(r: &Result<impl std::fmt::Debug, todav_core::Error>) {
+fn set_state(r: &Result<todav_core::SyncReport, todav_core::Error>) {
+    if let Some(report) = r.as_ref().ok().filter(|r| !r.refused.is_empty()) {
+        post(Event::Refused(report.refused.clone()));
+    }
     post(Event::SyncState(match r {
         Ok(_) => "idle".into(),
         Err(e) => format!("error:{e}"),

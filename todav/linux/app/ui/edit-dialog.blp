@@ -30,6 +30,12 @@ Adw.Dialog dialog {
       }
     }
 
+    // Why the server refused the task as it is (set in code); plain text, as the server wrote it.
+    [top]
+    Adw.Banner refused {
+      use-markup: false;
+    }
+
     content: Gtk.ScrolledWindow {
       hscrollbar-policy: never;
       propagate-natural-height: true;
