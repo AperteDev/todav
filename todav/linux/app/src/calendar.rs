@@ -35,7 +35,11 @@ const CSS: &str = "
 .day.selected { background: alpha(@accent_bg_color, 0.08); }
 .chip { padding: 0 6px; min-height: 22px; border-radius: 6px; font-size: smaller; }
 .chip button, .more button { font-weight: normal; }
-menubutton.chip > button, menubutton.more > button, .chip.task button { min-height: 0; min-width: 0; padding: 0; }
+menubutton.chip > button, menubutton.more > button { min-height: 0; min-width: 0; padding: 0; }
+/* A task is a button itself: its colour is its background, so hover and press tint over it. */
+button.chip.task { min-width: 0; font-weight: normal; }
+button.chip.task:hover { background-image: linear-gradient(alpha(currentColor, 0.07), alpha(currentColor, 0.07)); }
+button.chip.task:active { background-image: linear-gradient(alpha(currentColor, 0.16), alpha(currentColor, 0.16)); }
 /* An event's button fills it, so its hover does too. */
 menubutton.chip, menubutton.more { padding: 0; }
 menubutton.chip > button, menubutton.more > button { padding: 0 6px; border-radius: 6px; }
@@ -51,7 +55,6 @@ menubutton.block > button { padding: 2px 6px; }
 .chip.from-before, menubutton.chip.from-before > button { border-top-left-radius: 0; border-bottom-left-radius: 0; }
 .chip.goes-on, menubutton.chip.goes-on > button { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .chip.task check { min-width: 14px; min-height: 14px; margin: 0 4px 0 0; padding: 0; }
-.chip.task button { padding: 0; min-height: 0; }
 .chip.done label { text-decoration-line: line-through; opacity: 0.55; }
 .chip.cancelled label { text-decoration-line: line-through; }
 .more { padding: 0 6px; min-height: 20px; font-size: smaller; }
@@ -1131,24 +1134,6 @@ fn chip(c: &Rc<Cal>, i: &Item) -> gtk::Widget {
             b.upcast()
         }
         Item::Task(t) => {
-            let row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-            row.add_css_class("chip");
-            row.add_css_class("task");
-            row.add_css_class(&class(c, &t.list_href));
-            if t.done {
-                row.add_css_class("done");
-            }
-            let check = gtk::CheckButton::builder()
-                .active(t.done)
-                .valign(gtk::Align::Center)
-                .build();
-            let uid = t.uid.clone();
-            check.connect_toggled(move |b| {
-                if core().set_done(uid.clone(), b.is_active()).is_ok() {
-                    request_sync();
-                }
-            });
-            row.append(&check);
             let (at, all_day) = when(t);
             let text = if all_day {
                 t.summary.clone()
@@ -1160,18 +1145,49 @@ fn chip(c: &Rc<Cal>, i: &Item) -> gtk::Widget {
                 .xalign(0.0)
                 .ellipsize(gtk::pango::EllipsizeMode::End)
                 .build();
-            let open = gtk::Button::builder()
-                .child(&label)
-                .has_frame(false)
-                .hexpand(true)
-                .build();
-            let task = t.clone();
-            open.connect_clicked(move |_| crate::window::edit_task(&task));
-            row.append(&open);
-            drag_task(&row, t);
-            row.upcast()
+            task_chip(c, t, &label, gtk::Align::Center).upcast()
         }
     }
+}
+
+/// A task on the calendar: one button, opening it, that holds its check (`check_align`ed,
+/// ticking it) and `label`.
+fn task_chip(c: &Cal, t: &Task, label: &gtk::Label, check_align: gtk::Align) -> gtk::Button {
+    let check = gtk::CheckButton::builder()
+        .active(t.done)
+        .valign(check_align)
+        .build();
+    let uid = t.uid.clone();
+    check.connect_toggled(move |b| {
+        if core().set_done(uid.clone(), b.is_active()).is_ok() {
+            request_sync();
+        }
+    });
+    let content = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    content.append(&check);
+    content.append(label);
+    let b = gtk::Button::builder()
+        .child(&content)
+        .has_frame(false)
+        .build();
+    for cls in ["chip", "task", &class(c, &t.list_href)] {
+        b.add_css_class(cls);
+    }
+    if t.done {
+        b.add_css_class("done");
+    }
+    let task = t.clone();
+    b.connect_clicked(move |_| crate::window::edit_task(&task));
+    // A button takes clicks in the capture phase, before its children; in the bubble phase the
+    // check, being deeper, gets its own clicks first.
+    let controllers = b.observe_controllers();
+    for g in controllers.iter::<glib::Object>().flatten() {
+        if let Ok(g) = g.downcast::<gtk::GestureClick>() {
+            g.set_propagation_phase(gtk::PropagationPhase::Bubble);
+        }
+    }
+    drag_task(&b, t);
+    b
 }
 
 /// When an event is, in words: "Tuesday 20 October, 09:00 – 10:00", or its days.

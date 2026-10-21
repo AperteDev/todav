@@ -404,34 +404,9 @@ fn block(c: &Rc<Cal>, i: &Item, geo: Geo) -> gtk::Widget {
             b.upcast()
         }
         Item::Task(t) => {
-            let row = gtk::Box::new(gtk::Orientation::Horizontal, 4);
-            for cls in ["block", "chip", "task", &class(c, &t.list_href)] {
-                row.add_css_class(cls);
-            }
-            if t.done {
-                row.add_css_class("done");
-            }
-            let check = gtk::CheckButton::builder()
-                .active(t.done)
-                .valign(gtk::Align::Start)
-                .build();
-            let uid = t.uid.clone();
-            check.connect_toggled(move |b| {
-                if core().set_done(uid.clone(), b.is_active()).is_ok() {
-                    request_sync();
-                }
-            });
-            row.append(&check);
-            let open = gtk::Button::builder()
-                .child(&label(text(&t.summary, when(t).0)))
-                .has_frame(false)
-                .hexpand(true)
-                .build();
-            let task = t.clone();
-            open.connect_clicked(move |_| crate::window::edit_task(&task));
-            row.append(&open);
-            drag_task(&row, t);
-            row.upcast()
+            let b = task_chip(c, t, &label(text(&t.summary, when(t).0)), gtk::Align::Start);
+            b.add_css_class("block");
+            b.upcast()
         }
     }
 }
