@@ -37,7 +37,7 @@ rm -f "$XDG_RUNTIME_DIR/$display" "$XDG_RUNTIME_DIR/$display.lock"
 MUTTER_DEBUG_DUMMY_MODE_SPECS=${MUTTER_DEBUG_DUMMY_MODE_SPECS:-1600x900} \
 SHELL_DEBUG=${SHELL_DEBUG:-all} \
 XDG_DATA_DIRS=$modes:${XDG_DATA_DIRS:-/usr/local/share:/usr/share} \
-  gnome-shell --devkit --wayland --wayland-display=$display --mode=nested &
+  gnome-shell --devkit --unsafe-mode --wayland --wayland-display=$display --mode=nested &
 shell=$!
 
 while [ ! -S "$XDG_RUNTIME_DIR/$display" ]; do
@@ -62,6 +62,24 @@ until gdbus introspect --session --dest io.github.selfref.Todav \
   sleep 0.1
 done
 gnome-extensions enable $uuid || true
+
+# The app's window maximized rather than the overview the shell starts in (Eval needs
+# --unsafe-mode above; only this nested session's own bus can reach it).
+if [ -n "${TODAV_WINDOW:-}" ]; then
+  show='const w = global.get_window_actors().map(a => a.meta_window)
+    .find(w => w.get_wm_class()?.startsWith("io.github.selfref.Todav"));
+  if (w) {
+    Main.overview.hide();
+    try { w.maximize(); } catch { w.maximize(imports.gi.Meta.MaximizeFlags.BOTH); }
+  }
+  !!w'
+  for _ in $(seq 50); do
+    gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell \
+      --method org.gnome.Shell.Eval "$show" 2>/dev/null | grep -q "'true'" && break
+    kill -0 $app_pid 2>/dev/null || break
+    sleep 0.2
+  done
+fi
 
 wait $shell || true
 kill $app_pid 2>/dev/null || true
