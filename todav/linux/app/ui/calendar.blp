@@ -142,19 +142,23 @@ Adw.NavigationSplitView split {
 
         [end]
         Adw.ToggleGroup mode {
-          Adw.Toggle {
+          // Icons only when the header is tight.
+          Adw.Toggle month_toggle {
             name: "month";
             label: "Month";
+            tooltip: "Month";
           }
 
-          Adw.Toggle {
+          Adw.Toggle week_toggle {
             name: "week";
             label: "Week";
+            tooltip: "Week";
           }
 
-          Adw.Toggle {
+          Adw.Toggle agenda_toggle {
             name: "agenda";
             label: "Agenda";
+            tooltip: "Agenda";
           }
         }
       }

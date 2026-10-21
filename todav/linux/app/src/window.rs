@@ -320,7 +320,7 @@ fn build(app: &adw::Application) -> Rc<Ui> {
     });
     ui.conn.attach(&get(&b, "login_group"));
     connect(&ui);
-    crate::calendar::build(&get(&b, "views"), &ui.split);
+    crate::calendar::build(&get(&b, "views"));
     ui
 }
 

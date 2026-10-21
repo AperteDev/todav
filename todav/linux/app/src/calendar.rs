@@ -142,18 +142,36 @@ fn today() -> i64 {
     now - now.rem_euclid(DAY)
 }
 
-/// Add the Calendar page to the window's view stack; it collapses with `tasks` (the Tasks page's
-/// split view).
-pub fn build(views: &adw::ViewStack, tasks: &adw::NavigationSplitView) {
+/// Add the Calendar page to the window's view stack.
+pub fn build(views: &adw::ViewStack) {
     let b = view!("calendar");
     let split: adw::NavigationSplitView = get(&b, "split");
-    let page = views.add_titled(&split, Some("calendar"), "Calendar");
+    // Its own breakpoints: the views need more room than the task list. Tight, the view
+    // switcher shows icons; narrow, one pane at a time (last, so it wins).
+    let bin = adw::BreakpointBin::builder()
+        .width_request(360)
+        .height_request(294)
+        .child(&split)
+        .build();
+    let breakpoint = |condition| {
+        let bp = adw::Breakpoint::new(adw::BreakpointCondition::parse(condition).unwrap());
+        bin.add_breakpoint(bp.clone());
+        bp
+    };
+    let tight = breakpoint("max-width: 1000sp");
+    for (toggle, icon) in [
+        ("month_toggle", "view-grid-symbolic"),
+        ("week_toggle", "view-dual-symbolic"),
+        ("agenda_toggle", "view-list-symbolic"),
+    ] {
+        let t: adw::Toggle = get(&b, toggle);
+        tight.add_setter(&t, "label", Some(&None::<String>.to_value()));
+        tight.add_setter(&t, "icon-name", Some(&icon.to_value()));
+    }
+    breakpoint("max-width: 880sp").add_setter(&split, "collapsed", Some(&true.to_value()));
+    let page = views.add_titled(&bin, Some("calendar"), "Calendar");
     page.set_icon_name(Some("x-office-calendar-symbolic"));
     get::<adw::InlineViewSwitcher>(&b, "switcher").set_stack(Some(views));
-    tasks
-        .bind_property("collapsed", &split, "collapsed")
-        .sync_create()
-        .build();
 
     let display = split.display();
     let css = gtk::CssProvider::new();
