@@ -10,7 +10,7 @@ mod week;
 use crate::window::{get, view};
 use crate::{core, dates, request_sync};
 use adw::prelude::*;
-use gtk::{gdk, glib};
+use gtk::{gdk, gio, glib};
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -302,29 +302,27 @@ pub fn build(views: &adw::ViewStack) {
         *c.query.borrow_mut() = crate::window::folded(e.text().trim());
         refresh();
     });
-    get::<gtk::Button>(&b, "today").connect_clicked(|_| go(|_| today()));
-    get::<gtk::Button>(&b, "prev").connect_clicked(|_| step(-1));
-    get::<gtk::Button>(&b, "next").connect_clicked(|_| step(1));
-    // A new event on the selected day, at the next full hour when that is today, else at 9:00.
-    let actions = gtk::gio::SimpleActionGroup::new();
-    let new_event = gtk::gio::SimpleAction::new("new-event", None);
-    new_event.connect_activate(|_, _| {
-        let Some(c) = cal() else { return };
-        let day = c.anchor.get();
-        let now = core().local_now();
-        let start = if day == today() {
-            (now / 3600 + 1) * 3600
-        } else {
-            day + 9 * 3600
-        };
-        let time = EventTime {
-            start,
-            end: start + 3600,
-            all_day: false,
-        };
-        dialog::open(&c, None, time);
-    });
-    actions.add_action(&new_event);
+    // The header's buttons and the page's shortcuts.
+    let actions = gio::SimpleActionGroup::new();
+    let action = |name: &str, f: fn()| {
+        gio::ActionEntry::builder(name)
+            .activate(move |_: &gio::SimpleActionGroup, _, _| f())
+            .build()
+    };
+    actions.add_action_entries([
+        action("new-event", new_event),
+        action("today", || go(|_| today())),
+        action("previous", || step(-1)),
+        action("next", || step(1)),
+        gio::ActionEntry::builder("view")
+            .parameter_type(Some(glib::VariantTy::STRING))
+            .activate(|_: &gio::SimpleActionGroup, _, view| {
+                if let (Some(c), Some(v)) = (cal(), view.and_then(|v| v.str())) {
+                    c.mode.set_active_name(Some(v));
+                }
+            })
+            .build(),
+    ]);
     c.split.insert_action_group("cal", Some(&actions));
     // New events are written in the system's zone.
     core().set_local_zone(glib::TimeZone::local().identifier().to_string());
@@ -397,6 +395,24 @@ fn step(by: i64) {
 }
 
 /// The timed event on now or next within a week, in the calendars shown (for the extension).
+/// A new event on the selected day, at the next full hour when that is today, else at 9:00.
+fn new_event() {
+    let Some(c) = cal() else { return };
+    let day = c.anchor.get();
+    let now = core().local_now();
+    let start = if day == today() {
+        (now / 3600 + 1) * 3600
+    } else {
+        day + 9 * 3600
+    };
+    let time = EventTime {
+        start,
+        end: start + 3600,
+        all_day: false,
+    };
+    dialog::open(&c, None, time);
+}
+
 pub fn next_event() -> Option<Event> {
     let hidden = hidden();
     let now = core().local_now();

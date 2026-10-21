@@ -154,14 +154,26 @@ pub fn setup_actions(app: &adw::Application) {
             request_sync();
         }
     });
+    let shortcuts = gio::SimpleAction::new("shortcuts", None);
+    shortcuts.connect_activate(|_, _| {
+        if let Some(ui) = ui() {
+            get::<adw::Dialog>(&view!("shortcuts"), "dialog").present(Some(&ui.window));
+        }
+    });
     app.add_action(&sync);
     app.add_action(&quit);
     app.add_action(&show);
     app.add_action(&complete);
+    app.add_action(&shortcuts);
+    // Listed in ui/shortcuts.blp, with the pages' own.
     app.set_accels_for_action("app.sync", &["F5"]);
     app.set_accels_for_action("app.quit", &["<Control>q"]);
+    app.set_accels_for_action("app.shortcuts", &["<Control>question"]);
     app.set_accels_for_action("window.close", &["<Control>w"]);
     app.set_accels_for_action("win.preferences", &["<Control>comma"]);
+    app.set_accels_for_action("win.undo", &["<Control>z"]);
+    app.set_accels_for_action("win.page::tasks", &["<Alt>1"]);
+    app.set_accels_for_action("win.page::calendar", &["<Alt>2"]);
 }
 
 pub fn present(app: &adw::Application) {
@@ -598,6 +610,45 @@ fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
         }
     });
     ui.window.add_action(&prefs);
+
+    // Undo the latest change; in a text field, the typing there.
+    let window = ui.window.downgrade();
+    let undo_last = gio::SimpleAction::new("undo", None);
+    undo_last.connect_activate(move |_, _| {
+        let Some(w) = window.upgrade() else { return };
+        match gtk::prelude::RootExt::focus(&w)
+            .filter(|f| f.is::<gtk::Text>() || f.is::<gtk::TextView>())
+        {
+            Some(text) => {
+                let _ = text.activate_action("text.undo", None);
+            }
+            // Not from under a dialog, whose own changes are not saved yet.
+            None if w.visible_dialog().is_none() => undo(None),
+            None => {}
+        }
+    });
+    ui.window.add_action(&undo_last);
+    let views: adw::ViewStack = get(b, "views");
+    let page = gio::SimpleAction::new("page", Some(glib::VariantTy::STRING));
+    page.connect_activate(move |_, name| {
+        if let Some(name) = name.and_then(|n| n.str()) {
+            views.set_visible_child_name(name);
+        }
+    });
+    ui.window.add_action(&page);
+    // Ctrl+N on the Tasks page goes to the entry adding tasks (the Calendar page's opens a new
+    // event).
+    let keys = gtk::ShortcutController::new();
+    keys.set_scope(gtk::ShortcutScope::Managed);
+    let entry = ui.entry.clone();
+    keys.add_shortcut(gtk::Shortcut::new(
+        gtk::ShortcutTrigger::parse_string("<Control>n"),
+        Some(gtk::CallbackAction::new(move |_, _| {
+            entry.grab_focus();
+            glib::Propagation::Stop
+        })),
+    ));
+    ui.split.add_controller(keys);
 
     let weak = Rc::downgrade(ui);
     ui.cancel_login.connect_clicked(move |_| {

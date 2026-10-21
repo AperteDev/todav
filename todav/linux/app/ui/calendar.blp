@@ -7,13 +7,46 @@ Adw.NavigationSplitView split {
   min-sidebar-width: 300;
   max-sidebar-width: 340;
 
-  // Ctrl+N while the page has the focus (the Tasks page adds tasks from its entry).
+  // The page's shortcuts, while it is shown (listed in ui/shortcuts.blp).
   Gtk.ShortcutController {
     scope: managed;
 
     Gtk.Shortcut {
       trigger: "<Control>n";
       action: "action(cal.new-event)";
+    }
+
+    Gtk.Shortcut {
+      trigger: "<Control>t";
+      action: "action(cal.today)";
+    }
+
+    Gtk.Shortcut {
+      trigger: "<Alt>Left|Page_Up";
+      action: "action(cal.previous)";
+    }
+
+    Gtk.Shortcut {
+      trigger: "<Alt>Right|Page_Down";
+      action: "action(cal.next)";
+    }
+
+    Gtk.Shortcut {
+      trigger: "<Control>1";
+      action: "action(cal.view)";
+      arguments: "'month'";
+    }
+
+    Gtk.Shortcut {
+      trigger: "<Control>2";
+      action: "action(cal.view)";
+      arguments: "'week'";
+    }
+
+    Gtk.Shortcut {
+      trigger: "<Control>3";
+      action: "action(cal.view)";
+      arguments: "'agenda'";
     }
   }
 
@@ -167,19 +200,22 @@ Adw.NavigationSplitView split {
         Gtk.Box {
           styles ["linked"]
 
-          Gtk.Button prev {
+          Gtk.Button {
             icon-name: "go-previous-symbolic";
-            tooltip-text: "Previous";
+            tooltip-text: "Previous (Alt+←)";
+            action-name: "cal.previous";
           }
 
-          Gtk.Button today {
+          Gtk.Button {
             icon-name: "calendar-go-today-symbolic";
-            tooltip-text: "Today";
+            tooltip-text: "Today (Ctrl+T)";
+            action-name: "cal.today";
           }
 
-          Gtk.Button next {
+          Gtk.Button {
             icon-name: "go-next-symbolic";
-            tooltip-text: "Next";
+            tooltip-text: "Next (Alt+→)";
+            action-name: "cal.next";
           }
         }
 
@@ -235,19 +271,19 @@ Adw.NavigationSplitView split {
           Adw.Toggle {
             name: "month";
             icon-name: "view-grid-symbolic";
-            tooltip: "Month";
+            tooltip: "Month (Ctrl+1)";
           }
 
           Adw.Toggle {
             name: "week";
             icon-name: "view-column-symbolic";
-            tooltip: "Week";
+            tooltip: "Week (Ctrl+2)";
           }
 
           Adw.Toggle {
             name: "agenda";
             icon-name: "view-list-symbolic";
-            tooltip: "Agenda";
+            tooltip: "Agenda (Ctrl+3)";
           }
         }
       }
@@ -279,19 +315,19 @@ Adw.NavigationSplitView split {
           Adw.Toggle {
             name: "month";
             icon-name: "view-grid-symbolic";
-            tooltip: "Month";
+            tooltip: "Month (Ctrl+1)";
           }
 
           Adw.Toggle {
             name: "week";
             icon-name: "view-column-symbolic";
-            tooltip: "Week";
+            tooltip: "Week (Ctrl+2)";
           }
 
           Adw.Toggle {
             name: "agenda";
             icon-name: "view-list-symbolic";
-            tooltip: "Agenda";
+            tooltip: "Agenda (Ctrl+3)";
           }
         }
       }
@@ -394,5 +430,6 @@ Adw.NavigationSplitView split {
 
 menu main_menu {
   item ("Preferences", "win.preferences")
+  item ("Keyboard Shortcuts", "app.shortcuts")
   item ("Quit", "app.quit")
 }

@@ -1,0 +1,108 @@
+using Gtk 4.0;
+using Adw 1;
+
+// Keyboard Shortcuts (Ctrl+?). Window-wide ones show the keys set in code by their action;
+// the pages' own are set in their views.
+Adw.ShortcutsDialog dialog {
+  Adw.ShortcutsSection {
+    title: "General";
+
+    Adw.ShortcutsItem {
+      title: "Search";
+      accelerator: "<Control>f";
+    }
+
+    Adw.ShortcutsItem {
+      title: "Undo";
+      action-name: "win.undo";
+    }
+
+    Adw.ShortcutsItem {
+      title: "Sync";
+      action-name: "app.sync";
+    }
+
+    Adw.ShortcutsItem {
+      title: "Show Tasks";
+      action-name: "win.page::tasks";
+    }
+
+    Adw.ShortcutsItem {
+      title: "Show Calendar";
+      action-name: "win.page::calendar";
+    }
+
+    Adw.ShortcutsItem {
+      title: "Preferences";
+      action-name: "win.preferences";
+    }
+
+    Adw.ShortcutsItem {
+      title: "Keyboard Shortcuts";
+      action-name: "app.shortcuts";
+    }
+
+    Adw.ShortcutsItem {
+      title: "Close Window";
+      action-name: "window.close";
+    }
+
+    Adw.ShortcutsItem {
+      title: "Quit";
+      action-name: "app.quit";
+    }
+  }
+
+  Adw.ShortcutsSection {
+    title: "Tasks";
+
+    Adw.ShortcutsItem {
+      title: "New Task";
+      accelerator: "<Control>n";
+    }
+
+    Adw.ShortcutsItem {
+      title: "Choose Category";
+      accelerator: "<Control>k";
+    }
+  }
+
+  Adw.ShortcutsSection {
+    title: "Calendar";
+
+    Adw.ShortcutsItem {
+      title: "New Event";
+      accelerator: "<Control>n";
+    }
+
+    Adw.ShortcutsItem {
+      title: "Today";
+      accelerator: "<Control>t";
+    }
+
+    Adw.ShortcutsItem {
+      title: "Previous";
+      accelerator: "<Alt>Left Page_Up";
+    }
+
+    Adw.ShortcutsItem {
+      title: "Next";
+      accelerator: "<Alt>Right Page_Down";
+    }
+
+    Adw.ShortcutsItem {
+      title: "Month";
+      accelerator: "<Control>1";
+    }
+
+    Adw.ShortcutsItem {
+      title: "Week";
+      accelerator: "<Control>2";
+    }
+
+    Adw.ShortcutsItem {
+      title: "Agenda";
+      accelerator: "<Control>3";
+    }
+  }
+}
