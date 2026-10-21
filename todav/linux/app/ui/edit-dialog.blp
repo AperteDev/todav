@@ -1,12 +1,12 @@
 using Gtk 4.0;
 using Adw 1;
 
-// Two columns (the task, then its due date and reminders); one below the other when narrow.
+// Two columns (the task, then its dates and reminders); one below the other when narrow.
 Adw.Dialog dialog {
   title: "Edit Task";
   content-width: 760;
-  // Room for the expanded due date; smaller windows shrink it.
-  content-height: 600;
+  // Room for an expanded date; smaller windows shrink it.
+  content-height: 640;
   // Breakpoints need a minimum size; the smallest GNOME supports.
   width-request: 360;
   height-request: 294;
@@ -43,7 +43,7 @@ Adw.Dialog dialog {
         margin-start: 18;
         margin-end: 18;
 
-        // The note fills what the title and category leave.
+        // The note fills what the rows above it leave.
         Gtk.Box {
           orientation: vertical;
           spacing: 18;
@@ -57,6 +57,26 @@ Adw.Dialog dialog {
             Adw.ComboRow category {
               title: "Category";
               model: Gtk.StringList cats {};
+            }
+
+            // Stored as 1 (high), 5 (medium) or 9 (low), as Nextcloud Tasks does.
+            Adw.ComboRow priority {
+              title: "Priority";
+              model: Gtk.StringList { strings ["None", "Low", "Medium", "High"] };
+            }
+
+            // Only for a task linked to an event (from the event's details).
+            Adw.ActionRow event {
+              title: "For Event";
+              visible: false;
+
+              [suffix]
+              Gtk.Button unlink {
+                icon-name: "edit-clear-symbolic";
+                tooltip-text: "Unlink From Event";
+                valign: center;
+                styles ["flat"]
+              }
             }
           }
 
@@ -87,16 +107,27 @@ Adw.Dialog dialog {
           spacing: 18;
           valign: start;
 
+          // The one rule the format has: a task is not due before it starts. Above the dates,
+          // so it shows while either is changed.
+          Gtk.Label conflict {
+            label: "The task starts after it is due";
+            xalign: 0;
+            wrap: true;
+            visible: false;
+            styles ["error"]
+          }
+
+          // Start and due are both optional and independent: planned for a time, due by one.
           Adw.PreferencesGroup {
-            Adw.ExpanderRow due {
-              title: "Due Date";
+            Adw.ExpanderRow start {
+              title: "Start";
               show-enable-switch: true;
               enable-expansion: false;
 
               Gtk.ListBoxRow {
                 activatable: false;
 
-                Gtk.Calendar calendar {
+                Gtk.Calendar start_calendar {
                   margin-top: 6;
                   margin-bottom: 6;
                   margin-start: 6;
@@ -104,16 +135,16 @@ Adw.Dialog dialog {
                 }
               }
 
-              Adw.SwitchRow has_time {
+              Adw.SwitchRow start_has_time {
                 title: "Time";
               }
 
-              Adw.ActionRow time_row {
+              Adw.ActionRow {
                 title: "At";
-                visible: bind has_time.active;
+                visible: bind start_has_time.active;
 
                 [suffix]
-                Gtk.SpinButton hour {
+                Gtk.SpinButton start_hour {
                   valign: center;
                   numeric: true;
                   wrap: true;
@@ -130,7 +161,62 @@ Adw.Dialog dialog {
                 }
 
                 [suffix]
-                Gtk.SpinButton minute {
+                Gtk.SpinButton start_minute {
+                  valign: center;
+                  numeric: true;
+                  wrap: true;
+                  adjustment: Gtk.Adjustment {
+                    lower: 0;
+                    upper: 59;
+                    step-increment: 5;
+                  };
+                }
+              }
+            }
+
+            Adw.ExpanderRow due {
+              title: "Due Date";
+              show-enable-switch: true;
+              enable-expansion: false;
+
+              Gtk.ListBoxRow {
+                activatable: false;
+
+                Gtk.Calendar due_calendar {
+                  margin-top: 6;
+                  margin-bottom: 6;
+                  margin-start: 6;
+                  margin-end: 6;
+                }
+              }
+
+              Adw.SwitchRow due_has_time {
+                title: "Time";
+              }
+
+              Adw.ActionRow {
+                title: "At";
+                visible: bind due_has_time.active;
+
+                [suffix]
+                Gtk.SpinButton due_hour {
+                  valign: center;
+                  numeric: true;
+                  wrap: true;
+                  adjustment: Gtk.Adjustment {
+                    lower: 0;
+                    upper: 23;
+                    step-increment: 1;
+                  };
+                }
+
+                [suffix]
+                Gtk.Label {
+                  label: ":";
+                }
+
+                [suffix]
+                Gtk.SpinButton due_minute {
                   valign: center;
                   numeric: true;
                   wrap: true;
@@ -144,7 +230,7 @@ Adw.Dialog dialog {
             }
           }
 
-          // Reminders (ui/reminder.blp) go above the button.
+          // Reminders (ui/reminder.blp) go above the button; they count from the due date.
           Gtk.ListBox reminders {
             selection-mode: none;
             visible: bind due.enable-expansion;
@@ -163,10 +249,11 @@ Adw.Dialog dialog {
   Adw.Breakpoint {
     condition ("max-width: 560sp")
 
-    // One column: the due date opens collapsed, so the task's own fields come first.
+    // One column: the dates open collapsed, so the task's own fields come first.
     setters {
       columns.orientation: vertical;
       columns.homogeneous: false;
+      start.expanded: false;
       due.expanded: false;
     }
   }

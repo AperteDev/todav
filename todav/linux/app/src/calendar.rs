@@ -711,8 +711,8 @@ fn move_to_day(t: &Task, day: i64) {
 
 /// Plan a task into the slot starting at `at`: as long as it was planned before, else an hour.
 fn plan_at(t: &Task, at: i64) {
-    let len = match (t.start, t.due) {
-        (Some(s), Some(d)) if !t.start_all_day && !t.due_all_day && d > s => d - s,
+    let len = match (t.start, slot_end(t)) {
+        (Some(s), Some(e)) => e - s,
         _ => 3600,
     };
     let time = |t| {
@@ -729,6 +729,14 @@ fn plan_at(t: &Task, at: i64) {
             ..Default::default()
         },
     );
+}
+
+/// Where a planned task's slot ends: its due time, when that is later the same day. A deadline
+/// further off is not the end of a slot.
+fn slot_end(t: &Task) -> Option<i64> {
+    let s = t.start.filter(|_| !t.start_all_day)?;
+    t.due
+        .filter(|&d| !t.due_all_day && d > s && d <= s - s.rem_euclid(DAY) + DAY)
 }
 
 /// Whether `t` has a time slot: a start, or a due time rather than a date. Without one it is in

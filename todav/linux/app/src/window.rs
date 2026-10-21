@@ -1960,7 +1960,48 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
             c.set_selected(list.n_items() - 2);
         }
     });
-    let due_at = due_dialog(&b, t);
+    let (due_at, due) = due_dialog(&b, t);
+    let old_start = t.start.map(|at| Due {
+        at,
+        all_day: t.start_all_day,
+    });
+    let start = date_row(&b, "start", old_start);
+    let priority: adw::ComboRow = get(&b, "priority");
+    let old_priority = priority_row(t.priority);
+    priority.set_selected(old_priority);
+
+    // The event it is for, with a way to unlink it.
+    let event_row: adw::ActionRow = get(&b, "event");
+    let linked = t.event_uid.clone().and_then(|e| core().event(e));
+    if let Some(e) = &linked {
+        event_row.set_subtitle(&e.summary);
+        event_row.set_visible(true);
+    }
+    let unlinked = Rc::new(Cell::new(false));
+    let (row, u) = (event_row.clone(), unlinked.clone());
+    get::<gtk::Button>(&b, "unlink").connect_clicked(move |_| {
+        u.set(true);
+        row.set_visible(false);
+    });
+
+    let save: gtk::Button = get(&b, "save");
+    // The one rule iCalendar has here: not due before it starts (a due date lasts all day).
+    let conflict: gtk::Label = get(&b, "conflict");
+    let check: Rc<dyn Fn()> = {
+        let (start, due, save) = (start.clone(), due.clone(), save.clone());
+        Rc::new(move || {
+            let end = |d: Due| d.at + if d.all_day { 86400 } else { 0 };
+            let bad = matches!((start(), due()), (Some(s), Some(d)) if end(d) < s.at);
+            save.set_sensitive(!bad);
+            save.set_tooltip_text(bad.then_some("The task starts after it is due"));
+            conflict.set_visible(bad);
+        })
+    };
+    check();
+    for name in ["start", "due"] {
+        on_date_change(&b, name, check.clone());
+    }
+
     let cancel: gtk::Button = get(&b, "cancel");
     let d = dialog.downgrade();
     cancel.connect_clicked(move |_| {
@@ -1968,7 +2009,6 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
             d.close();
         }
     });
-    let save: gtk::Button = get(&b, "save");
     let (task, d) = (t.clone(), dialog.downgrade());
     save.connect_clicked(move |_| {
         // Only send what changed.
@@ -1993,6 +2033,10 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
                 description.buffer().property::<String>("text"),
                 task.description.as_deref(),
             ),
+            start: Some(start()).filter(|s| *s != old_start),
+            priority: (priority.selected() != old_priority)
+                .then(|| priority_value(priority.selected())),
+            event: unlinked.get().then_some(None),
             ..due_at()
         };
         let uid = task.uid.clone();
@@ -2034,19 +2078,39 @@ pub fn scroll_past(w: &gtk::Widget) {
     w.add_controller(wheel);
 }
 
-/// Fill the dialog's due date rows from `t`; the returned function reads what changed.
-fn due_dialog(b: &gtk::Builder, t: &Task) -> impl Fn() -> TaskPatch + 'static {
-    let due: adw::ExpanderRow = get(b, "due");
-    let calendar: gtk::Calendar = get(b, "calendar");
-    let has_time: adw::SwitchRow = get(b, "has_time");
-    let (hour, minute): (gtk::SpinButton, gtk::SpinButton) = (get(b, "hour"), get(b, "minute"));
+/// Call `f` on every change of the dialog's date row `name` (see `date_row`).
+fn on_date_change(b: &gtk::Builder, name: &str, f: Rc<dyn Fn()>) {
+    let row: adw::ExpanderRow = get(b, name);
+    let g = f.clone();
+    row.connect_enable_expansion_notify(move |_| g());
+    // Day, month or year: scrolling over the calendar changes the month, keeping the day.
+    let calendar: gtk::Calendar = get(b, &format!("{name}_calendar"));
+    let g = f.clone();
+    calendar.connect_notify_local(None, move |_, _| g());
+    let has_time: adw::SwitchRow = get(b, &format!("{name}_has_time"));
+    let g = f.clone();
+    has_time.connect_active_notify(move |_| g());
+    for part in ["hour", "minute"] {
+        let spin: gtk::SpinButton = get(b, &format!("{name}_{part}"));
+        let g = f.clone();
+        spin.connect_value_changed(move |_| g());
+    }
+}
+
+/// The dialog's date row `name` (a switch, `{name}_calendar` and an optional time from
+/// `{name}_has_time`, `_hour`, `_minute`), set to `at`, else offering today at 9:00. Its
+/// subtitle shows the date picked; the returned function reads it.
+fn date_row(b: &gtk::Builder, name: &str, at: Option<Due>) -> Rc<dyn Fn() -> Option<Due>> {
+    let row: adw::ExpanderRow = get(b, name);
+    let calendar: gtk::Calendar = get(b, &format!("{name}_calendar"));
+    let has_time: adw::SwitchRow = get(b, &format!("{name}_has_time"));
+    let hour: gtk::SpinButton = get(b, &format!("{name}_hour"));
+    let minute: gtk::SpinButton = get(b, &format!("{name}_minute"));
     for spin in [&hour, &minute] {
         two_digits(spin);
     }
-
     let now = core().local_now();
-    let at = t.due.unwrap_or(now - now.rem_euclid(86400) + 9 * 3600); // default: today at 9:00
-    let f = dates::fields(at);
+    let f = dates::fields(at.map_or(now - now.rem_euclid(86400) + 9 * 3600, |d| d.at));
     calendar.select_day(
         &glib::DateTime::from_utc(f.year(), f.month(), f.day_of_month(), 0, 0, 0.0).unwrap(),
     );
@@ -2057,12 +2121,52 @@ fn due_dialog(b: &gtk::Builder, t: &Task) -> impl Fn() -> TaskPatch + 'static {
     ] {
         scroll_past(w);
     }
-    due.set_enable_expansion(t.due.is_some());
-    // Open next to the note when there is a date; the one-column layout collapses it again.
-    due.set_expanded(t.due.is_some());
-    has_time.set_active(t.due.is_some() && !t.due_all_day);
+    row.set_enable_expansion(at.is_some());
+    // Open next to the note when set; the one-column layout collapses it again.
+    row.set_expanded(at.is_some());
+    has_time.set_active(at.is_some_and(|d| !d.all_day));
     hour.set_value(f.hour() as f64);
     minute.set_value(f.minute() as f64);
+
+    let r = row.clone();
+    let read: Rc<dyn Fn() -> Option<Due>> = Rc::new(move || {
+        r.enables_expansion().then(|| {
+            let all_day = !has_time.is_active();
+            let time = if all_day {
+                0
+            } else {
+                hour.value() as i64 * 3600 + minute.value() as i64 * 60
+            };
+            Due {
+                at: dates::midnight(&calendar.date()) + time,
+                all_day,
+            }
+        })
+    });
+    let r = read.clone();
+    let show = move || {
+        let label = r().map(|d| dates::label(d.at, d.all_day, now));
+        row.set_subtitle(label.as_deref().unwrap_or(""));
+    };
+    show();
+    on_date_change(b, name, Rc::new(show));
+    read
+}
+
+/// Fill the dialog's due date and reminders from `t`: what reads the patch for them, and what
+/// reads the due date.
+fn due_dialog(
+    b: &gtk::Builder,
+    t: &Task,
+) -> (
+    impl Fn() -> TaskPatch + 'static,
+    Rc<dyn Fn() -> Option<Due>>,
+) {
+    let old_due = t.due.map(|at| Due {
+        at,
+        all_day: t.due_all_day,
+    });
+    let read = date_row(b, "due", old_due);
 
     // Seconds after the due time, as the rows show them (whole minutes), so untouched
     // reminders are not rewritten.
@@ -2082,61 +2186,34 @@ fn due_dialog(b: &gtk::Builder, t: &Task) -> impl Fn() -> TaskPatch + 'static {
         })
         .unwrap_or_default();
     let reminders = crate::reminders::Reminders::new(b, t.due_all_day || t.due.is_none(), &old);
-
-    let read = {
-        let (due, calendar, has_time) = (due.clone(), calendar.clone(), has_time.clone());
-        let (hour, minute) = (hour.clone(), minute.clone());
-        move || {
-            due.enables_expansion().then(|| {
-                let all_day = !has_time.is_active();
-                let time = if all_day {
-                    0
-                } else {
-                    hour.value() as i64 * 3600 + minute.value() as i64 * 60
-                };
-                Due {
-                    at: dates::midnight(&calendar.date()) + time,
-                    all_day,
-                }
-            })
-        }
-    };
-    // The row's subtitle shows the date picked.
-    let show = {
-        let (due, read) = (due.clone(), read.clone());
-        move || {
-            let label = read().map(|d| dates::label(d.at, d.all_day, now));
-            due.set_subtitle(label.as_deref().unwrap_or(""));
-        }
-    };
-    show();
-    let s = show.clone();
-    // Day, month or year: scrolling over the calendar changes the month, keeping the day.
-    calendar.connect_notify_local(None, move |_, _| s());
-    let s = show.clone();
-    due.connect_enable_expansion_notify(move |_| s());
-    let s = show.clone();
-    hour.connect_value_changed(move |_| s());
-    let s = show.clone();
-    minute.connect_value_changed(move |_| s());
+    let has_time: adw::SwitchRow = get(b, "due_has_time");
     let r = reminders.clone();
-    has_time.connect_active_notify(move |h| {
-        show();
-        r.set_all_day(!h.is_active());
-    });
+    has_time.connect_active_notify(move |h| r.set_all_day(!h.is_active()));
 
-    let old_due = t.due.map(|at| Due {
-        at,
-        all_day: t.due_all_day,
-    });
-    move || {
-        let new_due = read();
+    let due = read.clone();
+    let patch = move || {
+        let new_due = due();
         TaskPatch {
             due: (new_due != old_due).then_some(new_due),
             reminders: Some(reminders.offsets()).filter(|r| *r != old || new_due != old_due),
             ..Default::default()
         }
+    };
+    (patch, read)
+}
+
+/// Priority rows: None, Low, Medium, High; as stored, `priority_value`.
+fn priority_row(p: Option<i64>) -> u32 {
+    match p {
+        Some(1..=4) => 3,
+        Some(5) => 2,
+        Some(6..=9) => 1,
+        _ => 0,
     }
+}
+
+fn priority_value(row: u32) -> Option<i64> {
+    [None, Some(9), Some(5), Some(1)][row as usize]
 }
 
 #[cfg(test)]

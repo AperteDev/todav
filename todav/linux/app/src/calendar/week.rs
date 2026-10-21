@@ -140,8 +140,8 @@ fn slot(c: &Cal, x: f64, y: f64) -> Option<(i64, i64)> {
 /// Length in minutes of what a dropped task becomes (for the drop preview).
 fn drop_length(i: &Item) -> i64 {
     match i {
-        Item::Task(t) => match (t.start, t.due) {
-            (Some(s), Some(d)) if !t.start_all_day && !t.due_all_day && d > s => (d - s) / 60,
+        Item::Task(t) => match (t.start, slot_end(t)) {
+            (Some(s), Some(e)) => (e - s) / 60,
             _ => 60,
         },
         Item::Event(e) if !e.all_day && e.end > e.start => (e.end - e.start) / 60,
@@ -217,13 +217,7 @@ fn segments(i: &Item, start: i64) -> Vec<(i64, i64, i64)> {
         // Only tasks planned into a slot (a start time) take hours; one just due at a time goes
         // above with the day's other items, its chip showing the time.
         Item::Task(t) => match t.start {
-            Some(s) if !t.start_all_day => {
-                let end = match t.due {
-                    Some(d) if !t.due_all_day && d > s => d,
-                    _ => s + 30 * 60,
-                };
-                (s, end)
-            }
+            Some(s) if !t.start_all_day => (s, slot_end(t).unwrap_or(s + 30 * 60)),
             _ => return Vec::new(),
         },
         _ => return Vec::new(),
