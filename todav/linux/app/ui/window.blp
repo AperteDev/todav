@@ -189,6 +189,37 @@ Adw.ApplicationWindow window {
                         }
                       }
                     }
+
+                    [end]
+                    Gtk.ToggleButton task_search_button {
+                      icon-name: "system-search-symbolic";
+                      tooltip-text: "Search (Ctrl+F)";
+
+                      Gtk.ShortcutController {
+                        scope: managed;
+
+                        Gtk.Shortcut {
+                          trigger: "<Control>f";
+                          action: "activate";
+                        }
+                      }
+                    }
+                  }
+
+                  // Typing on the page opens it too (its key capture widget is set in code).
+                  [top]
+                  Gtk.SearchBar task_search {
+                    search-mode-enabled: bind task_search_button.active bidirectional;
+
+                    Adw.Clamp {
+                      maximum-size: 720;
+                      hexpand: true;
+
+                      Gtk.SearchEntry task_query {
+                        placeholder-text: "Search tasks";
+                        hexpand: true;
+                      }
+                    }
                   }
 
                   content: Gtk.ScrolledWindow {

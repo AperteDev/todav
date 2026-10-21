@@ -57,6 +57,8 @@ struct Ui {
     stack: gtk::Stack,
     split: adw::NavigationSplitView,
     sidebar: gtk::ListBox,
+    /// The search, lower case: while set, the page shows matching tasks of every list.
+    query: RefCell<String>,
     cat_section: gtk::Box,
     cat_list: gtk::ListBox,
     /// Category of each `cat_list` row; None is "Other" (no category).
@@ -232,7 +234,8 @@ pub fn on_event(ev: &Event) {
             glib::idle_add_local_once(move || {
                 refresh_sidebar_counts(&ui);
                 let current = ui.current.borrow().clone();
-                if current.as_deref() == Some(&list) || current.as_deref() == Some(UPCOMING) {
+                let mixed = current.as_deref() == Some(UPCOMING) || !ui.query.borrow().is_empty();
+                if current.as_deref() == Some(&list) || mixed {
                     refresh_tasks(&ui);
                 }
                 crate::calendar::refresh();
@@ -301,6 +304,7 @@ fn build(app: &adw::Application) -> Rc<Ui> {
         cat_busy: Rc::new(Cell::new(false)),
         hrefs: RefCell::new(Vec::new()),
         current: RefCell::new(None),
+        query: RefCell::new(String::new()),
         title: get(&b, "title"),
         sync_state: get(&b, "sync_state"),
         entry: get(&b, "entry"),
@@ -325,8 +329,62 @@ fn build(app: &adw::Application) -> Rc<Ui> {
     });
     ui.conn.attach(&get(&b, "login_group"));
     connect(&ui);
-    crate::calendar::build(&get(&b, "views"));
+    let views = get(&b, "views");
+    connect_search(&ui, &get(&b, "task_search"), &get(&b, "task_query"), &views);
+    crate::calendar::build(&views);
     ui
+}
+
+/// Typing on the Tasks page searches the tasks of every list (GNOME's type to search).
+fn connect_search(
+    ui: &Rc<Ui>,
+    bar: &gtk::SearchBar,
+    entry: &gtk::SearchEntry,
+    views: &adw::ViewStack,
+) {
+    search_bar(bar, entry, views, "tasks");
+    // Picking a list ends the search.
+    let b = bar.clone();
+    ui.sidebar
+        .connect_row_activated(move |_, _| b.set_search_mode(false));
+    let weak = Rc::downgrade(ui);
+    entry.connect_search_changed(move |e| {
+        let Some(ui) = weak.upgrade() else { return };
+        *ui.query.borrow_mut() = e.text().trim().to_lowercase();
+        refresh_tasks(&ui);
+    });
+}
+
+/// Set up the search bar of the `views` page `page`, its `entry` not being its direct child:
+/// typing anywhere in the window opens it while that page is shown (unless an entry has focus).
+pub fn search_bar(
+    bar: &gtk::SearchBar,
+    entry: &gtk::SearchEntry,
+    views: &adw::ViewStack,
+    page: &'static str,
+) {
+    bar.connect_entry(entry);
+    let capture = {
+        let bar = bar.clone();
+        move |v: &adw::ViewStack| {
+            let shown = v.visible_child_name().as_deref() == Some(page);
+            let window = v.root().filter(|_| shown).and_upcast::<gtk::Widget>();
+            bar.set_key_capture_widget(window.as_ref());
+        }
+    };
+    capture(views);
+    views.connect_visible_child_name_notify(capture);
+    // Closed: the search ends, and the focus goes back to the page rather than into another
+    // entry (where typing would not search).
+    let entry = entry.clone();
+    bar.connect_search_mode_enabled_notify(move |b| {
+        if !b.is_search_mode() {
+            entry.set_text("");
+            if let Some(root) = b.root() {
+                root.set_focus(None::<&gtk::Widget>);
+            }
+        }
+    });
 }
 
 /// Open a task's edit dialog (from the calendar).
@@ -778,8 +836,10 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
         ui.title.set_title("");
         return;
     };
-    // Upcoming mixes lists: count subtasks in all of them.
-    let all: Vec<Task> = if href == UPCOMING {
+    // Upcoming and search results mix lists: count subtasks in all of them.
+    let query = ui.query.borrow().clone();
+    let mixed = href == UPCOMING || !query.is_empty();
+    let all: Vec<Task> = if mixed {
         let lists = core().lists().into_iter();
         lists.flat_map(|l| core().tasks(l.href, true)).collect()
     } else {
@@ -788,7 +848,11 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
     *ui.counts.borrow_mut() = subtask_counts(&all);
     // The new-task entry and its category picker.
     let add_box = ui.entry.parent();
-    add_box.iter().for_each(|b| b.set_visible(href != UPCOMING));
+    add_box.iter().for_each(|b| b.set_visible(!mixed));
+    if !query.is_empty() {
+        ui.cat_section.set_visible(false);
+        return rebuild_search(ui, &query, all);
+    }
     if href == UPCOMING {
         ui.cat_section.set_visible(false);
         return rebuild_upcoming(ui);
@@ -1041,6 +1105,50 @@ fn rebuild_upcoming(ui: &Rc<Ui>) {
     }
 }
 
+/// Tasks of `all` whose title, notes or category hold `query` (lower case): a group per list,
+/// open ones first.
+fn rebuild_search(ui: &Rc<Ui>, query: &str, all: Vec<Task>) {
+    let hit = |t: &Task| {
+        [
+            Some(&t.summary),
+            t.description.as_ref(),
+            t.category.as_ref(),
+        ]
+        .into_iter()
+        .flatten()
+        .any(|s| s.to_lowercase().contains(query))
+    };
+    let found: Vec<Task> = all.into_iter().filter(hit).collect();
+    ui.title.set_title("Search");
+    ui.title.set_subtitle(&match found.len() {
+        1 => "1 task".to_string(),
+        n => format!("{n} tasks"),
+    });
+    for l in core().lists() {
+        let mut here: Vec<&Task> = found.iter().filter(|t| t.list_href == l.href).collect();
+        if here.is_empty() {
+            continue;
+        }
+        here.sort_by_key(|t| t.done); // stable: list order otherwise
+        let group = adw::PreferencesGroup::builder()
+            .title(glib::markup_escape_text(&l.display_name))
+            .build();
+        for t in here {
+            group.add(&task_row(ui, t, 0, None));
+        }
+        ui.groups.append(&group);
+    }
+    if found.is_empty() {
+        let empty = adw::StatusPage::builder()
+            .icon_name("system-search-symbolic")
+            .title("No Results Found")
+            .description("Try a different search")
+            .build();
+        empty.add_css_class("compact");
+        ui.groups.append(&empty);
+    }
+}
+
 /// Split a group's depth-first task list into root tasks, each with its (depth, subtask) list.
 fn trees(tasks: &[Task]) -> Vec<(&Task, Vec<(usize, &Task)>)> {
     let mut depth = HashMap::new();
@@ -1152,9 +1260,9 @@ fn task_row(ui: &Rc<Ui>, t: &Task, indent: usize, slot: Option<Slot>) -> adw::Ac
         row.add_suffix(&e);
     }
     // Subtasks have no category of their own: the top-level task's decides. The Upcoming page
-    // mixes lists, so it leaves categories alone.
-    let upcoming = ui.current.borrow().as_deref() == Some(UPCOMING);
-    let sub = indent > 0 || upcoming;
+    // and search results mix lists, so they leave categories alone.
+    let mixed = ui.current.borrow().as_deref() == Some(UPCOMING) || !ui.query.borrow().is_empty();
+    let sub = indent > 0 || mixed;
     if let Some(tag) = tag(ui, t).filter(|_| indent == 0) {
         row.add_suffix(&tag);
     }
