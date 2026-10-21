@@ -97,10 +97,10 @@ struct Cal {
     split: adw::NavigationSplitView,
     mini: gtk::Calendar,
     calendars: gtk::ListBox,
-    all_calendars: gtk::CheckButton,
+    all_calendars: gtk::Button,
     task_heading: gtk::Box,
     task_lists: gtk::ListBox,
-    all_task_lists: gtk::CheckButton,
+    all_task_lists: gtk::Button,
     title: adw::WindowTitle,
     sync_state: gtk::Stack,
     search: gtk::SearchBar,
@@ -241,25 +241,25 @@ pub fn build(views: &adw::ViewStack) {
 
     week::setup(&c);
     plan_drop(&c);
-    // Clicking a calendar's row shows or hides it, as its check does; the heading's check
-    // shows all of the section, or hides them when all are shown.
+    // Clicking a calendar's row shows or hides it; the heading's button shows all of the
+    // section, or hides them when all are shown.
     for (list, all, events) in [
         (&c.calendars, &c.all_calendars, true),
         (&c.task_lists, &c.all_task_lists, false),
     ] {
-        list.connect_row_activated(|_, row| {
-            let check = row.child().and_then(|b| b.last_child());
-            if let Some(check) = check.and_downcast::<gtk::CheckButton>() {
-                check.set_active(!check.is_active());
-            }
-        });
-        all.connect_toggled(move |all| {
+        list.connect_row_activated(move |_, row| {
             let Some(c) = cal() else { return };
-            let (shown, hrefs) = section(&c, events);
-            if all.is_active() != (shown == hrefs.len()) {
-                set_hidden(hrefs.iter().map(String::as_str), !all.is_active());
+            // Rows are in the section's order.
+            if let Some(href) = section(&c, events).1.get(row.index() as usize) {
+                set_hidden([href.as_str()], !hidden().contains(href));
                 glib::idle_add_local_once(refresh);
             }
+        });
+        all.connect_clicked(move |_| {
+            let Some(c) = cal() else { return };
+            let (shown, hrefs) = section(&c, events);
+            set_hidden(hrefs.iter().map(String::as_str), shown == hrefs.len());
+            glib::idle_add_local_once(refresh);
         });
     }
     // The Month / Week / Agenda choice in the bottom bar, when it is there.
@@ -851,16 +851,18 @@ fn refresh_calendars(c: &Rc<Cal>) {
             .ellipsize(gtk::pango::EllipsizeMode::End)
             .build();
         row.append(&name);
-        let shown = gtk::CheckButton::builder()
-            .active(!hidden.contains(&l.href))
-            .tooltip_text("Show on the Calendar")
+        // A mark when shown (the row toggles it, see `build`); kept in place when hidden.
+        let shown = !hidden.contains(&l.href);
+        let mark = gtk::Image::builder()
+            .icon_name("object-select-symbolic")
+            .opacity(if shown { 1.0 } else { 0.0 })
             .build();
-        let href = l.href.clone();
-        shown.connect_toggled(move |s| {
-            set_hidden([href.as_str()], !s.is_active());
-            glib::idle_add_local_once(refresh);
-        });
-        row.append(&shown);
+        row.append(&mark);
+        row.set_tooltip_text(Some(if shown {
+            "Shown on the Calendar"
+        } else {
+            "Hidden from the Calendar"
+        }));
         if l.holds_events {
             c.calendars.append(&row);
         } else {
@@ -887,13 +889,17 @@ fn section(c: &Cal, events: bool) -> (usize, Vec<String>) {
     (hrefs.iter().filter(|h| !hidden.contains(*h)).count(), hrefs)
 }
 
-/// The headings' checks: on when all are shown, mixed when some are.
+/// The headings' marks: a check when all are shown, a dash when some are, none when none are.
 fn sync_all(c: &Cal) {
     for (all, events) in [(&c.all_calendars, true), (&c.all_task_lists, false)] {
         let (shown, hrefs) = section(c, events);
-        // Inconsistent first: the toggled handler then sees nothing to change.
-        all.set_inconsistent(shown > 0 && shown < hrefs.len());
-        all.set_active(shown == hrefs.len());
+        let all_shown = shown == hrefs.len();
+        all.set_icon_name(match shown {
+            _ if all_shown => "object-select-symbolic",
+            0 => "",
+            _ => "list-remove-symbolic",
+        });
+        all.set_tooltip_text(Some(if all_shown { "Hide All" } else { "Show All" }));
     }
 }
 
