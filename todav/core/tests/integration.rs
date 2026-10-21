@@ -180,7 +180,7 @@ fn a_refused_task_waits_for_an_edit_and_the_rest_syncs() {
     assert!(report.refused[0].error.contains("DTSTART"), "{report:?}");
     assert!(f.a.task(bad.clone()).unwrap().sync_error.is_some());
     f.b.sync().unwrap();
-    assert!(f.b.task(good).is_some(), "the rest synced");
+    assert!(f.b.task(good.clone()).is_some(), "the rest synced");
     assert!(f.b.task(bad.clone()).is_none());
 
     // Not sent again as it is; an edit the server takes goes up and clears the error.
@@ -189,7 +189,13 @@ fn a_refused_task_waits_for_an_edit_and_the_rest_syncs() {
     assert!(f.a.sync().unwrap().refused.is_empty());
     assert_eq!(f.a.task(bad.clone()).unwrap().sync_error, None);
     f.b.sync().unwrap();
-    assert!(f.b.task(bad).is_some());
+    assert!(f.b.task(bad.clone()).is_some());
+
+    // Gone again: dated today, they would show in the account's calendars.
+    for uid in [bad, good] {
+        f.a.delete_task(uid).unwrap();
+    }
+    f.a.sync().unwrap();
 }
 
 #[test]
