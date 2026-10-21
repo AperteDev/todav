@@ -30,12 +30,6 @@ Adw.Dialog dialog {
       }
     }
 
-    // Why the server refused the task as it is (set in code); plain text, as the server wrote it.
-    [top]
-    Adw.Banner refused {
-      use-markup: false;
-    }
-
     content: Gtk.ScrolledWindow {
       hscrollbar-policy: never;
       propagate-natural-height: true;
@@ -53,6 +47,23 @@ Adw.Dialog dialog {
         Gtk.Box {
           orientation: vertical;
           spacing: 18;
+
+          // Why the server refused the task as it is (the reason set in code, as written).
+          Adw.PreferencesGroup refused_group {
+            visible: false;
+
+            Adw.ActionRow refused {
+              title: "Not saved on the server";
+              subtitle-selectable: true;
+              use-markup: false;
+
+              [prefix]
+              Gtk.Image {
+                icon-name: "dialog-warning-symbolic";
+                styles ["warning"]
+              }
+            }
+          }
 
           Adw.PreferencesGroup {
             Adw.EntryRow summary {
@@ -113,17 +124,20 @@ Adw.Dialog dialog {
           spacing: 18;
           valign: start;
 
-          // What the format asks of both dates, when they break it (text set in code). Above the
-          // dates, so it shows while either is changed.
-          Gtk.Label conflict {
-            xalign: 0;
-            wrap: true;
-            visible: false;
-            styles ["error"]
-          }
-
           // Start and due are both optional and independent: planned for a time, due by one.
           Adw.PreferencesGroup {
+            // What the format asks of both dates, when they break it (text set in code). First,
+            // so it shows while either is changed.
+            Adw.ActionRow conflict {
+              visible: false;
+
+              [prefix]
+              Gtk.Image {
+                icon-name: "dialog-warning-symbolic";
+                styles ["warning"]
+              }
+            }
+
             Adw.ExpanderRow start {
               title: "Start";
               show-enable-switch: true;

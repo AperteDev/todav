@@ -2018,9 +2018,8 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
         }
     });
     if let Some(e) = &t.sync_error {
-        let refused: adw::Banner = get(&b, "refused");
-        refused.set_title(&format!("Not saved on the server: {}", server_reason(e)));
-        refused.set_revealed(true);
+        get::<adw::ActionRow>(&b, "refused").set_subtitle(server_reason(e));
+        get::<adw::PreferencesGroup>(&b, "refused_group").set_visible(true);
     }
     let (due_at, due) = due_dialog(&b, t);
     let old_start = t.start.map(|at| Due {
@@ -2049,7 +2048,7 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
     let save: gtk::Button = get(&b, "save");
     // What iCalendar (and the server, which refuses otherwise) asks of both dates: the same kind,
     // and not due before the start.
-    let conflict: gtk::Label = get(&b, "conflict");
+    let conflict: adw::ActionRow = get(&b, "conflict");
     let check: Rc<dyn Fn()> = {
         let (start, due, save) = (start.clone(), due.clone(), save.clone());
         Rc::new(move || {
@@ -2062,7 +2061,7 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
             };
             save.set_sensitive(problem.is_none());
             save.set_tooltip_text(problem);
-            conflict.set_label(problem.unwrap_or_default());
+            conflict.set_title(problem.unwrap_or_default());
             conflict.set_visible(problem.is_some());
         })
     };
