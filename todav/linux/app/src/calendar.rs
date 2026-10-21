@@ -150,8 +150,9 @@ fn today() -> i64 {
 pub fn build(views: &adw::ViewStack) {
     let b = view!("calendar");
     let split: adw::NavigationSplitView = get(&b, "split");
-    // Its own breakpoints: the views need more room than the task list. Tight, the view
-    // switcher shows icons; narrow, one pane at a time (last, so it wins).
+    // Its own breakpoints, the narrowest last (the last matching one wins): tight, the view
+    // switcher shows icons; narrower, it moves to a bar at the bottom and the sync button
+    // goes (F5 still syncs); narrow, one pane at a time, with the Tasks page.
     let bin = adw::BreakpointBin::builder()
         .width_request(360)
         .height_request(294)
@@ -172,7 +173,17 @@ pub fn build(views: &adw::ViewStack) {
         tight.add_setter(&t, "label", Some(&None::<String>.to_value()));
         tight.add_setter(&t, "icon-name", Some(&icon.to_value()));
     }
-    breakpoint("max-width: 880sp").add_setter(&split, "collapsed", Some(&true.to_value()));
+    let (mode, bar, sync): (adw::ToggleGroup, gtk::ActionBar, gtk::Button) =
+        (get(&b, "mode"), get(&b, "mode_bar"), get(&b, "sync"));
+    let to_bar = |bp: &adw::Breakpoint| {
+        bp.add_setter(&mode, "visible", Some(&false.to_value()));
+        bp.add_setter(&bar, "revealed", Some(&true.to_value()));
+        bp.add_setter(&sync, "visible", Some(&false.to_value()));
+    };
+    to_bar(&breakpoint("max-width: 880sp"));
+    let narrow = breakpoint("max-width: 700sp");
+    to_bar(&narrow);
+    narrow.add_setter(&split, "collapsed", Some(&true.to_value()));
     let page = views.add_titled(&bin, Some("calendar"), "Calendar");
     page.set_icon_name(Some("x-office-calendar-symbolic"));
     get::<adw::InlineViewSwitcher>(&b, "switcher").set_stack(Some(views));
@@ -252,31 +263,19 @@ pub fn build(views: &adw::ViewStack) {
             }
         });
     }
-    // Narrow: the Month / Week / Agenda choice moves from the header to a bar at the bottom.
+    // The Month / Week / Agenda choice in the bottom bar, when it is there.
     let narrow: adw::ToggleGroup = get(&b, "mode_narrow");
     c.mode
         .bind_property("active-name", &narrow, "active-name")
         .bidirectional()
         .sync_create()
         .build();
-    let bar: gtk::ActionBar = get(&b, "mode_bar");
-    let sync: gtk::Button = get(&b, "sync");
-    let place = {
-        let (mode, bar) = (c.mode.clone(), bar.clone());
-        move |collapsed: bool| {
-            mode.set_visible(!collapsed);
-            bar.set_revealed(collapsed);
-            sync.set_visible(!collapsed); // F5 still syncs
-        }
-    };
     // Shrinking keeps the views, as the Tasks page keeps its list; the sidebar is a Back away.
     c.split.set_show_content(true);
-    place(c.split.is_collapsed());
-    c.split.connect_collapsed_notify(move |s| {
+    c.split.connect_collapsed_notify(|s| {
         if s.is_collapsed() {
             s.set_show_content(true);
         }
-        place(s.is_collapsed());
     });
     let mode = at_start("start_calendar_view", "calendar_mode");
     c.mode.set_active_name(Some(match mode.as_str() {
