@@ -67,6 +67,7 @@ menubutton.block > button { padding: 2px 6px; }
 .block { border-radius: 6px; padding: 2px 6px; font-size: smaller; }
 .block label { font-weight: normal; }
 .block.task { border-left: 3px solid alpha(currentColor, 0.5); }
+.drop-preview { border-radius: 6px; padding: 2px 6px; font-size: smaller; font-feature-settings: 'tnum'; background: alpha(@accent_bg_color, 0.25); box-shadow: inset 0 0 0 1px @accent_bg_color; }
 .drag-card { margin: 8px; padding: 8px 14px; border-radius: 10px; background: @card_bg_color; color: @card_fg_color; box-shadow: 0 2px 8px alpha(black, 0.25); }
 ";
 
@@ -130,8 +131,10 @@ struct Cal {
     hours: gtk::Box,
     /// The week grid's blocks and where they go.
     blocks: RefCell<Vec<(gtk::Widget, week::Geo)>>,
-    /// Week-grid slot a dragged task would land in: (day of the week, minute of the day).
+    /// Week-grid slot a dragged task would land in: (day of the week, minute of the day), and the
+    /// block showing it there with its times.
     hover: Cell<Option<(i64, i64)>>,
+    preview: gtk::Label,
     /// The week view scrolled to the morning once.
     scrolled: Cell<bool>,
     /// An event's details are open: redraws wait (`pending`) until it closes.
@@ -233,6 +236,14 @@ pub fn build(views: &adw::ViewStack) {
         hours: get(&b, "hours"),
         blocks: RefCell::new(Vec::new()),
         hover: Cell::new(None),
+        preview: gtk::Label::builder()
+            .css_classes(["drop-preview"])
+            .xalign(0.0)
+            .yalign(0.0)
+            .ellipsize(gtk::pango::EllipsizeMode::End)
+            .can_target(false)
+            .visible(false)
+            .build(),
         scrolled: Cell::new(false),
         holding: Cell::new(false),
         pending: Cell::new(false),
@@ -523,6 +534,9 @@ fn render_plan(c: &Rc<Cal>, until: i64) {
 thread_local! {
     /// The task or event being dragged.
     static DRAGGING: RefCell<Option<Item>> = const { RefCell::new(None) };
+    /// How far below its top a week block was grabbed (0 for anything else): it stays under the
+    /// pointer at that point while it moves.
+    static GRAB: Cell<f64> = const { Cell::new(0.0) };
 }
 
 fn dragging() -> Option<Item> {
@@ -533,7 +547,11 @@ fn dragging() -> Option<Item> {
 fn drag_item(w: &impl IsA<gtk::Widget>, i: Item) {
     let src = gtk::DragSource::new();
     src.set_actions(gdk::DragAction::MOVE);
-    src.connect_prepare(|_, _, _| Some(gdk::ContentProvider::for_value(&"todav-item".to_value())));
+    src.connect_prepare(|src, _, y| {
+        let block = src.widget().is_some_and(|w| w.has_css_class("block"));
+        GRAB.set(if block { y } else { 0.0 });
+        Some(gdk::ContentProvider::for_value(&"todav-item".to_value()))
+    });
     src.connect_drag_begin(move |_, drag| {
         let title = match &i {
             Item::Task(t) => t.summary.clone(),
@@ -550,7 +568,7 @@ fn drag_item(w: &impl IsA<gtk::Widget>, i: Item) {
         DRAGGING.with(|d| d.borrow_mut().take());
         if let Some(c) = cal() {
             c.hover.set(None);
-            c.week_lines.queue_draw();
+            c.preview.set_visible(false);
         }
     });
     w.add_controller(src);

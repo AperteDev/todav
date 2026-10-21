@@ -1,6 +1,6 @@
 //! The week view: seven columns of hours with events and planned tasks as blocks, all-day items
-//! above. Blocks are children of an overlay, placed by `Geo`; the drawing area under them draws
-//! the hour lines, the drop preview and the current time.
+//! above. Blocks are children of an overlay, placed by `Geo`, as is the drop preview; the drawing
+//! area under them draws the hour lines and the current time.
 
 use super::*;
 
@@ -52,6 +52,17 @@ pub(super) fn setup(c: &Rc<Cal>) {
     c.week_grid
         .connect_get_child_position(move |overlay, child| {
             let c = weak.upgrade()?;
+            if child == c.preview.upcast_ref::<gtk::Widget>() {
+                let (day, minute) = c.hover.get()?;
+                let colw = col_width(overlay.width());
+                let h = (drop_length(&dragging()?) as f64 / 60.0 * HOUR).max(24.0);
+                return Some(gdk::Rectangle::new(
+                    (GUTTER as f64 + colw * day as f64) as i32 + 2,
+                    (minute as f64 / 60.0 * HOUR) as i32,
+                    (colw as i32 - 4).max(4),
+                    h as i32,
+                ));
+            }
             let blocks = c.blocks.borrow();
             let (_, g) = blocks.iter().find(|(w, _)| w == child)?;
             let colw = col_width(overlay.width());
@@ -87,7 +98,7 @@ pub(super) fn setup(c: &Rc<Cal>) {
                     ),
                 }
             }
-            c.week_lines.queue_draw();
+            c.preview.set_visible(false);
         },
     );
     // A double click or a long press on a free hour adds an event there.
@@ -100,11 +111,29 @@ pub(super) fn setup(c: &Rc<Cal>) {
             all_day: false,
         })
     });
+    c.week_grid.add_overlay(&c.preview);
     let weak = Rc::downgrade(c);
     drop.connect_motion(move |_, x, y| {
-        if let Some(c) = weak.upgrade() {
-            c.hover.set(slot(&c, x, y));
-            c.week_lines.queue_draw();
+        let (Some(c), Some(i)) = (weak.upgrade(), dragging()) else {
+            return gdk::DragAction::MOVE;
+        };
+        // Where the dragged block's top would be, to the nearest slot.
+        let top = y - GRAB.get() + HOUR * SNAP as f64 / 120.0;
+        let hover = slot(&c, x, top);
+        if hover != c.hover.get() {
+            c.hover.set(hover);
+            if let Some((_, minute)) = hover {
+                let at = |m: i64| fmt(today() + m * 60, "%H:%M");
+                c.preview.set_label(&format!(
+                    "{} – {}",
+                    at(minute),
+                    at(minute + drop_length(&i))
+                ));
+                // Over the blocks (last drawn), which re-rendering puts after it.
+                c.preview.insert_before(&c.week_grid, gtk::Widget::NONE);
+            }
+            c.preview.set_visible(hover.is_some());
+            c.week_grid.queue_allocate();
         }
         gdk::DragAction::MOVE
     });
@@ -112,7 +141,7 @@ pub(super) fn setup(c: &Rc<Cal>) {
     drop.connect_leave(move |_| {
         if let Some(c) = weak.upgrade() {
             c.hover.set(None);
-            c.week_lines.queue_draw();
+            c.preview.set_visible(false);
         }
     });
     // Keep the current-time line moving.
@@ -180,20 +209,6 @@ fn draw(c: &Cal, area: &gtk::DrawingArea, cr: &gtk::cairo::Context, w: i32, h: i
         cr.move_to(x, 0.0);
         cr.line_to(x, h as f64);
         let _ = cr.stroke();
-    }
-    // Where a dragged task would land.
-    if let (Some((day, minute)), Some(t)) = (c.hover.get(), dragging()) {
-        let accent = adw::StyleManager::default().accent_color_rgba();
-        let (ar, ag, ab) = (
-            accent.red() as f64,
-            accent.green() as f64,
-            accent.blue() as f64,
-        );
-        let y = minute as f64 / 60.0 * HOUR;
-        let hgt = drop_length(&t) as f64 / 60.0 * HOUR;
-        cr.set_source_rgba(ar, ag, ab, 0.25);
-        cr.rectangle(colw * day as f64 + 2.0, y, colw - 4.0, hgt);
-        let _ = cr.fill();
     }
     // Now.
     if (0..7).contains(&today_col) {
