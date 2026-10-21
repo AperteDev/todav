@@ -241,9 +241,23 @@ pub fn build(views: &adw::ViewStack, tasks: &adw::NavigationSplitView) {
             return;
         };
         c.anchor.set(dates::midnight(&m.date()));
-        c.split.set_show_content(true); // narrow window: from the sidebar to the views
         refresh();
     });
+    // Narrow window: clicking a day, the selected one too (no day-selected then), goes from the
+    // sidebar to the views. Before the calendar's own gesture, which claims the click.
+    let click = gtk::GestureClick::new();
+    click.set_propagation_phase(gtk::PropagationPhase::Capture);
+    click.connect_pressed(|g, _, x, y| {
+        let day = g.widget().and_then(|m| m.pick(x, y, gtk::PickFlags::DEFAULT));
+        if day.is_some_and(|d| d.has_css_class("day-number")) {
+            glib::idle_add_local_once(|| {
+                if let Some(c) = cal() {
+                    c.split.set_show_content(true);
+                }
+            });
+        }
+    });
+    c.mini.add_controller(click);
     get::<gtk::Button>(&b, "today").connect_clicked(|_| go(|_| today()));
     get::<gtk::Button>(&b, "prev").connect_clicked(|_| step(-1));
     get::<gtk::Button>(&b, "next").connect_clicked(|_| step(1));
