@@ -485,7 +485,27 @@ fn render_plan(c: &Rc<Cal>, until: i64) {
     c.plan_heading.set_visible(until != 0);
     c.plan.set_visible(until != 0);
     // ponytail: capped; a search or a list picker if the cut matters.
-    for t in tasks.iter().take(40) {
+    let shown: Vec<&Task> = tasks.iter().take(40).collect();
+    // Two groups: due by a date (they come first), then without one.
+    let dated: Vec<bool> = shown.iter().map(|t| t.due.is_some()).collect();
+    c.plan.set_header_func(move |row, _| {
+        let i = row.index() as usize;
+        let starts = dated.get(i).filter(|&&d| i == 0 || dated[i - 1] != d);
+        let header = starts.map(|&d| {
+            let l = gtk::Label::builder()
+                .label(if d { "Due" } else { "No date" })
+                .xalign(0.0)
+                .margin_start(18)
+                .margin_top(6)
+                .margin_bottom(2)
+                .build();
+            l.add_css_class("caption-heading");
+            l.add_css_class("dim-label");
+            l
+        });
+        row.set_header(header.as_ref());
+    });
+    for t in shown {
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         let dot = gtk::Box::builder().valign(gtk::Align::Center).build();
         dot.add_css_class("dot");
