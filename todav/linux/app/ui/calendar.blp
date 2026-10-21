@@ -48,70 +48,105 @@ Adw.NavigationSplitView split {
             styles ["card"]
           }
 
-          // The heading's button shows or hides all of them; its mark tells how many show.
-          Gtk.Box {
-            margin-start: 18;
+          // Each section folds under its heading, as the Tasks page's categories do.
+          Gtk.ToggleButton calendars_toggle {
+            active: true;
+            margin-start: 6;
             margin-end: 6;
-            margin-top: 6;
+            styles ["flat", "cat-toggle"]
 
-            Gtk.Label {
-              label: "Calendars";
-              xalign: 0;
-              hexpand: true;
-              styles ["heading"]
-            }
+            Gtk.Box {
+              spacing: 6;
 
-            Gtk.Button all_calendars {
-              valign: center;
-              styles ["flat"]
+              Gtk.Label {
+                label: "Calendars";
+                xalign: 0;
+                hexpand: true;
+                styles ["heading"]
+              }
+
+              Gtk.Image {
+                icon-name: "pan-down-symbolic";
+              }
             }
           }
 
-          // A row per calendar: colour, name, shown or not.
-          Gtk.ListBox calendars {
-            selection-mode: none;
-            styles ["navigation-sidebar"]
+          Gtk.Revealer {
+            reveal-child: bind calendars_toggle.active;
+
+            // A row per calendar: colour, name, shown or not.
+            Gtk.ListBox calendars {
+              selection-mode: none;
+              styles ["navigation-sidebar"]
+            }
           }
 
-          Gtk.Box task_heading {
-            margin-start: 18;
+          Gtk.ToggleButton task_heading {
+            active: true;
+            margin-start: 6;
             margin-end: 6;
-            margin-top: 6;
+            styles ["flat", "cat-toggle"]
 
-            Gtk.Label {
-              label: "Task lists";
-              xalign: 0;
-              hexpand: true;
-              styles ["heading"]
-            }
+            Gtk.Box {
+              spacing: 6;
 
-            Gtk.Button all_task_lists {
-              valign: center;
-              styles ["flat"]
+              Gtk.Label {
+                label: "Task lists";
+                xalign: 0;
+                hexpand: true;
+                styles ["heading"]
+              }
+
+              Gtk.Image {
+                icon-name: "pan-down-symbolic";
+              }
             }
           }
 
-          // The same for lists holding only tasks (their dated tasks are on the calendar).
-          Gtk.ListBox task_lists {
-            selection-mode: none;
-            styles ["navigation-sidebar"]
+          Gtk.Revealer {
+            reveal-child: bind task_heading.active;
+
+            // The same for lists holding only tasks (their dated tasks are on the calendar).
+            Gtk.ListBox task_lists {
+              selection-mode: none;
+              styles ["navigation-sidebar"]
+            }
           }
 
-          Gtk.Label plan_heading {
-            label: "To Plan";
-            xalign: 0;
-            margin-start: 18;
-            margin-top: 12;
+          Gtk.ToggleButton plan_heading {
+            active: true;
+            margin-start: 6;
+            margin-end: 6;
             tooltip-text: "Drag a task onto a day or an hour";
-            styles ["heading"]
+            styles ["flat", "cat-toggle"]
+
+            Gtk.Box {
+              spacing: 6;
+
+              Gtk.Label {
+                label: "To Plan";
+                xalign: 0;
+                hexpand: true;
+                styles ["heading"]
+              }
+
+              Gtk.Image {
+                icon-name: "pan-down-symbolic";
+              }
+            }
           }
 
-          // Open tasks without a time slot: undated, or due by the end of the shown range.
-          // Dropping a planned task here takes it out of its slot.
-          Gtk.ListBox plan {
-            selection-mode: none;
-            margin-bottom: 12;
-            styles ["navigation-sidebar"]
+          Gtk.Revealer {
+            reveal-child: bind plan_heading.active;
+
+            // Open tasks without a time slot: due by a date (by the end of the shown range,
+            // overdue included), then undated. Dropping a planned task here takes it out of
+            // its slot.
+            Gtk.ListBox plan {
+              selection-mode: none;
+              margin-bottom: 12;
+              styles ["navigation-sidebar"]
+            }
           }
         }
       };

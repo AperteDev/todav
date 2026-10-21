@@ -97,10 +97,8 @@ struct Cal {
     split: adw::NavigationSplitView,
     mini: gtk::Calendar,
     calendars: gtk::ListBox,
-    all_calendars: gtk::Button,
-    task_heading: gtk::Box,
+    task_heading: gtk::ToggleButton,
     task_lists: gtk::ListBox,
-    all_task_lists: gtk::Button,
     title: adw::WindowTitle,
     sync_state: gtk::Stack,
     search: gtk::SearchBar,
@@ -111,7 +109,7 @@ struct Cal {
     weekdays: gtk::Box,
     month: gtk::Grid,
     agenda: gtk::Box,
-    plan_heading: gtk::Label,
+    plan_heading: gtk::ToggleButton,
     plan: gtk::ListBox,
     week_head: gtk::Box,
     week_all_day: gtk::Box,
@@ -205,10 +203,8 @@ pub fn build(views: &adw::ViewStack) {
         split,
         mini: get(&b, "mini"),
         calendars: get(&b, "calendars"),
-        all_calendars: get(&b, "all_calendars"),
         task_heading: get(&b, "task_heading"),
         task_lists: get(&b, "task_lists"),
-        all_task_lists: get(&b, "all_task_lists"),
         title: get(&b, "title"),
         sync_state: get(&b, "sync_state"),
         search: get(&b, "search"),
@@ -241,25 +237,15 @@ pub fn build(views: &adw::ViewStack) {
 
     week::setup(&c);
     plan_drop(&c);
-    // Clicking a calendar's row shows or hides it; the heading's button shows all of the
-    // section, or hides them when all are shown.
-    for (list, all, events) in [
-        (&c.calendars, &c.all_calendars, true),
-        (&c.task_lists, &c.all_task_lists, false),
-    ] {
+    // Clicking a calendar's row shows or hides it.
+    for (list, events) in [(&c.calendars, true), (&c.task_lists, false)] {
         list.connect_row_activated(move |_, row| {
             let Some(c) = cal() else { return };
             // Rows are in the section's order.
-            if let Some(href) = section(&c, events).1.get(row.index() as usize) {
+            if let Some(href) = section(&c, events).get(row.index() as usize) {
                 set_hidden([href.as_str()], !hidden().contains(href));
                 glib::idle_add_local_once(refresh);
             }
-        });
-        all.connect_clicked(move |_| {
-            let Some(c) = cal() else { return };
-            let (shown, hrefs) = section(&c, events);
-            set_hidden(hrefs.iter().map(String::as_str), shown == hrefs.len());
-            glib::idle_add_local_once(refresh);
         });
     }
     // The Month / Week / Agenda choice in the bottom bar, when it is there.
@@ -454,7 +440,6 @@ pub fn refresh() {
         return;
     }
     refresh_calendars(&c);
-    sync_all(&c);
     let anchor = c.anchor.get();
     // Keep the mini month on the selected day.
     c.busy.set(true);
@@ -881,31 +866,14 @@ fn refresh_calendars(c: &Rc<Cal>) {
     *c.hidden.borrow_mut() = hidden;
 }
 
-/// How many of the calendars (`events`) or task lists are shown, and all their hrefs.
-fn section(c: &Cal, events: bool) -> (usize, Vec<String>) {
-    let hidden = hidden();
-    let hrefs: Vec<String> = c
-        .lists
+/// The hrefs of the calendars (`events`) or task lists, in sidebar order.
+fn section(c: &Cal, events: bool) -> Vec<String> {
+    c.lists
         .borrow()
         .iter()
         .filter(|l| l.holds_events == events)
         .map(|l| l.href.clone())
-        .collect();
-    (hrefs.iter().filter(|h| !hidden.contains(*h)).count(), hrefs)
-}
-
-/// The headings' marks: a check when all are shown, a dash when some are, none when none are.
-fn sync_all(c: &Cal) {
-    for (all, events) in [(&c.all_calendars, true), (&c.all_task_lists, false)] {
-        let (shown, hrefs) = section(c, events);
-        let all_shown = shown == hrefs.len();
-        all.set_icon_name(match shown {
-            _ if all_shown => "object-select-symbolic",
-            0 => "",
-            _ => "list-remove-symbolic",
-        });
-        all.set_tooltip_text(Some(if all_shown { "Hide All" } else { "Show All" }));
-    }
+        .collect()
 }
 
 fn class(c: &Cal, list: &str) -> String {
