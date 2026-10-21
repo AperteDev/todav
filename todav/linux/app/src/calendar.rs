@@ -592,14 +592,26 @@ fn item_drop(
     drop
 }
 
-/// Drop target for a day (a month cell, the week's all-day row): tasks move there; events move
-/// there keeping their time, or (`all_day`) become all-day events of that day.
+/// Drop target for a day (a month cell, the week's all-day row): items move there keeping their
+/// time; with `all_day`, events become all-day events and tasks leave their time slot.
 fn day_drop(w: &impl IsA<gtk::Widget>, day: i64, all_day: bool) {
     item_drop(w, |_| true, move |i| drop_on_day(i, day, all_day));
 }
 
 fn drop_on_day(i: &Item, day: i64, all_day: bool) {
     match i {
+        // Out of the hours: due that day, no time (its due time was the slot's end).
+        Item::Task(t) if all_day && t.start.is_some() && !t.start_all_day => save(
+            &t.uid,
+            TaskPatch {
+                start: Some(None),
+                due: Some(Some(Due {
+                    at: day,
+                    all_day: true,
+                })),
+                ..Default::default()
+            },
+        ),
         Item::Task(t) => move_to_day(t, day),
         Item::Event(e) if all_day && !e.all_day => move_event(
             e,
