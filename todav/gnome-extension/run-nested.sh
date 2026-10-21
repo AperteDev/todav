@@ -27,6 +27,13 @@ modes=$(realpath "$(dirname "$0")/../..")/target/nested
 mkdir -p "$modes/gnome-shell/modes"
 echo '{"parentMode": "user", "showWelcomeDialog": false}' > "$modes/gnome-shell/modes/nested.json"
 
+# A socket left by a run that was killed would pass the wait below before the shell listens.
+if pgrep -f "[w]ayland-display=$display" >/dev/null; then
+  echo "A nested shell on $display is already running" >&2
+  exit 1
+fi
+rm -f "$XDG_RUNTIME_DIR/$display" "$XDG_RUNTIME_DIR/$display.lock"
+
 MUTTER_DEBUG_DUMMY_MODE_SPECS=${MUTTER_DEBUG_DUMMY_MODE_SPECS:-1600x900} \
 SHELL_DEBUG=${SHELL_DEBUG:-all} \
 XDG_DATA_DIRS=$modes:${XDG_DATA_DIRS:-/usr/local/share:/usr/share} \
@@ -41,8 +48,9 @@ done
 # TODAV_WINDOW=1 opens the app's window too; otherwise it only runs as the background service.
 args=--gapplication-service
 [ -n "${TODAV_WINDOW:-}" ] && args=
-# No accessibility: its registry is a systemd unit, which this bus cannot start.
-WAYLAND_DISPLAY=$display GTK_A11Y=none "$app" $args &
+# No accessibility: its registry is a systemd unit, which this bus cannot start. Wayland only:
+# GTK would otherwise fall back to the host's X display when the nested shell is not up.
+WAYLAND_DISPLAY=$display GDK_BACKEND=wayland GTK_A11Y=none "$app" $args &
 app_pid=$!
 
 # The extension asks the app for lists right away: enable it once the app's interface is up.
