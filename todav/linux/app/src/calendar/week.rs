@@ -86,29 +86,16 @@ pub(super) fn setup(c: &Rc<Cal>) {
         }
         c.week_lines.queue_draw();
     });
-    // A double click on a free hour adds an event there.
-    let click = gtk::GestureClick::new();
-    let weak = Rc::downgrade(c);
-    click.connect_pressed(move |g, n, x, y| {
-        let Some(c) = weak.upgrade() else { return };
-        if n != 2 {
-            return;
-        }
-        if let Some((day, minute)) = slot(&c, x, y) {
-            g.set_state(gtk::EventSequenceState::Claimed);
-            let at = week_start(c.anchor.get()) + day * DAY + minute / 30 * 30 * 60;
-            dialog::open(
-                &c,
-                None,
-                EventTime {
-                    start: at,
-                    end: at + 3600,
-                    all_day: false,
-                },
-            );
-        }
+    // A double click or a long press on a free hour adds an event there.
+    new_event_on(&c.week_grid, |c, x, y| {
+        let (day, minute) = slot(c, x, y)?;
+        let at = week_start(c.anchor.get()) + day * DAY + minute / 30 * 30 * 60;
+        Some(EventTime {
+            start: at,
+            end: at + 3600,
+            all_day: false,
+        })
     });
-    c.week_grid.add_controller(click);
     let weak = Rc::downgrade(c);
     drop.connect_motion(move |_, x, y| {
         if let Some(c) = weak.upgrade() {

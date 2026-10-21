@@ -857,7 +857,7 @@ fn clear(w: &impl IsA<gtk::Widget>) {
 fn render_month(c: &Rc<Cal>) -> i64 {
     let anchor = c.anchor.get();
     let d = dates::fields(anchor);
-    let first = anchor - (d.day_of_month() as i64 - 1) * DAY;
+    let first = month_first(anchor);
     let start = week_start(first);
     let end = start + 42 * DAY;
     c.title.set_title(&capitalized(&fmt(first, "%OB %Y")));
@@ -909,32 +909,82 @@ fn render_month(c: &Rc<Cal>) -> i64 {
                 here[shown..].iter().map(|i| (*i).clone()).collect(),
             ));
         }
-        // Clicking a day selects it, a double click adds an event that day; what is dropped
-        // on it moves there.
+        // Clicking a day selects it, a double click or a long press adds an event that day;
+        // what is dropped on it moves there.
         let click = gtk::GestureClick::new();
-        let weak = Rc::downgrade(c);
         click.connect_released(move |_, n, _, _| {
-            if n == 2 {
-                if let Some(c) = weak.upgrade() {
-                    dialog::open(
-                        &c,
-                        None,
-                        EventTime {
-                            start: day,
-                            end: day + DAY,
-                            all_day: true,
-                        },
-                    );
-                }
-            } else {
-                go(|_| day);
+            if n == 1 {
+                select_in_month(day);
             }
         });
         cell.add_controller(click);
+        new_event_on(&cell, move |_, _, _| {
+            Some(EventTime {
+                start: day,
+                end: day + DAY,
+                all_day: true,
+            })
+        });
         day_drop(&cell, day, false);
         c.month.attach(&cell, (n % 7) as i32, (n / 7) as i32, 1, 1);
     }
     end
+}
+
+/// Midnight of the first day of the month holding `day`.
+fn month_first(day: i64) -> i64 {
+    day - (dates::fields(day).day_of_month() as i64 - 1) * DAY
+}
+
+/// Select a day of the month grid. In the month shown only the highlight moves: a rebuilt
+/// grid would lose the second click of a double click.
+fn select_in_month(day: i64) {
+    let Some(c) = cal() else { return };
+    let first = month_first(day);
+    if first != month_first(c.anchor.get()) {
+        return go(|_| day);
+    }
+    c.anchor.set(day);
+    let mut d = week_start(first);
+    let mut cell = c.month.first_child();
+    while let Some(w) = cell {
+        if d == day {
+            w.add_css_class("selected");
+        } else {
+            w.remove_css_class("selected");
+        }
+        d += DAY;
+        cell = w.next_sibling();
+    }
+    c.busy.set(true);
+    c.mini.select_day(&dates::fields(day));
+    c.busy.set(false);
+}
+
+/// A double click, or a long press on a touchscreen, on `w` adds an event at the time `at`
+/// gives for that point, if any.
+fn new_event_on(
+    w: &impl IsA<gtk::Widget>,
+    at: impl Fn(&Rc<Cal>, f64, f64) -> Option<EventTime> + 'static,
+) {
+    let open = Rc::new(move |g: &gtk::Gesture, x, y| {
+        let Some(c) = cal() else { return };
+        if let Some(time) = at(&c, x, y) {
+            g.set_state(gtk::EventSequenceState::Claimed);
+            dialog::open(&c, None, time);
+        }
+    });
+    let click = gtk::GestureClick::new();
+    let o = open.clone();
+    click.connect_pressed(move |g, n, x, y| {
+        if n == 2 {
+            o(g.upcast_ref(), x, y);
+        }
+    });
+    w.add_controller(click);
+    let hold = gtk::GestureLongPress::builder().touch_only(true).build();
+    hold.connect_pressed(move |g, x, y| open(g.upcast_ref(), x, y));
+    w.add_controller(hold);
 }
 
 /// "+N more": a popover with the rest of the day.
