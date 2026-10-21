@@ -1076,14 +1076,18 @@ fn subtask_counts(tasks: &[Task]) -> HashMap<String, (usize, usize)> {
 /// The event a task is for, as a pill opening the calendar on its (next) day.
 fn event_tag(t: &Task) -> Option<gtk::Button> {
     let e = core().event(t.event_uid.clone()?)?;
+    // Ellipsized in narrow windows, so the full name is in the tooltip too.
     let content = adw::ButtonContent::builder()
         .icon_name("x-office-calendar-symbolic")
         .label(&e.summary)
+        .can_shrink(true)
         .build();
+    let when = dates::label(e.start, e.all_day, core().local_now());
     let b = gtk::Button::builder()
         .child(&content)
+        .can_shrink(true)
         .valign(gtk::Align::Center)
-        .tooltip_text(dates::label(e.start, e.all_day, core().local_now()))
+        .tooltip_text(format!("{} · {when}", e.summary))
         .build();
     b.add_css_class("tag");
     b.add_css_class("event");
