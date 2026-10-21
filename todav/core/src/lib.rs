@@ -699,11 +699,15 @@ impl std::fmt::Display for Error {
             Error::Conflict => write!(f, "precondition failed (changed on server)"),
             Error::NoAccount => write!(f, "no account configured"),
             Error::NotFound(s) => write!(f, "not found: {s}"),
-            Error::Http(code, body) => write!(
-                f,
-                "HTTP {code}: {}",
-                body.chars().take(300).collect::<String>()
-            ),
+            // A WebDAV error body is XML: its <s:message> is the part worth reading.
+            Error::Http(code, body) => {
+                let message = body
+                    .split_once("<s:message>")
+                    .and_then(|(_, m)| m.split_once("</s:message>"))
+                    .map_or(body.as_str(), |(m, _)| m);
+                let short: String = message.chars().take(300).collect();
+                write!(f, "HTTP {code}: {}", short.trim())
+            }
             Error::Net(s) => write!(f, "network: {s}"),
             Error::Parse(s) => write!(f, "parse: {s}"),
             Error::Db(s) => write!(f, "database: {s}"),
@@ -873,6 +877,23 @@ mod tests {
         assert_eq!((t.due, t.reminders.len()), (None, 0));
         assert!(!raw().contains("VALARM"), "no due date, no reminders");
         assert!(c.upcoming().is_empty());
+    }
+
+    #[test]
+    fn http_errors_show_the_servers_message() {
+        let body = r#"<?xml version="1.0" encoding="utf-8"?>
+<d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+  <s:exception>Sabre\DAV\Exception\UnsupportedMediaType</s:exception>
+  <s:message>Validation error in iCalendar: DUE must occur after DTSTART</s:message>
+</d:error>"#;
+        assert_eq!(
+            Error::Http(415, body.into()).to_string(),
+            "HTTP 415: Validation error in iCalendar: DUE must occur after DTSTART"
+        );
+        assert_eq!(
+            Error::Http(500, "oops".into()).to_string(),
+            "HTTP 500: oops"
+        );
     }
 
     #[test]
