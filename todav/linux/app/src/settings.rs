@@ -160,12 +160,14 @@ pub fn present(parent: &impl IsA<gtk::Widget>) {
     let manual = crate::goa_id().is_none();
     let password = crate::password_load(&old_server, &user).unwrap_or_default();
     let old_ntfy = core().setting("ntfy_url".into()).unwrap_or_default();
-    let sync: adw::SwitchRow = get(&b, "sync_settings");
-    sync.set_active(core().setting("sync_settings".into()).as_deref() != Some("false"));
-    sync.connect_active_notify(|s| {
-        let _ = core().set_setting("sync_settings".into(), s.is_active().to_string());
-        request_sync(); // turning it on pulls the server's settings right away
-    });
+    for key in ["sync_settings", "sync_ntfy"] {
+        let sync: adw::SwitchRow = get(&b, key);
+        sync.set_active(core().setting(key.into()).as_deref() != Some("false"));
+        sync.connect_active_notify(move |s| {
+            let _ = core().set_setting(key.into(), s.is_active().to_string());
+            request_sync(); // turning it on pulls the server's settings right away
+        });
+    }
     connect_choice(&b, "start_view", &["last", "tasks", "calendar"]);
     connect_choice(
         &b,

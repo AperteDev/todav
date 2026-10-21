@@ -9,7 +9,8 @@
   time; when syncing, the newer value wins implicitly per key (the server wins ties).
 - Synced settings live in Nextcloud Files at `.config/todav/settings.json`, merged on every sync.
 - The user can turn syncing off with "Sync settings with server" (Preferences → General),
-  stored as the device-only `sync_settings` setting; on by default.
+  stored as the device-only `sync_settings` setting; on by default. The ntfy server
+  (`ntfy_url`) syncs with them unless "Sync ntfy server" (`sync_ntfy`) is off.
 
 ## Linux UI
 

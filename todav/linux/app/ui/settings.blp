@@ -85,8 +85,15 @@ Adw.PreferencesDialog dialog {
 
       Adw.SwitchRow sync_settings {
         title: "Sync settings with server";
-        subtitle: "Server addresses always stay on this device";
+        subtitle: "The Nextcloud server always stays on this device";
         active: true;
+      }
+
+      Adw.SwitchRow sync_ntfy {
+        title: "Sync ntfy server";
+        subtitle: "Use the same push server on all devices";
+        active: true;
+        sensitive: bind sync_settings.active;
       }
     }
   }

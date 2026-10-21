@@ -22,6 +22,8 @@ pub const APP_ID: &str = "io.github.selfref.Todav";
 static CORE: OnceLock<Arc<Client>> = OnceLock::new();
 static SYNC: OnceLock<Sender<()>> = OnceLock::new();
 static SYNC_STATE: Mutex<String> = Mutex::new(String::new());
+/// The ntfy server the push listener was started for.
+static PUSH_URL: Mutex<String> = Mutex::new(String::new());
 
 pub fn core() -> &'static Arc<Client> {
     CORE.get().expect("core opened at startup")
@@ -73,10 +75,15 @@ impl ChangeListener for Listener {
         post(Event::Changed(list_href));
     }
 
-    /// Synced settings (e.g. task order) affect every list's view.
+    /// Synced settings (e.g. task order) affect every list's view; a synced ntfy server is
+    /// listened to at once.
     fn settings_changed(&self) {
         for l in core().lists() {
             post(Event::Changed(l.href));
+        }
+        let ntfy = core().setting("ntfy_url".into()).unwrap_or_default();
+        if ntfy != *PUSH_URL.lock().unwrap() {
+            restart_push();
         }
     }
 }
@@ -265,7 +272,9 @@ pub async fn switch_account(target: Target) -> Result<(), String> {
 /// Stop the push listener and start a new one if an ntfy server is configured.
 pub fn restart_push() {
     core().stop_listening();
-    if let Some(ntfy) = core().setting("ntfy_url".into()).filter(|u| !u.is_empty()) {
+    let url = core().setting("ntfy_url".into()).unwrap_or_default();
+    *PUSH_URL.lock().unwrap() = url.clone();
+    if let Some(ntfy) = Some(url).filter(|u| !u.is_empty()) {
         std::thread::spawn(move || {
             // Blocks until the next restart_push; reconnects internally.
             let _ = core().listen(ntfy, &|r| set_state(&r));

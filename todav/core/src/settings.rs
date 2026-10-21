@@ -6,11 +6,12 @@ use crate::{Client, Error, Result, store};
 use std::collections::BTreeMap;
 
 /// Settings that only make sense on one device and are never synced.
-/// (`drag_handles` depends on whether the device has a touchscreen.)
+/// (`drag_handles` depends on whether the device has a touchscreen.) The ntfy server joins
+/// them when `sync_ntfy` is "false".
 pub const DEVICE_ONLY: &[&str] = &[
-    "ntfy_url",
     "last_list",
     "sync_settings",
+    "sync_ntfy",
     "drag_handles",
     "goa_account",
     "manual_url",
@@ -45,6 +46,10 @@ impl Client {
     pub(crate) fn sync_settings(&self) -> Result<()> {
         if self.setting("sync_settings".into()).as_deref() == Some("false") {
             return Ok(());
+        }
+        let mut local_only = DEVICE_ONLY.to_vec();
+        if self.setting("sync_ntfy".into()).as_deref() == Some("false") {
+            local_only.push("ntfy_url");
         }
         let dav = self.dav()?;
         let cached = store::kv_get(&self.db.lock().unwrap(), "config_settings_href")?;
@@ -84,7 +89,7 @@ impl Client {
                 s => return Err(Error::Http(s, r.body)),
             };
             let remote = parse(&body);
-            let (apply, merged, upload) = merge(&self.synced()?, &remote);
+            let (apply, merged, upload) = merge(&self.synced(&local_only)?, &remote, &local_only);
             {
                 let db = self.db.lock().unwrap();
                 for (k, (v, t)) in &apply {
@@ -141,8 +146,9 @@ impl Client {
         Ok(()) // still racing: the next sync tries again
     }
 
-    /// Local settings that sync, with change times (0 when set before times were recorded).
-    fn synced(&self) -> Result<Map> {
+    /// Local settings that sync (all but `local_only`), with change times (0 when set before
+    /// times were recorded).
+    fn synced(&self, local_only: &[&str]) -> Result<Map> {
         let db = self.db.lock().unwrap();
         let mut st = db.prepare(
             "SELECT substr(s.key, 9), s.value, t.value FROM kv s
@@ -159,7 +165,7 @@ impl Client {
         let mut out = Map::new();
         for row in rows {
             let (k, v, t) = row?;
-            if !DEVICE_ONLY.contains(&k.as_str()) {
+            if !local_only.contains(&k.as_str()) {
                 out.insert(k, (v, t.and_then(|t| t.parse().ok()).unwrap_or(0)));
             }
         }
@@ -168,13 +174,13 @@ impl Client {
 }
 
 /// (remote entries to apply locally, merged map, whether the server lacks something newer).
-/// Newer wins; on a tie the server wins, so devices converge.
-fn merge(local: &Map, remote: &Map) -> (Map, Map, bool) {
+/// Newer wins; on a tie the server wins, so devices converge. `local_only` keys are left out.
+fn merge(local: &Map, remote: &Map, local_only: &[&str]) -> (Map, Map, bool) {
     let mut apply = Map::new();
     let mut merged = remote.clone();
     let mut upload = false;
     for (k, (rv, rt)) in remote {
-        if DEVICE_ONLY.contains(&k.as_str()) {
+        if local_only.contains(&k.as_str()) {
             merged.remove(k);
             continue;
         }
@@ -260,9 +266,9 @@ mod tests {
             ("c", "remote", 3),
             ("d", "same", 3),
             ("only_remote", "y", 1),
-            ("ntfy_url", "https://other", 9), // device-only: never applied or kept
+            ("last_list", "/other/", 9), // device-only: never applied or kept
         ]);
-        let (apply, merged, upload) = merge(&local, &remote);
+        let (apply, merged, upload) = merge(&local, &remote, DEVICE_ONLY);
         assert_eq!(
             apply,
             map(&[

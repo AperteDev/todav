@@ -65,6 +65,12 @@ CREATE INDEX events_span ON events(first_start, last_end);
 ALTER TABLE tasks ADD COLUMN event_uid TEXT;
 CREATE INDEX tasks_event ON tasks(event_uid);
 "#,
+    // The ntfy server syncs now: an empty one saved when signing in must not clear the one
+    // other devices use.
+    r#"
+DELETE FROM kv WHERE key IN ('setting_ntfy_url', 'settime_ntfy_url')
+  AND (SELECT value FROM kv WHERE key = 'setting_ntfy_url') = '';
+"#,
 ];
 
 /// RELTYPE of the RELATED-TO linking a task to the event it is for (a custom type: PARENT would
@@ -118,7 +124,8 @@ pub fn open(path: &str) -> Result<Connection> {
         tx.pragma_update(None, "user_version", i as i64 + 1)?;
         tx.commit()?;
     }
-    // Derived columns changed with every migration so far (local times, reminders, zones, start).
+    // Derived columns changed with most migrations so far (local times, reminders, zones, start);
+    // after the others rederiving is only wasted time.
     if version > 0 && (version as usize) < MIGRATIONS.len() {
         rederive(&db)?;
     }

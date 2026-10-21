@@ -521,7 +521,11 @@ fn connect_goa(ui: &Rc<Ui>) {
 }
 
 async fn connect_with(ui: &Rc<Ui>, target: crate::Target) {
-    let _ = core().set_setting("ntfy_url".into(), url_text(&ui.ntfy));
+    // Left empty: a synced ntfy server, if any, comes with the first sync.
+    let ntfy = url_text(&ui.ntfy);
+    if !ntfy.is_empty() {
+        let _ = core().set_setting("ntfy_url".into(), ntfy);
+    }
     match crate::switch_account(target).await {
         Ok(()) => {
             ui.stack.set_visible_child_name("main");
