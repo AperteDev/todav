@@ -210,8 +210,15 @@ pub fn refresh() {
 
 pub fn toast(msg: &str) {
     if let Some(ui) = ui() {
-        ui.toasts.add_toast(adw::Toast::new(msg));
+        ui.toasts.add_toast(note(msg));
     }
+}
+
+/// A toast showing `text` as it is: a toast title is markup otherwise, and errors carry `<`.
+pub fn note(text: &str) -> adw::Toast {
+    let t = adw::Toast::new(text);
+    t.set_use_markup(false);
+    t
 }
 
 pub fn show_list(href: &str) {
@@ -246,8 +253,7 @@ pub fn on_event(ev: &Event) {
             crate::calendar::set_syncing(s == "syncing");
             if let Some(err) = s.strip_prefix("error:") {
                 if *ui.last_error.borrow() != err {
-                    ui.toasts
-                        .add_toast(adw::Toast::new(&format!("Sync failed: {err}")));
+                    ui.toasts.add_toast(note(&format!("Sync failed: {err}")));
                     *ui.last_error.borrow_mut() = err.to_string();
                 }
             } else if s == "idle" {
@@ -495,7 +501,7 @@ fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
                 entry.set_text("");
                 request_sync();
             }
-            Err(e) => ui.toasts.add_toast(adw::Toast::new(&e.to_string())),
+            Err(e) => ui.toasts.add_toast(note(&e.to_string())),
         }
     });
 
@@ -598,7 +604,7 @@ fn start_login(ui: &Rc<Ui>, copy: bool) {
             Ok(Some(c)) => connect_with(&ui, crate::Target::Manual(c)).await,
             // Cancelled: Cancel already reset the page, which may be waiting for a new sign-in.
             Ok(None) => return,
-            Err(e) => ui.toasts.add_toast(adw::Toast::new(&e)),
+            Err(e) => ui.toasts.add_toast(note(&e)),
         }
         reset_login(&ui);
     });
@@ -628,7 +634,7 @@ async fn connect_with(ui: &Rc<Ui>, target: crate::Target) {
             ui.stack.set_visible_child_name("main");
             refresh_lists(ui);
         }
-        Err(e) => ui.toasts.add_toast(adw::Toast::new(&e)),
+        Err(e) => ui.toasts.add_toast(note(&e)),
     }
 }
 
@@ -1410,7 +1416,7 @@ fn tree_row(
                 *ui.focus_sub.borrow_mut() = Some(root.uid.clone()); // keep typing after the rebuild
                 request_sync();
             }
-            Err(err) => ui.toasts.add_toast(adw::Toast::new(&err.to_string())),
+            Err(err) => ui.toasts.add_toast(note(&err.to_string())),
         }
     });
     if start {
@@ -1560,7 +1566,7 @@ fn connect_dnd(
         };
         let above = y < w.height() as f64 / 2.0;
         if let Err(e) = drop_task(&d, &ds, &target, &slot, above) {
-            ui.toasts.add_toast(adw::Toast::new(&e.to_string()));
+            ui.toasts.add_toast(note(&e.to_string()));
         }
         true
     });
@@ -1645,7 +1651,7 @@ fn adopt_target(
                 ui.expanded.borrow_mut().insert(p.uid.clone()); // show where it went
                 request_sync();
             }
-            Err(e) => ui.toasts.add_toast(adw::Toast::new(&e.to_string())),
+            Err(e) => ui.toasts.add_toast(note(&e.to_string())),
         }
         true
     });

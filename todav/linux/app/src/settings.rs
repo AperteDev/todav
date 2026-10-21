@@ -322,7 +322,7 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
                 crate::window::account_changed();
             }
             show(); // also puts the switch back when that failed
-            d.add_toast(adw::Toast::new(&r.unwrap_or_else(|e| e)));
+            d.add_toast(crate::window::note(&r.unwrap_or_else(|e| e)));
         });
     });
 
@@ -359,7 +359,7 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
         move |copy: bool| {
             let server = url_text(&c.server);
             if server.is_empty() {
-                d.add_toast(adw::Toast::new("Enter the Nextcloud server first"));
+                d.add_toast(crate::window::note("Enter the Nextcloud server first"));
                 return;
             }
             let button = if sign_in.is_visible() {
@@ -382,7 +382,7 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
                     Err(e) => e,
                 };
                 reset();
-                d.add_toast(adw::Toast::new(&msg));
+                d.add_toast(crate::window::note(&msg));
             });
         }
     };
@@ -399,7 +399,7 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
     password.connect_activate(move |_, _| {
         let server = url_text(&c.server);
         if server.is_empty() {
-            d.add_toast(adw::Toast::new("Enter the Nextcloud server first"));
+            d.add_toast(crate::window::note("Enter the Nextcloud server first"));
             return;
         }
         let (dd, show) = (d.clone(), describe_.clone());
@@ -408,7 +408,7 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
             glib::spawn_future_local(async move {
                 let msg = use_sign_in(c).await;
                 show();
-                d.add_toast(adw::Toast::new(&msg));
+                d.add_toast(crate::window::note(&msg));
             });
         });
     });
@@ -423,7 +423,7 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
         let (d, b, show) = (d.clone(), b.clone(), show.clone());
         glib::spawn_future_local(async move {
             if let Err(e) = crate::disconnect(true).await {
-                d.add_toast(adw::Toast::new(&e));
+                d.add_toast(crate::window::note(&e));
             }
             b.set_sensitive(true);
             show();
@@ -479,7 +479,7 @@ fn connect_test(
                 Err(_) => "Test failed".to_string(),
             };
             button.set_sensitive(true);
-            dialog.add_toast(adw::Toast::new(&msg));
+            dialog.add_toast(crate::window::note(&msg));
         });
     });
 }
