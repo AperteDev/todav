@@ -532,6 +532,7 @@ fn render_plan(c: &Rc<Cal>, until: i64) {
             }
             row.append(&due);
         }
+        row.set_tooltip_markup(Some(&tooltip(c, &Item::Task(t.clone()))));
         drag_task(&row, t);
         c.plan.append(&row);
     }
@@ -1172,6 +1173,7 @@ fn chip(c: &Rc<Cal>, i: &Item) -> gtk::Widget {
                 .build();
             b.add_css_class("chip");
             b.add_css_class(&class(c, &e.list_href));
+            b.set_tooltip_markup(Some(&tooltip(c, i)));
             if e.all_day {
                 b.add_css_class("all-day");
             }
@@ -1233,6 +1235,7 @@ fn task_chip(c: &Cal, t: &Task, label: &gtk::Label, check_align: gtk::Align) -> 
     for cls in ["chip", "task", &class(c, &t.list_href)] {
         b.add_css_class(cls);
     }
+    b.set_tooltip_markup(Some(&tooltip(c, &Item::Task(t.clone()))));
     if t.done {
         b.add_css_class("done");
     }
@@ -1276,6 +1279,61 @@ fn span_text(e: &Event) -> String {
             fmt(e.end, "%H:%M")
         )
     }
+}
+
+/// An event's or task's tooltip (markup): the whole title, when, where and in which list; the
+/// views cut titles short.
+fn tooltip(c: &Cal, i: &Item) -> String {
+    let mut lines = Vec::new();
+    let title = match i {
+        Item::Event(e) => &e.summary,
+        Item::Task(t) => &t.summary,
+    };
+    match i {
+        Item::Event(e) => {
+            lines.push(span_text(e));
+            lines.extend(e.location.clone());
+            if e.cancelled {
+                lines.push("Cancelled".into());
+            }
+        }
+        Item::Task(t) => {
+            let at = |t: i64, all_day: bool| {
+                let date = fmt(t, "%A %-d %B %Y");
+                if all_day {
+                    date
+                } else {
+                    format!("{date}, {}", fmt(t, "%H:%M"))
+                }
+            };
+            match (t.start, t.due) {
+                // Planned into a slot of one day: as an event's time.
+                (Some(s), Some(d))
+                    if !t.start_all_day && !t.due_all_day && fmt(s, "%F") == fmt(d, "%F") =>
+                {
+                    lines.push(format!("{} – {}", at(s, false), fmt(d, "%H:%M")))
+                }
+                (start, due) => {
+                    lines.extend(start.map(|s| format!("Starts {}", at(s, t.start_all_day))));
+                    lines.extend(due.map(|d| format!("Due {}", at(d, t.due_all_day))));
+                }
+            }
+            lines.extend(t.category.clone().filter(|c| !c.is_empty()));
+            if t.done {
+                lines.push("Completed".into());
+            }
+            if t.sync_error.is_some() {
+                lines.push("Not saved on the server".into());
+            }
+        }
+    }
+    lines.push(list_name(c, i.list()));
+    let mut text = format!("<b>{}</b>", glib::markup_escape_text(title));
+    for l in lines.iter().filter(|l| !l.is_empty()) {
+        text.push('\n');
+        text.push_str(&glib::markup_escape_text(l));
+    }
+    text
 }
 
 /// The tasks for an event: tick them, add one (to the task list used last, due when the event
