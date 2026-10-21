@@ -79,6 +79,8 @@ pub struct TaskPatch {
     pub start: Option<Option<Due>>,
     /// The event (UID) the task is for; Some(None) unlinks it.
     pub event: Option<Option<String>>,
+    /// PRIORITY, 1 (highest) to 9 (lowest); Some(None) clears it.
+    pub priority: Option<Option<i64>>,
 }
 
 /// A due date in local time; `all_day`: a date without a time (`at` is its midnight).
@@ -549,6 +551,9 @@ impl Client {
             if let Some(e) = &patch.event {
                 cal.set_related(store::EVENT_LINK, e.as_deref());
             }
+            if let Some(p) = patch.priority {
+                cal.set("PRIORITY", "", p.map(|p| p.to_string()).as_deref());
+            }
             if let Some(r) = patch.reminders.as_ref().filter(|_| patch.due != Some(None)) {
                 let v: Vec<String> = r.iter().map(|o| ical::fmt_duration(*o)).collect();
                 let t: Vec<(&str, &str)> = v.iter().map(|v| (";RELATED=END", v.as_str())).collect();
@@ -920,9 +925,18 @@ mod tests {
             ..Default::default()
         };
         c.update_task(uid.clone(), patch).unwrap();
-        assert_eq!(c.task(uid).unwrap().start, None);
+        assert_eq!(c.task(uid.clone()).unwrap().start, None);
         assert_eq!(c.unscheduled(week).len(), 1);
         assert!(c.unscheduled(day).is_empty(), "due later than asked");
+        // Priority is set and cleared on its own.
+        let priority = |p| TaskPatch {
+            priority: Some(p),
+            ..Default::default()
+        };
+        c.update_task(uid.clone(), priority(Some(1))).unwrap();
+        assert_eq!(c.task(uid.clone()).unwrap().priority, Some(1));
+        c.update_task(uid.clone(), priority(None)).unwrap();
+        assert_eq!(c.task(uid).unwrap().priority, None);
     }
 
     #[test]
