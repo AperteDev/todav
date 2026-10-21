@@ -277,9 +277,7 @@ pub(super) fn render(c: &Rc<Cal>) -> i64 {
     c.week_head.append(&gutter());
     c.week_all_day.append(&gutter());
     let head = gtk::Box::builder().homogeneous(true).hexpand(true).build();
-    let all_day = gtk::Box::builder().homogeneous(true).hexpand(true).build();
     c.week_head.append(&head);
-    c.week_all_day.append(&all_day);
     let items = items(start, end);
     for d in 0..7 {
         let day = start + d * DAY;
@@ -288,17 +286,20 @@ pub(super) fn render(c: &Rc<Cal>) -> i64 {
             name.add_css_class("today");
         }
         head.append(&name);
-        let cell = gtk::Box::new(gtk::Orientation::Vertical, 2);
-        cell.add_css_class("all-day-cell");
-        for i in items
-            .iter()
-            .filter(|i| on_day(i, day) && segments(i, start).is_empty())
-        {
-            cell.append(&chip(c, i));
-        }
-        day_drop(&cell, day, true);
-        all_day.append(&cell);
     }
+    // What has no hours: all-day items, a bar across their days.
+    let all_day: Vec<&Item> = items
+        .iter()
+        .filter(|i| segments(i, start).is_empty())
+        .collect();
+    let row = days::row(c, start, &all_day, usize::MAX, true, |day| {
+        let cell = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        cell.add_css_class("all-day-cell");
+        day_drop(&cell, day, true);
+        cell
+    });
+    row.set_hexpand(true);
+    c.week_all_day.append(&row);
 
     // The hours.
     for (w, _) in c.blocks.borrow_mut().drain(..) {

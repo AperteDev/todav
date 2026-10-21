@@ -2,6 +2,7 @@
 //! with the calendars (and task lists) to show and the tasks still to plan in the sidebar.
 //! Times are local wall-clock seconds, as in the core.
 
+mod days;
 mod dialog;
 mod week;
 
@@ -38,6 +39,9 @@ menubutton.chip > button, menubutton.more > button, .chip.task button { min-heig
 menubutton.chip, menubutton.more { padding: 0; }
 menubutton.chip > button, menubutton.more > button { padding: 0 6px; border-radius: 6px; }
 menubutton.block > button { padding: 2px 6px; }
+/* Ends of a bar that goes on into the next or previous week (or past a full day) are square. */
+.chip.from-before, menubutton.chip.from-before > button { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.chip.goes-on, menubutton.chip.goes-on > button { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .chip.task check { min-width: 14px; min-height: 14px; margin: 0 4px 0 0; padding: 0; }
 .chip.task button { padding: 0; min-height: 0; }
 .chip.done label { text-decoration-line: line-through; opacity: 0.55; }
@@ -586,7 +590,11 @@ fn item_drop(
 /// Drop target for a day (a month cell, the week's all-day row): tasks move there; events move
 /// there keeping their time, or (`all_day`) become all-day events of that day.
 fn day_drop(w: &impl IsA<gtk::Widget>, day: i64, all_day: bool) {
-    item_drop(w, false, move |i| match i {
+    item_drop(w, false, move |i| drop_on_day(i, day, all_day));
+}
+
+fn drop_on_day(i: &Item, day: i64, all_day: bool) {
+    match i {
         Item::Task(t) => move_to_day(t, day),
         Item::Event(e) if all_day && !e.all_day => move_event(
             e,
@@ -607,7 +615,7 @@ fn day_drop(w: &impl IsA<gtk::Widget>, day: i64, all_day: bool) {
                 },
             )
         }
-    });
+    }
 }
 
 /// Give an occurrence a new time; for a repeating event, ask which occurrences move.
@@ -951,11 +959,9 @@ fn render_month(c: &Rc<Cal>) -> i64 {
     }
     let all = items(start, end);
     let (today, month) = (today(), d.month());
-    for n in 0..42 {
-        let day = start + n * DAY;
+    let cell = |day: i64| {
         let cell = gtk::Box::new(gtk::Orientation::Vertical, 2);
         cell.add_css_class("day");
-        cell.set_overflow(gtk::Overflow::Hidden);
         if dates::fields(day).month() != month {
             cell.add_css_class("other");
         }
@@ -971,22 +977,6 @@ fn render_month(c: &Rc<Cal>) -> i64 {
             .build();
         num.add_css_class("num");
         cell.append(&num);
-        let here: Vec<&Item> = all.iter().filter(|i| on_day(i, day)).collect();
-        let shown = if here.len() > CHIPS {
-            CHIPS - 1
-        } else {
-            here.len()
-        };
-        for i in &here[..shown] {
-            cell.append(&chip(c, i));
-        }
-        if here.len() > shown {
-            cell.append(&more(
-                c,
-                day,
-                here[shown..].iter().map(|i| (*i).clone()).collect(),
-            ));
-        }
         // Clicking a day selects it, a double click or a long press adds an event that day;
         // what is dropped on it moves there.
         let click = gtk::GestureClick::new();
@@ -1004,7 +994,16 @@ fn render_month(c: &Rc<Cal>) -> i64 {
             })
         });
         day_drop(&cell, day, false);
-        c.month.attach(&cell, (n % 7) as i32, (n / 7) as i32, 1, 1);
+        cell
+    };
+    for w in 0..6 {
+        let from = start + w * 7 * DAY;
+        let here: Vec<&Item> = all
+            .iter()
+            .filter(|i| (0..7).any(|d| on_day(i, from + d * DAY)))
+            .collect();
+        let row = days::row(c, from, &here, CHIPS, false, cell);
+        c.month.attach(&row, 0, w as i32, 1, 1);
     }
     end
 }
@@ -1024,15 +1023,17 @@ fn select_in_month(day: i64) {
     }
     c.anchor.set(day);
     let mut d = week_start(first);
-    let mut cell = c.month.first_child();
-    while let Some(w) = cell {
-        if d == day {
-            w.add_css_class("selected");
-        } else {
-            w.remove_css_class("selected");
+    let mut row = c.month.first_child();
+    while let Some(r) = row {
+        for w in days::cells(&r) {
+            if d == day {
+                w.add_css_class("selected");
+            } else {
+                w.remove_css_class("selected");
+            }
+            d += DAY;
         }
-        d += DAY;
-        cell = w.next_sibling();
+        row = r.next_sibling();
     }
     c.busy.set(true);
     c.mini.select_day(&dates::fields(day));
@@ -1066,7 +1067,7 @@ fn new_event_on(
 }
 
 /// "+N more": a popover with the rest of the day.
-fn more(c: &Rc<Cal>, day: i64, rest: Vec<Item>) -> gtk::MenuButton {
+fn more_button(c: &Rc<Cal>, day: i64, rest: Vec<Item>) -> gtk::MenuButton {
     let label = gtk::Label::builder()
         .label(format!("+{} more", rest.len()))
         .xalign(0.0)
