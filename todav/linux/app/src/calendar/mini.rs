@@ -79,6 +79,15 @@ fn render(c: &Rc<Cal>) {
         m.grid.attach(&name, d as i32, 0, 1, 1);
     }
     let (today, anchor, month) = (today(), c.anchor.get(), dates::fields(first).month());
+    // The Week view's week: a band under its row (if shown in this month).
+    if mode(c) == Mode::Week && c.query.borrow().is_empty() {
+        let row = (week_start(anchor) - start).div_euclid(7 * DAY);
+        if (0..6).contains(&row) {
+            let band = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+            band.add_css_class("week-band");
+            m.grid.attach(&band, 0, row as i32 + 1, 7, 1);
+        }
+    }
     for n in 0..42 {
         let day = start + n * DAY;
         let b = gtk::Button::builder()

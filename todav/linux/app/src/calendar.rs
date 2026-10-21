@@ -46,6 +46,7 @@ menubutton.block > button { padding: 2px 6px; }
 .mini button.day.other { opacity: 0.45; }
 .mini button.day.today { box-shadow: inset 0 0 0 1px @accent_color; }
 .mini button.day.selected { background: @accent_bg_color; color: @accent_fg_color; }
+.mini .week-band { background: alpha(currentColor, 0.08); border-radius: 9999px; }
 /* Ends of a bar that goes on into the next or previous week (or past a full day) are square. */
 .chip.from-before, menubutton.chip.from-before > button { border-top-left-radius: 0; border-bottom-left-radius: 0; }
 .chip.goes-on, menubutton.chip.goes-on > button { border-top-right-radius: 0; border-bottom-right-radius: 0; }
