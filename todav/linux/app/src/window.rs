@@ -2029,6 +2029,14 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
         all_day: t.start_all_day,
     });
     let start = date_row(&b, "start", old_start);
+    // One time choice for both dates, as the server asks: switching either switches both. Linked
+    // after loading, so a task that mixes them opens as it is (the banner says so).
+    let (start_time, due_time): (gtk::Switch, gtk::Switch) =
+        (get(&b, "start_has_time"), get(&b, "due_has_time"));
+    let other = due_time.clone();
+    start_time.connect_active_notify(move |s| other.set_active(s.is_active()));
+    let other = start_time.clone();
+    due_time.connect_active_notify(move |s| other.set_active(s.is_active()));
     let priority: adw::ComboRow = get(&b, "priority");
     let old_priority = priority_row(t.priority);
     priority.set_selected(old_priority);
@@ -2159,7 +2167,7 @@ fn on_date_change(b: &gtk::Builder, name: &str, f: Rc<dyn Fn()>) {
     let calendar: gtk::Calendar = get(b, &format!("{name}_calendar"));
     let g = f.clone();
     calendar.connect_notify_local(None, move |_, _| g());
-    let has_time: adw::SwitchRow = get(b, &format!("{name}_has_time"));
+    let has_time: gtk::Switch = get(b, &format!("{name}_has_time"));
     let g = f.clone();
     has_time.connect_active_notify(move |_| g());
     for part in ["hour", "minute"] {
@@ -2169,13 +2177,18 @@ fn on_date_change(b: &gtk::Builder, name: &str, f: Rc<dyn Fn()>) {
     }
 }
 
-/// The dialog's date row `name` (a switch, `{name}_calendar` and an optional time from
-/// `{name}_has_time`, `_hour`, `_minute`), set to `at`, else offering today at 9:00. Its
-/// subtitle shows the date picked; the returned function reads it.
+/// The dialog's date row `name` (a switch, `{name}_calendar` and an optional time in
+/// `{name}_time_row`: `_hour`, `_minute`, switched by `_has_time`), set to `at`, else offering
+/// today; a time not set offers 9:00. Its subtitle shows the date picked; the returned function
+/// reads it.
 fn date_row(b: &gtk::Builder, name: &str, at: Option<Due>) -> Rc<dyn Fn() -> Option<Due>> {
     let row: adw::ExpanderRow = get(b, name);
     let calendar: gtk::Calendar = get(b, &format!("{name}_calendar"));
-    let has_time: adw::SwitchRow = get(b, &format!("{name}_has_time"));
+    let has_time: gtk::Switch = get(b, &format!("{name}_has_time"));
+    // The row says what its switch is for while there is no time.
+    let time_row: adw::ActionRow = get(b, &format!("{name}_time_row"));
+    let tip = move |on: bool| time_row.set_tooltip_text((!on).then_some("Add a Time"));
+    has_time.connect_active_notify(move |s| tip(s.is_active()));
     let hour: gtk::SpinButton = get(b, &format!("{name}_hour"));
     let minute: gtk::SpinButton = get(b, &format!("{name}_minute"));
     for spin in [&hour, &minute] {
@@ -2196,9 +2209,16 @@ fn date_row(b: &gtk::Builder, name: &str, at: Option<Due>) -> Rc<dyn Fn() -> Opt
     row.set_enable_expansion(at.is_some());
     // Open next to the note when set; the one-column layout collapses it again.
     row.set_expanded(at.is_some());
-    has_time.set_active(at.is_some_and(|d| !d.all_day));
-    hour.set_value(f.hour() as f64);
-    minute.set_value(f.minute() as f64);
+    let timed = at.is_some_and(|d| !d.all_day);
+    has_time.set_active(timed);
+    has_time.notify("active"); // the tooltip, also when it stays off
+    let (h, m) = if timed {
+        (f.hour(), f.minute())
+    } else {
+        (9, 0)
+    };
+    hour.set_value(h as f64);
+    minute.set_value(m as f64);
 
     let r = row.clone();
     let read: Rc<dyn Fn() -> Option<Due>> = Rc::new(move || {
@@ -2258,7 +2278,7 @@ fn due_dialog(
         })
         .unwrap_or_default();
     let reminders = crate::reminders::Reminders::new(b, t.due_all_day || t.due.is_none(), &old);
-    let has_time: adw::SwitchRow = get(b, "due_has_time");
+    let has_time: gtk::Switch = get(b, "due_has_time");
     let r = reminders.clone();
     has_time.connect_active_notify(move |h| r.set_all_day(!h.is_active()));
 

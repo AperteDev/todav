@@ -150,41 +150,44 @@ Adw.Dialog dialog {
                 }
               }
 
-              Adw.SwitchRow start_has_time {
-                title: "Time";
-              }
+              // The time, used while the switch is on.
+              Adw.ActionRow start_time_row {
+                activatable-widget: start_has_time;
 
-              Adw.ActionRow {
-                title: "At";
-                visible: bind start_has_time.active;
-
-                [suffix]
-                Gtk.SpinButton start_hour {
+                [prefix]
+                Gtk.Box {
+                  spacing: 6;
                   valign: center;
-                  numeric: true;
-                  wrap: true;
-                  adjustment: Gtk.Adjustment {
-                    lower: 0;
-                    upper: 23;
-                    step-increment: 1;
-                  };
+                  sensitive: bind start_has_time.active;
+
+                  Gtk.SpinButton start_hour {
+                    numeric: true;
+                    wrap: true;
+                    adjustment: Gtk.Adjustment {
+                      lower: 0;
+                      upper: 23;
+                      step-increment: 1;
+                    };
+                  }
+
+                  Gtk.Label {
+                    label: ":";
+                  }
+
+                  Gtk.SpinButton start_minute {
+                    numeric: true;
+                    wrap: true;
+                    adjustment: Gtk.Adjustment {
+                      lower: 0;
+                      upper: 59;
+                      step-increment: 5;
+                    };
+                  }
                 }
 
                 [suffix]
-                Gtk.Label {
-                  label: ":";
-                }
-
-                [suffix]
-                Gtk.SpinButton start_minute {
+                Gtk.Switch start_has_time {
                   valign: center;
-                  numeric: true;
-                  wrap: true;
-                  adjustment: Gtk.Adjustment {
-                    lower: 0;
-                    upper: 59;
-                    step-increment: 5;
-                  };
                 }
               }
             }
@@ -205,41 +208,43 @@ Adw.Dialog dialog {
                 }
               }
 
-              Adw.SwitchRow due_has_time {
-                title: "Time";
-              }
+              Adw.ActionRow due_time_row {
+                activatable-widget: due_has_time;
 
-              Adw.ActionRow {
-                title: "At";
-                visible: bind due_has_time.active;
-
-                [suffix]
-                Gtk.SpinButton due_hour {
+                [prefix]
+                Gtk.Box {
+                  spacing: 6;
                   valign: center;
-                  numeric: true;
-                  wrap: true;
-                  adjustment: Gtk.Adjustment {
-                    lower: 0;
-                    upper: 23;
-                    step-increment: 1;
-                  };
+                  sensitive: bind due_has_time.active;
+
+                  Gtk.SpinButton due_hour {
+                    numeric: true;
+                    wrap: true;
+                    adjustment: Gtk.Adjustment {
+                      lower: 0;
+                      upper: 23;
+                      step-increment: 1;
+                    };
+                  }
+
+                  Gtk.Label {
+                    label: ":";
+                  }
+
+                  Gtk.SpinButton due_minute {
+                    numeric: true;
+                    wrap: true;
+                    adjustment: Gtk.Adjustment {
+                      lower: 0;
+                      upper: 59;
+                      step-increment: 5;
+                    };
+                  }
                 }
 
                 [suffix]
-                Gtk.Label {
-                  label: ":";
-                }
-
-                [suffix]
-                Gtk.SpinButton due_minute {
+                Gtk.Switch due_has_time {
                   valign: center;
-                  numeric: true;
-                  wrap: true;
-                  adjustment: Gtk.Adjustment {
-                    lower: 0;
-                    upper: 59;
-                    step-increment: 5;
-                  };
                 }
               }
             }
