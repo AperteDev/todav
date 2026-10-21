@@ -8,6 +8,15 @@ Adw.PreferencesDialog dialog {
     title: "General";
     icon-name: "preferences-system-symbolic";
 
+    Adw.PreferencesGroup {
+      title: "Startup";
+
+      Adw.ComboRow start_view {
+        title: "Open at start";
+        model: Gtk.StringList { strings ["Last used", "Tasks", "Calendar"] };
+      }
+    }
+
     // The status row, then the shared connection rows (ui/connection.blp).
     Adw.PreferencesGroup account {
       title: "Account";
@@ -183,6 +192,20 @@ Adw.PreferencesDialog dialog {
       Adw.SwitchRow drag_handles {
         title: "Drag handles";
         subtitle: "Move tasks by a handle instead of the whole row, for touchscreens";
+      }
+    }
+  }
+
+  Adw.PreferencesPage {
+    title: "Calendar";
+    icon-name: "x-office-calendar-symbolic";
+
+    Adw.PreferencesGroup {
+      title: "Views";
+
+      Adw.ComboRow start_calendar_view {
+        title: "View at start";
+        model: Gtk.StringList { strings ["Last used", "Month", "Week", "Agenda"] };
       }
     }
   }

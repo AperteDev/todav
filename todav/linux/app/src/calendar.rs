@@ -272,7 +272,7 @@ pub fn build(views: &adw::ViewStack) {
     place(c.split.is_collapsed());
     c.split
         .connect_collapsed_notify(move |s| place(s.is_collapsed()));
-    let mode = core().setting("calendar_mode".into()).unwrap_or_default();
+    let mode = at_start("start_calendar_view", "calendar_mode");
     c.mode.set_active_name(Some(match mode.as_str() {
         "week" | "agenda" => mode.as_str(),
         _ => "month",
@@ -333,8 +333,8 @@ pub fn build(views: &adw::ViewStack) {
     // New events are written in the system's zone.
     core().set_local_zone(glib::TimeZone::local().identifier().to_string());
 
-    // Shown when it was left open.
-    if core().setting("last_view".into()).as_deref() == Some("calendar") {
+    // Shown when chosen in Preferences, or when it was left open.
+    if at_start("start_view", "last_view") == "calendar" {
         views.set_visible_child_name("calendar");
         glib::idle_add_local_once(refresh);
     }
@@ -348,6 +348,14 @@ pub fn build(views: &adw::ViewStack) {
             refresh();
         }
     });
+}
+
+/// What to show at start: the setting `choice`, or the `last` one used when it says so.
+fn at_start(choice: &str, last: &str) -> String {
+    match core().setting(choice.into()).unwrap_or_default().as_str() {
+        "" | "last" => core().setting(last.into()).unwrap_or_default(),
+        v => v.to_string(),
+    }
 }
 
 #[derive(PartialEq)]

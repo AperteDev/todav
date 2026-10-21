@@ -1,5 +1,5 @@
 //! Preferences dialog: General (account, server addresses with connection tests, applied on
-//! close; sync) and Tasks (order and display, applied at once).
+//! close; sync; what opens at start), Tasks (order and display, applied at once) and Calendar.
 
 use crate::connection::Connection;
 use crate::window::{get, toast, url_text, view};
@@ -166,6 +166,12 @@ pub fn present(parent: &impl IsA<gtk::Widget>) {
         let _ = core().set_setting("sync_settings".into(), s.is_active().to_string());
         request_sync(); // turning it on pulls the server's settings right away
     });
+    connect_choice(&b, "start_view", &["last", "tasks", "calendar"]);
+    connect_choice(
+        &b,
+        "start_calendar_view",
+        &["last", "month", "week", "agenda"],
+    );
     connect_choice(&b, "category_view", &["group", "tags", "none"]);
     connect_choice(&b, "done_tasks", &["group", "in_place", "last"]);
     connect_choice(&b, "done_subtasks", &["show", "hide", "last"]);
