@@ -88,23 +88,49 @@ fn render(c: &Rc<Cal>) {
             m.grid.attach(&band, 0, row as i32 + 1, 7, 1);
         }
     }
+    let all = items(start, start + 42 * DAY);
     for n in 0..42 {
         let day = start + n * DAY;
+        let inside = dates::fields(day).month() == month;
+        let selected = day == anchor && inside;
+        // Under the number, a dot for each calendar with something that day (three at most).
+        let dots = gtk::Box::builder()
+            .spacing(2)
+            .halign(gtk::Align::Center)
+            .build();
+        let mut lists: Vec<&str> = Vec::new();
+        for i in all.iter().filter(|i| on_day(i, day)) {
+            if lists.len() < 3 && !lists.contains(&i.list()) {
+                lists.push(i.list());
+                let dot = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+                dot.add_css_class("dot");
+                // On the selected day's fill they take its text colour (see the CSS).
+                if !selected {
+                    dot.add_css_class(&class(c, i.list()));
+                }
+                dots.append(&dot);
+            }
+        }
+        let content = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .valign(gtk::Align::Center)
+            .build();
+        content.append(&gtk::Label::new(Some(&fmt(day, "%-d"))));
+        content.append(&dots);
         let b = gtk::Button::builder()
-            .label(fmt(day, "%-d"))
+            .child(&content)
             .halign(gtk::Align::Center)
             .build();
         b.add_css_class("flat");
         b.add_css_class("circular");
         b.add_css_class("day");
-        let inside = dates::fields(day).month() == month;
         if !inside {
             b.add_css_class("other");
         }
         if day == today {
             b.add_css_class("today");
         }
-        if day == anchor && inside {
+        if selected {
             b.add_css_class("selected");
         }
         b.connect_clicked(move |_| {
