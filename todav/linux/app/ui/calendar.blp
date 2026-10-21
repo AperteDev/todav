@@ -151,16 +151,28 @@ Adw.NavigationSplitView split {
           styles ["suggested-action"]
         }
 
+        // The icon, or a spinner while syncing.
         [end]
         Gtk.Button sync {
-          icon-name: "view-refresh-symbolic";
           tooltip-text: "Sync (F5)";
           action-name: "app.sync";
-        }
+          styles ["image-button"]
 
-        [end]
-        Adw.Spinner spinner {
-          visible: false;
+          Gtk.Stack sync_state {
+            transition-type: crossfade;
+
+            Gtk.StackPage {
+              name: "idle";
+              child: Gtk.Image {
+                icon-name: "view-refresh-symbolic";
+              };
+            }
+
+            Gtk.StackPage {
+              name: "syncing";
+              child: Adw.Spinner {};
+            }
+          }
         }
 
         [end]

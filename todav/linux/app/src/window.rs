@@ -70,7 +70,7 @@ struct Ui {
     hrefs: RefCell<Vec<String>>,
     current: RefCell<Option<String>>,
     title: adw::WindowTitle,
-    spinner: adw::Spinner,
+    sync_state: gtk::Stack,
     entry: gtk::Entry,
     cats: gtk::StringList,
     cat: gtk::DropDown,
@@ -194,6 +194,11 @@ pub fn account_changed() {
     }
 }
 
+/// A sync button's icon, or its spinner while syncing.
+pub fn set_syncing(state: &gtk::Stack, on: bool) {
+    state.set_visible_child_name(if on { "syncing" } else { "idle" });
+}
+
 /// Rebuild the task page, e.g. after the task order changed.
 pub fn refresh() {
     if let Some(ui) = ui() {
@@ -234,7 +239,7 @@ pub fn on_event(ev: &Event) {
             });
         }
         Event::SyncState(s) => {
-            ui.spinner.set_visible(s == "syncing");
+            set_syncing(&ui.sync_state, s == "syncing");
             crate::calendar::set_syncing(s == "syncing");
             if let Some(err) = s.strip_prefix("error:") {
                 if *ui.last_error.borrow() != err {
@@ -297,7 +302,7 @@ fn build(app: &adw::Application) -> Rc<Ui> {
         hrefs: RefCell::new(Vec::new()),
         current: RefCell::new(None),
         title: get(&b, "title"),
-        spinner: get(&b, "spinner"),
+        sync_state: get(&b, "sync_state"),
         entry: get(&b, "entry"),
         cats: get(&b, "cats"),
         cat: get(&b, "cat"),

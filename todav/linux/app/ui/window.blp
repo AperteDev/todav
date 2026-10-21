@@ -166,16 +166,28 @@ Adw.ApplicationWindow window {
                   Adw.HeaderBar {
                     title-widget: Adw.WindowTitle title {};
 
+                    // The icon, or a spinner while syncing.
                     [end]
                     Gtk.Button {
-                      icon-name: "view-refresh-symbolic";
                       tooltip-text: "Sync (F5)";
                       action-name: "app.sync";
-                    }
+                      styles ["image-button"]
 
-                    [end]
-                    Adw.Spinner spinner {
-                      visible: false;
+                      Gtk.Stack sync_state {
+                        transition-type: crossfade;
+
+                        Gtk.StackPage {
+                          name: "idle";
+                          child: Gtk.Image {
+                            icon-name: "view-refresh-symbolic";
+                          };
+                        }
+
+                        Gtk.StackPage {
+                          name: "syncing";
+                          child: Adw.Spinner {};
+                        }
+                      }
                     }
                   }
 

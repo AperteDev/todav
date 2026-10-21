@@ -98,7 +98,7 @@ struct Cal {
     task_lists: gtk::ListBox,
     all_task_lists: gtk::CheckButton,
     title: adw::WindowTitle,
-    spinner: adw::Spinner,
+    sync_state: gtk::Stack,
     mode: adw::ToggleGroup,
     views: gtk::Stack,
     weekdays: gtk::Box,
@@ -203,7 +203,7 @@ pub fn build(views: &adw::ViewStack) {
         task_lists: get(&b, "task_lists"),
         all_task_lists: get(&b, "all_task_lists"),
         title: get(&b, "title"),
-        spinner: get(&b, "spinner"),
+        sync_state: get(&b, "sync_state"),
         mode: get(&b, "mode"),
         views: get(&b, "views"),
         weekdays: get(&b, "weekdays"),
@@ -739,7 +739,7 @@ fn plan_drop(c: &Rc<Cal>) {
 
 pub fn set_syncing(on: bool) {
     if let Some(c) = cal() {
-        c.spinner.set_visible(on);
+        crate::window::set_syncing(&c.sync_state, on);
     }
 }
 
