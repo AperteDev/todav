@@ -13,6 +13,29 @@ pub struct SyncReport {
     pub pulled: u32,
     pub deleted: u32,
     pub conflicts: u32,
+    /// What the server refused this time (not again until edited); the rest synced.
+    pub refused: Vec<Refused>,
+}
+
+/// A task or event the server would not take.
+#[derive(Debug, Clone)]
+pub struct Refused {
+    pub task: bool,
+    pub uid: String,
+    pub list_href: String,
+    pub summary: String,
+    /// A deletion: the item is back, as on the server.
+    pub deleted: bool,
+    pub error: String,
+}
+
+/// The server's refusal of this one item (what it says is wrong with it), rather than a reason
+/// to stop syncing: network trouble, its own failure, signing in, a conflict.
+fn refusal(e: &Error) -> Option<String> {
+    match e {
+        Error::Http(400 | 403 | 405 | 413 | 415 | 422, _) => Some(e.to_string()),
+        _ => None,
+    }
 }
 
 impl Client {
@@ -107,7 +130,24 @@ impl Client {
                             store::delete(&db, &t)?
                         }
                     }
-                    Err(e) => return Err(e),
+                    // Not deleted there: back here, as the server has it.
+                    Err(e) => match refusal(&e) {
+                        Some(error) => {
+                            let db = self.db.lock().unwrap();
+                            let summary = store::refuse(&db, &t, &error)?;
+                            store::set_sync_state(&db, &t, t.href.as_deref(), None, store::CLEAN)?;
+                            report.refused.push(Refused {
+                                task: t.kind == Kind::Task,
+                                uid: t.uid.clone(),
+                                list_href: t.list_href.clone(),
+                                summary,
+                                deleted: true,
+                                error,
+                            });
+                            continue;
+                        }
+                        None => return Err(e),
+                    },
                 }
                 report.pushed += 1;
                 continue;
@@ -123,7 +163,22 @@ impl Client {
                     self.resolve_conflict(&t, &href, reg.as_deref())?;
                     continue;
                 }
-                Err(e) => return Err(e),
+                // Kept here as edited, waiting for a version the server takes.
+                Err(e) => match refusal(&e) {
+                    Some(error) => {
+                        let summary = store::refuse(&self.db.lock().unwrap(), &t, &error)?;
+                        report.refused.push(Refused {
+                            task: t.kind == Kind::Task,
+                            uid: t.uid.clone(),
+                            list_href: t.list_href.clone(),
+                            summary,
+                            deleted: false,
+                            error,
+                        });
+                        continue;
+                    }
+                    None => return Err(e),
+                },
             };
             let db = self.db.lock().unwrap();
             // Only clear the flag if nobody edited the row while we were uploading.

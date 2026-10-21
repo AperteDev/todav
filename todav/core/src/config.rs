@@ -384,6 +384,7 @@ mod tests {
             start: None,
             start_all_day: false,
             event_uid: None,
+            sync_error: None,
         }
     }
 

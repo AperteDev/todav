@@ -71,6 +71,14 @@ CREATE INDEX tasks_event ON tasks(event_uid);
 DELETE FROM kv WHERE key IN ('setting_ntfy_url', 'settime_ntfy_url')
   AND (SELECT value FROM kv WHERE key = 'setting_ntfy_url') = '';
 "#,
+    // The server refused this version (`refused_ics`) for `sync_error`: it is not sent again
+    // until edited, and the rest syncs on.
+    r#"
+ALTER TABLE tasks ADD COLUMN sync_error TEXT;
+ALTER TABLE tasks ADD COLUMN refused_ics TEXT;
+ALTER TABLE events ADD COLUMN sync_error TEXT;
+ALTER TABLE events ADD COLUMN refused_ics TEXT;
+"#,
 ];
 
 /// RELTYPE of the RELATED-TO linking a task to the event it is for (a custom type: PARENT would
@@ -257,7 +265,8 @@ pub fn lists(db: &Connection) -> Result<Vec<List>> {
 
 const TASK_COLS: &str = "uid, list_href, summary, description, status, completed_at, category, parent_uid, priority, due, due_all_day,
   (SELECT group_concat(at) FROM (SELECT at FROM alarms a WHERE a.uid = tasks.uid ORDER BY at)),
-  sort_order, created, last_modified, start, start_all_day, event_uid";
+  sort_order, created, last_modified, start, start_all_day, event_uid,
+  CASE WHEN refused_ics IS raw_ics THEN sync_error END";
 
 fn task_row(r: &rusqlite::Row) -> rusqlite::Result<Task> {
     let status: String = r.get(4)?;
@@ -286,6 +295,7 @@ fn task_row(r: &rusqlite::Row) -> rusqlite::Result<Task> {
         start: r.get(15)?,
         start_all_day: r.get(16)?,
         event_uid: r.get(17)?,
+        sync_error: r.get(18)?,
     })
 }
 
@@ -437,7 +447,11 @@ pub fn synced(db: &Connection, list_href: &str) -> Result<Vec<RawObject>> {
 pub fn dirty(db: &Connection) -> Result<Vec<RawObject>> {
     let mut out = Vec::new();
     for kind in [Kind::Task, Kind::Event] {
-        let sql = format!("SELECT {RAW_COLS} FROM {} WHERE dirty != 0", kind.table());
+        // Not a version the server refused: it would refuse it again.
+        let sql = format!(
+            "SELECT {RAW_COLS} FROM {} WHERE dirty != 0 AND refused_ics IS NOT raw_ics",
+            kind.table()
+        );
         let rows = db
             .prepare(&sql)?
             .query_map([], |r| raw_row(r, kind))?
@@ -610,13 +624,30 @@ pub fn set_sync_state(
     etag: Option<&str>,
     dirty: i64,
 ) -> Result<()> {
+    // In step with the server again: any refusal is over.
     let sql = format!(
-        "UPDATE {} SET href = ?3, etag = ?4, dirty = ?5 WHERE {}",
+        "UPDATE {} SET href = ?3, etag = ?4, dirty = ?5, sync_error = NULL, refused_ics = NULL
+         WHERE {}",
         o.kind.table(),
         o.kind.key()
     );
     db.execute(&sql, params![o.list_href, o.uid, href, etag, dirty])?;
     Ok(())
+}
+
+/// The server refused `o` as it is now, saying `error`; returns its title. It is not sent again
+/// until edited.
+pub fn refuse(db: &Connection, o: &RawObject, error: &str) -> Result<String> {
+    let (table, key) = (o.kind.table(), o.kind.key());
+    db.execute(
+        &format!("UPDATE {table} SET sync_error = ?3, refused_ics = raw_ics WHERE {key}"),
+        params![o.list_href, o.uid, error],
+    )?;
+    Ok(db.query_row(
+        &format!("SELECT summary FROM {table} WHERE {key}"),
+        params![o.list_href, o.uid],
+        |r| r.get(0),
+    )?)
 }
 
 pub fn delete(db: &Connection, o: &RawObject) -> Result<()> {

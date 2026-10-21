@@ -150,6 +150,49 @@ fn add_on_a_shows_on_b_and_external_edits_arrive() {
 }
 
 #[test]
+fn a_refused_task_waits_for_an_edit_and_the_rest_syncs() {
+    use todav_core::{Due, TaskPatch};
+    let f = Fixture::new("refused");
+    let add = |s: &str| {
+        f.a.add_task(f.href.clone(), s.into(), None, None, false)
+            .unwrap()
+            .uid
+    };
+    let (bad, good) = (add("Bad dates"), add("Fine"));
+    // A dated start with a timed due: the server refuses mixed kinds.
+    let day = now() - now() % 86400;
+    let dates = |start_all_day| TaskPatch {
+        start: Some(Some(Due {
+            at: day,
+            all_day: start_all_day,
+        })),
+        due: Some(Some(Due {
+            at: day + 9 * 3600,
+            all_day: false,
+        })),
+        ..Default::default()
+    };
+    f.a.update_task(bad.clone(), dates(true)).unwrap();
+
+    let report = f.a.sync().unwrap();
+    let refused: Vec<_> = report.refused.iter().map(|r| r.summary.as_str()).collect();
+    assert_eq!(refused, ["Bad dates"]);
+    assert!(report.refused[0].error.contains("DTSTART"), "{report:?}");
+    assert!(f.a.task(bad.clone()).unwrap().sync_error.is_some());
+    f.b.sync().unwrap();
+    assert!(f.b.task(good).is_some(), "the rest synced");
+    assert!(f.b.task(bad.clone()).is_none());
+
+    // Not sent again as it is; an edit the server takes goes up and clears the error.
+    assert!(f.a.sync().unwrap().refused.is_empty());
+    f.a.update_task(bad.clone(), dates(false)).unwrap();
+    assert!(f.a.sync().unwrap().refused.is_empty());
+    assert_eq!(f.a.task(bad.clone()).unwrap().sync_error, None);
+    f.b.sync().unwrap();
+    assert!(f.b.task(bad).is_some());
+}
+
+#[test]
 fn offline_tick_vs_edit_resolves_to_done() {
     let f = Fixture::new("conflict");
     let t =

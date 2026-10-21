@@ -205,6 +205,7 @@ impl Client {
                             total.pulled += r.pulled;
                             total.pushed += r.pushed;
                             total.deleted += r.deleted;
+                            total.refused.extend(r.refused);
                         }
                         Ok(total)
                     });

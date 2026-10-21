@@ -23,7 +23,7 @@ pub use event::{Event, EventPatch, EventTime, Repeat, Scope};
 pub use login::{Credentials, LoginFlow, login_flow_poll, login_flow_start, password_login};
 pub use push::{PushRegistration, ntfy_check};
 pub use settings::DEVICE_ONLY;
-pub use sync::SyncReport;
+pub use sync::{Refused, SyncReport};
 
 /// A calendar collection: a task list, a calendar of events, or both (Nextcloud's "Personal").
 #[derive(Debug, Clone, PartialEq)]
@@ -63,6 +63,8 @@ pub struct Task {
     pub start_all_day: bool,
     /// UID of the event this task is for (RELATED-TO, see `store::EVENT_LINK`).
     pub event_uid: Option<String>,
+    /// Why the server refused this version of the task; it is not uploaded until edited.
+    pub sync_error: Option<String>,
 }
 
 /// Fields left `None` are untouched; `Some("")` clears description/category.
