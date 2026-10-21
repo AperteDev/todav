@@ -54,7 +54,10 @@ menubutton.block > button { padding: 2px 6px; }
 /* Ends of a bar that goes on into the next or previous week (or past a full day) are square. */
 .chip.from-before, menubutton.chip.from-before > button { border-top-left-radius: 0; border-bottom-left-radius: 0; }
 .chip.goes-on, menubutton.chip.goes-on > button { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+/* The check takes no more than itself, leaving the room to the title. */
+.chip.task checkbutton { padding: 0; }
 .chip.task check { min-width: 14px; min-height: 14px; margin: 0 4px 0 0; padding: 0; }
+button.block.task { padding-left: 4px; }
 .chip.done label { text-decoration-line: line-through; opacity: 0.55; }
 .chip.cancelled label { text-decoration-line: line-through; }
 .more { padding: 0 6px; min-height: 20px; font-size: smaller; }
