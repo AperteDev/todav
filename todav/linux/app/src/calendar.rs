@@ -34,6 +34,10 @@ const CSS: &str = "
 .chip { padding: 0 6px; min-height: 22px; border-radius: 6px; font-size: smaller; }
 .chip button, .more button { font-weight: normal; }
 menubutton.chip > button, menubutton.more > button, .chip.task button { min-height: 0; min-width: 0; padding: 0; }
+/* An event's button fills it, so its hover does too. */
+menubutton.chip, menubutton.more { padding: 0; }
+menubutton.chip > button, menubutton.more > button { padding: 0 6px; border-radius: 6px; }
+menubutton.block > button { padding: 2px 6px; }
 .chip.task check { min-width: 14px; min-height: 14px; margin: 0 4px 0 0; padding: 0; }
 .chip.task button { padding: 0; min-height: 0; }
 .chip.done label { text-decoration-line: line-through; opacity: 0.55; }
