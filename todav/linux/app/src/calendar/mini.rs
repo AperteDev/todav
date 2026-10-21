@@ -88,7 +88,11 @@ fn render(c: &Rc<Cal>) {
             m.grid.attach(&band, 0, row as i32 + 1, 7, 1);
         }
     }
-    let all = items(start, start + 42 * DAY);
+    let all = if crate::settings::mini_dots() {
+        items(start, start + 42 * DAY)
+    } else {
+        Vec::new()
+    };
     for n in 0..42 {
         let day = start + n * DAY;
         let inside = dates::fields(day).month() == month;

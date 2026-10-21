@@ -55,6 +55,11 @@ pub fn apply_color_scheme() {
     adw::StyleManager::default().set_color_scheme(scheme);
 }
 
+/// Whether the sidebar month marks days with dots (`mini_dots`; on unless turned off).
+pub fn mini_dots() -> bool {
+    core().setting("mini_dots".into()).as_deref() != Some("false")
+}
+
 /// Lengths offered for `duration`, in minutes, as the rows list them.
 const DURATIONS: [i64; 7] = [15, 30, 45, 60, 90, 120, 180];
 
@@ -225,6 +230,12 @@ pub fn present(parent: &impl IsA<gtk::Widget>) {
     connect_choice(&b, "done_subtasks", &["show", "hide", "last"]);
     connect_duration(&b, "task_duration");
     connect_duration(&b, "event_duration");
+    let dots: adw::SwitchRow = get(&b, "mini_dots");
+    dots.set_active(mini_dots());
+    dots.connect_active_notify(|d| {
+        let _ = core().set_setting("mini_dots".into(), d.is_active().to_string());
+        crate::calendar::refresh();
+    });
     let handles: adw::SwitchRow = get(&b, "drag_handles");
     handles.set_active(core().setting("drag_handles".into()).as_deref() == Some("true"));
     handles.connect_active_notify(|h| {

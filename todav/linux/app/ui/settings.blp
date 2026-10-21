@@ -250,6 +250,11 @@ Adw.PreferencesDialog dialog {
         title: "View at start";
         model: Gtk.StringList { strings ["Last used", "Month", "Week", "Agenda"] };
       }
+
+      Adw.SwitchRow mini_dots {
+        title: "Dots in the sidebar month";
+        subtitle: "Mark the days that have events or tasks";
+      }
     }
 
     Adw.PreferencesGroup {
