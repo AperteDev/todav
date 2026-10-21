@@ -260,7 +260,7 @@ pub fn build(views: &adw::ViewStack) {
         .bidirectional()
         .sync_create()
         .build();
-    // Shrinking keeps the views, as the Tasks page keeps its list; the sidebar is a Back away.
+    // Shrinking keeps the views, as on the Tasks page; the sidebar is a Back away.
     c.split.set_show_content(true);
     c.split.connect_collapsed_notify(|s| {
         if s.is_collapsed() {

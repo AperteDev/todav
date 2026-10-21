@@ -337,6 +337,12 @@ pub fn edit_task(t: &Task) {
 }
 
 fn connect(ui: &Rc<Ui>) {
+    // Shrinking keeps the task list, as the Calendar page keeps its views.
+    ui.split.connect_collapsed_notify(|s| {
+        if s.is_collapsed() {
+            s.set_show_content(true);
+        }
+    });
     let weak = Rc::downgrade(ui);
     ui.sidebar.connect_row_selected(move |_, row| {
         let (Some(ui), Some(row)) = (weak.upgrade(), row) else {
