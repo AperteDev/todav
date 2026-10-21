@@ -173,6 +173,12 @@ pub(super) fn show_preview(c: &Cal, at: Option<(&Item, (i64, i64, i64))>) {
     }
     c.preview.set_visible(span.is_some());
     c.week_grid.queue_allocate();
+    CARD.with(|card| {
+        if let Some(card) = &*card.borrow() {
+            // Not quite 0: a drag icon with nothing to draw keeps showing its last frame.
+            card.set_opacity(if span.is_some() { 0.01 } else { 1.0 });
+        }
+    });
 }
 
 /// Dragging a block's top or bottom edge changes when it starts or ends, in steps of `SNAP`;

@@ -558,6 +558,9 @@ thread_local! {
     /// How far below its top a week block was grabbed (0 for anything else): it stays under the
     /// pointer at that point while it moves.
     static GRAB: Cell<f64> = const { Cell::new(0.0) };
+    /// The card with its title following the pointer; hidden over the week's hours, where the
+    /// preview block shows it.
+    static CARD: RefCell<Option<gtk::Label>> = const { RefCell::new(None) };
 }
 
 fn dragging() -> Option<Item> {
@@ -584,9 +587,11 @@ fn drag_item(w: &impl IsA<gtk::Widget>, i: Item) {
         if let Ok(icon) = gtk::DragIcon::for_drag(drag).downcast::<gtk::DragIcon>() {
             icon.set_child(Some(&card));
         }
+        CARD.with(|c| *c.borrow_mut() = Some(card));
     });
     src.connect_drag_end(|_, _, _| {
         DRAGGING.with(|d| d.borrow_mut().take());
+        CARD.with(|c| c.borrow_mut().take());
         if let Some(c) = cal() {
             c.hover.set(None);
             week::show_preview(&c, None);
