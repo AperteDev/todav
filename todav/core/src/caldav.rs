@@ -10,6 +10,12 @@ pub const CS: &str = "http://calendarserver.org/ns/";
 pub const APPLE: &str = "http://apple.com/ns/ical/";
 pub const PUSH: &str = "https://bitfire.at/webdav-push";
 
+/// Opening a connection (TLS included) gets this long: the system resends a dropped connection
+/// request after 1 and 3 s, later ones are seldom answered. Then it is tried anew, up to
+/// `CONNECT_TRIES` more times.
+const CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(4);
+const CONNECT_TRIES: u32 = 3;
+
 #[derive(Debug, Default, Clone)]
 pub struct Element {
     pub ns: String,
@@ -246,6 +252,7 @@ impl Dav {
             .user_agent("Todav")
             .http_status_as_error(false)
             .timeout_global(Some(std::time::Duration::from_secs(30)))
+            .timeout_connect(Some(CONNECT_TIMEOUT))
             .build()
             .new_agent();
         Dav {
@@ -274,24 +281,35 @@ impl Dav {
         headers: &[(&str, &str)],
         body: &str,
     ) -> Result<HttpResponse> {
-        let mut b = ureq::http::Request::builder()
-            .method(method)
-            .uri(self.url(href))
-            .header("Authorization", &self.auth);
-        if !body.is_empty()
-            && !headers
-                .iter()
-                .any(|(k, _)| k.eq_ignore_ascii_case("content-type"))
-        {
-            b = b.header("Content-Type", "application/xml; charset=utf-8");
-        }
-        for (k, v) in headers {
-            b = b.header(*k, *v);
-        }
-        let req = b
-            .body(body.to_string())
-            .map_err(|e| Error::Net(e.to_string()))?;
-        let mut resp = self.agent.run(req).map_err(|e| Error::Net(e.to_string()))?;
+        let req = || {
+            let mut b = ureq::http::Request::builder()
+                .method(method)
+                .uri(self.url(href))
+                .header("Authorization", &self.auth);
+            if !body.is_empty()
+                && !headers
+                    .iter()
+                    .any(|(k, _)| k.eq_ignore_ascii_case("content-type"))
+            {
+                b = b.header("Content-Type", "application/xml; charset=utf-8");
+            }
+            for (k, v) in headers {
+                b = b.header(*k, *v);
+            }
+            b.body(body.to_string())
+                .map_err(|e| Error::Net(e.to_string()))
+        };
+        // A connection the server never answers is tried again rather than waited out (until
+        // the global timeout): nothing was sent on it yet.
+        let mut tries = 0;
+        let mut resp = loop {
+            match self.agent.run(req()?) {
+                Err(ureq::Error::Timeout(ureq::Timeout::Connect)) if tries < CONNECT_TRIES => {
+                    tries += 1
+                }
+                r => break r.map_err(|e| Error::Net(e.to_string()))?,
+            }
+        };
         let header = |n: &str| {
             resp.headers()
                 .get(n)
