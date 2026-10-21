@@ -55,6 +55,30 @@ pub fn apply_color_scheme() {
     adw::StyleManager::default().set_color_scheme(scheme);
 }
 
+/// Lengths offered for `duration`, in minutes, as the rows list them.
+const DURATIONS: [i64; 7] = [15, 30, 45, 60, 90, 120, 180];
+
+/// How long, in seconds, a task's or event's time lasts when one is added ("task_duration" or
+/// "event_duration", minutes; an hour by default).
+pub fn duration(key: &str) -> i64 {
+    core()
+        .setting(key.into())
+        .and_then(|v| v.parse::<i64>().ok())
+        .filter(|m| *m > 0)
+        .unwrap_or(60)
+        * 60
+}
+
+fn connect_duration(b: &gtk::Builder, key: &'static str) {
+    let row: adw::ComboRow = get(b, key);
+    let current = duration(key) / 60;
+    let hour = DURATIONS.iter().position(|m| *m == 60).unwrap_or(0);
+    row.set_selected(DURATIONS.iter().position(|m| *m == current).unwrap_or(hour) as u32);
+    row.connect_selected_notify(move |r| {
+        let _ = core().set_setting(key.into(), DURATIONS[r.selected() as usize].to_string());
+    });
+}
+
 /// Bind a ComboRow to the setting `key`, one stored value per row entry (the first is the
 /// default); changes apply at once.
 fn connect_choice(b: &gtk::Builder, key: &'static str, values: &'static [&'static str]) {
@@ -199,6 +223,8 @@ pub fn present(parent: &impl IsA<gtk::Widget>) {
     connect_choice(&b, "category_view", &["group", "tags", "none"]);
     connect_choice(&b, "done_tasks", &["group", "in_place", "last"]);
     connect_choice(&b, "done_subtasks", &["show", "hide", "last"]);
+    connect_duration(&b, "task_duration");
+    connect_duration(&b, "event_duration");
     let handles: adw::SwitchRow = get(&b, "drag_handles");
     handles.set_active(core().setting("drag_handles".into()).as_deref() == Some("true"));
     handles.connect_active_notify(|h| {

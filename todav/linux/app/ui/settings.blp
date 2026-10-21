@@ -148,6 +148,13 @@ Adw.PreferencesDialog dialog {
         title: "Completed tasks";
         model: Gtk.StringList { strings ["In a separate group", "Keep in place", "Move to the end"] };
       }
+
+      // Entries as settings.rs DURATIONS lists them.
+      Adw.ComboRow task_duration {
+        title: "Default duration";
+        subtitle: "When a task gets a time, or is planned on the calendar";
+        model: Gtk.StringList { strings ["15 minutes", "30 minutes", "45 minutes", "1 hour", "1.5 hours", "2 hours", "3 hours"] };
+      }
     }
 
     Adw.PreferencesGroup {
@@ -242,6 +249,17 @@ Adw.PreferencesDialog dialog {
       Adw.ComboRow start_calendar_view {
         title: "View at start";
         model: Gtk.StringList { strings ["Last used", "Month", "Week", "Agenda"] };
+      }
+    }
+
+    Adw.PreferencesGroup {
+      title: "Events";
+
+      // Entries as settings.rs DURATIONS lists them.
+      Adw.ComboRow event_duration {
+        title: "Default duration";
+        subtitle: "When an event is added at a time, or an all-day one gets a time";
+        model: Gtk.StringList { strings ["15 minutes", "30 minutes", "45 minutes", "1 hour", "1.5 hours", "2 hours", "3 hours"] };
       }
     }
   }

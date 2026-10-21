@@ -98,7 +98,7 @@ pub(super) fn setup(c: &Rc<Cal>) {
         let at = week_start(c.anchor.get()) + day * DAY + minute / 30 * 30 * 60;
         Some(EventTime {
             start: at,
-            end: at + 3600,
+            end: at + duration("event_duration"),
             all_day: false,
         })
     });
@@ -314,15 +314,16 @@ fn rect(width: i32, g: &Geo) -> (f64, f64, f64, f64) {
     )
 }
 
-/// Length in minutes of what a dropped task becomes (for the drop preview).
+/// Length in minutes of what a dropped item becomes (for the drop preview): its own, else the
+/// default.
 fn drop_length(i: &Item) -> i64 {
     match i {
         Item::Task(t) => match (t.start, slot_end(t)) {
             (Some(s), Some(e)) => (e - s) / 60,
-            _ => 60,
+            _ => duration("task_duration") / 60,
         },
         Item::Event(e) if !e.all_day && e.end > e.start => (e.end - e.start) / 60,
-        Item::Event(_) => 60,
+        Item::Event(_) => duration("event_duration") / 60,
     }
 }
 
@@ -380,7 +381,9 @@ fn span(i: &Item) -> Option<(i64, i64)> {
         // Only tasks planned into a slot (a start time) take hours; one just due at a time goes
         // above with the day's other items, its chip showing the time.
         Item::Task(t) => match t.start {
-            Some(s) if !t.start_all_day => Some((s, slot_end(t).unwrap_or(s + 30 * 60))),
+            Some(s) if !t.start_all_day => {
+                Some((s, slot_end(t).unwrap_or(s + duration("task_duration"))))
+            }
             _ => None,
         },
         _ => None,

@@ -2102,6 +2102,21 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
     start_time.connect_active_notify(move |s| other.set_active(s.is_active()));
     let other = start_time.clone();
     due_time.connect_active_notify(move |s| other.set_active(s.is_active()));
+    // Times added to dates that had none: due the default length after the start (the same day
+    // at the latest), rather than at the start itself.
+    if t.due.is_none_or(|_| t.due_all_day) {
+        let spins: [gtk::SpinButton; 4] =
+            ["start_hour", "start_minute", "due_hour", "due_minute"].map(|id| get(&b, id));
+        let start_row: adw::ExpanderRow = get(&b, "start");
+        due_time.connect_active_notify(move |s| {
+            if s.is_active() && start_row.enables_expansion() {
+                let from = spins[0].value() as i64 * 3600 + spins[1].value() as i64 * 60;
+                let to = (from + crate::settings::duration("task_duration")).min(86400 - 60);
+                spins[2].set_value((to / 3600) as f64);
+                spins[3].set_value((to / 60 % 60) as f64);
+            }
+        });
+    }
     let priority: adw::ComboRow = get(&b, "priority");
     let old_priority = priority_row(t.priority);
     priority.set_selected(old_priority);

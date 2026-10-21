@@ -148,11 +148,18 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) {
             time.end
         },
     );
+    // An all-day event's times, should it get some: 9:00 for the default length.
+    let (from, to) = if time.all_day {
+        let at = 9 * 3600;
+        (at, at + duration("event_duration"))
+    } else {
+        (time.start, time.end)
+    };
     for (spin, t, unit) in [
-        (&spins[0], time.start, 3600),
-        (&spins[1], time.start, 60),
-        (&spins[2], time.end, 3600),
-        (&spins[3], time.end, 60),
+        (&spins[0], from, 3600),
+        (&spins[1], from, 60),
+        (&spins[2], to, 3600),
+        (&spins[3], to, 60),
     ] {
         let v = if unit == 3600 {
             t.rem_euclid(DAY) / 3600
@@ -233,7 +240,7 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) {
             let end = if end > start {
                 end
             } else {
-                start + if all { DAY } else { 3600 }
+                start + if all { DAY } else { duration("event_duration") }
             };
             EventTime {
                 start,
@@ -279,6 +286,12 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) {
     }
     let (read2, len2) = (read.clone(), len.clone());
     end_cal.connect_day_selected(move |_| {
+        let t = read2();
+        len2.set(t.end - t.start);
+    });
+    // So does turning "All day" off or on: its days or times are what is kept then.
+    let (read2, len2) = (read.clone(), len.clone());
+    all_day.connect_active_notify(move |_| {
         let t = read2();
         len2.set(t.end - t.start);
     });

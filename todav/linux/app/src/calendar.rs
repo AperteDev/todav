@@ -7,6 +7,7 @@ mod dialog;
 mod mini;
 mod week;
 
+use crate::settings::duration;
 use crate::window::{get, view};
 use crate::{core, dates, request_sync};
 use adw::prelude::*;
@@ -401,7 +402,6 @@ fn step(by: i64) {
     }
 }
 
-/// The timed event on now or next within a week, in the calendars shown (for the extension).
 /// A new event on the selected day, at the next full hour when that is today, else at 9:00.
 fn new_event() {
     let Some(c) = cal() else { return };
@@ -414,12 +414,13 @@ fn new_event() {
     };
     let time = EventTime {
         start,
-        end: start + 3600,
+        end: start + duration("event_duration"),
         all_day: false,
     };
     dialog::open(&c, None, time);
 }
 
+/// The timed event on now or next within a week, in the calendars shown (for the extension).
 pub fn next_event() -> Option<Event> {
     let hidden = hidden();
     let now = core().local_now();
@@ -756,11 +757,12 @@ fn move_to_day(t: &Task, day: i64) {
     save(&t.uid, patch);
 }
 
-/// Plan a task into the slot starting at `at`: as long as it was planned before, else an hour.
+/// Plan a task into the slot starting at `at`: as long as it was planned before, else the
+/// default length.
 fn plan_at(t: &Task, at: i64) {
     let len = match (t.start, slot_end(t)) {
         (Some(s), Some(e)) => e - s,
-        _ => 3600,
+        _ => duration("task_duration"),
     };
     let time = |t| {
         Some(Some(Due {
