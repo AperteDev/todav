@@ -57,7 +57,7 @@ struct Ui {
     stack: gtk::Stack,
     split: adw::NavigationSplitView,
     sidebar: gtk::ListBox,
-    /// The search, lower case: while set, the page shows matching tasks of every list.
+    /// The search, `folded`: while set, the page shows matching tasks of every list.
     query: RefCell<String>,
     cat_section: gtk::Box,
     cat_list: gtk::ListBox,
@@ -350,9 +350,23 @@ fn connect_search(
     let weak = Rc::downgrade(ui);
     entry.connect_search_changed(move |e| {
         let Some(ui) = weak.upgrade() else { return };
-        *ui.query.borrow_mut() = e.text().trim().to_lowercase();
+        *ui.query.borrow_mut() = folded(e.text().trim());
         refresh_tasks(&ui);
     });
+}
+
+/// Text as search compares it: lower case, without diacritics ("Żarówki" → "zarowki").
+pub fn folded(s: &str) -> String {
+    glib::normalize(s, glib::NormalizeMode::All)
+        .chars()
+        .filter(|c| !('\u{300}'..='\u{36f}').contains(c)) // the marks split off above
+        .map(|c| match c {
+            'ł' => 'l', // a letter of its own, not split
+            'Ł' => 'L',
+            c => c,
+        })
+        .collect::<String>()
+        .to_lowercase()
 }
 
 /// Set up the search bar of the `views` page `page`, its `entry` not being its direct child:
@@ -1119,7 +1133,7 @@ fn rebuild_upcoming(ui: &Rc<Ui>) {
     }
 }
 
-/// Tasks of `all` whose title, notes or category hold `query` (lower case): a group per list,
+/// Tasks of `all` whose title, notes or category hold `query` (`folded`): a group per list,
 /// open ones first.
 fn rebuild_search(ui: &Rc<Ui>, query: &str, all: Vec<Task>) {
     let hit = |t: &Task| {
@@ -1130,7 +1144,7 @@ fn rebuild_search(ui: &Rc<Ui>, query: &str, all: Vec<Task>) {
         ]
         .into_iter()
         .flatten()
-        .any(|s| s.to_lowercase().contains(query))
+        .any(|s| folded(s).contains(query))
     };
     let found: Vec<Task> = all.into_iter().filter(hit).collect();
     ui.title.set_title("Search");
@@ -2128,6 +2142,12 @@ fn due_dialog(b: &gtk::Builder, t: &Task) -> impl Fn() -> TaskPatch + 'static {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+
+    #[test]
+    fn search_ignores_case_and_diacritics() {
+        assert_eq!(folded("Żarówki ŁÓDŹ Crème"), "zarowki lodz creme");
+        assert!(folded("Rybałki").contains(&folded("rybal")));
+    }
 
     pub(crate) fn task(uid: &str, parent: Option<&str>) -> Task {
         Task {

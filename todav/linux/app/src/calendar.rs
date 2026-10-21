@@ -104,7 +104,7 @@ struct Cal {
     title: adw::WindowTitle,
     sync_state: gtk::Stack,
     search: gtk::SearchBar,
-    /// The search, lower case: while set, matching events show instead of the views.
+    /// The search, `folded`: while set, matching events show instead of the views.
     query: RefCell<String>,
     mode: adw::ToggleGroup,
     views: gtk::Stack,
@@ -302,7 +302,7 @@ pub fn build(views: &adw::ViewStack) {
     crate::window::search_bar(&c.search, &query, views, "calendar");
     query.connect_search_changed(|e| {
         let Some(c) = cal() else { return };
-        *c.query.borrow_mut() = e.text().trim().to_lowercase();
+        *c.query.borrow_mut() = crate::window::folded(e.text().trim());
         refresh();
     });
     // Narrow window: clicking a day, the selected one too (no day-selected then), goes from the
@@ -1506,7 +1506,7 @@ fn render_search(c: &Rc<Cal>) {
         ]
         .into_iter()
         .flatten()
-        .any(|s| s.to_lowercase().contains(&query))
+        .any(|s| crate::window::folded(s).contains(&query))
     };
     let ahead = |e: &Event| e.end > now;
     let mut best: HashMap<(String, String), Event> = HashMap::new();
