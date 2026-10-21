@@ -176,6 +176,21 @@ Adw.NavigationSplitView split {
         }
 
         [end]
+        Gtk.ToggleButton search_button {
+          icon-name: "system-search-symbolic";
+          tooltip-text: "Search (Ctrl+F)";
+
+          Gtk.ShortcutController {
+            scope: managed;
+
+            Gtk.Shortcut {
+              trigger: "<Control>f";
+              action: "activate";
+            }
+          }
+        }
+
+        [end]
         Adw.ToggleGroup mode {
           Adw.Toggle {
             name: "month";
@@ -193,6 +208,23 @@ Adw.NavigationSplitView split {
             name: "agenda";
             icon-name: "view-list-symbolic";
             tooltip: "Agenda";
+          }
+        }
+      }
+
+      // Typing on the page opens it too (its key capture widget is set in code). Results show
+      // in the agenda's place.
+      [top]
+      Gtk.SearchBar search {
+        search-mode-enabled: bind search_button.active bidirectional;
+
+        Adw.Clamp {
+          maximum-size: 720;
+          hexpand: true;
+
+          Gtk.SearchEntry query {
+            placeholder-text: "Search events";
+            hexpand: true;
           }
         }
       }

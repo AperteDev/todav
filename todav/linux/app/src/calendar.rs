@@ -11,7 +11,7 @@ use crate::{core, dates, request_sync};
 use adw::prelude::*;
 use gtk::{gdk, glib};
 use std::cell::{Cell, RefCell};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use todav_core::{Due, Event, EventPatch, EventTime, List, Scope, Task, TaskPatch};
 
@@ -103,6 +103,9 @@ struct Cal {
     all_task_lists: gtk::CheckButton,
     title: adw::WindowTitle,
     sync_state: gtk::Stack,
+    search: gtk::SearchBar,
+    /// The search, lower case: while set, matching events show instead of the views.
+    query: RefCell<String>,
     mode: adw::ToggleGroup,
     views: gtk::Stack,
     weekdays: gtk::Box,
@@ -208,6 +211,8 @@ pub fn build(views: &adw::ViewStack) {
         all_task_lists: get(&b, "all_task_lists"),
         title: get(&b, "title"),
         sync_state: get(&b, "sync_state"),
+        search: get(&b, "search"),
+        query: RefCell::new(String::new()),
         mode: get(&b, "mode"),
         views: get(&b, "views"),
         weekdays: get(&b, "weekdays"),
@@ -279,6 +284,9 @@ pub fn build(views: &adw::ViewStack) {
     c.mode.connect_active_name_notify(|m| {
         let name = m.active_name().map(|n| n.to_string()).unwrap_or_default();
         let _ = core().set_setting("calendar_mode".into(), name);
+        if let Some(c) = cal() {
+            c.search.set_search_mode(false);
+        }
         refresh();
     });
     c.mini.connect_day_selected(|m| {
@@ -286,6 +294,15 @@ pub fn build(views: &adw::ViewStack) {
             return;
         };
         c.anchor.set(dates::midnight(&m.date()));
+        c.search.set_search_mode(false);
+        refresh();
+    });
+    // Typing on the page searches the events; going to a day, a view or a period ends it.
+    let query: gtk::SearchEntry = get(&b, "query");
+    crate::window::search_bar(&c.search, &query, views, "calendar");
+    query.connect_search_changed(|e| {
+        let Some(c) = cal() else { return };
+        *c.query.borrow_mut() = e.text().trim().to_lowercase();
         refresh();
     });
     // Narrow window: clicking a day, the selected one too (no day-selected then), goes from the
@@ -376,6 +393,7 @@ fn mode(c: &Cal) -> Mode {
 fn go(f: impl FnOnce(i64) -> i64) {
     if let Some(c) = cal() {
         c.anchor.set(f(c.anchor.get()));
+        c.search.set_search_mode(false);
         refresh();
     }
 }
@@ -424,6 +442,7 @@ pub fn show_day(t: i64) {
     c.stack.set_visible_child_name("calendar");
     c.split.set_show_content(true);
     c.anchor.set(t - t.rem_euclid(DAY));
+    c.search.set_search_mode(false);
     refresh();
 }
 
@@ -442,6 +461,11 @@ pub fn refresh() {
     c.mini.select_day(&dates::fields(anchor));
     c.busy.set(false);
     let until = match mode(&c) {
+        _ if !c.query.borrow().is_empty() => {
+            c.views.set_visible_child_name("agenda");
+            render_search(&c);
+            0
+        }
         Mode::Month => {
             c.views.set_visible_child_name("month");
             render_month(&c)
@@ -1434,14 +1458,8 @@ fn render_agenda(c: &Rc<Cal>) {
             continue;
         }
         any = true;
-        let date = fmt(day, "%A %-d %B");
-        let title = match (day - today()) / DAY {
-            0 => format!("Today · {date}"),
-            1 => format!("Tomorrow · {date}"),
-            _ => capitalized(&date),
-        };
         let group = adw::PreferencesGroup::builder()
-            .title(glib::markup_escape_text(&title))
+            .title(glib::markup_escape_text(&day_title(day, "%A %-d %B")))
             .build();
         for i in here {
             group.add(&agenda_row(c, i));
@@ -1452,6 +1470,87 @@ fn render_agenda(c: &Rc<Cal>) {
         let empty = adw::StatusPage::builder()
             .icon_name("x-office-calendar-symbolic")
             .title("Nothing Planned")
+            .build();
+        empty.add_css_class("compact");
+        c.agenda.append(&empty);
+    }
+}
+
+/// A day's heading: its date in `format`, after "Today" or "Tomorrow" when it is.
+fn day_title(day: i64, format: &str) -> String {
+    let date = fmt(day, format);
+    match (day - today()) / DAY {
+        0 => format!("Today · {date}"),
+        1 => format!("Tomorrow · {date}"),
+        _ => capitalized(&date),
+    }
+}
+
+/// Events in the calendars shown whose title, location or notes hold the search, within a
+/// year either way: each series once, at its next time (or its last, when all are past); the
+/// coming ones first.
+fn render_search(c: &Rc<Cal>) {
+    let query = c.query.borrow().clone();
+    let (now, hidden) = (core().local_now(), hidden());
+    let hit = |e: &Event| {
+        [
+            Some(&e.summary),
+            e.location.as_ref(),
+            e.description.as_ref(),
+        ]
+        .into_iter()
+        .flatten()
+        .any(|s| s.to_lowercase().contains(&query))
+    };
+    let ahead = |e: &Event| e.end > now;
+    let mut best: HashMap<(String, String), Event> = HashMap::new();
+    let all = core().events(today() - 366 * DAY, today() + 366 * DAY);
+    for e in all
+        .into_iter()
+        .filter(|e| !hidden.contains(&e.list_href) && hit(e))
+    {
+        let key = (e.list_href.clone(), e.uid.clone());
+        let better = best
+            .get(&key)
+            .is_none_or(|old| match (ahead(&e), ahead(old)) {
+                (true, true) => e.start < old.start,
+                (false, false) => e.start > old.start,
+                (a, _) => a,
+            });
+        if better {
+            best.insert(key, e);
+        }
+    }
+    let mut found: Vec<Event> = best.into_values().collect();
+    found.sort_by_key(|e| (!ahead(e), if ahead(e) { e.start } else { -e.start }));
+
+    c.title.set_title("Search");
+    c.title.set_subtitle(&match found.len() {
+        1 => "1 event".to_string(),
+        n => format!("{n} events"),
+    });
+    clear(&c.agenda);
+    let mut group: Option<(i64, adw::PreferencesGroup)> = None;
+    for e in found {
+        let day = e.start - e.start.rem_euclid(DAY);
+        if group.as_ref().is_none_or(|(d, _)| *d != day) {
+            let g = adw::PreferencesGroup::builder()
+                .title(glib::markup_escape_text(&day_title(day, "%A %-d %B %Y")))
+                .build();
+            c.agenda.append(&g);
+            group = Some((day, g));
+        }
+        group
+            .as_ref()
+            .unwrap()
+            .1
+            .add(&agenda_row(c, &Item::Event(e)));
+    }
+    if group.is_none() {
+        let empty = adw::StatusPage::builder()
+            .icon_name("system-search-symbolic")
+            .title("No Results Found")
+            .description("Try a different search")
             .build();
         empty.add_css_class("compact");
         c.agenda.append(&empty);
