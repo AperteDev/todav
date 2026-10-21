@@ -67,7 +67,8 @@ menubutton.block > button { padding: 2px 6px; }
 .block { border-radius: 6px; padding: 2px 6px; font-size: smaller; }
 .block label { font-weight: normal; }
 .block.task { border-left: 3px solid alpha(currentColor, 0.5); }
-.drop-preview { border-radius: 6px; padding: 2px 6px; font-size: smaller; font-feature-settings: 'tnum'; background: alpha(@accent_bg_color, 0.25); box-shadow: inset 0 0 0 1px @accent_bg_color; }
+/* Opaque, so the block it is resized or moved from does not show through it. */
+.drop-preview { border-radius: 6px; padding: 2px 6px; font-size: smaller; font-feature-settings: 'tnum'; background: color-mix(in srgb, @accent_bg_color 25%, @window_bg_color); box-shadow: inset 0 0 0 1px @accent_bg_color; }
 .drag-card { margin: 8px; padding: 8px 14px; border-radius: 10px; background: @card_bg_color; color: @card_fg_color; box-shadow: 0 2px 8px alpha(black, 0.25); }
 ";
 
@@ -129,12 +130,14 @@ struct Cal {
     week_grid: gtk::Overlay,
     week_lines: gtk::DrawingArea,
     hours: gtk::Box,
-    /// The week grid's blocks and where they go.
-    blocks: RefCell<Vec<(gtk::Widget, week::Geo)>>,
-    /// Week-grid slot a dragged task would land in: (day of the week, minute of the day), and the
-    /// block showing it there with its times.
+    /// The week grid's blocks, where they go and what they show.
+    blocks: RefCell<Vec<(gtk::Widget, week::Geo, Item)>>,
+    /// Week-grid slot a dragged task would land in: (day of the week, minute of the day).
     hover: Cell<Option<(i64, i64)>>,
+    /// The block showing where a dragged or resized item lands, with its times, and where that
+    /// is: (day of the week, from, to in minutes into the day).
     preview: gtk::Label,
+    span: Cell<Option<(i64, i64, i64)>>,
     /// The week view scrolled to the morning once.
     scrolled: Cell<bool>,
     /// An event's details are open: redraws wait (`pending`) until it closes.
@@ -244,6 +247,7 @@ pub fn build(views: &adw::ViewStack) {
             .can_target(false)
             .visible(false)
             .build(),
+        span: Cell::new(None),
         scrolled: Cell::new(false),
         holding: Cell::new(false),
         pending: Cell::new(false),
@@ -585,7 +589,7 @@ fn drag_item(w: &impl IsA<gtk::Widget>, i: Item) {
         DRAGGING.with(|d| d.borrow_mut().take());
         if let Some(c) = cal() {
             c.hover.set(None);
-            c.preview.set_visible(false);
+            week::show_preview(&c, None);
         }
     });
     w.add_controller(src);

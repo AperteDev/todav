@@ -53,29 +53,20 @@ pub(super) fn setup(c: &Rc<Cal>) {
         .connect_get_child_position(move |overlay, child| {
             let c = weak.upgrade()?;
             if child == c.preview.upcast_ref::<gtk::Widget>() {
-                let (day, minute) = c.hover.get()?;
+                let (day, from, to) = c.span.get()?;
                 let colw = col_width(overlay.width());
-                let h = (drop_length(&dragging()?) as f64 / 60.0 * HOUR).max(24.0);
+                let h = ((to - from) as f64 / 60.0 * HOUR).max(24.0);
                 return Some(gdk::Rectangle::new(
                     (GUTTER as f64 + colw * day as f64) as i32 + 2,
-                    (minute as f64 / 60.0 * HOUR) as i32,
+                    (from as f64 / 60.0 * HOUR) as i32,
                     (colw as i32 - 4).max(4),
                     h as i32,
                 ));
             }
             let blocks = c.blocks.borrow();
-            let (_, g) = blocks.iter().find(|(w, _)| w == child)?;
-            let colw = col_width(overlay.width());
-            let x = GUTTER as f64 + colw * g.day as f64 + colw * g.col as f64 / g.cols as f64;
-            let y = g.from as f64 / 60.0 * HOUR;
-            let h = ((g.to - g.from) as f64 / 60.0 * HOUR).max(24.0);
-            let w = colw / g.cols as f64;
-            Some(gdk::Rectangle::new(
-                x as i32 + 1,
-                y as i32 + 1,
-                (w as i32 - 2).max(4),
-                h as i32 - 2,
-            ))
+            let (_, g, _) = blocks.iter().find(|(w, _, _)| w == child)?;
+            let (x, y, w, h) = rect(overlay.width(), g);
+            Some(gdk::Rectangle::new(x as i32, y as i32, w as i32, h as i32))
         });
 
     // Dragging over the hours shows where it lands: a task is planned there, an event moves.
@@ -98,7 +89,7 @@ pub(super) fn setup(c: &Rc<Cal>) {
                     ),
                 }
             }
-            c.preview.set_visible(false);
+            show_preview(&c, None);
         },
     );
     // A double click or a long press on a free hour adds an event there.
@@ -120,30 +111,21 @@ pub(super) fn setup(c: &Rc<Cal>) {
         // Where the dragged block's top would be, to the nearest slot.
         let top = y - GRAB.get() + HOUR * SNAP as f64 / 120.0;
         let hover = slot(&c, x, top);
-        if hover != c.hover.get() {
-            c.hover.set(hover);
-            if let Some((_, minute)) = hover {
-                let at = |m: i64| fmt(today() + m * 60, "%H:%M");
-                c.preview.set_label(&format!(
-                    "{} – {}",
-                    at(minute),
-                    at(minute + drop_length(&i))
-                ));
-                // Over the blocks (last drawn), which re-rendering puts after it.
-                c.preview.insert_before(&c.week_grid, gtk::Widget::NONE);
-            }
-            c.preview.set_visible(hover.is_some());
-            c.week_grid.queue_allocate();
-        }
+        c.hover.set(hover);
+        show_preview(
+            &c,
+            hover.map(|(day, m)| (&i, (day, m, m + drop_length(&i)))),
+        );
         gdk::DragAction::MOVE
     });
     let weak = Rc::downgrade(c);
     drop.connect_leave(move |_| {
         if let Some(c) = weak.upgrade() {
             c.hover.set(None);
-            c.preview.set_visible(false);
+            show_preview(&c, None);
         }
     });
+    resizing(c);
     // Keep the current-time line moving.
     let weak = Rc::downgrade(c);
     glib::timeout_add_seconds_local(60, move || match weak.upgrade() {
@@ -164,6 +146,166 @@ fn slot(c: &Cal, x: f64, y: f64) -> Option<(i64, i64)> {
     }
     let minute = (y / HOUR * 60.0) as i64 / SNAP * SNAP;
     Some((day, minute.clamp(0, 24 * 60 - SNAP)))
+}
+
+/// Show the preview block of `item` over `span` (day, from, to in minutes) with its title and
+/// times, laid out as blocks are; or hide it.
+pub(super) fn show_preview(c: &Cal, at: Option<(&Item, (i64, i64, i64))>) {
+    let span = at.map(|(_, s)| s);
+    if span == c.span.get() {
+        return;
+    }
+    c.span.set(span);
+    if let Some((i, (_, from, to))) = at {
+        let time = |m: i64| fmt(today() + m * 60, "%H:%M");
+        let times = format!("{} – {}", time(from), time(to));
+        let title = match i {
+            Item::Event(e) => &e.summary,
+            Item::Task(t) => &t.summary,
+        };
+        c.preview.set_label(&if to - from >= 45 {
+            format!("{title}\n{times}")
+        } else {
+            format!("{times} {title}")
+        });
+        // Over the blocks (last drawn), which re-rendering puts after it.
+        c.preview.insert_before(&c.week_grid, gtk::Widget::NONE);
+    }
+    c.preview.set_visible(span.is_some());
+    c.week_grid.queue_allocate();
+}
+
+/// Dragging a block's top or bottom edge changes when it starts or ends, in steps of `SNAP`;
+/// the pointer shows a resize cursor over those edges.
+fn resizing(c: &Rc<Cal>) {
+    // The block being resized, and whether by its top.
+    let held: Rc<RefCell<Option<(Item, Geo, bool)>>> = Rc::default();
+    let drag = gtk::GestureDrag::new();
+    // Before the block's own click and drag, which an edge takes from it.
+    drag.set_propagation_phase(gtk::PropagationPhase::Capture);
+    let (weak, h) = (Rc::downgrade(c), held.clone());
+    drag.connect_drag_begin(move |g, x, y| {
+        let edge = weak.upgrade().and_then(|c| edge_at(&c, x, y));
+        g.set_state(if edge.is_some() {
+            gtk::EventSequenceState::Claimed
+        } else {
+            gtk::EventSequenceState::Denied
+        });
+        *h.borrow_mut() = edge;
+    });
+    let (weak, h) = (Rc::downgrade(c), held.clone());
+    drag.connect_drag_update(move |g, _, dy| {
+        let (Some(c), Some((i, geo, top)), Some((_, y))) =
+            (weak.upgrade(), h.borrow().clone(), g.start_point())
+        else {
+            return;
+        };
+        let minute = ((y + dy) / HOUR * 60.0 / SNAP as f64).round() as i64 * SNAP;
+        let span = if top {
+            (geo.day, minute.clamp(0, geo.to - SNAP), geo.to)
+        } else {
+            (geo.day, geo.from, minute.clamp(geo.from + SNAP, 24 * 60))
+        };
+        show_preview(&c, Some((&i, span)));
+    });
+    let weak = Rc::downgrade(c);
+    drag.connect_drag_end(move |_, _, _| {
+        let (Some(c), Some((i, geo, top))) = (weak.upgrade(), held.borrow_mut().take()) else {
+            return;
+        };
+        let span = c.span.get();
+        show_preview(&c, None);
+        let Some((day, from, to)) = span.filter(|s| (s.1, s.2) != (geo.from, geo.to)) else {
+            return;
+        };
+        let day = week_start(c.anchor.get()) + day * DAY;
+        let (from, to) = (day + from * 60, day + to * 60);
+        match &i {
+            Item::Event(e) => move_event(
+                e,
+                EventTime {
+                    start: if top { from } else { e.start },
+                    end: if top { e.end } else { to },
+                    all_day: false,
+                },
+            ),
+            // The top is when it starts, the bottom when it is due.
+            Item::Task(t) => {
+                let at = |at| Some(Some(Due { at, all_day: false }));
+                let patch = if top {
+                    TaskPatch {
+                        start: at(from),
+                        ..Default::default()
+                    }
+                } else {
+                    TaskPatch {
+                        due: at(to),
+                        ..Default::default()
+                    }
+                };
+                save(&t.uid, patch);
+            }
+        }
+    });
+    c.week_grid.add_controller(drag);
+    let motion = gtk::EventControllerMotion::new();
+    let weak = Rc::downgrade(c);
+    motion.connect_motion(move |_, x, y| {
+        if let Some(c) = weak.upgrade() {
+            let edge = edge_at(&c, x, y).is_some();
+            c.week_grid
+                .set_cursor_from_name(edge.then_some("ns-resize"));
+        }
+    });
+    c.week_grid.add_controller(motion);
+}
+
+/// The block edge under a point of the grid: its item, its place and whether it is the top. Only
+/// an item's real start or end (not where a longer one crosses midnight) of one we may change.
+fn edge_at(c: &Cal, x: f64, y: f64) -> Option<(Item, Geo, bool)> {
+    let width = c.week_grid.width();
+    let week = week_start(c.anchor.get());
+    let blocks = c.blocks.borrow();
+    blocks.iter().find_map(|(_, g, i)| {
+        let (bx, by, bw, bh) = rect(width, g);
+        if x < bx || x > bx + bw || y < by || y > by + bh {
+            return None;
+        }
+        let zone = (bh / 4.0).min(6.0);
+        let top = if y < by + zone {
+            true
+        } else if y > by + bh - zone {
+            false
+        } else {
+            return None;
+        };
+        let (from, to) = span(i)?;
+        let day = week + g.day * DAY;
+        let real = if top {
+            from == day + g.from * 60
+        } else {
+            to == day + g.to * 60
+        };
+        let ours = match i {
+            Item::Event(e) => writable(c, &e.list_href),
+            Item::Task(_) => true,
+        };
+        (real && ours).then(|| (i.clone(), *g, top))
+    })
+}
+
+/// Where `g`'s block goes in an overlay `width` wide: x, y, width, height.
+fn rect(width: i32, g: &Geo) -> (f64, f64, f64, f64) {
+    let colw = col_width(width);
+    let x = GUTTER as f64 + colw * g.day as f64 + colw * g.col as f64 / g.cols as f64;
+    let y = g.from as f64 / 60.0 * HOUR;
+    let h = ((g.to - g.from) as f64 / 60.0 * HOUR).max(24.0);
+    (
+        x + 1.0,
+        y + 1.0,
+        (colw / g.cols as f64 - 2.0).max(4.0),
+        h - 2.0,
+    )
 }
 
 /// Length in minutes of what a dropped task becomes (for the drop preview).
@@ -225,17 +367,24 @@ fn draw(c: &Cal, area: &gtk::DrawingArea, cr: &gtk::cairo::Context, w: i32, h: i
     }
 }
 
-/// A timed item's part within one day: (day of the week, from, to in minutes into the day).
-fn segments(i: &Item, start: i64) -> Vec<(i64, i64, i64)> {
-    let (from, to) = match i {
-        Item::Event(e) if !e.all_day => (e.start, e.end.max(e.start + 15 * 60)),
+/// When an item takes hours, from and to; None for what goes above them.
+fn span(i: &Item) -> Option<(i64, i64)> {
+    match i {
+        Item::Event(e) if !e.all_day => Some((e.start, e.end.max(e.start + 15 * 60))),
         // Only tasks planned into a slot (a start time) take hours; one just due at a time goes
         // above with the day's other items, its chip showing the time.
         Item::Task(t) => match t.start {
-            Some(s) if !t.start_all_day => (s, slot_end(t).unwrap_or(s + 30 * 60)),
-            _ => return Vec::new(),
+            Some(s) if !t.start_all_day => Some((s, slot_end(t).unwrap_or(s + 30 * 60))),
+            _ => None,
         },
-        _ => return Vec::new(),
+        _ => None,
+    }
+}
+
+/// A timed item's part within one day: (day of the week, from, to in minutes into the day).
+fn segments(i: &Item, start: i64) -> Vec<(i64, i64, i64)> {
+    let Some((from, to)) = span(i) else {
+        return Vec::new();
     };
     (0..7)
         .filter_map(|d| {
@@ -315,7 +464,7 @@ pub(super) fn render(c: &Rc<Cal>) -> i64 {
     c.week_all_day.append(&row);
 
     // The hours.
-    for (w, _) in c.blocks.borrow_mut().drain(..) {
+    for (w, _, _) in c.blocks.borrow_mut().drain(..) {
         c.week_grid.remove_overlay(&w);
     }
     let mut placed = Vec::new();
@@ -353,7 +502,7 @@ pub(super) fn render(c: &Rc<Cal>) -> i64 {
     for (n, geo) in placed {
         let w = block(c, &items[n], geo);
         c.week_grid.add_overlay(&w);
-        c.blocks.borrow_mut().push((w, geo));
+        c.blocks.borrow_mut().push((w, geo, items[n].clone()));
     }
     c.week_lines.queue_draw();
     // Open on the morning (or the current hour) the first time.
