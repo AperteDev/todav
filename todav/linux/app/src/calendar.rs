@@ -294,7 +294,9 @@ pub fn build(views: &adw::ViewStack) {
     let click = gtk::GestureClick::new();
     click.set_propagation_phase(gtk::PropagationPhase::Capture);
     click.connect_pressed(|g, _, x, y| {
-        let day = g.widget().and_then(|m| m.pick(x, y, gtk::PickFlags::DEFAULT));
+        let day = g
+            .widget()
+            .and_then(|m| m.pick(x, y, gtk::PickFlags::DEFAULT));
         if day.is_some_and(|d| d.has_css_class("day-number")) {
             glib::idle_add_local_once(|| {
                 if let Some(c) = cal() {
