@@ -41,11 +41,13 @@ Adw.NavigationSplitView split {
           orientation: vertical;
           spacing: 6;
 
-          Gtk.Calendar mini {
+          // Filled in code (src/calendar/mini.rs).
+          Gtk.Box mini {
+            orientation: vertical;
             margin-start: 12;
             margin-end: 12;
             margin-top: 6;
-            styles ["card"]
+            styles ["card", "mini"]
           }
 
           // Each section folds under its heading, as the Tasks page's categories do.

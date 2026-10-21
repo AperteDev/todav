@@ -4,6 +4,7 @@
 
 mod days;
 mod dialog;
+mod mini;
 mod week;
 
 use crate::window::{get, view};
@@ -39,6 +40,12 @@ menubutton.chip > button, menubutton.more > button, .chip.task button { min-heig
 menubutton.chip, menubutton.more { padding: 0; }
 menubutton.chip > button, menubutton.more > button { padding: 0 6px; border-radius: 6px; }
 menubutton.block > button { padding: 2px 6px; }
+.mini { padding: 6px; }
+.mini .weekday { font-size: smaller; opacity: 0.6; padding: 4px 0; }
+.mini button.day { min-width: 32px; min-height: 32px; padding: 0; font-weight: normal; font-feature-settings: 'tnum'; }
+.mini button.day.other { opacity: 0.45; }
+.mini button.day.today { box-shadow: inset 0 0 0 1px @accent_color; }
+.mini button.day.selected { background: @accent_bg_color; color: @accent_fg_color; }
 /* Ends of a bar that goes on into the next or previous week (or past a full day) are square. */
 .chip.from-before, menubutton.chip.from-before > button { border-top-left-radius: 0; border-bottom-left-radius: 0; }
 .chip.goes-on, menubutton.chip.goes-on > button { border-top-right-radius: 0; border-bottom-right-radius: 0; }
@@ -95,7 +102,7 @@ struct Cal {
     /// The window's Tasks / Calendar stack.
     stack: adw::ViewStack,
     split: adw::NavigationSplitView,
-    mini: gtk::Calendar,
+    mini: mini::Mini,
     calendars: gtk::ListBox,
     task_heading: gtk::ToggleButton,
     task_lists: gtk::ListBox,
@@ -128,8 +135,6 @@ struct Cal {
     pending: Cell<bool>,
     /// Midnight of the day the views are around (the selected day).
     anchor: Cell<i64>,
-    /// Set while the mini month is moved in code, so its handler ignores that.
-    busy: Cell<bool>,
     /// Calendar colours, rebuilt with the sidebar.
     colors: gtk::CssProvider,
     /// Index of each collection's colour class (`cal-<i>`), by href.
@@ -201,7 +206,7 @@ pub fn build(views: &adw::ViewStack) {
     let c = Rc::new(Cal {
         stack: views.clone(),
         split,
-        mini: get(&b, "mini"),
+        mini: mini::Mini::new(&get(&b, "mini")),
         calendars: get(&b, "calendars"),
         task_heading: get(&b, "task_heading"),
         task_lists: get(&b, "task_lists"),
@@ -228,7 +233,6 @@ pub fn build(views: &adw::ViewStack) {
         holding: Cell::new(false),
         pending: Cell::new(false),
         anchor: Cell::new(today()),
-        busy: Cell::new(false),
         colors,
         lists: RefCell::new(Vec::new()),
         hidden: RefCell::new(HashSet::new()),
@@ -275,14 +279,6 @@ pub fn build(views: &adw::ViewStack) {
         }
         refresh();
     });
-    c.mini.connect_day_selected(|m| {
-        let Some(c) = cal().filter(|c| !c.busy.get()) else {
-            return;
-        };
-        c.anchor.set(dates::midnight(&m.date()));
-        c.search.set_search_mode(false);
-        refresh();
-    });
     // Typing on the page searches the events; going to a day, a view or a period ends it.
     let query: gtk::SearchEntry = get(&b, "query");
     crate::window::search_bar(&c.search, &query, views, "calendar");
@@ -291,23 +287,6 @@ pub fn build(views: &adw::ViewStack) {
         *c.query.borrow_mut() = crate::window::folded(e.text().trim());
         refresh();
     });
-    // Narrow window: clicking a day, the selected one too (no day-selected then), goes from the
-    // sidebar to the views. Before the calendar's own gesture, which claims the click.
-    let click = gtk::GestureClick::new();
-    click.set_propagation_phase(gtk::PropagationPhase::Capture);
-    click.connect_pressed(|g, _, x, y| {
-        let day = g
-            .widget()
-            .and_then(|m| m.pick(x, y, gtk::PickFlags::DEFAULT));
-        if day.is_some_and(|d| d.has_css_class("day-number")) {
-            glib::idle_add_local_once(|| {
-                if let Some(c) = cal() {
-                    c.split.set_show_content(true);
-                }
-            });
-        }
-    });
-    c.mini.add_controller(click);
     get::<gtk::Button>(&b, "today").connect_clicked(|_| go(|_| today()));
     get::<gtk::Button>(&b, "prev").connect_clicked(|_| step(-1));
     get::<gtk::Button>(&b, "next").connect_clicked(|_| step(1));
@@ -440,11 +419,7 @@ pub fn refresh() {
         return;
     }
     refresh_calendars(&c);
-    let anchor = c.anchor.get();
-    // Keep the mini month on the selected day.
-    c.busy.set(true);
-    c.mini.select_day(&dates::fields(anchor));
-    c.busy.set(false);
+    mini::refresh(&c);
     let until = match mode(&c) {
         _ if !c.query.borrow().is_empty() => {
             c.views.set_visible_child_name("agenda");
@@ -1058,9 +1033,7 @@ fn select_in_month(day: i64) {
         }
         row = r.next_sibling();
     }
-    c.busy.set(true);
-    c.mini.select_day(&dates::fields(day));
-    c.busy.set(false);
+    mini::refresh(&c);
 }
 
 /// A double click, or a long press on a touchscreen, on `w` adds an event at the time `at`
