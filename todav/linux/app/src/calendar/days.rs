@@ -155,9 +155,11 @@ pub(super) fn row(
     // Dropped on an item rather than a cell: the day under the pointer.
     let column = Rc::new(Cell::new(0));
     let col = column.clone();
-    let drop = item_drop(&overlay, false, move |i| {
-        drop_on_day(i, start + col.get() * DAY, all_day)
-    });
+    let drop = item_drop(
+        &overlay,
+        |_| true,
+        move |i| drop_on_day(i, start + col.get() * DAY, all_day),
+    );
     drop.connect_motion(move |t, x, _| {
         let width = t.widget().map_or(1, |w| w.width().max(1));
         column.set(((x * 7.0 / width as f64) as i64).clamp(0, 6));

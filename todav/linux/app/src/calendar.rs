@@ -590,18 +590,15 @@ fn writable(c: &Cal, list: &str) -> bool {
         .any(|l| l.href == list && l.writable)
 }
 
-/// A drop target taking dragged items (only tasks with `tasks_only`); `dropped` gets the item.
+/// A drop target taking the dragged items `accepts` agrees to (no highlight for the others);
+/// `dropped` gets the item.
 fn item_drop(
     w: &impl IsA<gtk::Widget>,
-    tasks_only: bool,
+    accepts: fn(&Item) -> bool,
     dropped: impl Fn(&Item) + 'static,
 ) -> gtk::DropTarget {
     let drop = gtk::DropTarget::new(glib::Type::STRING, gdk::DragAction::MOVE);
-    drop.connect_accept(move |_, _| match dragging() {
-        Some(Item::Task(_)) => true,
-        Some(Item::Event(_)) => !tasks_only,
-        None => false,
-    });
+    drop.connect_accept(move |_, _| dragging().is_some_and(|i| accepts(&i)));
     drop.connect_drop(move |_, _, _, _| {
         let Some(i) = dragging() else { return false };
         dropped(&i);
@@ -614,7 +611,7 @@ fn item_drop(
 /// Drop target for a day (a month cell, the week's all-day row): tasks move there; events move
 /// there keeping their time, or (`all_day`) become all-day events of that day.
 fn day_drop(w: &impl IsA<gtk::Widget>, day: i64, all_day: bool) {
-    item_drop(w, false, move |i| drop_on_day(i, day, all_day));
+    item_drop(w, |_| true, move |i| drop_on_day(i, day, all_day));
 }
 
 fn drop_on_day(i: &Item, day: i64, all_day: bool) {
@@ -738,10 +735,16 @@ fn plan_at(t: &Task, at: i64) {
     );
 }
 
+/// Whether `t` has a time slot: a start, or a due time rather than a date. Without one it is in
+/// "To Plan" already.
+fn planned(t: &Task) -> bool {
+    t.start.is_some() || (t.due.is_some() && !t.due_all_day)
+}
+
 /// Back to "To Plan": no slot, due on the day it was planned for.
 fn unplan(t: &Task) {
-    if t.start.is_none() && t.due_all_day {
-        return; // nothing planned
+    if !planned(t) {
+        return;
     }
     let (at, _) = when(t);
     let due = t.due.map(|_| {
@@ -762,7 +765,9 @@ fn unplan(t: &Task) {
 
 fn plan_drop(c: &Rc<Cal>) {
     c.plan.add_css_class("plan");
-    item_drop(&c.plan, true, |i| {
+    // Only planned tasks: one dragged out of the list does not light it up.
+    let accepts = |i: &Item| matches!(i, Item::Task(t) if planned(t));
+    item_drop(&c.plan, accepts, |i| {
         if let Item::Task(t) = i {
             unplan(t);
         }

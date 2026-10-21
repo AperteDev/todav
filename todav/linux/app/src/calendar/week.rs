@@ -68,24 +68,28 @@ pub(super) fn setup(c: &Rc<Cal>) {
         });
 
     // Dragging over the hours shows where it lands: a task is planned there, an event moves.
-    let drop = item_drop(&c.week_grid, false, |i| {
-        let Some(c) = cal() else { return };
-        if let Some((day, minute)) = c.hover.take() {
-            let at = week_start(c.anchor.get()) + day * DAY + minute * 60;
-            match i {
-                Item::Task(t) => plan_at(t, at),
-                Item::Event(e) => move_event(
-                    e,
-                    EventTime {
-                        start: at,
-                        end: at + drop_length(i) * 60,
-                        all_day: false,
-                    },
-                ),
+    let drop = item_drop(
+        &c.week_grid,
+        |_| true,
+        |i| {
+            let Some(c) = cal() else { return };
+            if let Some((day, minute)) = c.hover.take() {
+                let at = week_start(c.anchor.get()) + day * DAY + minute * 60;
+                match i {
+                    Item::Task(t) => plan_at(t, at),
+                    Item::Event(e) => move_event(
+                        e,
+                        EventTime {
+                            start: at,
+                            end: at + drop_length(i) * 60,
+                            all_day: false,
+                        },
+                    ),
+                }
             }
-        }
-        c.week_lines.queue_draw();
-    });
+            c.week_lines.queue_draw();
+        },
+    );
     // A double click or a long press on a free hour adds an event there.
     new_event_on(&c.week_grid, |c, x, y| {
         let (day, minute) = slot(c, x, y)?;
