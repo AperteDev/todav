@@ -1189,6 +1189,8 @@ fn task_chip(c: &Cal, t: &Task, label: &gtk::Label, check_align: gtk::Align) -> 
         w.set_margin_end(4);
         content.append(&w);
     }
+    // The title takes the rest: left to its natural width, a wrapping label can end up a "…".
+    label.set_hexpand(true);
     content.append(label);
     let b = gtk::Button::builder()
         .child(&content)
