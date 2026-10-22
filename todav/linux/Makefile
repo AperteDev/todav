@@ -12,15 +12,24 @@ install:
 	install -Dm644 data/$(ID)-autostart.desktop $(AUTOSTART)/$(ID).desktop
 
 # Binary and data files of an already built release; the Flatpak build uses this too (it asks
-# the Background portal for autostart instead).
+# the Background portal for autostart instead). DESTDIR stages them for a package.
 install-data:
-	install -Dm755 ../../target/release/todav-linux $(BINDIR)/todav-linux
-	install -Dm644 data/$(ID).desktop $(DATADIR)/applications/$(ID).desktop
-	install -Dm644 data/$(ID).metainfo.xml $(DATADIR)/metainfo/$(ID).metainfo.xml
-	mkdir -p $(DATADIR)/dbus-1/services
-	sed 's|@bindir@|$(BINDIR)|' data/$(ID).service.in > $(DATADIR)/dbus-1/services/$(ID).service
-	install -Dm644 data/$(ID).svg $(ICONS)/scalable/apps/$(ID).svg
-	install -Dm644 data/$(ID)-symbolic.svg $(ICONS)/symbolic/apps/$(ID)-symbolic.svg
+	install -Dm755 ../../target/release/todav-linux $(DESTDIR)$(BINDIR)/todav-linux
+	install -Dm644 data/$(ID).desktop $(DESTDIR)$(DATADIR)/applications/$(ID).desktop
+	install -Dm644 data/$(ID).metainfo.xml $(DESTDIR)$(DATADIR)/metainfo/$(ID).metainfo.xml
+	mkdir -p $(DESTDIR)$(DATADIR)/dbus-1/services
+	sed 's|@bindir@|$(BINDIR)|' data/$(ID).service.in > $(DESTDIR)$(DATADIR)/dbus-1/services/$(ID).service
+	install -Dm644 data/$(ID).svg $(DESTDIR)$(ICONS)/scalable/apps/$(ID).svg
+	install -Dm644 data/$(ID)-symbolic.svg $(DESTDIR)$(ICONS)/symbolic/apps/$(ID)-symbolic.svg
+
+# The system-wide tree the tarball and the .deb are made of, in DESTDIR:
+#   make stage PREFIX=/usr DESTDIR=$PWD/../../target/stage
+# The app and its data, autostart for every session, and the GNOME Shell extension.
+stage:
+	cargo build --release --locked -p todav-linux
+	$(MAKE) install-data
+	install -Dm644 data/$(ID)-autostart.desktop $(DESTDIR)/etc/xdg/autostart/$(ID).desktop
+	$(MAKE) -C ../gnome-extension install DEST=$(DESTDIR)$(DATADIR)/gnome-shell/extensions/todav@selfref.dev
 
 # Needs flatpak-builder (or the org.flatpak.Builder Flatpak); the build fetches crates over the
 # network. ponytail: Flathub builds offline, add a generated cargo-sources.json when submitting.
@@ -62,4 +71,4 @@ uninstall:
 	  $(DATADIR)/dbus-1/services/$(ID).service $(AUTOSTART)/$(ID).desktop \
 	  $(ICONS)/scalable/apps/$(ID).svg $(ICONS)/symbolic/apps/$(ID)-symbolic.svg
 
-.PHONY: install install-data flatpak uninstall broadway sandbox sandbox-reset
+.PHONY: install install-data stage flatpak uninstall broadway sandbox sandbox-reset
