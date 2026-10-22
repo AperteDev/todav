@@ -378,6 +378,27 @@ fn lists_are_created_renamed_and_deleted() {
 }
 
 #[test]
+fn a_setting_reaches_a_new_device() {
+    let (url, user, pass) = env();
+    let device = |name: &str| {
+        let dir = std::env::temp_dir().join(format!("todav-it-settings-{name}-{}", now()));
+        let c = Client::open(dir.to_string_lossy().to_string()).unwrap();
+        c.set_account(url.clone(), user.clone(), pass.clone())
+            .unwrap();
+        c
+    };
+    // A key of its own: a real setting would reach the account's real devices.
+    let value = now().to_string();
+    let a = device("a");
+    a.sync().unwrap();
+    a.set_setting("it_probe".into(), value.clone()).unwrap();
+    a.sync().unwrap();
+    let b = device("b");
+    b.sync().unwrap();
+    assert_eq!(b.setting("it_probe".into()), Some(value));
+}
+
+#[test]
 fn password_login_checks_the_credentials() {
     let (url, user, pass) = env();
     let host = url.trim_start_matches("https://").to_string() + "/";

@@ -294,7 +294,13 @@ impl Dav {
                 b = b.header("Content-Type", "application/xml; charset=utf-8");
             }
             for (k, v) in headers {
-                b = b.header(*k, *v);
+                // Also one stored before ETags were made strong (below).
+                let v = if k.eq_ignore_ascii_case("if-match") {
+                    strong(v)
+                } else {
+                    v
+                };
+                b = b.header(*k, v);
             }
             b.body(body.to_string())
                 .map_err(|e| Error::Net(e.to_string()))
@@ -316,7 +322,8 @@ impl Dav {
                 .and_then(|v| v.to_str().ok())
                 .map(str::to_string)
         };
-        let (etag, location) = (header("etag"), header("location"));
+        let etag = header("etag").map(|e| strong(&e).to_string());
+        let location = header("location");
         let status = resp.status().as_u16();
         let body = resp
             .body_mut()
@@ -532,6 +539,12 @@ impl Dav {
             s => Err(Error::Http(s, r.body)),
         }
     }
+}
+
+/// A proxy that compresses a response marks its ETag weak ("W/"), and If-Match never matches a
+/// weak one (412 every time); the value under it is the resource's own, strong ETag.
+fn strong(etag: &str) -> &str {
+    etag.strip_prefix("W/").unwrap_or(etag)
 }
 
 fn name_and_color(name: &str, color: &str) -> String {
