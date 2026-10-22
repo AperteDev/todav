@@ -4,7 +4,7 @@ DEST = $(HOME)/.local/share/gnome-shell/extensions/$(UUID)
 install:
 	glib-compile-schemas schemas
 	mkdir -p $(DEST)
-	cp -r metadata.json extension.js dbus.js stylesheet.css schemas $(DEST)/
+	cp -r metadata.json extension.js dbus.js stylesheet.css schemas icons $(DEST)/
 
 # Development: symlink the source dir so edits apply on the next shell start.
 link:

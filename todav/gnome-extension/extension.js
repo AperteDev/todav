@@ -17,13 +17,15 @@ const MAX_TASKS = 25;
 
 const Indicator = GObject.registerClass(
 class TodavIndicator extends PanelMenu.Button {
-    _init(settings) {
+    _init(settings, path) {
         super._init(0.5, 'Todav');
         this._settings = settings;
         this._proxy = null;
 
         const box = new St.BoxLayout({style_class: 'panel-status-menu-box'});
-        box.add_child(new St.Icon({icon_name: 'io.github.selfref.Todav-symbolic', style_class: 'system-status-icon'}));
+        // Its own copy of the app's symbolic icon (linux/data), found whether or not the app is installed.
+        const icon = Gio.icon_new_for_string(`${path}/icons/io.github.selfref.Todav-symbolic.svg`);
+        box.add_child(new St.Icon({gicon: icon, style_class: 'system-status-icon'}));
         this._count = new St.Label({text: '', y_align: Clutter.ActorAlign.CENTER, style_class: 'todav-count'});
         box.add_child(this._count);
         this._warning = new St.Icon({icon_name: 'dialog-warning-symbolic', style_class: 'system-status-icon', visible: false});
@@ -192,7 +194,7 @@ class TodavIndicator extends PanelMenu.Button {
 
 export default class TodavExtension extends Extension {
     enable() {
-        this._indicator = new Indicator(this.getSettings());
+        this._indicator = new Indicator(this.getSettings(), this.path);
         Main.panel.addToStatusArea(this.uuid, this._indicator);
     }
 
