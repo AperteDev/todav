@@ -8,6 +8,9 @@
 - Store settings with `Client::set_setting` / `Client::setting`. `set_setting` records the change
   time; when syncing, the newer value wins implicitly per key (the server wins ties).
 - Synced settings live in Nextcloud Files at `.config/todav/settings.json`, merged on every sync.
+- The GNOME extension keeps no settings of its own: its options are app settings `ext_*`
+  (`EXTENSION` in `todav/linux/app/src/settings.rs`, Preferences → Extension), read over D-Bus
+  (`GetSettings`; it may set only those keys).
 - The user can turn syncing off with "Sync settings with server" (Preferences → General),
   stored as the device-only `sync_settings` setting; on by default. The ntfy server
   (`ntfy_url`) syncs with them unless "Sync ntfy server" (`sync_ntfy`) is off.

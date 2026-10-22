@@ -268,14 +268,17 @@ A single Rust binary (`todav-linux`) that is both the GUI and a background servi
 
 ```xml
 <interface name="io.github.<you>.Todav1">
-  <method name="GetLists">   <arg direction="out" type="a(ssu)"/> </method>            <!-- href, name, open_count -->
+  <method name="GetLists">   <arg direction="out" type="a(ssus)"/> </method>           <!-- href, name, open_count, colour -->
   <method name="GetTasks">   <arg direction="in" name="list" type="s"/>
-                             <arg direction="out" type="a(sssb)"/> </method>           <!-- uid, summary, category, done -->
-  <method name="SetDone">    <arg direction="in" type="s"/> <arg direction="in" type="b"/> </method>
+                             <arg direction="out" type="a(sssbu)"/> </method>          <!-- uid, summary, category, done, depth -->
   <method name="AddTask">    <arg direction="in" type="s"/> <arg direction="in" type="s"/> <arg direction="out" type="s"/> </method>
   <method name="ShowList">   <arg direction="in" type="s"/> </method>                    <!-- raise the window on that list -->
+  <method name="ShowTask">   <arg direction="in" type="s"/> </method>                    <!-- the task's list, the task pulsing -->
   <method name="GetNextEvent"> <arg direction="out" type="(ssx)"/> </method>          <!-- title, when in words, start (local); empty title: none -->
   <method name="ShowDay">    <arg direction="in" type="x"/> </method>                    <!-- the calendar on that day -->
+  <method name="NewEvent">   <arg direction="in" type="s"/> </method>                    <!-- the new-event dialog with this title -->
+  <method name="GetSettings"> <arg direction="out" type="a{ss}"/> </method>            <!-- the extension's options (ext_*) -->
+  <method name="SetSetting"> <arg direction="in" type="s"/> <arg direction="in" type="s"/> </method> <!-- ext_* keys only -->
   <method name="Sync"/>
   <signal name="Changed">    <arg name="list" type="s"/> </signal>
   <property name="SyncState" type="s" access="read"/>                                 <!-- idle | syncing | error:<msg> -->
@@ -288,25 +291,27 @@ The interface returns small tuples, not JSON, so the extension needs no parsing 
 
 ## GNOME Shell extension
 
-A panel indicator that shows the current list in a popup menu, lets you tick items and add one, and opens the app for anything more. It holds no state and does no networking: everything goes over D-Bus to the Linux app, which means the extension is \~300 lines of GJS with zero dependencies.
+A panel indicator with a read-only view of a list and a month calendar; clicking anything opens the app there. It holds no state and does no networking: everything goes over D-Bus to the Linux app, which means the extension is a few hundred lines of GJS with zero dependencies.
 
 **Behaviour**
 
-- Panel icon (symbolic checklist) with the open-task count of the pinned list as a small label; the pinned list is a GSettings key shared with the app (`io.github.<you>.Todav pinned-list`).
-- Click → `PopupMenu`: list switcher at the top (`PopupSubMenuMenuItem`), then one section per category (`PopupMenuSection` with a `PopupSeparatorMenuItem` header), tasks as `PopupSwitchMenuItem`-style rows with a check ornament; toggling calls `SetDone` and keeps the menu open.
-- Text entry at the bottom (`St.Entry`) → Enter calls `AddTask(list, text)` with no category (lands in "Other"; the app is where you categorise).
-- "Open Todav" item → `ShowList(list)`.
-- Subscribes to the `Changed` signal and `SyncState` property; rebuilds the menu on change; shows a small warning glyph when `SyncState` starts with `error:`.
-- If the app is not running, the first D-Bus call activates it (D-Bus activation); the menu shows "Starting…" for that second.
+- Panel icon (the app's symbolic icon, shipped with the extension) with the open-task count of the shown list.
+- Click → a dense two-column menu (or one column): tasks on the left, calendar on the right.
+  - Tasks: the list's name heads the column; clicking it swaps the tasks for the lists to pick another. Tasks are grouped by category, subtasks indented; done ones keep the same circle with a check in it. Clicking a task opens it in the app (`ShowTask`: its list, the row pulsing in the accent colour). A field adds a task (`AddTask`, no category).
+  - Calendar: the next event (`ShowDay` on its day), a month to browse (a day opens it in the app) and a field that opens the app's new-event dialog with the title typed (`NewEvent`).
+  - "Open Todav" → `ShowList(list)`.
+- Its options are app settings (`ext_*`, Preferences → Extension), synced between devices like the rest; the list shown (`ext_list`) too. The extension reads them with `GetSettings` each time the menu opens and sets only `ext_list`.
+- Subscribes to the `Changed` signal and `SyncState` property; updates the count on change; shows a small warning glyph when `SyncState` starts with `error:`.
+- If the app is not running, the first D-Bus call activates it (D-Bus activation); the menu shows "Starting…" for that second. The app's window then asks for attention (the shell does not raise a window on a D-Bus call); the extension raises it.
 
 **Implementation**
 
-- `metadata.json`: `shell-version` 48 and 49; `settings-schema` reusing the app's compiled schema is not possible across Flatpak, so the extension ships its own schema with the single `pinned-list` key and the app reads it via `gsettings` host lookup; fallback is the first list.
+- `metadata.json`: `shell-version` 48–51; no GSettings schema.
 - `Gio.DBusProxy.makeProxyWrapper(interfaceXml)` from the XML in the Linux section; copy the XML verbatim into `dbus.js`.
-- Cap the popup at 25 tasks and show "+ n more" to keep the menu usable on small screens.
+- The task list scrolls; at most 100 tasks, then "+ n more".
 - Install: `make install` copies to `~/.local/share/gnome-shell/extensions/todav@<you>`; no extensions.gnome.org submission in v1.
 
-**Non-goals**: editing text, reordering, categories, subtask display (subtasks appear flattened with a `↳` prefix).
+**Non-goals**: ticking or editing tasks (read-only for now), reordering, categories.
 
 ## Android app
 

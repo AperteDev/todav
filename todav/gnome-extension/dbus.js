@@ -6,13 +6,16 @@ export const OBJECT_PATH = '/io/github/selfref/Todav';
 // Keep in sync with linux/app/src/dbus.rs.
 const XML = `<node>
 <interface name="io.github.selfref.Todav1">
-  <method name="GetLists"><arg direction="out" type="a(ssu)"/></method>
-  <method name="GetTasks"><arg direction="in" name="list" type="s"/><arg direction="out" type="a(sssb)"/></method>
-  <method name="SetDone"><arg direction="in" name="uid" type="s"/><arg direction="in" name="done" type="b"/></method>
+  <method name="GetLists"><arg direction="out" type="a(ssus)"/></method>
+  <method name="GetTasks"><arg direction="in" name="list" type="s"/><arg direction="out" type="a(sssbu)"/></method>
   <method name="AddTask"><arg direction="in" name="list" type="s"/><arg direction="in" name="summary" type="s"/><arg direction="out" type="s"/></method>
   <method name="ShowList"><arg direction="in" name="list" type="s"/></method>
+  <method name="ShowTask"><arg direction="in" name="uid" type="s"/></method>
   <method name="GetNextEvent"><arg direction="out" type="(ssx)"/></method>
   <method name="ShowDay"><arg direction="in" name="at" type="x"/></method>
+  <method name="NewEvent"><arg direction="in" name="summary" type="s"/></method>
+  <method name="GetSettings"><arg direction="out" type="a{ss}"/></method>
+  <method name="SetSetting"><arg direction="in" name="key" type="s"/><arg direction="in" name="value" type="s"/></method>
   <method name="Sync"/>
   <signal name="Changed"><arg name="list" type="s"/></signal>
   <property name="SyncState" type="s" access="read"/>

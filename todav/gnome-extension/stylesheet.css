@@ -1,2 +1,41 @@
-.todav-count { padding-left: 4px; }
-.todav-entry { min-width: 260px; }
+/* The panel button: icon and count close together, the button no wider than needed. */
+.todav-button { -natural-hpadding: 8px; -minimum-hpadding: 4px; }
+.todav-panel { spacing: 4px; }
+/* The shell pads a lone panel icon (6px) and adds a margin (4px); next to the count that left a gap. */
+.todav-panel > .system-status-icon { padding: 0 2px; margin: 0; }
+.todav-count { font-weight: bold; font-feature-settings: "tnum"; }
+
+/* The menu: dense rows, two columns of about the same width. */
+.todav-item { padding: 6px 8px; }
+.todav-item:hover, .todav-item:focus { background-color: transparent; }
+.todav-columns { spacing: 10px; }
+.todav-column { spacing: 2px; width: 270px; }
+.todav-vsep { width: 1px; background-color: rgba(128, 128, 128, 0.25); }
+.todav-hsep { height: 1px; margin: 6px 0; background-color: rgba(128, 128, 128, 0.25); }
+.todav-scroll { max-height: 380px; }
+
+.todav-row { padding: 4px 8px; border-radius: 6px; }
+.todav-row > StBoxLayout { spacing: 8px; }
+.todav-row:hover, .todav-row:focus, .todav-day:hover, .todav-day:focus, .todav-nav:hover, .todav-nav:focus { background-color: rgba(128, 128, 128, 0.2); }
+.todav-header { font-weight: bold; }
+.todav-arrow { icon-size: 14px; }
+.todav-dot { width: 10px; height: 10px; border-radius: 99px; }
+.todav-list.current { font-weight: bold; }
+.todav-list-count, .todav-category, .todav-empty { color: rgba(128, 128, 128, 1); }
+.todav-category { font-size: 0.85em; font-weight: bold; padding: 6px 8px 1px; }
+.todav-empty { padding: 4px 8px; }
+
+/* Done or not, the same circle; done adds a check in it. */
+.todav-mark { width: 14px; height: 14px; border-radius: 99px; border: 1.5px solid rgba(128, 128, 128, 0.85); }
+.todav-mark-icon { icon-size: 10px; }
+.todav-task.done { text-decoration: line-through; }
+
+.todav-next-icon { icon-size: 16px; }
+.todav-entry { margin-top: 6px; }
+
+.todav-month { spacing: 2px; margin-top: 4px; }
+.todav-month-title { font-weight: bold; }
+.todav-nav { padding: 4px; border-radius: 99px; }
+.todav-weekday { font-size: 0.8em; padding: 2px 0; }
+.todav-day { width: 30px; height: 28px; border-radius: 99px; font-size: 0.9em; font-feature-settings: "tnum"; }
+.todav-day.today { background-color: -st-accent-color; color: -st-accent-fg-color; font-weight: bold; }
