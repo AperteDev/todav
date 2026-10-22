@@ -23,6 +23,11 @@ const CSS: &str = "
 .swatch:hover { filter: brightness(1.1); }
 .swatch image { opacity: 0; }
 .swatch.chosen image { opacity: 1; }
+/* The custom colour: a smaller swatch in a rainbow ring, the size of the others in all. */
+.custom-ring { padding: 4px; border-radius: 9999px; background-image: conic-gradient(#e01b24, #f6d32d, #33d17a, #3584e4, #9141ac, #e01b24); }
+.custom-ring > button { min-width: 24px; min-height: 24px; padding: 0; box-shadow: 0 0 0 2px @dialog_bg_color; background-color: @dialog_bg_color; }
+.custom-ring > button.custom { color: white; }
+.custom-ring > button:hover { filter: brightness(1.1); }
 ";
 
 thread_local! {
@@ -247,9 +252,16 @@ pub fn open(parent: &gtk::Widget, list: Option<List>, events: bool) {
             b
         })
         .collect();
+    // In a rainbow ring: any colour, set apart from the presets.
     let custom = swatch("Custom Color…");
+    let ring = gtk::Box::builder()
+        .valign(gtk::Align::Center)
+        .halign(gtk::Align::Center)
+        .css_classes(["custom-ring"])
+        .build();
+    ring.append(&custom);
     let n = PRESETS.len() as i32;
-    grid.attach(&custom, n % COLUMNS, n / COLUMNS, 1, 1);
+    grid.attach(&ring, n % COLUMNS, n / COLUMNS, 1, 1);
 
     // The chosen swatch has a check; a colour that is no preset shows in the last one.
     let render = {
@@ -265,9 +277,10 @@ pub fn open(parent: &gtk::Widget, list: Option<List>, events: bool) {
                 }
             }
             let icon = if at.is_none() {
-                custom_css
-                    .load_from_string(&format!(".swatch.custom {{ background-color: {c}; }}"));
-                custom.set_css_classes(&["circular", "swatch", "custom", "chosen"]);
+                custom_css.load_from_string(&format!(
+                    ".custom-ring > button.custom {{ background-color: {c}; }}"
+                ));
+                custom.set_css_classes(&["circular", "custom"]);
                 "object-select-symbolic"
             } else {
                 custom.set_css_classes(&["circular"]);
