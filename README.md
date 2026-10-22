@@ -89,8 +89,21 @@ seconds.
 
 ## Getting started
 
-Download a package from the [latest release](https://github.com/SelfRef/todav/releases/latest)
-(GNOME 49 or newer):
+Todav needs GNOME 49 or newer. The GNOME Shell extension is optional.
+
+**Arch Linux and derivatives** (Manjaro, EndeavourOS, CachyOS…): install from the
+[AUR](https://aur.archlinux.org/packages?K=todav) with an AUR helper:
+
+```sh
+yay -S todav gnome-shell-extension-todav
+```
+
+These build the latest release from source; `todav-bin` and `gnome-shell-extension-todav-bin`
+install the prebuilt release instead, and `todav-git` and `gnome-shell-extension-todav-git` build
+the latest commit.
+
+**Other distributions:** download a package from the
+[latest release](https://github.com/SelfRef/todav/releases/latest):
 
 ```sh
 # Flatpak, on any distribution (the GNOME runtime comes from Flathub), plus the extension
