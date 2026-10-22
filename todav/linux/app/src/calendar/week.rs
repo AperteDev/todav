@@ -456,6 +456,7 @@ pub(super) fn render(c: &Rc<Cal>) -> i64 {
         if day == today() {
             name.add_css_class("today");
         }
+        flash_if(c, &name, day);
         head.append(&name);
     }
     // What has no hours: all-day items, a bar across their days.
@@ -467,6 +468,7 @@ pub(super) fn render(c: &Rc<Cal>) -> i64 {
         let cell = gtk::Box::new(gtk::Orientation::Vertical, 0);
         cell.add_css_class("all-day-cell");
         day_drop(&cell, day, true);
+        flash_if(c, &cell, day);
         cell
     });
     row.set_hexpand(true);

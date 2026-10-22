@@ -35,6 +35,9 @@ const CSS: &str = "
 .day.other .num { opacity: 0.4; }
 .day.today .num { background: @accent_bg_color; color: @accent_fg_color; border-radius: 9999px; font-weight: bold; }
 .day.selected { background: alpha(@accent_bg_color, 0.08); }
+/* The day the extension (or a reminder) opened, pulsing twice as a task the Tasks page opens. */
+@keyframes day-flash { from { background-color: transparent; } 50% { background-color: alpha(@accent_bg_color, 0.3); } to { background-color: transparent; } }
+.flash { animation: day-flash 900ms ease-in-out 2; border-radius: 6px; }
 .chip { padding: 0 6px; min-height: 22px; border-radius: 6px; font-size: smaller; }
 .chip button, .more button { font-weight: normal; }
 menubutton.chip > button, menubutton.more > button { min-height: 0; min-width: 0; padding: 0; }
@@ -152,6 +155,8 @@ struct Cal {
     /// An event's details are open: redraws wait (`pending`) until it closes.
     holding: Cell<bool>,
     pending: Cell<bool>,
+    /// The day `show_day` went to, pulsing until then (as the Tasks page pulses a task).
+    flash: Cell<Option<(i64, std::time::Instant)>>,
     /// Midnight of the day the views are around (the selected day).
     anchor: Cell<i64>,
     /// The collections the sidebar shows, in its order.
@@ -252,6 +257,7 @@ pub fn build(views: &adw::ViewStack) {
         scrolled: Cell::new(false),
         holding: Cell::new(false),
         pending: Cell::new(false),
+        flash: Cell::new(None),
         anchor: Cell::new(today()),
         lists: RefCell::new(Vec::new()),
         hidden: RefCell::new(HashSet::new()),
@@ -502,14 +508,34 @@ pub fn today_events() -> Vec<Event> {
     all
 }
 
-/// Switch to the calendar on the day holding `t` (local time).
+/// Switch to the calendar on the day holding `t` (local time), the day pulsing once.
 pub fn show_day(t: i64) {
     let Some(c) = cal() else { return };
     c.stack.set_visible_child_name("calendar");
     c.split.set_show_content(true);
-    c.anchor.set(t - t.rem_euclid(DAY));
+    let day = t - t.rem_euclid(DAY);
+    c.anchor.set(day);
+    c.flash.set(Some((
+        day,
+        std::time::Instant::now() + crate::window::FLASH,
+    )));
     c.search.set_search_mode(false);
     refresh();
+}
+
+/// Pulse `w` if it shows the day `show_day` went to, for what is left of the pulse.
+fn flash_if(c: &Cal, w: &impl IsA<gtk::Widget>, day: i64) {
+    let left = match c.flash.get() {
+        Some((d, until)) if d == day => until.saturating_duration_since(std::time::Instant::now()),
+        _ => return,
+    };
+    if left.is_zero() {
+        c.flash.set(None);
+        return;
+    }
+    let w = w.clone().upcast::<gtk::Widget>();
+    w.add_css_class("flash");
+    glib::timeout_add_local_once(left, move || w.remove_css_class("flash"));
 }
 
 /// Redraw the page if it is built; cheap enough to call on every change.
@@ -1102,6 +1128,7 @@ fn render_month(c: &Rc<Cal>) -> i64 {
             })
         });
         day_drop(&cell, day, false);
+        flash_if(c, &cell, day);
         cell
     };
     for w in 0..6 {
@@ -1626,6 +1653,7 @@ fn render_agenda(c: &Rc<Cal>) {
         for i in here {
             group.add(&agenda_row(c, i));
         }
+        flash_if(c, &group, day);
         c.agenda.append(&group);
     }
     if !any {

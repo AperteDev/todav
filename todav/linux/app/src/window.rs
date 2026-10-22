@@ -289,7 +289,7 @@ pub fn show_task(uid: &str) {
 }
 
 /// How long a row `show_task` asked for pulses (the `flash` animation, twice).
-const FLASH: std::time::Duration = std::time::Duration::from_millis(1800);
+pub const FLASH: std::time::Duration = std::time::Duration::from_millis(1800);
 
 /// Pulse `row` if it is the task `show_task` asked for, once it is laid out, and scroll to it.
 fn flash_if(ui: &Ui, row: &impl IsA<gtk::Widget>, uid: &str) {
