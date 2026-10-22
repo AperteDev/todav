@@ -2,6 +2,8 @@
 resolver = "3"
 members = ["todav/core", "todav/cli", "todav/linux/app"]
 
+# One version for the whole app, set by the Release workflow (scripts/release.py).
 [workspace.package]
+version = "0.1.0"
 edition = "2024"
 license = "GPL-3.0-or-later"
