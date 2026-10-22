@@ -21,6 +21,8 @@ const MAX_TASKS = 100;
 /// Days the agenda covers, from today.
 const AGENDA_DAYS = 7;
 const DAY = 86400;
+/// Where to get the app when it is missing.
+const RELEASES = 'https://github.com/SelfRef/todav/releases/latest';
 const {HORIZONTAL, VERTICAL} = Clutter.Orientation;
 const CENTER = Clutter.ActorAlign.CENTER;
 /// What St draws dimmed (it has no CSS opacity): done tasks, other months' days, weekdays.
@@ -136,6 +138,27 @@ class TodavIndicator extends PanelMenu.Button {
         this.menu.addMenuItem(new PopupMenu.PopupMenuItem(text, {reactive: false}));
     }
 
+    /// No app answers or can be started (D-Bus knows no such service): say what is missing and
+    /// where to get it.
+    _notInstalled() {
+        this.menu.removeAll();
+        const box = new St.BoxLayout({orientation: VERTICAL, style_class: 'todav-missing'});
+        box.add_child(new St.Label({text: 'Todav isn’t installed', style_class: 'todav-missing-title'}));
+        const text = new St.Label({
+            text: 'This extension shows the tasks and calendar of the Todav app. Install the app to use it.',
+            style_class: 'todav-missing-text',
+        });
+        text.clutter_text.line_wrap = true;
+        box.add_child(text);
+        // Reactive, or the shell dims it as insensitive.
+        const item = new PopupMenu.PopupBaseMenuItem({activate: false, hover: false, can_focus: false});
+        item.add_child(box);
+        this.menu.addMenuItem(item);
+        const get = new PopupMenu.PopupMenuItem('Get Todav');
+        get.connect('activate', () => Gio.AppInfo.launch_default_for_uri(RELEASES, global.create_app_launch_context(0, -1)));
+        this.menu.addMenuItem(get);
+    }
+
     /// Close the menu and have the app show something. Its window asks for attention (the shell
     /// says "is ready" rather than raise a window on a D-Bus call); asked by us, it is raised.
     _open(call) {
@@ -160,7 +183,10 @@ class TodavIndicator extends PanelMenu.Button {
         try {
             data = await this._load();
         } catch (e) {
-            this._placeholder(`Todav: ${e.message}`);
+            if (e.matches?.(Gio.DBusError, Gio.DBusError.SERVICE_UNKNOWN))
+                this._notInstalled();
+            else
+                this._placeholder(`Todav: ${e.message}`);
             return;
         }
         const {on, settings, pinned} = data;

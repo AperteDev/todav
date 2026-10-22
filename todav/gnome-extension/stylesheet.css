@@ -32,6 +32,11 @@
 
 .todav-entry { margin-top: 6px; }
 
+/* Without the app: what is missing, then the way to get it. */
+.todav-missing { spacing: 4px; width: 280px; padding: 4px 0; }
+.todav-missing-title { font-weight: bold; }
+.todav-missing-text { color: rgba(128, 128, 128, 1); }
+
 /* The agenda: an event's dot takes a task circle's room, the times line up. */
 .todav-agenda { max-height: 220px; margin-top: 4px; }
 .todav-mark-slot { width: 18px; }

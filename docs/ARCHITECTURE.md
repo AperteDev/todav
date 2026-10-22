@@ -284,6 +284,7 @@ A panel indicator with a read-only view of a list and a month calendar; clicking
 - Its options are app settings (`ext_*`, Preferences → Extension), synced between devices like the rest; the list shown (`ext_list`) too. The extension reads them with `GetSettings` each time the menu opens and sets only `ext_list`.
 - Subscribes to the `Changed` signal and `SyncState` property; updates the count on change; shows a small warning glyph when `SyncState` starts with `error:`.
 - If the app is not running, the first D-Bus call activates it (D-Bus activation); the menu shows "Starting…" for that second. The app exports its interface in `dbus_register` (an `adw::Application` subclass in `main.rs`), before it takes the bus name, so that activating call finds it. The app's window then asks for attention (the shell does not raise a window on a D-Bus call); the extension raises it.
+- If the app is not installed (D-Bus knows no such service: `ServiceUnknown`), the menu says so and offers "Get Todav", opening the latest GitHub release.
 
 **Implementation**
 

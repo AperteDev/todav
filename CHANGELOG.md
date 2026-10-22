@@ -38,4 +38,5 @@ The first release.
 - A GNOME Shell extension: the open-task count in the top bar, and a menu with a
   task list, a month calendar with dots for what each day holds and the coming
   week's agenda; it adds tasks and events and opens the app where you click.
-  Its options are in the app's Preferences.
+  Its options are in the app's Preferences. Without the app installed, its
+  menu says so and links to the download.
