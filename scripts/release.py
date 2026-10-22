@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Prepare a release: set the version in Cargo.toml, the app's metainfo and the extension's
-metadata.json, move the Unreleased changelog section under the new version, and print its notes
-for the GitHub release. The Release workflow runs it; Cargo.lock follows on the next cargo run.
+"""Prepare a release: set the version in Cargo.toml and Cargo.lock, the app's metainfo and the
+extension's metadata.json, move the Unreleased changelog section under the new version, and print
+its notes for the GitHub release. The Release workflow runs it.
 
     scripts/release.py 0.2.0 > notes.md
 """
@@ -67,6 +67,16 @@ def main() -> None:
     changelog.write_text(f"{text[:body_start]}\n## [{version}] - {date}\n\n{notes}\n\n{rest}")
 
     edit("Cargo.toml", r'(\[workspace\.package\].*?^version = )"[^"]*"', rf'\g<1>"{version}"')
+    # The workspace's own crates, the packages without a `source`, so `--locked` builds still work.
+    lock = ROOT / "Cargo.lock"
+    lock.write_text(
+        re.sub(
+            r'^(name = "[^"]+"\nversion = )"[^"]*"$(?!\nsource)',
+            rf'\g<1>"{version}"',
+            lock.read_text(),
+            flags=re.M,
+        )
+    )
     edit(
         "todav/gnome-extension/metadata.json",
         r'("version-name": )"[^"]*"',
