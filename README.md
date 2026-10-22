@@ -131,6 +131,14 @@ Ideas, bug reports and discussions are welcome: open an
 [discussion](https://github.com/SelfRef/todav/discussions). See
 [CONTRIBUTING.md](CONTRIBUTING.md) before working on a pull request.
 
+## Translations
+
+Todav speaks English, Polish, German, French, Spanish, Italian and Brazilian Portuguese, and
+follows your GNOME language. English and Polish are reviewed; the others are first drafts, so
+corrections from native speakers are very welcome. Missing your language? Ask for it in an
+[issue](https://github.com/SelfRef/todav/issues/new?template=translation.yml), or translate it
+yourself (see [CONTRIBUTING.md](CONTRIBUTING.md#translations)).
+
 ## Development
 
 ### Tested setup
@@ -139,7 +147,7 @@ Todav is developed and tested mainly on this setup:
 
 - **Nextcloud** with its built-in CalDAV server (the Tasks and Calendar apps are optional, but
   handy as web fallbacks).
-- **GNOME** 48 to 51, with the app (GTK 4 + libadwaita) and the optional GNOME Shell extension.
+- **GNOME** 49 to 51, with the app (GTK 4 + libadwaita) and the optional GNOME Shell extension.
 - Optionally, for instant updates: the [WebDAV Push](https://github.com/bitfireAT/nc_ext_dav_push)
   Nextcloud app (`dav_push`) and an [ntfy](https://ntfy.sh) server.
 
@@ -147,8 +155,8 @@ Todav speaks standard CalDAV, but other servers and desktops are untested for no
 
 ### Building and installing
 
-**Dependencies:** Rust (stable), GTK 4.14+, libadwaita 1.8+, libsecret, `blueprint-compiler`
-and `glib-compile-resources` (GLib).
+**Dependencies:** Rust (stable), GTK 4.14+, libadwaita 1.8+, libsecret, `blueprint-compiler`,
+`glib-compile-resources` (GLib) and gettext's `msgfmt`.
 
 ```sh
 # The app: binary, desktop file, icons, D-Bus activation and autostart in ~/.local

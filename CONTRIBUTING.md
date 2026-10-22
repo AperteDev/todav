@@ -23,5 +23,21 @@ When you open one:
 - Use [Conventional Commits](https://www.conventionalcommits.org/) for commit messages, e.g.
   `fix(linux): keep the scroll position when ticking a task`.
 
+## Translations
+
+Translations live in [`po/`](po), one gettext catalog per language, shared by the app, its
+UI files, the GNOME Shell extension, the desktop file and the metainfo. Corrections to an
+existing language and new languages are welcome; as for code, open a
+[translation issue](https://github.com/SelfRef/todav/issues/new?template=translation.yml) first,
+so two people don't translate the same thing.
+
+- **Fix a language:** edit `po/<lang>.po` with any PO editor (such as
+  [Translation Editor](https://flathub.org/apps/org.gnome.Gtranslator)) and open a pull request.
+- **Add a language:** add its code to `po/LINGUAS`, run `scripts/i18n.sh` (it creates
+  `po/<lang>.po` from the template), translate it and open a pull request.
+- Keep placeholders such as `{name}` or `%d` as they are, and fill every plural form.
+- To try it, build the app (`cargo build -p todav-linux` compiles the catalogs) and run it with
+  your language, e.g. `LANGUAGE=pl target/debug/todav-linux`.
+
 By contributing, you agree that your contribution is licensed under the
 [GPL-3.0-or-later](LICENSE).
