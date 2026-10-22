@@ -12,17 +12,19 @@ and other CalDAV clients keep seeing the same data. Todav adds a fast desktop ap
 works from a local copy, syncs in the background and picks up changes from other devices within
 seconds.
 
-<!-- Screenshots: replace with real images, e.g. docs/screenshots/tasks.png -->
 ## Screenshots
 
-| Tasks | Calendar | GNOME Shell extension |
-| --- | --- | --- |
-| _coming soon_ | _coming soon_ | _coming soon_ |
+| Tasks, grouped by category | The month, an event's details |
+| --- | --- |
+| ![A task list with categories, due dates and an expanded task's subtasks](docs/screenshots/tasks.png) | ![The month view with an event's details open](docs/screenshots/calendar-month.png) |
+| **The week, a time-blocked task** | **Editing an event** |
+| ![The week view with a planned task's details open](docs/screenshots/calendar-week.png) | ![The Edit Event dialog](docs/screenshots/event-dialog.png) |
 
-<!-- Demo video: link or embed it here -->
-## Demo
-
-_Video coming soon._
+<p align="center">
+  <img src="docs/screenshots/extension.png" width="480"
+    alt="The GNOME Shell extension's menu: a task list, the month with dots and the coming week's agenda">
+  <br><em>The GNOME Shell extension</em>
+</p>
 
 ## Features
 
