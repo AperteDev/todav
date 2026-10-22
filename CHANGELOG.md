@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-22
+
 ### Added
 
 - Tasks and events in your Nextcloud over CalDAV, kept in a local copy: the app
@@ -43,4 +45,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Its options are in the app's Preferences. Without the app installed, its
   menu says so and links to the download.
 
-[Unreleased]: https://github.com/SelfRef/todav/commits/HEAD
+[Unreleased]: https://github.com/SelfRef/todav/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/SelfRef/todav/releases/tag/v1.0.0
