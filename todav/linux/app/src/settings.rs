@@ -453,17 +453,16 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
     dialog.insert_action_group("account", Some(&actions));
     sign_in.connect_clicked(move |_| start(false));
     // Only offered for a browser sign-in; a GOA account is managed in GNOME Settings.
-    let (d, show) = (dialog.clone(), describe.clone());
-    sign_out.connect_clicked(move |b| {
-        b.set_sensitive(false);
+    // The welcome page at once; pending changes still go up first, in the background.
+    let d = dialog.clone();
+    sign_out.connect_clicked(move |_| {
         crate::forget_sign_in();
-        let (d, b, show) = (d.clone(), b.clone(), show.clone());
-        glib::spawn_future_local(async move {
+        d.close();
+        crate::window::show_welcome();
+        glib::spawn_future_local(async {
             if let Err(e) = crate::disconnect(true).await {
-                d.add_toast(crate::window::note(&e));
+                crate::window::toast(&e);
             }
-            b.set_sensitive(true);
-            show();
         });
     });
     // A sign-in still waiting for the browser stops with the dialog.
