@@ -4,7 +4,7 @@ using Adw 1;
 Adw.ApplicationWindow window {
   title: "Todav";
   default-width: 900;
-  default-height: 650;
+  default-height: 700;
   hide-on-close: true;
 
   content: Adw.ToastOverlay toasts {
@@ -20,6 +20,8 @@ Adw.ApplicationWindow window {
             icon-name: "checkbox-checked-symbolic";
             title: "Todav";
             description: "Tasks synced with your Nextcloud";
+            // A smaller icon and margins: the sign-in rows fit the default window size.
+            styles ["compact"]
 
             Adw.Clamp {
               maximum-size: 420;
