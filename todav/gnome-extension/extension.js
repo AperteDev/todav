@@ -13,7 +13,7 @@ import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
-import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
+import {Extension, gettext as _, ngettext, pgettext} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 import {BUS_NAME, OBJECT_PATH, TodavProxy} from './dbus.js';
 
@@ -106,7 +106,7 @@ class TodavIndicator extends PanelMenu.Button {
                 this._rebuild();
             }
         });
-        this._placeholder('Starting…');
+        this._placeholder(_('Starting…'));
     }
 
     _updateState() {
@@ -143,9 +143,9 @@ class TodavIndicator extends PanelMenu.Button {
     _notInstalled() {
         this.menu.removeAll();
         const box = new St.BoxLayout({orientation: VERTICAL, style_class: 'todav-missing'});
-        box.add_child(new St.Label({text: 'Todav isn’t installed', style_class: 'todav-missing-title'}));
+        box.add_child(new St.Label({text: _('Todav isn’t installed'), style_class: 'todav-missing-title'}));
         const text = new St.Label({
-            text: 'This extension shows the tasks and calendar of the Todav app. Install the app to use it.',
+            text: _('This extension shows the tasks and calendar of the Todav app. Install the app to use it.'),
             style_class: 'todav-missing-text',
         });
         text.clutter_text.line_wrap = true;
@@ -154,7 +154,7 @@ class TodavIndicator extends PanelMenu.Button {
         const item = new PopupMenu.PopupBaseMenuItem({activate: false, hover: false, can_focus: false});
         item.add_child(box);
         this.menu.addMenuItem(item);
-        const get = new PopupMenu.PopupMenuItem('Get Todav');
+        const get = new PopupMenu.PopupMenuItem(_('Get Todav'));
         get.connect('activate', () => Gio.AppInfo.launch_default_for_uri(RELEASES, global.create_app_launch_context(0, -1)));
         this.menu.addMenuItem(get);
     }
@@ -178,7 +178,7 @@ class TodavIndicator extends PanelMenu.Button {
         if (!this._proxy)
             return;
         if (!this._proxy.g_name_owner)
-            this._placeholder('Starting…');
+            this._placeholder(_('Starting…'));
         let data;
         try {
             data = await this._load();
@@ -212,19 +212,19 @@ class TodavIndicator extends PanelMenu.Button {
         if (on('open')) {
             if (tasks || calendar)
                 this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-            const open = new PopupMenu.PopupMenuItem('Open Todav');
+            const open = new PopupMenu.PopupMenuItem(_('Open Todav'));
             open.connect('activate', () => this._open(p => p.ShowListAsync(pinned?.[0] ?? '')));
             this.menu.addMenuItem(open);
         }
         if (!tasks && !calendar && !on('open'))
-            this._placeholder('Everything is turned off in Todav’s Preferences');
+            this._placeholder(_('Everything is turned off in Todav’s Preferences'));
     }
 
     /// The list's tasks, or (its header clicked) the lists to pick another; then a field to add one.
     async _tasksColumn({on, lists, pinned}) {
         const col = new St.BoxLayout({style_class: 'todav-column', orientation: VERTICAL, x_expand: true});
         if (!pinned) {
-            col.add_child(label('No task lists — sign in in Todav', 'todav-empty'));
+            col.add_child(label(_('No task lists — sign in in Todav'), 'todav-empty'));
             return col;
         }
         const [href, name, , color] = pinned;
@@ -246,7 +246,7 @@ class TodavIndicator extends PanelMenu.Button {
         if (on('tasks')) {
             const arrow = new St.Icon({icon_name: 'pan-down-symbolic', style_class: 'todav-arrow'});
             const header = row([dot(color), label(name, 'todav-header-name', {x_expand: true}), arrow], 'todav-row todav-header');
-            header.accessible_name = `${name}, choose another list`;
+            header.accessible_name = _('%s, choose another list').replace('%s', name);
             header.connect('clicked', () => {
                 this._choosing = !this._choosing;
                 arrow.icon_name = this._choosing ? 'pan-up-symbolic' : 'pan-down-symbolic';
@@ -257,7 +257,7 @@ class TodavIndicator extends PanelMenu.Button {
             await fill();
         }
         if (on('add_task')) {
-            col.add_child(entry('Add a task…', text => {
+            col.add_child(entry(_('Add a task…'), text => {
                 this._proxy.AddTaskAsync(href, text)
                     .then(() => on('tasks') && !this._choosing && fill())
                     .catch(e => logError(e, 'Todav: AddTask failed'));
@@ -288,14 +288,16 @@ class TodavIndicator extends PanelMenu.Button {
         for (const t of tasks.slice(0, MAX_TASKS)) {
             if (titled && t[2] !== category) {
                 category = t[2];
-                content.add_child(label(category || 'Other', 'todav-category'));
+                content.add_child(label(category || pgettext('category', 'Other'), 'todav-category'));
             }
             content.add_child(this._taskRow(t));
         }
-        if (tasks.length > MAX_TASKS)
-            content.add_child(label(`+ ${tasks.length - MAX_TASKS} more`, 'todav-empty'));
-        else if (tasks.length === 0)
-            content.add_child(label('All done', 'todav-empty'));
+        if (tasks.length > MAX_TASKS) {
+            const n = tasks.length - MAX_TASKS;
+            content.add_child(label(ngettext('+ %d more', '+ %d more', n).replace('%d', n), 'todav-empty'));
+        } else if (tasks.length === 0) {
+            content.add_child(label(_('All done'), 'todav-empty'));
+        }
     }
 
     /// Read-only: a circle, with a check in it when done; clicking opens the task in Todav.
@@ -319,7 +321,7 @@ class TodavIndicator extends PanelMenu.Button {
         if (on('agenda'))
             col.add_child(await this._agenda());
         if (on('add_event'))
-            col.add_child(entry('Add an event…', text => this._open(p => p.NewEventAsync(text))));
+            col.add_child(entry(_('Add an event…'), text => this._open(p => p.NewEventAsync(text))));
         return col;
     }
 
@@ -336,14 +338,14 @@ class TodavIndicator extends PanelMenu.Button {
             if (day !== shown) {
                 shown = day;
                 const date = GLib.DateTime.new_from_unix_utc(day).format('%A %-d %B');
-                const when = ['Today', 'Tomorrow'][(day - today) / DAY];
+                const when = [_('Today'), _('Tomorrow')][(day - today) / DAY];
                 const heading = when ? `${when} · ${date}` : date.charAt(0).toUpperCase() + date.slice(1);
                 content.add_child(label(heading, 'todav-category'));
             }
             content.add_child(this._agendaRow(day, time, title, color, task, done));
         }
         if (items.length === 0)
-            content.add_child(label('Nothing planned this week', 'todav-empty'));
+            content.add_child(label(_('Nothing planned this week'), 'todav-empty'));
         const scroll = new St.ScrollView({
             style_class: 'todav-agenda',
             hscrollbar_policy: St.PolicyType.NEVER,

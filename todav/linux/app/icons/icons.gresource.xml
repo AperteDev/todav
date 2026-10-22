@@ -10,8 +10,9 @@
   <gresource prefix="/io/github/selfref/Todav/icons/scalable/apps">
     <file alias="io.github.selfref.Todav.svg">../../data/io.github.selfref.Todav.svg</file>
   </gresource>
-  <!-- What the About dialog shows (Adw.AboutDialog.new_from_appdata). -->
+  <!-- What the About dialog shows (Adw.AboutDialog.new_from_appdata): the metainfo with its
+       translations, as build.rs writes it to OUT_DIR. -->
   <gresource prefix="/io/github/selfref/Todav">
-    <file alias="metainfo.xml">../../data/io.github.selfref.Todav.metainfo.xml</file>
+    <file alias="metainfo.xml">io.github.selfref.Todav.metainfo.xml</file>
   </gresource>
 </gresources>

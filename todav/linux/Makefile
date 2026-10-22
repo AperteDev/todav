@@ -4,7 +4,11 @@ BINDIR = $(PREFIX)/bin
 DATADIR = $(PREFIX)/share
 AUTOSTART = $(HOME)/.config/autostart
 ICONS = $(DATADIR)/icons/hicolor
+LOCALE = $(DATADIR)/locale
 ID = io.github.selfref.Todav
+# Translations (see scripts/i18n.sh); po/its says what of the metainfo is translated.
+PO = ../../po
+export GETTEXTDATADIRS = $(abspath $(PO))
 
 install:
 	cargo build --release -p todav-linux
@@ -12,11 +16,20 @@ install:
 	install -Dm644 data/$(ID)-autostart.desktop $(AUTOSTART)/$(ID).desktop
 
 # Binary and data files of an already built release; the Flatpak build uses this too (it asks
-# the Background portal for autostart instead). DESTDIR stages them for a package.
+# the Background portal for autostart instead). DESTDIR stages them for a package. The desktop
+# file and metainfo get their translations; the catalogs go where the app looks for them
+# (../share/locale from its binary).
 install-data:
 	install -Dm755 ../../target/release/todav-linux $(DESTDIR)$(BINDIR)/todav-linux
-	install -Dm644 data/$(ID).desktop $(DESTDIR)$(DATADIR)/applications/$(ID).desktop
-	install -Dm644 data/$(ID).metainfo.xml $(DESTDIR)$(DATADIR)/metainfo/$(ID).metainfo.xml
+	mkdir -p $(DESTDIR)$(DATADIR)/applications $(DESTDIR)$(DATADIR)/metainfo
+	msgfmt --desktop --template=data/$(ID).desktop -d $(PO) \
+	  -o $(DESTDIR)$(DATADIR)/applications/$(ID).desktop
+	msgfmt --xml --template=data/$(ID).metainfo.xml -d $(PO) \
+	  -o $(DESTDIR)$(DATADIR)/metainfo/$(ID).metainfo.xml
+	for lang in $$(grep -v '^#' $(PO)/LINGUAS); do \
+	  mkdir -p $(DESTDIR)$(LOCALE)/$$lang/LC_MESSAGES; \
+	  msgfmt -o $(DESTDIR)$(LOCALE)/$$lang/LC_MESSAGES/todav.mo $(PO)/$$lang.po; \
+	done
 	mkdir -p $(DESTDIR)$(DATADIR)/dbus-1/services
 	sed 's|@bindir@|$(BINDIR)|' data/$(ID).service.in > $(DESTDIR)$(DATADIR)/dbus-1/services/$(ID).service
 	install -Dm644 data/$(ID).svg $(DESTDIR)$(ICONS)/scalable/apps/$(ID).svg
@@ -69,6 +82,7 @@ uninstall:
 	rm -f $(BINDIR)/todav-linux $(DATADIR)/applications/$(ID).desktop \
 	  $(DATADIR)/metainfo/$(ID).metainfo.xml \
 	  $(DATADIR)/dbus-1/services/$(ID).service $(AUTOSTART)/$(ID).desktop \
-	  $(ICONS)/scalable/apps/$(ID).svg $(ICONS)/symbolic/apps/$(ID)-symbolic.svg
+	  $(ICONS)/scalable/apps/$(ID).svg $(ICONS)/symbolic/apps/$(ID)-symbolic.svg \
+	  $(LOCALE)/*/LC_MESSAGES/todav.mo
 
 .PHONY: install install-data stage flatpak uninstall broadway sandbox sandbox-reset

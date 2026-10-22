@@ -25,6 +25,22 @@
   widget raises it: update the README, `scripts/deb.sh`'s libadwaita version and the
   tarball's build distribution together.
 
+## Translations
+
+- All text a user sees is translatable, in the app, its UI files and the extension; one gettext
+  domain, `todav`, with catalogs in `po/` (languages in `po/LINGUAS`).
+- Rust: `gettext("…")`, `ngettext("{n} task", "{n} tasks", n)` for anything counted (Polish has
+  three plural forms), `pgettext("context", "…")` for a short word that could translate two
+  ways; text in a `const` is marked `gettext_noop` and translated where it is shown. Fill
+  placeholders by name (`{name}`) with `replace`; never build a sentence from translated pieces
+  (other languages change word order and case), write each variant whole. Blueprint:
+  `_("…")` / `C_("context", "…")`. Extension: `_()`, `ngettext()`, `pgettext()`.
+- Dates and times come from the locale (LC_TIME) through GLib formats; don't translate them.
+- After adding or changing text, run `scripts/i18n.sh` and commit the refreshed `po/` with the
+  change. Translate new strings into Polish (reviewed by the user); add the other languages too
+  when you can, as unreviewed drafts. Every catalog must compile (`msgfmt --check`, done by the
+  build).
+
 ## Settings
 
 - Client settings are synced between devices by default. Any new setting syncs unless it only

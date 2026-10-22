@@ -2,20 +2,20 @@ using Gtk 4.0;
 using Adw 1;
 
 Adw.AlertDialog dialog {
-  heading: "New Category";
+  heading: _("New Category");
   default-response: "create";
   close-response: "cancel";
   focus-widget: name;
 
   extra-child: Adw.PreferencesGroup {
     Adw.EntryRow name {
-      title: "Name";
+      title: _("Name");
       activates-default: true;
     }
   };
 
   responses [
-    cancel: "Cancel",
-    create: "Create" suggested disabled,
+    cancel: _("Cancel"),
+    create: _("Create") suggested disabled,
   ]
 }

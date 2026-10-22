@@ -2,6 +2,7 @@
 //! Accounts account (the default when there is one) or a server to sign in to with the browser.
 
 use crate::goa;
+use crate::i18n::gettext;
 use crate::window::{get, view};
 use adw::prelude::*;
 use std::rc::Rc;
@@ -34,9 +35,9 @@ impl Connection {
             .position(|a| Some(a.id.as_str()) == selected);
         c.account.set_selected(pos.unwrap_or(0) as u32);
         match c.accounts.as_slice() {
-            [] => c
-                .goa
-                .set_subtitle("No Nextcloud account in Settings → Online Accounts"),
+            [] => c.goa.set_subtitle(&gettext(
+                "No Nextcloud account in Settings → Online Accounts",
+            )),
             [one] => c.goa.set_subtitle(&one.name),
             _ => {}
         }

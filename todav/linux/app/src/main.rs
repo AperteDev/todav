@@ -202,20 +202,25 @@ pub fn forget_sign_in() {
 
 /// Stop using the current account and drop the local copy; the window shows the welcome page.
 /// Pending edits are uploaded first, unless `force` (then they are lost when that fails).
+/// Why the account cannot change yet: edits not on the server would be lost with the local copy.
+fn pending_error(e: &todav_core::Error) -> String {
+    i18n::gettext("Cannot upload pending changes first: {error}").replace("{error}", &e.to_string())
+}
+
 pub async fn disconnect(force: bool) -> Result<(), String> {
     gio::spawn_blocking(move || -> Result<(), String> {
         if core().account().is_some()
             && let Err(e) = core().sync()
             && !force
         {
-            return Err(format!("Cannot upload pending changes first: {e}"));
+            return Err(pending_error(&e));
         }
         core().stop_listening();
         let _ = core().set_setting("goa_account".into(), String::new());
         core().logout().map_err(|e| e.to_string()) // also stops server pushes
     })
     .await
-    .map_err(|_| "Disconnecting failed".to_string())??;
+    .map_err(|_| i18n::gettext("Disconnecting failed"))??;
     window::show_welcome();
     Ok(())
 }
@@ -233,8 +238,9 @@ pub async fn switch_account(target: Target) -> Result<(), String> {
     gio::spawn_blocking(move || -> Result<(), String> {
         let (url, user, pw, goa) = match target {
             Target::Goa(a) => {
-                let pw = goa::password(&a.id)
-                    .ok_or("Online Accounts has no password for this account")?;
+                let pw = goa::password(&a.id).ok_or_else(|| {
+                    i18n::gettext("Online Accounts has no password for this account")
+                })?;
                 (a.url, a.user, pw, a.id)
             }
             Target::Manual(c) => (c.server, c.login_name, c.app_password, String::new()),
@@ -243,9 +249,7 @@ pub async fn switch_account(target: Target) -> Result<(), String> {
             && (old.url.as_str(), old.user.as_str()) != (url.as_str(), user.as_str())
         {
             // A different account drops the local copy: pending edits must reach the old one.
-            core()
-                .sync()
-                .map_err(|e| format!("Cannot upload pending changes first: {e}"))?;
+            core().sync().map_err(|e| pending_error(&e))?;
             let _ = core().push_unregister();
         }
         // The browser sign-in is remembered while GOA is used, to go back to it.
@@ -253,7 +257,9 @@ pub async fn switch_account(target: Target) -> Result<(), String> {
             if let Some((u, n)) = remembered().filter(|r| *r != (url.clone(), user.clone())) {
                 password_clear(&u, &n);
             }
-            password_store(&url, &user, &pw).map_err(|e| format!("Cannot save password: {e}"))?;
+            password_store(&url, &user, &pw).map_err(|e| {
+                i18n::gettext("Cannot save password: {error}").replace("{error}", &e.to_string())
+            })?;
             let _ = core().set_setting("manual_url".into(), url.clone());
             let _ = core().set_setting("manual_user".into(), user.clone());
         }
@@ -265,7 +271,7 @@ pub async fn switch_account(target: Target) -> Result<(), String> {
             .map_err(|e| e.to_string())
     })
     .await
-    .map_err(|_| "Connecting failed".to_string())??;
+    .map_err(|_| i18n::gettext("Connecting failed"))??;
     let running = logged_in();
     start_background();
     if running {
@@ -344,13 +350,17 @@ fn notify_reminders() {
     for t in core().reminders(from, now) {
         let n = gio::Notification::new(&t.summary);
         if let Some(d) = t.due {
-            n.set_body(Some(&format!(
-                "Due {}",
-                dates::label(d, t.due_all_day, now)
-            )));
+            n.set_body(Some(
+                &i18n::gettext("Due {date}")
+                    .replace("{date}", &dates::label(d, t.due_all_day, now)),
+            ));
         }
         n.set_default_action_and_target_value("app.show-list", Some(&t.list_href.to_variant()));
-        n.add_button_with_target_value("Mark as Done", "app.complete", Some(&t.uid.to_variant()));
+        n.add_button_with_target_value(
+            &i18n::gettext("Mark as Done"),
+            "app.complete",
+            Some(&t.uid.to_variant()),
+        );
         app.send_notification(Some(&format!("reminder-{}", t.uid)), &n);
     }
     for e in core().event_reminders(from, now) {
@@ -372,7 +382,10 @@ fn notify_reminders() {
 /// service at login instead (GNOME may ask the user once).
 fn request_autostart(conn: &gio::DBusConnection) {
     let opts = glib::VariantDict::new(None);
-    opts.insert("reason", "Sync tasks and receive changes in the background");
+    opts.insert(
+        "reason",
+        i18n::gettext("Sync tasks and receive changes in the background"),
+    );
     opts.insert("autostart", true);
     opts.insert("commandline", vec!["todav-linux", "--gapplication-service"]);
     let args = glib::Variant::tuple_from_iter(["".to_variant(), opts.end()]);
@@ -395,6 +408,7 @@ fn request_autostart(conn: &gio::DBusConnection) {
 }
 
 fn main() -> glib::ExitCode {
+    i18n::init();
     gio::resources_register_include!("icons.gresource").expect("register icons");
     let data = glib::user_data_dir().join("todav");
     let client = Client::open(data.to_string_lossy().into()).expect("open local database");

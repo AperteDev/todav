@@ -3,13 +3,13 @@ using Adw 1;
 
 // One reminder in the edit dialog: its choice, and the time span when it is "Custom…".
 Adw.ComboRow choice {
-  title: "Remind";
+  title: _("Remind");
   model: Gtk.StringList choices {};
 
   [suffix]
   Gtk.Button remove {
     icon-name: "user-trash-symbolic";
-    tooltip-text: "Remove Reminder";
+    tooltip-text: _("Remove Reminder");
     valign: center;
     styles ["flat"]
   }
@@ -39,7 +39,7 @@ Gtk.ListBoxRow custom {
 
     Gtk.DropDown unit {
       valign: center;
-      model: Gtk.StringList { strings ["minutes", "hours", "days", "weeks"] };
+      model: Gtk.StringList { strings [C_("reminder", "minutes"), C_("reminder", "hours"), C_("reminder", "days"), C_("reminder", "weeks")] };
     }
 
     Gtk.DropDown dir {

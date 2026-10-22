@@ -2,6 +2,7 @@
 //! Offsets count from a task's due time or an event's start.
 
 use crate::dates;
+use crate::i18n::{gettext, pgettext};
 use crate::window::{get, view};
 use adw::prelude::*;
 use std::cell::{Cell, RefCell};
@@ -26,7 +27,7 @@ struct Row {
 fn presets(all_day: bool, event: bool) -> Vec<(String, i64)> {
     let mut p = dates::reminders(all_day);
     if event && !all_day {
-        p[0].0 = "At start".into();
+        p[0].0 = gettext("At start");
     }
     p
 }
@@ -52,17 +53,25 @@ impl Row {
     /// time span.
     fn fill(&self, all_day: bool, offset: i64, custom: bool) {
         let presets = presets(all_day, self.event);
+        let custom_label = gettext("Custom…");
         let labels: Vec<&str> = presets
             .iter()
             .map(|(l, _)| l.as_str())
-            .chain(["Custom…"])
+            .chain([custom_label.as_str()])
             .collect();
-        // A date alone counts from the start of its day.
+        // A date alone counts from the start of its day. They follow "<amount> <unit>".
         let dirs = if all_day {
-            ["before the day", "into the day"]
+            [
+                pgettext("reminder", "before the day"),
+                pgettext("reminder", "into the day"),
+            ]
         } else {
-            ["before", "after"]
+            [
+                pgettext("reminder", "before"),
+                pgettext("reminder", "after"),
+            ]
         };
+        let dirs: Vec<&str> = dirs.iter().map(String::as_str).collect();
         *self.presets.borrow_mut() = presets.iter().map(|(_, o)| *o).collect();
         self.choices.splice(0, self.choices.n_items(), &labels);
         self.dirs.splice(0, self.dirs.n_items(), &dirs);

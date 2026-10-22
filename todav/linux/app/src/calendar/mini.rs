@@ -17,7 +17,7 @@ pub(super) struct Mini {
 impl Mini {
     /// Fill `parent` with a header (the month between arrows), the weekdays and the days.
     pub(super) fn new(parent: &gtk::Box) -> Mini {
-        let arrow = |icon: &str, tip: &str| {
+        let arrow = |icon: &str, tip: String| {
             let b = gtk::Button::builder()
                 .icon_name(icon)
                 .tooltip_text(tip)
@@ -25,8 +25,8 @@ impl Mini {
             b.add_css_class("flat");
             b
         };
-        let prev = arrow("go-previous-symbolic", "Previous Month");
-        let next = arrow("go-next-symbolic", "Next Month");
+        let prev = arrow("go-previous-symbolic", gettext("Previous Month"));
+        let next = arrow("go-next-symbolic", gettext("Next Month"));
         prev.connect_clicked(|_| turn(-1));
         next.connect_clicked(|_| turn(1));
         let title = gtk::Label::builder().hexpand(true).build();

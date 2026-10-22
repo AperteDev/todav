@@ -1,5 +1,6 @@
 //! Main window: login page, list sidebar, grouped task page.
 
+use crate::i18n::{gettext, ngettext, pgettext};
 use crate::{Event, core, dates, request_sync};
 use adw::prelude::*;
 use gtk::{gio, glib};
@@ -46,7 +47,9 @@ row.flash { animation: flash 900ms ease-in-out 2; }
 const INDENT: i32 = 24;
 
 /// Header and sidebar name for tasks without a category.
-const OTHER: &str = "Other";
+fn other() -> String {
+    pgettext("category", "Other")
+}
 
 /// Sidebar entry for the Upcoming page (tasks with a due date in every list), kept among the
 /// list hrefs.
@@ -340,7 +343,9 @@ pub fn on_event(ev: &Event) {
             crate::calendar::set_syncing(s == "syncing");
             if let Some(err) = s.strip_prefix("error:") {
                 if *ui.last_error.borrow() != err {
-                    ui.toasts.add_toast(note(&format!("Sync failed: {err}")));
+                    ui.toasts.add_toast(note(
+                        &gettext("Sync failed: {error}").replace("{error}", err),
+                    ));
                     *ui.last_error.borrow_mut() = err.to_string();
                 }
             } else if s == "idle" {
@@ -355,17 +360,20 @@ pub fn on_event(ev: &Event) {
         // Each refused item by name; a task opens to be fixed (its dialog says why).
         Event::Refused(items) => {
             for r in items {
-                let t = note(&if r.deleted {
-                    format!("“{}” could not be deleted on the server", r.summary)
-                } else if r.task {
-                    format!("“{}” was not saved on the server", r.summary)
-                } else {
-                    let why = server_reason(&r.error);
-                    format!("“{}” was not saved on the server: {why}", r.summary)
-                });
+                let t = note(
+                    &if r.deleted {
+                        gettext("“{title}” could not be deleted on the server")
+                    } else if r.task {
+                        gettext("“{title}” was not saved on the server")
+                    } else {
+                        gettext("“{title}” was not saved on the server: {reason}")
+                            .replace("{reason}", server_reason(&r.error))
+                    }
+                    .replace("{title}", &r.summary),
+                );
                 t.set_priority(adw::ToastPriority::High);
                 if r.task && !r.deleted {
-                    t.set_button_label(Some("Edit"));
+                    t.set_button_label(Some(&gettext("Edit")));
                     let uid = r.uid.clone();
                     t.connect_button_clicked(move |_| {
                         if let Some(task) = core().task(uid.clone()) {
@@ -672,7 +680,7 @@ fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
         let Some(ui) = weak.upgrade() else { return };
         let server = url_text(&ui.conn.server);
         if server.is_empty() {
-            toast(NO_SERVER);
+            toast(&no_server());
             return;
         }
         let u = ui.clone();
@@ -743,7 +751,9 @@ fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
 }
 
 /// What every way of signing in says when the server field is empty.
-pub const NO_SERVER: &str = "Enter the Nextcloud server first";
+pub fn no_server() -> String {
+    gettext("Enter the Nextcloud server first")
+}
 
 /// Full URL from a scheme picker and host entry; empty stays empty, a typed scheme wins over the picker.
 pub fn url_text((scheme, row): &(gtk::DropDown, adw::EntryRow)) -> String {
@@ -764,14 +774,14 @@ pub fn url_text((scheme, row): &(gtk::DropDown, adw::EntryRow)) -> String {
 fn start_login(ui: &Rc<Ui>, copy: bool) {
     let server = url_text(&ui.conn.server);
     if server.is_empty() {
-        toast(NO_SERVER);
+        toast(&no_server());
         return;
     }
     ui.login.set_sensitive(false);
-    ui.login.set_label(if copy {
-        "Waiting for Sign-In…"
+    ui.login.set_label(&if copy {
+        gettext("Waiting for Sign-In…")
     } else {
-        "Waiting for Browser…"
+        gettext("Waiting for Browser…")
     });
     ui.cancel_login.set_visible(true);
     let ui = ui.clone();
@@ -824,7 +834,7 @@ pub fn cancel_login() {
 
 fn reset_login(ui: &Ui) {
     ui.login.set_sensitive(true);
-    ui.login.set_label("Sign In with Browser");
+    ui.login.set_label(&gettext("Sign In with Browser"));
     ui.cancel_login.set_visible(false);
 }
 
@@ -838,8 +848,8 @@ pub async fn browser_login(
     let current = move || LOGIN_ATTEMPT.load(Ordering::SeqCst) == attempt;
     let flow = gio::spawn_blocking(move || todav_core::login_flow_start(server))
         .await
-        .map_err(|_| "Cannot start login".to_string())?
-        .map_err(|e| format!("Cannot start login: {e}"))?;
+        .map_err(|_| gettext("Cannot start login"))?
+        .map_err(|e| gettext("Cannot start login: {error}").replace("{error}", &e.to_string()))?;
     if !current() {
         return Ok(None);
     }
@@ -847,7 +857,7 @@ pub async fn browser_login(
         if let Some(d) = gtk::gdk::Display::default() {
             d.clipboard().set_text(&flow.login_url);
         }
-        toast("Login link copied to clipboard");
+        toast(&gettext("Login link copied to clipboard"));
     } else {
         let parent = ui().map(|u| u.window.clone());
         gtk::UriLauncher::new(&flow.login_url).launch(
@@ -866,11 +876,13 @@ pub async fn browser_login(
         match gio::spawn_blocking(move || todav_core::login_flow_poll(&f)).await {
             Ok(Ok(None)) => continue,
             Ok(Ok(Some(c))) => return Ok(current().then_some(c)),
-            Ok(Err(e)) => return Err(format!("Login failed: {e}")),
-            Err(_) => return Err("Login failed".into()),
+            Ok(Err(e)) => {
+                return Err(gettext("Login failed: {error}").replace("{error}", &e.to_string()));
+            }
+            Err(_) => return Err(gettext("Login failed")),
         }
     }
-    Err("Login timed out".into())
+    Err(gettext("Login timed out"))
 }
 
 /// Ask for a login name and (app) password for `server` and check them there; `done` gets the
@@ -919,9 +931,9 @@ pub fn password_login(
                     d.close();
                     return done(c);
                 }
-                Ok(Err(todav_core::Error::Auth)) => "Wrong login name or password".to_string(),
-                Ok(Err(e)) => format!("Sign-in failed: {e}"),
-                Err(_) => "Sign-in failed".to_string(),
+                Ok(Err(todav_core::Error::Auth)) => gettext("Wrong login name or password"),
+                Ok(Err(e)) => gettext("Sign-in failed: {error}").replace("{error}", &e.to_string()),
+                Err(_) => gettext("Sign-in failed"),
             };
             error.set_title(&msg);
             error.set_revealed(true);
@@ -950,7 +962,7 @@ fn refresh_lists(ui: &Rc<Ui>) {
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
         row.append(&gtk::Image::from_icon_name("x-office-calendar-symbolic"));
         let name = gtk::Label::builder()
-            .label("Upcoming")
+            .label(gettext("Upcoming"))
             .xalign(0.0)
             .hexpand(true)
             .build();
@@ -1087,7 +1099,7 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
         .set_title(list.as_ref().map_or("", |l| &l.display_name));
     ui.title.set_subtitle(
         &list
-            .map(|l| format!("{} open", l.open_count))
+            .map(|l| open_count(l.open_count as u64))
             .unwrap_or_default(),
     );
 
@@ -1111,9 +1123,10 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
             names.push(n.clone());
         }
     }
-    let refs: Vec<&str> = std::iter::once("No category")
+    let (none, new) = (gettext("No category"), gettext("New Category…"));
+    let refs: Vec<&str> = std::iter::once(none.as_str())
         .chain(names.iter().map(String::as_str))
-        .chain(std::iter::once("New Category…"))
+        .chain(std::iter::once(new.as_str()))
         .collect();
     let sel = selected
         .and_then(|s| refs[..refs.len() - 1].iter().position(|r| *r == s))
@@ -1133,7 +1146,7 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
     if *ui.cat_rows.borrow() != rows {
         ui.cat_list.remove_all();
         for (i, r) in rows.iter().enumerate() {
-            let label = r.as_deref().unwrap_or(OTHER);
+            let label = r.clone().unwrap_or_else(other);
             ui.cat_list
                 .append(&gtk::Label::builder().label(label).xalign(0.0).build());
             // Dropping a task here moves it into this category.
@@ -1212,7 +1225,7 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
         let group = adw::PreferencesGroup::new();
         if titled {
             group.set_title(&glib::markup_escape_text(
-                g.name.as_deref().unwrap_or(OTHER),
+                &g.name.clone().unwrap_or_else(other),
             ));
         }
         for (i, (root, subs)) in trees.iter().enumerate() {
@@ -1243,7 +1256,7 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
         done.sort_by_key(|t| std::cmp::Reverse(t.completed_at));
         let flash = ui.flash.borrow().clone().map(|(uid, _)| uid);
         let exp = adw::ExpanderRow::builder()
-            .title(format!("Completed ({})", done.len()))
+            .title(gettext("Completed ({n})").replace("{n}", &done.len().to_string()))
             .expanded(done.iter().any(|t| Some(&t.uid) == flash.as_ref()))
             .build();
         for t in done.iter().take(DONE_SHOWN) {
@@ -1256,7 +1269,7 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
     if !any {
         let empty = adw::StatusPage::builder()
             .icon_name("checkbox-checked-symbolic")
-            .title("All Done")
+            .title(gettext("All Done"))
             .build();
         empty.add_css_class("compact");
         ui.groups.prepend(&empty);
@@ -1273,17 +1286,17 @@ fn rebuild_upcoming(ui: &Rc<Ui>) {
         .into_iter()
         .map(|l| (l.href, l.display_name))
         .collect();
-    ui.title.set_title("Upcoming");
-    ui.title.set_subtitle(&format!("{} open", tasks.len()));
+    ui.title.set_title(&gettext("Upcoming"));
+    ui.title.set_subtitle(&open_count(tasks.len() as u64));
     // Today's events first: the day's plan next to what is due.
     let events = crate::calendar::today_events();
     if !events.is_empty() {
         let group = adw::PreferencesGroup::builder()
-            .title("Today’s Events")
+            .title(gettext("Today’s Events"))
             .build();
         for e in &events {
             let time = if e.all_day {
-                "All day".to_string()
+                gettext("All day")
             } else {
                 let at = |t: i64| {
                     dates::fields(t)
@@ -1324,8 +1337,8 @@ fn rebuild_upcoming(ui: &Rc<Ui>) {
     if tasks.is_empty() {
         let empty = adw::StatusPage::builder()
             .icon_name("x-office-calendar-symbolic")
-            .title("Nothing Scheduled")
-            .description("Tasks with a due date show up here")
+            .title(gettext("Nothing Scheduled"))
+            .description(gettext("Tasks with a due date show up here"))
             .build();
         empty.add_css_class("compact");
         ui.groups.append(&empty);
@@ -1346,11 +1359,10 @@ fn rebuild_search(ui: &Rc<Ui>, query: &str, all: Vec<Task>) {
         .any(|s| folded(s).contains(query))
     };
     let found: Vec<Task> = all.into_iter().filter(hit).collect();
-    ui.title.set_title("Search");
-    ui.title.set_subtitle(&match found.len() {
-        1 => "1 task".to_string(),
-        n => format!("{n} tasks"),
-    });
+    ui.title.set_title(&gettext("Search"));
+    let n = found.len() as u64;
+    ui.title
+        .set_subtitle(&ngettext("{n} task", "{n} tasks", n).replace("{n}", &n.to_string()));
     for l in core().lists() {
         let mut here: Vec<&Task> = found.iter().filter(|t| t.list_href == l.href).collect();
         if here.is_empty() {
@@ -1368,12 +1380,17 @@ fn rebuild_search(ui: &Rc<Ui>, query: &str, all: Vec<Task>) {
     if found.is_empty() {
         let empty = adw::StatusPage::builder()
             .icon_name("system-search-symbolic")
-            .title("No Results Found")
-            .description("Try a different search")
+            .title(gettext("No Results Found"))
+            .description(gettext("Try a different search"))
             .build();
         empty.add_css_class("compact");
         ui.groups.append(&empty);
     }
+}
+
+/// "3 open": the open tasks of a list or of Upcoming, under the title.
+fn open_count(n: u64) -> String {
+    ngettext("{n} open", "{n} open", n).replace("{n}", &n.to_string())
 }
 
 /// Split a group's depth-first task list into root tasks, each with its (depth, subtask) list.
@@ -1447,7 +1464,15 @@ fn count_tag(ui: &Ui, t: &Task) -> Option<gtk::Label> {
     let all = open + done;
     let l = gtk::Label::builder()
         .label(format!("{done}/{all}"))
-        .tooltip_text(format!("{done} of {all} subtasks done"))
+        .tooltip_text(
+            ngettext(
+                "{done} of {all} subtask done",
+                "{done} of {all} subtasks done",
+                all as u64,
+            )
+            .replace("{done}", &done.to_string())
+            .replace("{all}", &all.to_string()),
+        )
         .valign(gtk::Align::Center)
         .build();
     l.add_css_class("tag");
@@ -1461,7 +1486,9 @@ pub fn sync_warning(t: &Task) -> Option<gtk::Image> {
     let error = t.sync_error.as_deref()?;
     let w = gtk::Image::builder()
         .icon_name("dialog-warning-symbolic")
-        .tooltip_text(format!("Not saved on the server: {}", server_reason(error)))
+        .tooltip_text(
+            gettext("Not saved on the server: {reason}").replace("{reason}", server_reason(error)),
+        )
         .valign(gtk::Align::Center)
         .build();
     w.add_css_class("warning");
@@ -1522,7 +1549,7 @@ fn task_row(ui: &Rc<Ui>, t: &Task, indent: usize, slot: Option<Slot>) -> adw::Ac
 /// A root task without subtasks: its "+" turns it into a `tree_row` ready for the first one.
 fn leaf_row(ui: &Rc<Ui>, t: &Task, slot: Slot) -> adw::ActionRow {
     let row = task_row(ui, t, 0, Some(slot));
-    let add = icon_button("list-add-symbolic", "Add Subtask");
+    let add = icon_button("list-add-symbolic", &gettext("Add Subtask"));
     let (weak, uid) = (Rc::downgrade(ui), t.uid.clone());
     add.connect_clicked(move |_| {
         let Some(ui) = weak.upgrade() else { return };
@@ -1562,12 +1589,12 @@ fn tree_row(
         row.set_subtitle(d);
     }
     // Collapsed, the header shows no subtask list to drop on: a "+" appears during drags.
-    let plus = icon_button("list-add-symbolic", "Add Subtask");
+    let plus = icon_button("list-add-symbolic", &gettext("Add Subtask"));
     plus.set_visible(false);
     row.add_suffix(&plus);
     adopt_target(ui, &plus, root, Some(&row));
     // The header toggles the subtasks, so editing gets its own button.
-    let edit = icon_button("document-edit-symbolic", "Edit");
+    let edit = icon_button("document-edit-symbolic", &gettext("Edit"));
     let (weak, task) = (Rc::downgrade(ui), root.clone());
     edit.connect_clicked(move |_| {
         if let Some(ui) = weak.upgrade() {
@@ -1605,7 +1632,9 @@ fn tree_row(
         }
     });
 
-    let entry = adw::EntryRow::builder().title("Add subtask").build();
+    let entry = adw::EntryRow::builder()
+        .title(gettext("Add subtask"))
+        .build();
     entry.set_margin_start(INDENT);
     entry.add_prefix(&gtk::Image::from_icon_name("list-add-symbolic"));
     if ui.focus_sub.borrow().as_ref() == Some(&root.uid) {
@@ -1724,7 +1753,7 @@ fn connect_dnd(
     });
     if ui.handles.get() {
         let handle = gtk::Image::from_icon_name("list-drag-handle-symbolic");
-        handle.set_tooltip_text(Some("Drag to Move"));
+        handle.set_tooltip_text(Some(&gettext("Drag to Move")));
         handle.set_cursor_from_name(Some("grab"));
         handle.add_controller(drag);
         add_handle(&handle);
@@ -2057,7 +2086,7 @@ fn done_check(t: &Task) -> gtk::CheckButton {
 }
 
 fn delete_button(t: &Task) -> gtk::Button {
-    let del = icon_button("user-trash-symbolic", "Delete");
+    let del = icon_button("user-trash-symbolic", &gettext("Delete"));
     let task = t.clone();
     del.connect_clicked(move |_| delete_task(&task));
     del
@@ -2066,7 +2095,7 @@ fn delete_button(t: &Task) -> gtk::Button {
 pub fn delete_task(t: &Task) {
     if core().delete_task(t.uid.clone()).is_ok() {
         request_sync();
-        undo_toast(&format!("“{}” deleted", t.summary));
+        undo_toast(&gettext("“{title}” deleted").replace("{title}", &t.summary));
     }
 }
 
@@ -2075,7 +2104,7 @@ pub fn undo_toast(title: &str) {
     let Some(ui) = ui() else { return };
     let toast = adw::Toast::builder()
         .title(title)
-        .button_label("Undo")
+        .button_label(gettext("Undo"))
         .priority(adw::ToastPriority::High)
         .build();
     toast.set_use_markup(false);
@@ -2252,15 +2281,17 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
         let (start, due, save) = (start.clone(), due.clone(), save.clone());
         Rc::new(move || {
             let problem = match (start(), due()) {
-                (Some(s), Some(d)) if s.all_day != d.all_day => {
-                    Some("Start and due date need a time on both or on neither")
+                (Some(s), Some(d)) if s.all_day != d.all_day => Some(gettext(
+                    "Start and due date need a time on both or on neither",
+                )),
+                (Some(s), Some(d)) if d.at < s.at => {
+                    Some(gettext("The task starts after it is due"))
                 }
-                (Some(s), Some(d)) if d.at < s.at => Some("The task starts after it is due"),
                 _ => None,
             };
             save.set_sensitive(problem.is_none());
-            save.set_tooltip_text(problem);
-            if let Some(p) = problem {
+            save.set_tooltip_text(problem.as_deref());
+            if let Some(p) = &problem {
                 conflict.set_title(p);
             }
             conflict.set_revealed(problem.is_some());
@@ -2383,7 +2414,8 @@ fn date_row(b: &gtk::Builder, name: &str, at: Option<Due>) -> Rc<dyn Fn() -> Opt
     let has_time: gtk::Switch = get(b, &format!("{name}_has_time"));
     // The row says what its switch is for while there is no time.
     let time_row: adw::ActionRow = get(b, &format!("{name}_time_row"));
-    let tip = move |on: bool| time_row.set_tooltip_text((!on).then_some("Add a Time"));
+    let add_time = gettext("Add a Time");
+    let tip = move |on: bool| time_row.set_tooltip_text((!on).then_some(add_time.as_str()));
     has_time.connect_active_notify(move |s| tip(s.is_active()));
     let hour: gtk::SpinButton = get(b, &format!("{name}_hour"));
     let minute: gtk::SpinButton = get(b, &format!("{name}_minute"));
@@ -2500,9 +2532,14 @@ fn priority_row(p: Option<i64>) -> u32 {
     }
 }
 
-/// The priority as the edit dialog names it; none when not set.
-pub fn priority_name(p: Option<i64>) -> Option<&'static str> {
-    [None, Some("Low"), Some("Medium"), Some("High")][priority_row(p) as usize]
+/// The priority in words ("High priority"), as the edit dialog's levels; none when not set.
+pub fn priority_text(p: Option<i64>) -> Option<String> {
+    match priority_row(p) {
+        1 => Some(gettext("Low priority")),
+        2 => Some(gettext("Medium priority")),
+        3 => Some(gettext("High priority")),
+        _ => None,
+    }
 }
 
 fn priority_value(row: u32) -> Option<i64> {

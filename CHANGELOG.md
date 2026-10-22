@@ -31,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Search across tasks and events, undo with Ctrl+Z, keyboard shortcuts.
 - Preferences synced between devices through Nextcloud Files.
 - Runs in the background and starts with the session.
+- Translations into Polish, German, French, Spanish, Italian and Brazilian
+  Portuguese, for the app and the extension. Polish is reviewed; the others are
+  first drafts.
 - Packages for GNOME 49 and newer: a Flatpak bundle, a `.deb` for Ubuntu 26.04
   and newer, a tarball for other distributions (both with the extension), and
   the extension as a zip.

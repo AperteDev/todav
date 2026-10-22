@@ -4,7 +4,7 @@ using Adw 1;
 // A new event or an existing one, laid out as the task dialog: what, where, which calendar and
 // notes; then when, how it repeats and its reminders. One column when narrow.
 Adw.Dialog dialog {
-  title: "Event";
+  title: _("Event");
   content-width: 760;
   content-height: 640;
   // Breakpoints need a minimum size; the smallest GNOME supports.
@@ -21,12 +21,12 @@ Adw.Dialog dialog {
 
       [start]
       Gtk.Button cancel {
-        label: "Cancel";
+        label: _("Cancel");
       }
 
       [end]
       Gtk.Button save {
-        label: "Save";
+        label: _("Save");
         styles ["suggested-action"]
       }
     }
@@ -51,23 +51,23 @@ Adw.Dialog dialog {
 
           Adw.PreferencesGroup {
             Adw.EntryRow summary {
-              title: "Title";
+              title: _("Title");
               activates-default: true;
             }
 
             Adw.EntryRow location {
-              title: "Location";
+              title: _("Location");
               activates-default: true;
             }
 
             Adw.ComboRow calendar {
-              title: "Calendar";
+              title: _("Calendar");
               model: Gtk.StringList calendars {};
             }
           }
 
           Adw.PreferencesGroup {
-            title: "Notes";
+            title: _("Notes");
             vexpand: true;
 
             Gtk.ScrolledWindow {
@@ -97,11 +97,11 @@ Adw.Dialog dialog {
           // subtitles say what is picked.
           Adw.PreferencesGroup {
             Adw.SwitchRow all_day {
-              title: "All Day";
+              title: _("All Day");
             }
 
             Adw.ExpanderRow start {
-              title: "Starts";
+              title: _("Starts");
               expanded: true;
 
               Gtk.ListBoxRow {
@@ -116,7 +116,7 @@ Adw.Dialog dialog {
               }
 
               Adw.ActionRow start_time {
-                title: "Time";
+                title: _("Time");
 
                 [suffix]
                 Gtk.Box {
@@ -151,7 +151,7 @@ Adw.Dialog dialog {
             }
 
             Adw.ExpanderRow end {
-              title: "Ends";
+              title: _("Ends");
 
               Gtk.ListBoxRow {
                 activatable: false;
@@ -165,7 +165,7 @@ Adw.Dialog dialog {
               }
 
               Adw.ActionRow end_time {
-                title: "Time";
+                title: _("Time");
 
                 [suffix]
                 Gtk.Box {
@@ -202,12 +202,12 @@ Adw.Dialog dialog {
 
           Adw.PreferencesGroup {
             Adw.ComboRow repeat {
-              title: "Repeat";
-              model: Gtk.StringList repeats { strings ["Does Not Repeat", "Daily", "Weekly", "Monthly", "Yearly"] };
+              title: _("Repeat");
+              model: Gtk.StringList repeats { strings [_("Does Not Repeat"), _("Daily"), _("Weekly"), _("Monthly"), _("Yearly")] };
             }
 
             Adw.SpinRow interval {
-              title: "Every";
+              title: _("Every");
               adjustment: Gtk.Adjustment {
                 lower: 1;
                 upper: 99;
@@ -216,7 +216,7 @@ Adw.Dialog dialog {
             }
 
             Adw.ExpanderRow until {
-              title: "Until";
+              title: _("Until");
               show-enable-switch: true;
               enable-expansion: false;
 
@@ -239,7 +239,7 @@ Adw.Dialog dialog {
             styles ["boxed-list"]
 
             Adw.ButtonRow add_reminder {
-              title: "Add Reminder";
+              title: _("Add Reminder");
               start-icon-name: "list-add-symbolic";
             }
           }
@@ -249,7 +249,7 @@ Adw.Dialog dialog {
             styles ["boxed-list"]
 
             Adw.ButtonRow delete {
-              title: "Delete Event";
+              title: _("Delete Event");
               styles ["destructive-action"]
             }
           }

@@ -1,20 +1,22 @@
 //! Due dates as the app shows them. Task times are local wall-clock seconds (see
 //! `Client::local_now`), so their fields are read as if they were UTC.
 
+use crate::i18n::{gettext, gettext_noop};
 use gtk::glib;
 use gtk::prelude::*;
 use todav_core::Task;
 
 const DAY: i64 = 86400;
 
-/// Reminder choices for a due date with a time: label, seconds after the due time.
+/// Reminder choices for a due date with a time: label (translate it to show it), seconds after
+/// the due time.
 pub const TIMED: [(&str, i64); 6] = [
-    ("At due time", 0),
-    ("5 minutes before", -300),
-    ("15 minutes before", -900),
-    ("30 minutes before", -1800),
-    ("1 hour before", -3600),
-    ("1 day before", -DAY),
+    (gettext_noop("At due time"), 0),
+    (gettext_noop("5 minutes before"), -300),
+    (gettext_noop("15 minutes before"), -900),
+    (gettext_noop("30 minutes before"), -1800),
+    (gettext_noop("1 hour before"), -3600),
+    (gettext_noop("1 day before"), -DAY),
 ];
 
 /// When reminders of tasks without a time go off, in seconds into the day: the synced
@@ -42,13 +44,16 @@ pub fn default_reminder(all_day: bool) -> i64 {
 /// due time. A date alone counts from its midnight.
 pub fn reminders(all_day: bool) -> Vec<(String, i64)> {
     if !all_day {
-        return TIMED.iter().map(|(l, o)| (l.to_string(), *o)).collect();
+        return TIMED.iter().map(|(l, o)| (gettext(l), *o)).collect();
     }
     let t = all_day_time();
     let at = format!("{}:{:02}", t / 3600, t / 60 % 60);
     vec![
-        (format!("On the day at {at}"), t),
-        (format!("The day before at {at}"), t - DAY),
+        (gettext("On the day at {time}").replace("{time}", &at), t),
+        (
+            gettext("The day before at {time}").replace("{time}", &at),
+            t - DAY,
+        ),
     ]
 }
 
@@ -94,9 +99,9 @@ fn days(t: i64, now: i64) -> i64 {
 pub fn label(t: i64, all_day: bool, now: i64) -> String {
     let d = fields(t);
     let day = match days(t, now) {
-        0 => "Today".into(),
-        1 => "Tomorrow".into(),
-        -1 => "Yesterday".into(),
+        0 => gettext("Today"),
+        1 => gettext("Tomorrow"),
+        -1 => gettext("Yesterday"),
         2..=6 => fmt(&d, "%A"),
         _ if d.year() == fields(now).year() => fmt(&d, "%-d %B"),
         _ => fmt(&d, "%-d %B %Y"),
@@ -125,13 +130,13 @@ pub fn pressing(t: &Task, now: i64) -> bool {
 pub fn section(t: &Task, now: i64) -> String {
     let d = t.due.unwrap_or(now);
     if overdue(t, now) {
-        return "Overdue".into();
+        return gettext("Overdue");
     }
     match days(d, now) {
-        0 => "Today".into(),
-        1 => "Tomorrow".into(),
+        0 => gettext("Today"),
+        1 => gettext("Tomorrow"),
         2..=6 => fmt(&fields(d), "%A"),
-        _ => "Later".into(),
+        _ => gettext("Later"),
     }
 }
 

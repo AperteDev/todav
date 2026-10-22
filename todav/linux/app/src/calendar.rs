@@ -7,6 +7,7 @@ mod dialog;
 mod mini;
 mod week;
 
+use crate::i18n::{gettext, ngettext, pgettext};
 use crate::lists::class;
 use crate::settings::duration;
 use crate::window::{get, view};
@@ -206,7 +207,7 @@ pub fn build(views: &adw::ViewStack) {
     let narrow = breakpoint("max-width: 700sp");
     to_bar(&narrow);
     narrow.add_setter(&split, "collapsed", Some(&true.to_value()));
-    let page = views.add_titled(&bin, Some("calendar"), "Calendar");
+    let page = views.add_titled(&bin, Some("calendar"), &gettext("Calendar"));
     page.set_icon_name(Some("x-office-calendar-symbolic"));
     get::<adw::InlineViewSwitcher>(&b, "switcher").set_stack(Some(views));
 
@@ -466,9 +467,9 @@ pub fn agenda(days: i64) -> Vec<(i64, String, String, String, bool, bool)> {
                 Item::Event(e) => {
                     // A day inside a longer event: all of it, or until it ends.
                     let time = if e.all_day || (e.start < day && e.end >= day + DAY) {
-                        "All day".to_string()
+                        gettext("All day")
                     } else if e.start < day {
-                        format!("Until {}", fmt(e.end, "%H:%M"))
+                        gettext("Until {time}").replace("{time}", &fmt(e.end, "%H:%M"))
                     } else {
                         fmt(e.start, "%H:%M")
                     };
@@ -595,7 +596,11 @@ fn render_plan(c: &Rc<Cal>, until: i64) {
         let starts = dated.get(i).filter(|&&d| i == 0 || dated[i - 1] != d);
         let header = starts.map(|&d| {
             let l = gtk::Label::builder()
-                .label(if d { "Due" } else { "No date" })
+                .label(if d {
+                    pgettext("to plan", "Due")
+                } else {
+                    gettext("No date")
+                })
                 .xalign(0.0)
                 .margin_start(18)
                 .margin_top(6)
@@ -634,7 +639,7 @@ fn render_plan(c: &Rc<Cal>, until: i64) {
     }
     if tasks.is_empty() && until != 0 {
         let none = gtk::Label::builder()
-            .label("Nothing to plan")
+            .label(gettext("Nothing to plan"))
             .xalign(0.0)
             .build();
         none.add_css_class("dim-label");
@@ -795,7 +800,7 @@ fn move_event(e: &Event, time: EventTime) {
     };
     match cal() {
         Some(c) if e.recurring => {
-            dialog::ask_scope(&c.split, "Move Repeating Event?", false, apply)
+            dialog::ask_scope(&c.split, &gettext("Move Repeating Event?"), false, apply)
         }
         _ => apply(Scope::All),
     }
@@ -978,10 +983,10 @@ fn refresh_calendars(c: &Rc<Cal>) {
             .opacity(if shown { 1.0 } else { 0.0 })
             .build();
         row.append(&mark);
-        row.set_tooltip_text(Some(if shown {
-            "Shown on the Calendar"
+        row.set_tooltip_text(Some(&if shown {
+            gettext("Shown on the Calendar")
         } else {
-            "Hidden from the Calendar"
+            gettext("Hidden from the Calendar")
         }));
         if l.holds_events {
             c.calendars.append(&row);
@@ -1207,7 +1212,10 @@ fn new_event_on(
 /// "+N more": a popover with the rest of the day.
 fn more_button(c: &Rc<Cal>, day: i64, rest: Vec<Item>) -> gtk::MenuButton {
     let label = gtk::Label::builder()
-        .label(format!("+{} more", rest.len()))
+        .label(
+            ngettext("+{n} more", "+{n} more", rest.len() as u64)
+                .replace("{n}", &rest.len().to_string()),
+        )
         .xalign(0.0)
         .ellipsize(gtk::pango::EllipsizeMode::End)
         .build();
@@ -1383,9 +1391,9 @@ fn task_when(t: &Task) -> Vec<String> {
             vec![format!("{} – {}", at(s, false), fmt(d, "%H:%M"))]
         }
         (start, due) => start
-            .map(|s| format!("Starts {}", at(s, t.start_all_day)))
+            .map(|s| gettext("Starts {date}").replace("{date}", &at(s, t.start_all_day)))
             .into_iter()
-            .chain(due.map(|d| format!("Due {}", at(d, t.due_all_day))))
+            .chain(due.map(|d| gettext("Due {date}").replace("{date}", &at(d, t.due_all_day))))
             .collect(),
     }
 }
@@ -1403,17 +1411,17 @@ fn tooltip(c: &Cal, i: &Item) -> String {
             lines.push(span_text(e));
             lines.extend(e.location.clone());
             if e.cancelled {
-                lines.push("Cancelled".into());
+                lines.push(gettext("Cancelled"));
             }
         }
         Item::Task(t) => {
             lines.extend(task_when(t));
             lines.extend(t.category.clone().filter(|c| !c.is_empty()));
             if t.done {
-                lines.push("Completed".into());
+                lines.push(gettext("Completed"));
             }
             if t.sync_error.is_some() {
-                lines.push("Not saved on the server".into());
+                lines.push(gettext("Not saved on the server"));
             }
         }
     }
@@ -1429,7 +1437,7 @@ fn tooltip(c: &Cal, i: &Item) -> String {
 /// A heading counting done/all of `tasks`, a box to tick each, and (with `add`) a field adding
 /// one: `add` makes it from the title typed. The event's tasks, a task's subtasks.
 fn checklist(
-    title: &'static str,
+    title: String,
     hint: &str,
     tasks: Rc<dyn Fn() -> Vec<Task>>,
     add: Option<Box<dyn Fn(String) -> Option<Task>>>,
@@ -1442,7 +1450,7 @@ fn checklist(
         Rc::new(move || {
             let all = tasks();
             head.set_label(&match all.len() {
-                0 => title.to_string(),
+                0 => title.clone(),
                 n => format!("{title} · {}/{n}", all.iter().filter(|t| t.done).count()),
             });
         })
@@ -1519,8 +1527,8 @@ fn event_tasks(e: &Event) -> gtk::Box {
         added.ok().and_then(|t| core().task(t.uid))
     };
     checklist(
-        "Tasks",
-        "Add a task for this event",
+        gettext("Tasks"),
+        &gettext("Add a task for this event"),
         Rc::new(move || core().event_tasks(uid.clone())),
         Some(Box::new(add)),
     )
@@ -1546,8 +1554,8 @@ fn subtasks(t: &Task) -> gtk::Box {
             .ok()
     };
     checklist(
-        "Subtasks",
-        "Add a subtask",
+        gettext("Subtasks"),
+        &gettext("Add a subtask"),
         Rc::new(all),
         Some(Box::new(add)),
     )
@@ -1622,11 +1630,11 @@ fn details_popover(b: &gtk::Box, buttons: Option<Buttons>) -> gtk::Popover {
         let row = gtk::Box::builder().spacing(6).margin_top(4).build();
         let delete = gtk::Button::builder()
             .icon_name("user-trash-symbolic")
-            .tooltip_text("Delete")
+            .tooltip_text(gettext("Delete"))
             .build();
         delete.add_css_class("flat");
         let edit = gtk::Button::builder()
-            .label("Edit…")
+            .label(gettext("Edit…"))
             .hexpand(true)
             .halign(gtk::Align::End)
             .build();
@@ -1759,7 +1767,7 @@ fn details(c: &Cal, e: &Event) -> gtk::Popover {
     b.append(&title);
     b.append(&line("x-office-calendar-symbolic", &span_text(e)));
     if e.recurring {
-        b.append(&line("media-playlist-repeat-symbolic", "Repeats"));
+        b.append(&line("media-playlist-repeat-symbolic", &gettext("Repeats")));
     }
     if let Some(l) = &e.location {
         b.append(&line("mark-location-symbolic", l));
@@ -1786,13 +1794,15 @@ fn details(c: &Cal, e: &Event) -> gtk::Popover {
             ) {
                 Ok(()) => {
                     request_sync();
-                    crate::window::undo_toast(&format!("“{}” deleted", ev.summary));
+                    crate::window::undo_toast(
+                        &gettext("“{title}” deleted").replace("{title}", &ev.summary),
+                    );
                 }
                 Err(err) => crate::window::toast(&err.to_string()),
             };
             match cal() {
                 Some(c) if ev.recurring => {
-                    dialog::ask_scope(&c.split, "Delete Repeating Event?", true, del)
+                    dialog::ask_scope(&c.split, &gettext("Delete Repeating Event?"), true, del)
                 }
                 _ => del(Scope::All),
             }
@@ -1812,7 +1822,7 @@ fn task_details(c: &Cal, t: &Task) -> gtk::Popover {
     let check = gtk::CheckButton::builder()
         .active(t.done)
         .valign(gtk::Align::Center)
-        .tooltip_text("Done")
+        .tooltip_text(gettext("Done"))
         .build();
     let uid = t.uid.clone();
     check.connect_toggled(move |b| {
@@ -1834,10 +1844,8 @@ fn task_details(c: &Cal, t: &Task) -> gtk::Popover {
     if let Some(e) = &t.sync_error {
         b.append(&line(
             "dialog-warning-symbolic",
-            &format!(
-                "Not saved on the server: {}",
-                crate::window::server_reason(e)
-            ),
+            &gettext("Not saved on the server: {reason}")
+                .replace("{reason}", crate::window::server_reason(e)),
         ));
     }
     let when = task_when(t);
@@ -1849,11 +1857,14 @@ fn task_details(c: &Cal, t: &Task) -> gtk::Popover {
         None => list_name(c, &t.list_href),
     };
     b.append(&which(&t.list_href, &name));
-    if let Some(p) = crate::window::priority_name(t.priority) {
-        b.append(&line("emblem-important-symbolic", &format!("{p} priority")));
+    if let Some(p) = crate::window::priority_text(t.priority) {
+        b.append(&line("emblem-important-symbolic", &p));
     }
     if let Some(e) = t.event_uid.clone().and_then(|e| core().event(e)) {
-        b.append(&line("insert-link-symbolic", &format!("For {}", e.summary)));
+        b.append(&line(
+            "insert-link-symbolic",
+            &gettext("For {event}").replace("{event}", &e.summary),
+        ));
     }
     if let Some(r) = reminders_line(&t.reminders) {
         b.append(&r);
@@ -1864,7 +1875,7 @@ fn task_details(c: &Cal, t: &Task) -> gtk::Popover {
     match t.parent_uid.clone().and_then(|p| core().task(p)) {
         Some(parent) => b.append(&line(
             "view-list-bullet-symbolic",
-            &format!("Subtask of {}", parent.summary),
+            &gettext("Subtask of {task}").replace("{task}", &parent.summary),
         )),
         None => b.append(&subtasks(t)),
     }
@@ -1878,7 +1889,7 @@ fn task_details(c: &Cal, t: &Task) -> gtk::Popover {
 fn render_agenda(c: &Rc<Cal>) {
     let from = c.anchor.get();
     let to = from + AGENDA_DAYS * DAY;
-    c.title.set_title("Agenda");
+    c.title.set_title(&gettext("Agenda"));
     c.title.set_subtitle(&format!(
         "{} – {}",
         fmt(from, "%-d %b"),
@@ -1906,7 +1917,7 @@ fn render_agenda(c: &Rc<Cal>) {
     if !any {
         let empty = adw::StatusPage::builder()
             .icon_name("x-office-calendar-symbolic")
-            .title("Nothing Planned")
+            .title(gettext("Nothing Planned"))
             .build();
         empty.add_css_class("compact");
         c.agenda.append(&empty);
@@ -1917,8 +1928,8 @@ fn render_agenda(c: &Rc<Cal>) {
 fn day_title(day: i64, format: &str) -> String {
     let date = fmt(day, format);
     match (day - today()) / DAY {
-        0 => format!("Today · {date}"),
-        1 => format!("Tomorrow · {date}"),
+        0 => format!("{} · {date}", gettext("Today")),
+        1 => format!("{} · {date}", gettext("Tomorrow")),
         _ => capitalized(&date),
     }
 }
@@ -1961,11 +1972,10 @@ fn render_search(c: &Rc<Cal>) {
     let mut found: Vec<Event> = best.into_values().collect();
     found.sort_by_key(|e| (!ahead(e), if ahead(e) { e.start } else { -e.start }));
 
-    c.title.set_title("Search");
-    c.title.set_subtitle(&match found.len() {
-        1 => "1 event".to_string(),
-        n => format!("{n} events"),
-    });
+    c.title.set_title(&gettext("Search"));
+    let n = found.len() as u64;
+    c.title
+        .set_subtitle(&ngettext("{n} event", "{n} events", n).replace("{n}", &n.to_string()));
     clear(&c.agenda);
     let mut group: Option<(i64, adw::PreferencesGroup)> = None;
     for e in found {
@@ -1982,8 +1992,8 @@ fn render_search(c: &Rc<Cal>) {
     if group.is_none() {
         let empty = adw::StatusPage::builder()
             .icon_name("system-search-symbolic")
-            .title("No Results Found")
-            .description("Try a different search")
+            .title(gettext("No Results Found"))
+            .description(gettext("Try a different search"))
             .build();
         empty.add_css_class("compact");
         c.agenda.append(&empty);
@@ -2002,7 +2012,7 @@ fn agenda_row(i: &Item) -> adw::ActionRow {
         Item::Event(e) => {
             row.set_title(&e.summary);
             let time = if e.all_day {
-                "All day".to_string()
+                gettext("All day")
             } else {
                 format!("{} – {}", fmt(e.start, "%H:%M"), fmt(e.end, "%H:%M"))
             };
@@ -2023,10 +2033,11 @@ fn agenda_row(i: &Item) -> adw::ActionRow {
         Item::Task(t) => {
             row.set_title(&t.summary);
             let (at, all_day) = when(t);
+            let task = gettext("Task");
             row.set_subtitle(&if all_day {
-                "Task".to_string()
+                task
             } else {
-                format!("Task · {}", fmt(at, "%H:%M"))
+                format!("{task} · {}", fmt(at, "%H:%M"))
             });
             let check = gtk::CheckButton::builder()
                 .active(t.done)

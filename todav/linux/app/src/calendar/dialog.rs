@@ -6,7 +6,16 @@ use todav_core::rrule::{Freq, Rule};
 use todav_core::{EventPatch, EventTime, Repeat, Scope};
 
 const FREQS: [Freq; 4] = [Freq::Daily, Freq::Weekly, Freq::Monthly, Freq::Yearly];
-const UNITS: [&str; 4] = ["days", "weeks", "months", "years"];
+
+/// The unit of "Every n …" for repeat choice `freq` (1 daily … 4 yearly), in `n`'s form.
+fn unit(freq: u32, n: u64) -> String {
+    match freq {
+        1 => ngettext("day", "days", n),
+        2 => ngettext("week", "weeks", n),
+        3 => ngettext("month", "months", n),
+        _ => ngettext("year", "years", n),
+    }
+}
 
 /// How an existing rule shows in the dialog: as one of its plain choices, or as "Custom" (kept
 /// unless the user picks another).
@@ -33,12 +42,12 @@ pub(super) fn ask_scope(
     delete: bool,
     then: impl Fn(Scope) + 'static,
 ) {
-    let d = adw::AlertDialog::new(Some(heading), Some("The event repeats."));
+    let d = adw::AlertDialog::new(Some(heading), Some(&gettext("The event repeats.")));
     d.add_responses(&[
-        ("cancel", "Cancel"),
-        ("this", "Only This Event"),
-        ("following", "This and Following"),
-        ("all", "All Events"),
+        ("cancel", &gettext("Cancel")),
+        ("this", &gettext("Only This Event")),
+        ("following", &gettext("This and Following")),
+        ("all", &gettext("All Events")),
     ]);
     d.set_close_response("cancel");
     d.set_default_response(Some("this"));
@@ -84,10 +93,10 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
     let until: adw::ExpanderRow = get(&b, "until");
     let until_cal: gtk::Calendar = get(&b, "until_cal");
     let description: gtk::TextView = get(&b, "description");
-    dialog.set_title(if e.is_some() {
-        "Edit Event"
+    dialog.set_title(&if e.is_some() {
+        gettext("Edit Event")
     } else {
-        "New Event"
+        gettext("New Event")
     });
     for s in &spins {
         crate::window::two_digits(s);
@@ -167,7 +176,7 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
     let shown = rule.as_deref().map(plain);
     let custom = matches!(shown, Some(None));
     if custom {
-        repeats.append("Custom");
+        repeats.append(&pgettext("repeat", "Custom"));
     }
     let (freq, every, until_at) = match shown {
         Some(Some(p)) => p,
@@ -179,19 +188,22 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
     until.set_enable_expansion(until_at.is_some());
     until_cal.select_day(&dates::fields(until_at.unwrap_or(time.start + 30 * DAY)));
     let show_repeat = {
-        let (interval, until) = (interval.clone(), until.clone());
-        move |i: u32| {
+        let (interval, until, repeat) = (interval.clone(), until.clone(), repeat.clone());
+        move || {
+            let i = repeat.selected();
             let plain = (1..=4).contains(&i);
             interval.set_visible(plain);
             until.set_visible(plain);
             if plain {
-                interval.set_subtitle(UNITS[i as usize - 1]);
+                interval.set_subtitle(&unit(i, interval.value() as u64));
             }
         }
     };
-    show_repeat(freq as u32);
+    show_repeat();
     // An occurrence of a series changes how the series repeats only as a whole.
-    repeat.connect_selected_notify(move |r| show_repeat(r.selected()));
+    let s = show_repeat.clone();
+    repeat.connect_selected_notify(move |_| s());
+    interval.connect_value_notify(move |_| show_repeat());
 
     // Reminders count from the start.
     let offsets: Vec<i64> = e
@@ -329,14 +341,16 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
                 ) {
                     Ok(()) => {
                         request_sync();
-                        crate::window::undo_toast(&format!("“{}” deleted", ev.summary));
+                        crate::window::undo_toast(
+                            &gettext("“{title}” deleted").replace("{title}", &ev.summary),
+                        );
                     }
                     Err(err) => crate::window::toast(&err.to_string()),
                 }
                 done.close();
             };
             if ev.recurring {
-                ask_scope(&d, "Delete Repeating Event?", true, del);
+                ask_scope(&d, &gettext("Delete Repeating Event?"), true, del);
             } else {
                 del(Scope::All);
             }
@@ -350,7 +364,7 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
             .get(calendar.selected() as usize)
             .map(|l| l.href.clone())
         else {
-            crate::window::toast("No calendar to save to");
+            crate::window::toast(&gettext("No calendar to save to"));
             return;
         };
         let _ = core().set_setting("last_calendar".into(), list.clone());
@@ -370,7 +384,7 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
             // New: the title and time first, the rest as an edit of it.
             let title = Some(text(&summary))
                 .filter(|s| !s.is_empty())
-                .unwrap_or_else(|| "New Event".into());
+                .unwrap_or_else(|| gettext("New Event"));
             let added = core().together(|| {
                 let uid = core().add_event(list.clone(), title, new_time, offsets)?;
                 let rest = EventPatch {
@@ -454,7 +468,7 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
         };
         // How a series repeats, or which calendar it is in, is about all of it.
         if ev.recurring && !nothing && !repeat_changed && !moved {
-            ask_scope(&d, "Change Repeating Event?", false, save);
+            ask_scope(&d, &gettext("Change Repeating Event?"), false, save);
         } else {
             save(Scope::All);
         }

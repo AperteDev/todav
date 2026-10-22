@@ -3,7 +3,7 @@ using Adw 1;
 
 // Two columns (the task, then its dates and reminders); one below the other when narrow.
 Adw.Dialog dialog {
-  title: "Edit Task";
+  title: _("Edit Task");
   content-width: 760;
   // Room for an expanded date; smaller windows shrink it.
   content-height: 640;
@@ -20,12 +20,12 @@ Adw.Dialog dialog {
 
       [start]
       Gtk.Button cancel {
-        label: "Cancel";
+        label: _("Cancel");
       }
 
       [end]
       Gtk.Button save {
-        label: "Save";
+        label: _("Save");
         styles ["suggested-action"]
       }
     }
@@ -61,7 +61,7 @@ Adw.Dialog dialog {
             visible: false;
 
             Adw.ActionRow refused {
-              title: "Not saved on the server";
+              title: _("Not saved on the server");
               subtitle-selectable: true;
               use-markup: false;
 
@@ -75,30 +75,30 @@ Adw.Dialog dialog {
 
           Adw.PreferencesGroup {
             Adw.EntryRow summary {
-              title: "Title";
+              title: _("Title");
               activates-default: true;
             }
 
             Adw.ComboRow category {
-              title: "Category";
+              title: _("Category");
               model: Gtk.StringList cats {};
             }
 
             // Stored as 1 (high), 5 (medium) or 9 (low), as Nextcloud Tasks does.
             Adw.ComboRow priority {
-              title: "Priority";
-              model: Gtk.StringList { strings ["None", "Low", "Medium", "High"] };
+              title: _("Priority");
+              model: Gtk.StringList { strings [C_("priority", "None"), C_("priority", "Low"), C_("priority", "Medium"), C_("priority", "High")] };
             }
 
             // Only for a task linked to an event (from the event's details).
             Adw.ActionRow event {
-              title: "For Event";
+              title: _("For Event");
               visible: false;
 
               [suffix]
               Gtk.Button unlink {
                 icon-name: "edit-clear-symbolic";
-                tooltip-text: "Unlink From Event";
+                tooltip-text: _("Unlink From Event");
                 valign: center;
                 styles ["flat"]
               }
@@ -106,7 +106,7 @@ Adw.Dialog dialog {
           }
 
           Adw.PreferencesGroup {
-            title: "Note";
+            title: _("Note");
             vexpand: true;
 
             Gtk.ScrolledWindow {
@@ -135,7 +135,7 @@ Adw.Dialog dialog {
           // Start and due are both optional and independent: planned for a time, due by one.
           Adw.PreferencesGroup {
             Adw.ExpanderRow start {
-              title: "Start";
+              title: _("Start");
               show-enable-switch: true;
               enable-expansion: false;
 
@@ -193,7 +193,7 @@ Adw.Dialog dialog {
             }
 
             Adw.ExpanderRow due {
-              title: "Due Date";
+              title: _("Due Date");
               show-enable-switch: true;
               enable-expansion: false;
 
@@ -257,7 +257,7 @@ Adw.Dialog dialog {
             styles ["boxed-list"]
 
             Adw.ButtonRow add_reminder {
-              title: "Add Reminder";
+              title: _("Add Reminder");
               start-icon-name: "list-add-symbolic";
             }
           }
@@ -268,7 +268,7 @@ Adw.Dialog dialog {
             styles ["boxed-list"]
 
             Adw.ButtonRow delete {
-              title: "Delete Task";
+              title: _("Delete Task");
               styles ["destructive-action"]
             }
           }

@@ -2,6 +2,7 @@
 //! close; sync; what opens at start), Tasks (order and display, applied at once) and Calendar.
 
 use crate::connection::Connection;
+use crate::i18n::{gettext, gettext_noop};
 use crate::window::{get, toast, url_text, view};
 use crate::{core, request_sync};
 use adw::prelude::*;
@@ -163,10 +164,10 @@ fn connect_order(b: &gtk::Builder, which: &'static str, hint: Option<&'static st
             };
             new.set_sensitive(manual); // first, so the change below is not saved
             new.set_selected(if start { 0 } else { 1 });
-            new.set_subtitle(if manual {
-                hint.unwrap_or_default()
+            new.set_subtitle(&if manual {
+                hint.map(gettext).unwrap_or_default()
             } else {
-                "Set by the sort order"
+                gettext("Set by the sort order")
             });
         }
     };
@@ -192,7 +193,7 @@ fn connect_reminders(b: &gtk::Builder) {
     let default: adw::ComboRow = get(b, "reminder_default");
     let model: gtk::StringList = get(b, "reminder_defaults");
     for (label, _) in crate::dates::TIMED {
-        model.append(label);
+        model.append(&gettext(label));
     }
     let current = crate::dates::default_reminder(false);
     let pos = crate::dates::TIMED.iter().position(|(_, o)| *o == current);
@@ -289,7 +290,11 @@ pub fn present(parent: &impl IsA<gtk::Widget>) {
         crate::window::refresh();
     });
     connect_order(&b, "task", None);
-    connect_order(&b, "sub", Some("Also places the “Add subtask” field"));
+    connect_order(
+        &b,
+        "sub",
+        Some(gettext_noop("Also places the “Add subtask” field")),
+    );
     connect_reminders(&b);
     set_url(&server, &old_server);
     set_url(&ntfy, &old_ntfy);
@@ -351,15 +356,15 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
             });
             match &acc {
                 Some(a) if goa => {
-                    status.set_title(&format!("Connected as {}", a.user));
-                    status.set_subtitle(&format!("{host} · GNOME Online Accounts"));
+                    status.set_title(&gettext("Connected as {name}").replace("{name}", &a.user));
+                    status.set_subtitle(&format!("{host} · {}", gettext("GNOME Online Accounts")));
                 }
                 Some(a) => {
-                    status.set_title(&format!("Signed in as {}", a.user));
+                    status.set_title(&gettext("Signed in as {name}").replace("{name}", &a.user));
                     status.set_subtitle(&host);
                 }
                 None => {
-                    status.set_title("Not signed in");
+                    status.set_title(&gettext("Not signed in"));
                     status.set_subtitle("");
                 }
             }
@@ -387,18 +392,18 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
                     let name = a.name.clone();
                     crate::switch_account(crate::Target::Goa(a))
                         .await
-                        .map(|()| format!("Connected as {name}"))
+                        .map(|()| gettext("Connected as {name}").replace("{name}", &name))
                 }
                 None => match crate::remembered_sign_in() {
                     Some(c) => {
                         let who = c.login_name.clone();
                         crate::switch_account(crate::Target::Manual(c))
                             .await
-                            .map(|()| format!("Signed in as {who}"))
+                            .map(|()| gettext("Signed in as {name}").replace("{name}", &who))
                     }
                     None => crate::disconnect(false)
                         .await
-                        .map(|()| "Disconnected".into()),
+                        .map(|()| gettext("Disconnected")),
                 },
             };
             if r.is_ok() && core().account().is_some() {
@@ -442,7 +447,7 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
         move |copy: bool| {
             let server = url_text(&c.server);
             if server.is_empty() {
-                d.add_toast(crate::window::note(crate::window::NO_SERVER));
+                d.add_toast(crate::window::note(&crate::window::no_server()));
                 return;
             }
             let button = if sign_in.is_visible() {
@@ -451,10 +456,10 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
                 &sign_out
             };
             button.set_sensitive(false);
-            button.set_label(if copy {
-                "Waiting for Sign-In…"
+            button.set_label(&if copy {
+                gettext("Waiting for Sign-In…")
             } else {
-                "Waiting for Browser…"
+                gettext("Waiting for Browser…")
             });
             cancel.set_visible(true);
             let (d, reset) = (d.clone(), reset.clone());
@@ -482,7 +487,7 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
     password.connect_activate(move |_, _| {
         let server = url_text(&c.server);
         if server.is_empty() {
-            d.add_toast(crate::window::note(crate::window::NO_SERVER));
+            d.add_toast(crate::window::note(&crate::window::no_server()));
             return;
         }
         let (dd, show) = (d.clone(), describe_.clone());
@@ -522,7 +527,7 @@ async fn use_sign_in(c: todav_core::Credentials) -> String {
     match crate::switch_account(crate::Target::Manual(c)).await {
         Ok(()) => {
             crate::window::account_changed();
-            format!("Signed in as {who}")
+            gettext("Signed in as {name}").replace("{name}", &who)
         }
         Err(e) => e,
     }
@@ -556,9 +561,9 @@ fn connect_test(
         let (dialog, button, check) = (dialog.clone(), button.clone(), check.clone());
         glib::spawn_future_local(async move {
             let msg = match gio::spawn_blocking(move || check(url)).await {
-                Ok(Ok(())) => "Connection works".to_string(),
-                Ok(Err(e)) => format!("Test failed: {e}"),
-                Err(_) => "Test failed".to_string(),
+                Ok(Ok(())) => gettext("Connection works"),
+                Ok(Err(e)) => gettext("Test failed: {error}").replace("{error}", &e.to_string()),
+                Err(_) => gettext("Test failed"),
             };
             button.set_sensitive(true);
             dialog.add_toast(crate::window::note(&msg));
@@ -571,27 +576,29 @@ fn move_account(old: String, user: String, password: String, new: String) {
     glib::spawn_future_local(async move {
         let r = gio::spawn_blocking(move || -> Result<(), String> {
             // Switching servers drops the local copy, so pending edits must reach the old one first.
-            core()
-                .sync()
-                .map_err(|e| format!("Server not changed, cannot upload pending changes: {e}"))?;
+            core().sync().map_err(|e| {
+                gettext("Server not changed, cannot upload pending changes: {error}")
+                    .replace("{error}", &e.to_string())
+            })?;
             let _ = core().push_unregister();
             core()
                 .set_account(new.clone(), user.clone(), password.clone())
                 .map_err(|e| e.to_string())?;
-            crate::password_store(&new, &user, &password)
-                .map_err(|e| format!("Cannot save password: {e}"))?;
+            crate::password_store(&new, &user, &password).map_err(|e| {
+                gettext("Cannot save password: {error}").replace("{error}", &e.to_string())
+            })?;
             crate::password_clear(&old, &user);
             Ok(())
         })
         .await;
         match r {
             Ok(Ok(())) => {
-                toast("Nextcloud server changed");
+                toast(&gettext("Nextcloud server changed"));
                 request_sync();
                 crate::restart_push(); // register push on the new server now, not within the hour
             }
             Ok(Err(e)) => toast(&e),
-            Err(_) => toast("Changing the server failed"),
+            Err(_) => toast(&gettext("Changing the server failed")),
         }
     });
 }

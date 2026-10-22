@@ -132,6 +132,7 @@ One monorepo, one Cargo workspace at the root. Each app has its own top-level di
 | iCalendar | hand-written in `todav/core/src/ical.rs` | Full iCal crates are large; VTODO needs \~15 properties, line folding and escaping |
 | Linux UI | `gtk4`, `libadwaita` | The platform toolkit; D-Bus, GOA and notifications go through `gio` from the same bindings |
 | Linux secrets | `libsecret` | App passwords in the Secret Service |
+| Locale (gettext, first weekday) | `libc` (already in the tree) + glibc's own gettext | `setlocale`, `nl_langinfo`; the five gettext calls are declared in `i18n.rs`, no `gettext-rs` |
 
 Anything beyond this table needs a one-line justification in the PR.
 
@@ -439,6 +440,7 @@ Deviation: no docker stack (`infra/`) for now — integration runs against the r
 - [x] Sign-in through GNOME Online Accounts and with a login name + app password; synced client settings (`.config/todav/settings.json`, device-only keys, "Sync settings with server"); undo history (`Client::undo`, `Client::together`) with Ctrl+Z; create, rename, recolour and delete lists and calendars; search; keyboard shortcuts; About dialog from the metainfo; new app and symbolic icons
 - [x] README and CONTRIBUTING
 - [x] CI and releases (GitHub Actions): every push runs fmt, clippy `-D warnings` and the unit tests on Fedora 45 (GNOME 51), and builds the packages: the Flatpak bundle (Flathub's GNOME 51 builder image), a tarball of the system-wide tree (`make -C todav/linux stage`: app, data, `/etc/xdg/autostart`, the extension under `/usr/share/gnome-shell/extensions`) built on Fedora 43 so its glibc suits newer distributions, a `.deb` for Ubuntu 26.04+ repacked from that tree (`scripts/deb.sh`, dependencies by `dpkg-shlibdeps` plus libadwaita ≥ 1.8) and the extension zip. Lowest supported GNOME: 49 (libadwaita 1.8, `Adw.ShortcutsDialog`). The manual Release workflow builds them with the version set by `scripts/release.py`, then commits `chore(release): X`, tags `vX` and publishes a GitHub release with the changelog section as notes. One version for the workspace (`[workspace.package]`), the metainfo and the extension
+- [x] Translations: gettext domain `todav` for the app (Rust `i18n.rs` over glibc, Blueprint `_()`), the extension (`gettext-domain`, catalogs in its `locale/`), the desktop file and the metainfo (`msgfmt --desktop/--xml`, rules in `po/its/`, so no AppStream package is needed to build). `scripts/i18n.sh` refreshes `po/todav.pot` and merges it; build.rs compiles the catalogs for a build run (and the translated metainfo for About), `make install-data` and the extension's `stage` for installs. Languages: Polish (reviewed), German, French, Spanish, Italian, Brazilian Portuguese (drafts). Weeks start on the locale's first weekday (`i18n::first_weekday`, glibc's `_NL_TIME_WEEK_1STDAY` + `_NL_TIME_FIRST_WEEKDAY`, as GTK's calendar)
 - [ ] `docs/`, Flathub (generated `cargo-sources.json`), extensions.gnome.org
 - [ ] M6 Android (+ UniFFI exports) → M7 Pebble
 

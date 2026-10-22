@@ -5,15 +5,15 @@ Adw.PreferencesDialog dialog {
   search-enabled: false;
 
   Adw.PreferencesPage {
-    title: "General";
+    title: _("General");
     icon-name: "preferences-system-symbolic";
 
     Adw.PreferencesGroup {
-      title: "Appearance";
+      title: _("Appearance");
 
       // Kept on this device only.
       Adw.ActionRow {
-        title: "Style";
+        title: _("Style");
 
         [suffix]
         Adw.ToggleGroup color_scheme {
@@ -21,34 +21,34 @@ Adw.PreferencesDialog dialog {
 
           Adw.Toggle {
             name: "system";
-            label: "System";
+            label: C_("style", "System");
           }
 
           Adw.Toggle {
             name: "light";
-            label: "Light";
+            label: C_("style", "Light");
           }
 
           Adw.Toggle {
             name: "dark";
-            label: "Dark";
+            label: C_("style", "Dark");
           }
         }
       }
     }
 
     Adw.PreferencesGroup {
-      title: "Startup";
+      title: _("Startup");
 
       Adw.ComboRow start_view {
-        title: "Open at start";
-        model: Gtk.StringList { strings ["Last used", "Tasks", "Calendar"] };
+        title: _("Open at start");
+        model: Gtk.StringList { strings [_("Last used"), _("Tasks"), _("Calendar")] };
       }
     }
 
     // The status row, then the shared connection rows (ui/connection.blp).
     Adw.PreferencesGroup account {
-      title: "Account";
+      title: _("Account");
 
       // How Todav is connected now. Signed in here: "Sign Out", with signing in again in its
       // menu. Not connected: "Sign In with Browser". A GOA account is managed in GNOME Settings.
@@ -61,7 +61,7 @@ Adw.PreferencesDialog dialog {
 
         [suffix]
         Gtk.Button cancel_sign_in {
-          label: "Cancel";
+          label: _("Cancel");
           valign: center;
           visible: false;
           styles ["flat"]
@@ -69,29 +69,29 @@ Adw.PreferencesDialog dialog {
 
         [suffix]
         Adw.SplitButton sign_out {
-          label: "Sign Out";
+          label: _("Sign Out");
           menu-model: sign_out_menu;
-          dropdown-tooltip: "Sign In Again";
+          dropdown-tooltip: _("Sign In Again");
           valign: center;
           styles ["destructive-action"]
         }
 
         [suffix]
         Adw.SplitButton sign_in {
-          label: "Sign In with Browser";
+          label: _("Sign In with Browser");
           menu-model: sign_in_menu;
-          dropdown-tooltip: "More Sign-In Options";
+          dropdown-tooltip: _("More Sign-In Options");
           valign: center;
         }
       }
     }
 
     Adw.PreferencesGroup {
-      title: "Push";
-      description: "Changes are applied when this window closes";
+      title: _("Push");
+      description: _("Changes are applied when this window closes");
 
       Adw.EntryRow ntfy {
-        title: "ntfy server for push (optional)";
+        title: _("ntfy server for push (optional)");
 
         [prefix]
         Gtk.DropDown ntfy_scheme {
@@ -102,7 +102,7 @@ Adw.PreferencesDialog dialog {
 
         [suffix]
         Gtk.Button ntfy_test {
-          label: "Test";
+          label: _("Test");
           valign: center;
           styles ["flat"]
         }
@@ -110,17 +110,17 @@ Adw.PreferencesDialog dialog {
     }
 
     Adw.PreferencesGroup {
-      title: "Sync";
+      title: _("Sync");
 
       Adw.SwitchRow sync_settings {
-        title: "Sync settings with server";
-        subtitle: "The Nextcloud server always stays on this device";
+        title: _("Sync settings with server");
+        subtitle: _("The Nextcloud server always stays on this device");
         active: true;
       }
 
       Adw.SwitchRow sync_ntfy {
-        title: "Sync ntfy server";
-        subtitle: "Use the same push server on all devices";
+        title: _("Sync ntfy server");
+        subtitle: _("Use the same push server on all devices");
         active: true;
         sensitive: bind sync_settings.active;
       }
@@ -128,66 +128,66 @@ Adw.PreferencesDialog dialog {
   }
 
   Adw.PreferencesPage {
-    title: "Tasks";
+    title: _("Tasks");
     icon-name: "checkbox-checked-symbolic";
 
     Adw.PreferencesGroup {
-      title: "Tasks";
+      title: _("Tasks");
 
       Adw.ComboRow task_sort {
-        title: "Sort";
-        model: Gtk.StringList { strings ["Manual", "Newest first", "Oldest first", "Due date, soonest first", "Due date, latest first"] };
+        title: _("Sort");
+        model: Gtk.StringList { strings [_("Manual"), _("Newest first"), _("Oldest first"), _("Due date, soonest first"), _("Due date, latest first")] };
       }
 
       Adw.ComboRow task_new {
-        title: "Add new tasks";
-        model: Gtk.StringList { strings ["At the start", "At the end"] };
+        title: _("Add new tasks");
+        model: Gtk.StringList { strings [_("At the start"), _("At the end")] };
       }
 
       Adw.ComboRow done_tasks {
-        title: "Completed tasks";
-        model: Gtk.StringList { strings ["In a separate group", "Keep in place", "Move to the end"] };
+        title: _("Completed tasks");
+        model: Gtk.StringList { strings [_("In a separate group"), _("Keep in place"), _("Move to the end")] };
       }
 
       // Entries as settings.rs DURATIONS lists them.
       Adw.ComboRow task_duration {
-        title: "Default duration";
-        subtitle: "When a task gets a time, or is planned on the calendar";
-        model: Gtk.StringList { strings ["15 minutes", "30 minutes", "45 minutes", "1 hour", "1.5 hours", "2 hours", "3 hours"] };
+        title: _("Default duration");
+        subtitle: _("When a task gets a time, or is planned on the calendar");
+        model: Gtk.StringList { strings [_("15 minutes"), _("30 minutes"), _("45 minutes"), _("1 hour"), _("1.5 hours"), _("2 hours"), _("3 hours")] };
       }
     }
 
     Adw.PreferencesGroup {
-      title: "Subtasks";
+      title: _("Subtasks");
 
       Adw.ComboRow sub_sort {
-        title: "Sort";
-        model: Gtk.StringList { strings ["Manual", "Newest first", "Oldest first", "Due date, soonest first", "Due date, latest first"] };
+        title: _("Sort");
+        model: Gtk.StringList { strings [_("Manual"), _("Newest first"), _("Oldest first"), _("Due date, soonest first"), _("Due date, latest first")] };
       }
 
       Adw.ComboRow sub_new {
-        title: "Add new subtasks";
-        model: Gtk.StringList { strings ["At the start", "At the end"] };
+        title: _("Add new subtasks");
+        model: Gtk.StringList { strings [_("At the start"), _("At the end")] };
       }
 
       Adw.ComboRow done_subtasks {
-        title: "Completed subtasks";
-        model: Gtk.StringList { strings ["Show", "Hide", "Move to the end"] };
+        title: _("Completed subtasks");
+        model: Gtk.StringList { strings [_("Show"), _("Hide"), _("Move to the end")] };
       }
     }
 
     Adw.PreferencesGroup {
-      title: "Reminders";
+      title: _("Reminders");
 
       Adw.ComboRow reminder_default {
-        title: "New reminders";
-        subtitle: "For tasks due at a time";
+        title: _("New reminders");
+        subtitle: _("For tasks due at a time");
         model: Gtk.StringList reminder_defaults {};
       }
 
       Adw.ActionRow {
-        title: "Time for all-day tasks";
-        subtitle: "When reminders of tasks due on a date go off";
+        title: _("Time for all-day tasks");
+        subtitle: _("When reminders of tasks due on a date go off");
 
         [suffix]
         Gtk.SpinButton reminder_hour {
@@ -221,55 +221,55 @@ Adw.PreferencesDialog dialog {
     }
 
     Adw.PreferencesGroup {
-      title: "Categories";
+      title: _("Categories");
 
       Adw.ComboRow category_view {
-        title: "Show categories";
-        model: Gtk.StringList { strings ["Group by category", "As tags", "Hide"] };
+        title: _("Show categories");
+        model: Gtk.StringList { strings [_("Group by category"), _("As tags"), _("Hide")] };
       }
     }
 
     Adw.PreferencesGroup {
-      title: "Interaction";
+      title: _("Interaction");
 
       Adw.SwitchRow drag_handles {
-        title: "Drag handles";
-        subtitle: "Move tasks by a handle instead of the whole row, for touchscreens";
+        title: _("Drag handles");
+        subtitle: _("Move tasks by a handle instead of the whole row, for touchscreens");
       }
     }
   }
 
   Adw.PreferencesPage {
-    title: "Calendar";
+    title: _("Calendar");
     icon-name: "x-office-calendar-symbolic";
 
     Adw.PreferencesGroup {
-      title: "Views";
+      title: _("Views");
 
       Adw.ComboRow start_calendar_view {
-        title: "View at start";
-        model: Gtk.StringList { strings ["Last used", "Month", "Week", "Agenda"] };
+        title: _("View at start");
+        model: Gtk.StringList { strings [_("Last used"), _("Month"), _("Week"), _("Agenda")] };
       }
 
       Adw.SwitchRow mini_dots {
-        title: "Dots in the sidebar month";
-        subtitle: "Mark the days that have events or tasks";
+        title: _("Dots in the sidebar month");
+        subtitle: _("Mark the days that have events or tasks");
       }
 
       Adw.SwitchRow double_click_edit {
-        title: "Edit on double click";
-        subtitle: "Off, a click shows the details at once instead of after a short wait";
+        title: _("Edit on double click");
+        subtitle: _("Off, a click shows the details at once instead of after a short wait");
       }
     }
 
     Adw.PreferencesGroup {
-      title: "Events";
+      title: _("Events");
 
       // Entries as settings.rs DURATIONS lists them.
       Adw.ComboRow event_duration {
-        title: "Default duration";
-        subtitle: "When an event is added at a time, or an all-day one gets a time";
-        model: Gtk.StringList { strings ["15 minutes", "30 minutes", "45 minutes", "1 hour", "1.5 hours", "2 hours", "3 hours"] };
+        title: _("Default duration");
+        subtitle: _("When an event is added at a time, or an all-day one gets a time");
+        model: Gtk.StringList { strings [_("15 minutes"), _("30 minutes"), _("45 minutes"), _("1 hour"), _("1.5 hours"), _("2 hours"), _("3 hours")] };
       }
     }
   }
@@ -277,74 +277,74 @@ Adw.PreferencesDialog dialog {
   // The GNOME Shell extension's panel menu (ids are the settings' names, see settings.rs
   // EXTENSION).
   Adw.PreferencesPage {
-    title: "Extension";
+    title: _("Extension");
     icon-name: "application-x-addon-symbolic";
 
     Adw.PreferencesGroup {
-      title: "Panel Menu";
-      description: "For the Todav GNOME Shell extension";
+      title: _("Panel Menu");
+      description: _("For the Todav GNOME Shell extension");
 
       Adw.ComboRow ext_columns {
-        title: "Layout";
-        subtitle: "Two columns: tasks on the left, calendar on the right";
-        model: Gtk.StringList { strings ["Two columns", "One column"] };
+        title: _("Layout");
+        subtitle: _("Two columns: tasks on the left, calendar on the right");
+        model: Gtk.StringList { strings [_("Two columns"), _("One column")] };
       }
 
       Adw.SwitchRow ext_open {
-        title: "“Open Todav” button";
+        title: _("“Open Todav” button");
       }
     }
 
     Adw.PreferencesGroup {
-      title: "Tasks";
+      title: _("Tasks");
 
       Adw.SwitchRow ext_tasks {
-        title: "Task list";
+        title: _("Task list");
       }
 
       Adw.SwitchRow ext_subtasks {
-        title: "Subtasks";
+        title: _("Subtasks");
         sensitive: bind ext_tasks.active;
       }
 
       Adw.SwitchRow ext_add_task {
-        title: "Field for adding a task";
+        title: _("Field for adding a task");
       }
     }
 
     Adw.PreferencesGroup {
-      title: "Calendar";
+      title: _("Calendar");
 
       Adw.SwitchRow ext_month {
-        title: "Month calendar";
+        title: _("Month calendar");
       }
 
       Adw.SwitchRow ext_month_dots {
-        title: "Dots in the month";
-        subtitle: "Mark the days that have events or tasks";
+        title: _("Dots in the month");
+        subtitle: _("Mark the days that have events or tasks");
         sensitive: bind ext_month.active;
       }
 
       Adw.SwitchRow ext_agenda {
-        title: "Agenda";
-        subtitle: "Events and tasks of the coming week, under the month";
+        title: _("Agenda");
+        subtitle: _("Events and tasks of the coming week, under the month");
       }
 
       Adw.SwitchRow ext_add_event {
-        title: "Field for adding an event";
-        subtitle: "Opens a new event in Todav with the title typed";
+        title: _("Field for adding an event");
+        subtitle: _("Opens a new event in Todav with the title typed");
       }
     }
   }
 }
 
 menu sign_out_menu {
-  item ("Sign In Again", "account.sign-in")
-  item ("Copy Login Link", "account.sign-in-copy")
-  item ("Sign In with Password…", "account.sign-in-password")
+  item (_("Sign In Again"), "account.sign-in")
+  item (_("Copy Login Link"), "account.sign-in-copy")
+  item (_("Sign In with Password…"), "account.sign-in-password")
 }
 
 menu sign_in_menu {
-  item ("Copy Login Link", "account.sign-in-copy")
-  item ("Sign In with Password…", "account.sign-in-password")
+  item (_("Copy Login Link"), "account.sign-in-copy")
+  item (_("Sign In with Password…"), "account.sign-in-password")
 }

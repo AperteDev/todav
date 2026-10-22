@@ -28,6 +28,7 @@ jobs:
         run: >-
           dnf install -y --setopt=install_weak_deps=False
           git gcc gtk4-devel libadwaita-devel libsecret-devel glib2-devel blueprint-compiler
+          gettext
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -66,7 +67,7 @@ jobs:
         run: >-
           dnf install -y --setopt=install_weak_deps=False
           git gcc make python3 gtk4-devel libadwaita-devel libsecret-devel glib2-devel
-          blueprint-compiler
+          blueprint-compiler gettext
       - uses: actions/checkout@v7
       - name: Set the release version
         if: env.VERSION != ''
@@ -126,6 +127,8 @@ jobs:
       - name: Set the release version
         if: env.VERSION != ''
         run: python3 scripts/release.py "$VERSION" > /dev/null
+      # msgfmt, for the translations in its locale/.
+      - run: sudo apt-get install -y --no-install-recommends gettext
       - run: make -C todav/gnome-extension pack
       - uses: actions/upload-artifact@v7
         with:

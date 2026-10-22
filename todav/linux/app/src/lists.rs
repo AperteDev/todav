@@ -2,6 +2,7 @@
 //! adds one or renames, recolours or deletes it.
 
 use crate::core;
+use crate::i18n::{gettext, ngettext};
 use crate::window::{get, view};
 use adw::prelude::*;
 use gtk::{gdk, gio, glib};
@@ -147,7 +148,7 @@ pub fn context_menu(
         };
         let m = gio::Menu::new();
         let action = gio::Action::print_detailed_name("win.edit-list", Some(&href.to_variant()));
-        m.append(Some("Edit…"), Some(&action));
+        m.append(Some(&gettext("Edit…")), Some(&action));
         // On the row (a list box takes no other children), gone once closed.
         let menu = gtk::PopoverMenu::from_model(Some(&m));
         menu.set_parent(&row);
@@ -201,11 +202,18 @@ pub fn open(parent: &gtk::Widget, list: Option<List>, events: bool) {
     let (name, save, error): (adw::EntryRow, gtk::Button, adw::Banner) =
         (get(&b, "name"), get(&b, "save"), get(&b, "error"));
     let events = list.as_ref().map_or(events, |l| l.holds_events);
-    let kind = if events { "Calendar" } else { "List" };
-    let verb = if list.is_some() { "Edit" } else { "New" };
-    dialog.set_title(&format!("{verb} {kind}"));
-    let save_label = if list.is_some() { "Save" } else { "Create" };
-    save.set_label(save_label);
+    dialog.set_title(&match (events, list.is_some()) {
+        (true, true) => gettext("Edit Calendar"),
+        (true, false) => gettext("New Calendar"),
+        (false, true) => gettext("Edit List"),
+        (false, false) => gettext("New List"),
+    });
+    let save_label = if list.is_some() {
+        gettext("Save")
+    } else {
+        gettext("Create")
+    };
+    save.set_label(&save_label);
 
     // A new one gets the first preset no other list has.
     let mut all = core().calendars();
@@ -253,7 +261,7 @@ pub fn open(parent: &gtk::Widget, list: Option<List>, events: bool) {
         })
         .collect();
     // In a rainbow ring: any colour, set apart from the presets.
-    let custom = swatch("Custom Color…");
+    let custom = swatch(&gettext("Custom Color…"));
     let ring = gtk::Box::builder()
         .valign(gtk::Align::Center)
         .halign(gtk::Align::Center)
@@ -305,7 +313,7 @@ pub fn open(parent: &gtk::Widget, list: Option<List>, events: bool) {
             let initial = gdk::RGBA::parse(chosen.borrow().as_str()).ok();
             glib::spawn_future_local(async move {
                 let picker = gtk::ColorDialog::builder()
-                    .title("Custom Color")
+                    .title(gettext("Custom Color"))
                     .with_alpha(false)
                     .build();
                 let Ok(c) = picker
@@ -345,7 +353,7 @@ pub fn open(parent: &gtk::Widget, list: Option<List>, events: bool) {
             if on {
                 save.set_child(Some(&adw::Spinner::new()));
             } else {
-                save.set_label(save_label);
+                save.set_label(&save_label);
             }
         }
     };
@@ -383,14 +391,20 @@ pub fn open(parent: &gtk::Widget, list: Option<List>, events: bool) {
                         crate::window::show_list(&h);
                     }
                 }
-                Ok(Err(e)) => fail(format!("Not saved: {e}")),
-                Err(_) => fail("Not saved".into()),
+                Ok(Err(e)) => {
+                    fail(gettext("Not saved: {error}").replace("{error}", &e.to_string()))
+                }
+                Err(_) => fail(gettext("Not saved")),
             }
         });
     });
 
     let delete: adw::ButtonRow = get(&b, "delete");
-    delete.set_title(&format!("Delete {kind}"));
+    delete.set_title(&if events {
+        gettext("Delete Calendar")
+    } else {
+        gettext("Delete List")
+    });
     let delete_box: gtk::ListBox = get(&b, "delete_box");
     match list {
         Some(l) if l.writable => {
@@ -399,15 +413,17 @@ pub fn open(parent: &gtk::Widget, list: Option<List>, events: bool) {
                 let (d, l, busy, fail) = (d.clone(), l.clone(), busy.clone(), fail.clone());
                 glib::spawn_future_local(async move {
                     let alert = adw::AlertDialog::new(
-                        Some(&format!("Delete {kind}?")),
-                        Some(&format!(
-                            "“{}”{} will be deleted. It can be restored from the trash bin in \
-                             Nextcloud Calendar.",
-                            l.display_name,
-                            contents(&l)
-                        )),
+                        Some(&if events {
+                            gettext("Delete Calendar?")
+                        } else {
+                            gettext("Delete List?")
+                        }),
+                        Some(&delete_question(&l)),
                     );
-                    alert.add_responses(&[("cancel", "Cancel"), ("delete", "Delete")]);
+                    alert.add_responses(&[
+                        ("cancel", &gettext("Cancel")),
+                        ("delete", &gettext("Delete")),
+                    ]);
                     alert.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
                     alert.set_default_response(Some("cancel"));
                     alert.set_close_response("cancel");
@@ -421,8 +437,10 @@ pub fn open(parent: &gtk::Widget, list: Option<List>, events: bool) {
                             d.set_can_close(true);
                             d.close();
                         }
-                        Ok(Err(e)) => fail(format!("Not deleted: {e}")),
-                        Err(_) => fail("Not deleted".into()),
+                        Ok(Err(e)) => {
+                            fail(gettext("Not deleted: {error}").replace("{error}", &e.to_string()))
+                        }
+                        Err(_) => fail(gettext("Not deleted")),
                     }
                 });
             });
@@ -432,17 +450,29 @@ pub fn open(parent: &gtk::Widget, list: Option<List>, events: bool) {
     dialog.present(Some(parent));
 }
 
-/// What goes with list `l` when it is deleted, for the question: " with its 3 tasks".
-fn contents(l: &List) -> String {
-    let tasks = match core().tasks(l.href.clone(), true).len() {
-        0 => None,
-        1 => Some("1 task".to_string()),
-        n => Some(format!("{n} tasks")),
+/// What deleting list `l` deletes with it (its events, its tasks), as whole sentences for
+/// translation; and where it can be got back.
+fn delete_question(l: &List) -> String {
+    let n = core().tasks(l.href.clone(), true).len() as u64;
+    let what = match (l.holds_events, n) {
+        (true, 0) => gettext("“{name}” will be deleted with its events."),
+        (true, n) => ngettext(
+            "“{name}” will be deleted with its events and {n} task.",
+            "“{name}” will be deleted with its events and {n} tasks.",
+            n,
+        ),
+        (false, 0) => gettext("“{name}” will be deleted."),
+        (false, n) => ngettext(
+            "“{name}” will be deleted with its {n} task.",
+            "“{name}” will be deleted with its {n} tasks.",
+            n,
+        ),
     };
-    match (l.holds_events, tasks) {
-        (true, Some(t)) => format!(" with its events and {t}"),
-        (true, None) => " with its events".into(),
-        (false, Some(t)) => format!(" with its {t}"),
-        (false, None) => String::new(),
-    }
+    let what = what
+        .replace("{name}", &l.display_name)
+        .replace("{n}", &n.to_string());
+    format!(
+        "{what} {}",
+        gettext("It can be restored from the trash bin in Nextcloud Calendar.")
+    )
 }
