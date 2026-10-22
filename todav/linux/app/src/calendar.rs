@@ -1613,17 +1613,18 @@ fn details_popover(b: &gtk::Box, buttons: Option<Buttons>) -> gtk::Popover {
         }
     });
     if let Some((on_delete, on_edit)) = buttons {
-        let row = gtk::Box::builder()
-            .spacing(6)
-            .halign(gtk::Align::End)
-            .margin_top(4)
-            .build();
+        // Delete at the left edge, away from Edit… at the right.
+        let row = gtk::Box::builder().spacing(6).margin_top(4).build();
         let delete = gtk::Button::builder()
             .icon_name("user-trash-symbolic")
             .tooltip_text("Delete")
             .build();
         delete.add_css_class("flat");
-        let edit = gtk::Button::builder().label("Edit…").build();
+        let edit = gtk::Button::builder()
+            .label("Edit…")
+            .hexpand(true)
+            .halign(gtk::Align::End)
+            .build();
         let p = pop.downgrade();
         delete.connect_clicked(move |_| {
             if let Some(p) = p.upgrade() {
