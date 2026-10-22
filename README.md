@@ -89,15 +89,24 @@ seconds.
 
 ## Getting started
 
-Download the Flatpak bundle and the GNOME Shell extension from the
-[latest release](https://github.com/SelfRef/todav/releases/latest) and install them:
+Download a package from the [latest release](https://github.com/SelfRef/todav/releases/latest)
+(GNOME 49 or newer):
 
 ```sh
-flatpak install --user io.github.selfref.Todav.flatpak  # the GNOME 51 runtime comes from Flathub
-gnome-extensions install todav@selfref.dev.shell-extension.zip  # then log out and back in
+# Flatpak, on any distribution (the GNOME runtime comes from Flathub), plus the extension
+flatpak install --user io.github.selfref.Todav.flatpak
+gnome-extensions install todav@selfref.dev.shell-extension.zip
+
+# Ubuntu 26.04 and newer: the app with the extension
+sudo apt install ./todav_<version>_amd64.deb
+
+# Other distributions: the same files to unpack into /
+sudo tar -xzf todav-<version>-x86_64.tar.gz -C /
 ```
 
-Or [build and install](#building-and-installing) Todav from source. Then:
+Log out and back in, then turn the extension on in Extensions (or
+`gnome-extensions enable todav@selfref.dev`). Or [build and install](#building-and-installing)
+Todav from source. Then:
 
 1. Open Todav and sign in to your Nextcloud: pick a GNOME Online Accounts account, sign in in the
    browser, or use a login name and app password.
@@ -138,7 +147,7 @@ Todav speaks standard CalDAV, but other servers and desktops are untested for no
 
 ### Building and installing
 
-**Dependencies:** Rust (stable), GTK 4.14+, libadwaita 1.7+, libsecret, `blueprint-compiler`
+**Dependencies:** Rust (stable), GTK 4.14+, libadwaita 1.8+, libsecret, `blueprint-compiler`
 and `glib-compile-resources` (GLib).
 
 ```sh

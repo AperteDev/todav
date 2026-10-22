@@ -31,7 +31,10 @@ The first release.
 - Tasks linked to events, and today's events at the top of Upcoming.
 - Search across tasks and events, undo with Ctrl+Z, keyboard shortcuts.
 - Preferences synced between devices through Nextcloud Files.
-- Runs in the background and starts with the session; a Flatpak build.
+- Runs in the background and starts with the session.
+- Packages for GNOME 49 and newer: a Flatpak bundle, a `.deb` for Ubuntu 26.04
+  and newer, a tarball for other distributions (both with the extension), and
+  the extension as a zip.
 - A GNOME Shell extension: the open-task count in the top bar, and a menu with a
   task list, a month calendar with dots for what each day holds and the coming
   week's agenda; it adds tasks and events and opens the app where you click.
