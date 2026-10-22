@@ -1,12 +1,11 @@
 # Changelog
 
-All notable changes to this project will be documented in this file. The
-format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
-the project follows [Semantic Versioning](https://semver.org/).
+All notable changes to this project will be documented in this file.
 
-## Unreleased
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-The first release.
+## [Unreleased]
 
 ### Added
 
@@ -40,3 +39,5 @@ The first release.
   week's agenda; it adds tasks and events and opens the app where you click.
   Its options are in the app's Preferences. Without the app installed, its
   menu says so and links to the download.
+
+[Unreleased]: https://github.com/SelfRef/todav/commits/HEAD

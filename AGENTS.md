@@ -8,12 +8,14 @@
 
 ## Releases
 
-- Add user-visible changes to `CHANGELOG.md` under `Unreleased`, in the same commit as the
-  change.
+- Add user-visible changes to `CHANGELOG.md` under `## [Unreleased]`, in the same commit as the
+  change. It follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/): `Added`,
+  `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`; version links at the end.
 - Releases are cut by the manual Release workflow (`.github/workflows/release.yml`): with the
   version given, `scripts/release.py` sets it in `Cargo.toml`, the metainfo and the extension's
-  `metadata.json` and moves the `Unreleased` section under it; CI builds the packages, then it
-  commits `chore(release): X`, tags `vX` and publishes them. Don't bump versions by hand.
+  `metadata.json` and moves the `[Unreleased]` changes and link under it; CI builds the
+  packages, then it commits `chore(release): X`, tags `vX` and publishes them. Don't bump
+  versions by hand.
 - CI (`.github/workflows/ci.yml`) runs on every push: `cargo fmt --check`, clippy with
   warnings as errors and the unit tests on Fedora (GNOME 51), plus the packages: the Flatpak
   bundle, a tarball of the system-wide tree (`make -C todav/linux stage`, built on the oldest

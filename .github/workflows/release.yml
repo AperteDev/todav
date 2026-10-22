@@ -28,7 +28,7 @@ jobs:
       VERSION: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@v7
-      - name: Set the version and close the changelog section
+      - name: Set the version and move Unreleased changes and links under it
         run: python3 scripts/release.py "$VERSION" > "$RUNNER_TEMP/notes.md"
       - name: Bring Cargo.lock to the new version
         run: cargo update --workspace

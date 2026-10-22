@@ -35,23 +35,36 @@ def main() -> None:
         fail(f'Expected a version like 1.2.3, got "{version}"')
     date = datetime.date.today().isoformat()
 
+    # Keep a Changelog: `## [Unreleased]` and `## [x.y.z] - date` sections, links at the end.
     changelog = ROOT / "CHANGELOG.md"
     text = changelog.read_text()
-    if f"\n## {version} " in text:
+    if f"\n## [{version}]" in text:
         fail(f"CHANGELOG.md already has a {version} section")
-    heading = "## Unreleased\n"
+    heading = "## [Unreleased]\n"
     start = text.find(heading)
     if start == -1:
-        fail("CHANGELOG.md has no Unreleased section")
+        fail("CHANGELOG.md has no [Unreleased] section")
     body_start = start + len(heading)
-    nxt = text.find("\n## ", body_start)
-    body_end = len(text) if nxt == -1 else nxt + 1
+    # The next version's section, else the link definitions, end it.
+    ends = [i for i in (text.find("\n## [", body_start), text.find("\n[Unreleased]:")) if i != -1]
+    body_end = min(ends) + 1 if ends else len(text)
     notes = text[body_start:body_end].strip()
     if not notes:
         fail("The Unreleased section of CHANGELOG.md is empty")
-    changelog.write_text(
-        f"{text[:body_start]}\n## {version} - {date}\n\n{notes}\n\n{text[body_end:]}"
+    # [Unreleased] compares the last version with HEAD, and that comparison becomes the new
+    # version's link; before the first release it points at the commits, and the first version
+    # links to its tag.
+    link = re.compile(r"^\[Unreleased\]: (\S+?)/(?:compare/(\S+)\.\.\.HEAD|commits/HEAD)$", re.M)
+    match = link.search(text)
+    if not match:
+        fail("CHANGELOG.md has no [Unreleased] link")
+    repo, previous = match[1], match[2]
+    this = (
+        f"{repo}/compare/{previous}...v{version}" if previous else f"{repo}/releases/tag/v{version}"
     )
+    links = f"[Unreleased]: {repo}/compare/v{version}...HEAD\n[{version}]: {this}"
+    rest = link.sub(lambda _: links, text[body_end:], count=1)
+    changelog.write_text(f"{text[:body_start]}\n## [{version}] - {date}\n\n{notes}\n\n{rest}")
 
     edit("Cargo.toml", r'(\[workspace\.package\].*?^version = )"[^"]*"', rf'\g<1>"{version}"')
     edit(
