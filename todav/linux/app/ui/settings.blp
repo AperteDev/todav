@@ -268,6 +268,62 @@ Adw.PreferencesDialog dialog {
       }
     }
   }
+
+  // The GNOME Shell extension's panel menu (ids are the settings' names, see settings.rs
+  // EXTENSION).
+  Adw.PreferencesPage {
+    title: "Extension";
+    icon-name: "application-x-addon-symbolic";
+
+    Adw.PreferencesGroup {
+      title: "Panel Menu";
+      description: "For the Todav GNOME Shell extension";
+
+      Adw.ComboRow ext_columns {
+        title: "Layout";
+        subtitle: "Two columns: tasks on the left, calendar on the right";
+        model: Gtk.StringList { strings ["Two columns", "One column"] };
+      }
+
+      Adw.SwitchRow ext_open {
+        title: "“Open Todav” button";
+      }
+    }
+
+    Adw.PreferencesGroup {
+      title: "Tasks";
+
+      Adw.SwitchRow ext_tasks {
+        title: "Task list";
+      }
+
+      Adw.SwitchRow ext_subtasks {
+        title: "Subtasks";
+        sensitive: bind ext_tasks.active;
+      }
+
+      Adw.SwitchRow ext_add_task {
+        title: "Field for adding a task";
+      }
+    }
+
+    Adw.PreferencesGroup {
+      title: "Calendar";
+
+      Adw.SwitchRow ext_next_event {
+        title: "Next event";
+      }
+
+      Adw.SwitchRow ext_month {
+        title: "Month calendar";
+      }
+
+      Adw.SwitchRow ext_add_event {
+        title: "Field for adding an event";
+        subtitle: "Opens a new event in Todav with the title typed";
+      }
+    }
+  }
 }
 
 menu sign_out_menu {

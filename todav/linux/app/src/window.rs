@@ -38,6 +38,8 @@ banner.warning { --banner-color: var(--warning-bg-color); }
 .drag-card { margin: 8px; padding: 12px 18px; border-radius: 12px; background: @card_bg_color; color: @card_fg_color; box-shadow: 0 2px 8px alpha(black, 0.25); }
 row.drop-above { box-shadow: inset 0 2px 0 0 @accent_bg_color; }
 row.drop-below { box-shadow: inset 0 -2px 0 0 @accent_bg_color; }
+@keyframes flash { from { background-color: transparent; } 50% { background-color: alpha(@accent_bg_color, 0.3); } to { background-color: transparent; } }
+row.flash { animation: flash 900ms ease-in-out 2; }
 ";
 
 /// Left margin per subtask level, in pixels.
@@ -61,6 +63,7 @@ struct Ui {
     sidebar: gtk::ListBox,
     /// The search, `folded`: while set, the page shows matching tasks of every list.
     query: RefCell<String>,
+    search: gtk::SearchBar,
     cat_section: gtk::Box,
     cat_list: gtk::ListBox,
     /// Category of each `cat_list` row; None is "Other" (no category).
@@ -100,6 +103,9 @@ struct Ui {
     drop_mark: RefCell<Option<(gtk::Widget, gtk::Widget, &'static str)>>,
     /// Root task whose "Add subtask" entry takes focus after the next rebuild.
     focus_sub: RefCell<Option<String>>,
+    /// Task whose row pulses (opened from the extension), until when: rebuilds in between, as
+    /// after the sync that showing the window starts, pulse the new row.
+    flash: RefCell<Option<(String, std::time::Instant)>>,
     /// Welcome page: GNOME Online Accounts or a server to sign in to.
     conn: Rc<crate::connection::Connection>,
     ntfy: (gtk::DropDown, adw::EntryRow),
@@ -260,6 +266,59 @@ pub fn show_list(href: &str) {
     }
 }
 
+/// The Tasks page on task `uid`'s list, its row in view and pulsing once (from the extension):
+/// its parents open, a category filter or search that hides it gone.
+pub fn show_task(uid: &str) {
+    if let Some(app) = gio::Application::default().and_downcast::<adw::Application>() {
+        present(&app); // builds the window when running in the background
+    }
+    let (Some(t), Some(ui)) = (core().task(uid.into()), ui()) else {
+        return;
+    };
+    let mut parent = t.parent_uid.clone();
+    while let Some(p) = parent {
+        ui.expanded.borrow_mut().insert(p.clone());
+        parent = core().task(p).and_then(|p| p.parent_uid);
+    }
+    ui.filter.take();
+    ui.search.set_search_mode(false); // clears the query too
+    ui.query.borrow_mut().clear();
+    *ui.flash.borrow_mut() = Some((t.uid, std::time::Instant::now() + FLASH));
+    let _ = WidgetExt::activate_action(&ui.window, "win.page", Some(&"tasks".to_variant()));
+    show_list(&t.list_href);
+}
+
+/// How long a row `show_task` asked for pulses (the `flash` animation, twice).
+const FLASH: std::time::Duration = std::time::Duration::from_millis(1800);
+
+/// Pulse `row` if it is the task `show_task` asked for, once it is laid out, and scroll to it.
+fn flash_if(ui: &Ui, row: &impl IsA<gtk::Widget>, uid: &str) {
+    let left = match &*ui.flash.borrow() {
+        Some((u, until)) if u == uid => until.saturating_duration_since(std::time::Instant::now()),
+        _ => return,
+    };
+    if left.is_zero() {
+        ui.flash.take();
+        return;
+    }
+    let row = row.clone().upcast::<gtk::Widget>();
+    let scroll = ui
+        .groups
+        .ancestor(gtk::ScrolledWindow::static_type())
+        .and_downcast::<gtk::ScrolledWindow>();
+    glib::idle_add_local_once(move || {
+        if let Some(s) = scroll
+            && let Some(child) = s.child()
+            && let Some(at) = row.compute_point(&child, &gtk::graphene::Point::new(0.0, 0.0))
+        {
+            let adj = s.vadjustment();
+            adj.set_value(at.y() as f64 - adj.page_size() / 3.0);
+        }
+        row.add_css_class("flash");
+        glib::timeout_add_local_once(left, move || row.remove_css_class("flash"));
+    });
+}
+
 pub fn on_event(ev: &Event) {
     let Some(ui) = ui() else { return };
     match ev {
@@ -373,6 +432,7 @@ fn build(app: &adw::Application) -> Rc<Ui> {
         looks: RefCell::new(Vec::new()),
         current: RefCell::new(None),
         query: RefCell::new(String::new()),
+        search: get(&b, "task_search"),
         title: get(&b, "title"),
         sync_state: get(&b, "sync_state"),
         entry: get(&b, "entry"),
@@ -388,6 +448,7 @@ fn build(app: &adw::Application) -> Rc<Ui> {
         drop_mark: RefCell::new(None),
         adopters: RefCell::new(Vec::new()),
         focus_sub: RefCell::new(None),
+        flash: RefCell::new(None),
         conn: crate::connection::Connection::new(true, None),
         ntfy: (get(&b, "ntfy_scheme"), get(&b, "ntfy")),
         connect_goa: get(&b, "connect_goa"),
@@ -1180,8 +1241,10 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
         .collect();
     if !done.is_empty() {
         done.sort_by_key(|t| std::cmp::Reverse(t.completed_at));
+        let flash = ui.flash.borrow().clone().map(|(uid, _)| uid);
         let exp = adw::ExpanderRow::builder()
             .title(format!("Completed ({})", done.len()))
+            .expanded(done.iter().any(|t| Some(&t.uid) == flash.as_ref()))
             .build();
         for t in done.iter().take(DONE_SHOWN) {
             exp.add_row(&task_row(ui, t, 0, None));
@@ -1413,6 +1476,7 @@ fn task_row(ui: &Rc<Ui>, t: &Task, indent: usize, slot: Option<Slot>) -> adw::Ac
         .activatable(true)
         .build();
     row.set_margin_start(INDENT * indent as i32);
+    flash_if(ui, &row, &t.uid);
     // Shown among open tasks (a subtask, or kept in place): struck through. Rows in the
     // "Completed" group have no slot and stay plain.
     if t.done && slot.is_some() {
@@ -1487,6 +1551,7 @@ fn tree_row(
         .use_markup(false)
         .expanded(ui.expanded.borrow().contains(&root.uid))
         .build();
+    flash_if(ui, &row, &root.uid);
     if root.done {
         row.add_css_class("task-done"); // kept in place
     }

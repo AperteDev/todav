@@ -318,7 +318,9 @@ pub fn build(views: &adw::ViewStack) {
             .build()
     };
     actions.add_action_entries([
-        action("new-event", new_event),
+        action("new-event", || {
+            new_event();
+        }),
         action("today", || go(|_| today())),
         action("previous", || step(-1)),
         action("next", || step(1)),
@@ -402,9 +404,19 @@ fn step(by: i64) {
     }
 }
 
-/// A new event on the selected day, at the next full hour when that is today, else at 9:00.
-fn new_event() {
-    let Some(c) = cal() else { return };
+/// A new event titled `summary` today (from the extension).
+pub fn new_event_titled(summary: &str) {
+    show_day(core().local_now());
+    if let Some(title) = new_event() {
+        title.set_text(summary);
+        title.set_position(-1);
+    }
+}
+
+/// A new event on the selected day, at the next full hour when that is today, else at 9:00;
+/// returns the dialog's title field.
+fn new_event() -> Option<adw::EntryRow> {
+    let c = cal()?;
     let day = c.anchor.get();
     let now = core().local_now();
     let start = if day == today() {
@@ -417,7 +429,7 @@ fn new_event() {
         end: start + duration("event_duration"),
         all_day: false,
     };
-    dialog::open(&c, None, time);
+    Some(dialog::open(&c, None, time))
 }
 
 /// The timed event on now or next within a week, in the calendars shown (for the extension).

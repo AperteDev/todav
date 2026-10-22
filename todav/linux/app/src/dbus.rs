@@ -10,13 +10,16 @@ pub const IFACE: &str = "io.github.selfref.Todav1";
 
 const XML: &str = r#"<node>
 <interface name="io.github.selfref.Todav1">
-  <method name="GetLists"><arg direction="out" type="a(ssu)"/></method>
-  <method name="GetTasks"><arg direction="in" name="list" type="s"/><arg direction="out" type="a(sssb)"/></method>
-  <method name="SetDone"><arg direction="in" name="uid" type="s"/><arg direction="in" name="done" type="b"/></method>
+  <method name="GetLists"><arg direction="out" type="a(ssus)"/></method>
+  <method name="GetTasks"><arg direction="in" name="list" type="s"/><arg direction="out" type="a(sssbu)"/></method>
   <method name="AddTask"><arg direction="in" name="list" type="s"/><arg direction="in" name="summary" type="s"/><arg direction="out" type="s"/></method>
   <method name="ShowList"><arg direction="in" name="list" type="s"/></method>
+  <method name="ShowTask"><arg direction="in" name="uid" type="s"/></method>
   <method name="GetNextEvent"><arg direction="out" type="(ssx)"/></method>
   <method name="ShowDay"><arg direction="in" name="at" type="x"/></method>
+  <method name="NewEvent"><arg direction="in" name="summary" type="s"/></method>
+  <method name="GetSettings"><arg direction="out" type="a{ss}"/></method>
+  <method name="SetSetting"><arg direction="in" name="key" type="s"/><arg direction="in" name="value" type="s"/></method>
   <method name="Sync"/>
   <signal name="Changed"><arg name="list" type="s"/></signal>
   <property name="SyncState" type="s" access="read"/>
@@ -50,17 +53,23 @@ fn call(method: &str, params: &glib::Variant) -> Result<Option<glib::Variant>, S
     let c = core();
     let bad = || format!("bad arguments for {method}");
     Ok(match method {
+        // (href, name, open tasks, colour as the app shows it)
         "GetLists" => {
-            let lists: Vec<(String, String, u32)> = c
+            let lists: Vec<(String, String, u32, String)> = c
                 .lists()
                 .into_iter()
-                .map(|l| (l.href, l.display_name, l.open_count))
+                .map(|l| {
+                    let color = crate::lists::color(&l);
+                    (l.href, l.display_name, l.open_count, color)
+                })
                 .collect();
             Some((lists,).to_variant())
         }
+        // (uid, summary, category, done, depth: 0 for a task, 1 for its subtask, ...), in the
+        // app's order.
         "GetTasks" => {
             let (list,) = params.get::<(String,)>().ok_or_else(bad)?;
-            let mut out: Vec<(String, String, String, bool)> = Vec::new();
+            let mut out: Vec<(String, String, String, bool, u32)> = Vec::new();
             let order = crate::settings::order();
             for g in c.grouped_by(
                 list,
@@ -69,23 +78,19 @@ fn call(method: &str, params: &glib::Variant) -> Result<Option<glib::Variant>, S
                 crate::settings::done_view(),
             ) {
                 let cat = g.name.unwrap_or_default();
+                // Parents come before their subtasks.
+                let mut depths: HashMap<String, u32> = HashMap::new();
                 for t in g.tasks {
-                    // The extension cannot see hierarchy; mark subtasks inline.
-                    let summary = if t.parent_uid.is_some() {
-                        format!("↳ {}", t.summary)
-                    } else {
-                        t.summary
-                    };
-                    out.push((t.uid, summary, cat.clone(), t.done));
+                    let depth = t
+                        .parent_uid
+                        .as_ref()
+                        .and_then(|p| depths.get(p))
+                        .map_or(0, |d| d + 1);
+                    depths.insert(t.uid.clone(), depth);
+                    out.push((t.uid, t.summary, cat.clone(), t.done, depth));
                 }
             }
             Some((out,).to_variant())
-        }
-        "SetDone" => {
-            let (uid, done) = params.get::<(String, bool)>().ok_or_else(bad)?;
-            c.set_done(uid, done).map_err(|e| e.to_string())?;
-            request_sync();
-            None
         }
         "AddTask" => {
             let (list, summary) = params.get::<(String, String)>().ok_or_else(bad)?;
@@ -104,6 +109,32 @@ fn call(method: &str, params: &glib::Variant) -> Result<Option<glib::Variant>, S
         "ShowList" => {
             let (list,) = params.get::<(String,)>().ok_or_else(bad)?;
             window::show_list(&list);
+            None
+        }
+        "ShowTask" => {
+            let (uid,) = params.get::<(String,)>().ok_or_else(bad)?;
+            window::show_task(&uid);
+            None
+        }
+        "NewEvent" => {
+            let (summary,) = params.get::<(String,)>().ok_or_else(bad)?;
+            if let Some(app) = gio::Application::default().and_downcast::<adw::Application>() {
+                window::present(&app);
+            }
+            crate::calendar::new_event_titled(&summary);
+            None
+        }
+        // The extension's options, see settings::EXTENSION; it may only change those.
+        "GetSettings" => {
+            let map: HashMap<String, String> = crate::settings::extension().into_iter().collect();
+            Some((map,).to_variant())
+        }
+        "SetSetting" => {
+            let (key, value) = params.get::<(String, String)>().ok_or_else(bad)?;
+            if !crate::settings::EXTENSION.iter().any(|(k, _)| *k == key) {
+                return Err(format!("not an extension setting: {key}"));
+            }
+            c.set_setting(key, value).map_err(|e| e.to_string())?;
             None
         }
         // (title, when in words, start in local time for ShowDay); an empty title: none.

@@ -73,8 +73,9 @@ fn date_picker(button: &gtk::MenuButton, cal: &gtk::Calendar, at: i64) {
     cal.connect_notify_local(None, move |_, _| show());
 }
 
-/// Open the dialog on an existing occurrence (`Some(e)`) or a new event at `time`.
-pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) {
+/// Open the dialog on an existing occurrence (`Some(e)`) or a new event at `time`; returns its
+/// title field.
+pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::EntryRow {
     let b = view!("event-dialog");
     let dialog: adw::Dialog = get(&b, "dialog");
     let summary: adw::EntryRow = get(&b, "summary");
@@ -451,6 +452,7 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) {
         }
     });
     dialog.present(Some(&c.split));
+    get(&b, "summary")
 }
 
 #[cfg(test)]

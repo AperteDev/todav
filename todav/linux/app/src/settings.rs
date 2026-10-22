@@ -60,6 +60,31 @@ pub fn mini_dots() -> bool {
     core().setting("mini_dots".into()).as_deref() != Some("false")
 }
 
+/// The GNOME extension's options (Preferences → Extension, synced like the rest) with their
+/// defaults; it reads them over D-Bus. `ext_list` is the list it shows (empty: the first).
+pub const EXTENSION: [(&str, &str); 9] = [
+    ("ext_columns", "double"),
+    ("ext_tasks", "true"),
+    ("ext_subtasks", "true"),
+    ("ext_add_task", "true"),
+    ("ext_next_event", "true"),
+    ("ext_month", "true"),
+    ("ext_add_event", "true"),
+    ("ext_open", "true"),
+    ("ext_list", ""),
+];
+
+/// `EXTENSION` with this device's values.
+pub fn extension() -> Vec<(String, String)> {
+    EXTENSION
+        .iter()
+        .map(|(k, default)| {
+            let v = core().setting((*k).into());
+            (k.to_string(), v.unwrap_or_else(|| default.to_string()))
+        })
+        .collect()
+}
+
 /// Lengths offered for `duration`, in minutes, as the rows list them.
 const DURATIONS: [i64; 7] = [15, 30, 45, 60, 90, 120, 180];
 
@@ -236,6 +261,15 @@ pub fn present(parent: &impl IsA<gtk::Widget>) {
         let _ = core().set_setting("mini_dots".into(), d.is_active().to_string());
         crate::calendar::refresh();
     });
+    // The extension: its switches carry the setting's name as their id.
+    connect_choice(&b, "ext_columns", &["double", "single"]);
+    for (key, _) in EXTENSION.iter().filter(|(_, d)| *d == "true") {
+        let row: adw::SwitchRow = get(&b, key);
+        row.set_active(core().setting((*key).into()).as_deref() != Some("false"));
+        row.connect_active_notify(move |r| {
+            let _ = core().set_setting((*key).into(), r.is_active().to_string());
+        });
+    }
     let handles: adw::SwitchRow = get(&b, "drag_handles");
     handles.set_active(core().setting("drag_handles".into()).as_deref() == Some("true"));
     handles.connect_active_notify(|h| {
