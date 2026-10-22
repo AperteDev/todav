@@ -22,6 +22,8 @@ pub const DEVICE_ONLY: &[&str] = &[
     // UI state: which view (tasks, calendar) and calendar layout (month, week, agenda) is open.
     "last_view",
     "calendar_mode",
+    "window_size",
+    "window_maximized",
 ];
 
 /// key → (value, unix time of the last change)

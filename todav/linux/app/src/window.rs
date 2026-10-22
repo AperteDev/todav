@@ -408,6 +408,32 @@ pub fn get<T: IsA<glib::Object>>(b: &gtk::Builder, id: &str) -> T {
     b.object(id).unwrap_or_else(|| panic!("no `{id}` in view"))
 }
 
+/// Restores the last window size and saves it when the window is hidden or the app quits
+/// (Ctrl+Q skips close-request). GTK keeps the unmaximized size in default-width/height.
+fn restore_size(window: &adw::ApplicationWindow, app: &adw::Application) {
+    let size = core().setting("window_size".into()).unwrap_or_default();
+    if let Some((w, h)) = size.split_once('x')
+        && let (Ok(w), Ok(h)) = (w.parse(), h.parse())
+    {
+        window.set_default_size(w, h);
+    }
+    window.set_maximized(core().setting("window_maximized".into()).as_deref() == Some("true"));
+    fn save(window: &adw::ApplicationWindow) {
+        let (w, h) = window.default_size();
+        let _ = core().set_setting("window_size".into(), format!("{w}x{h}"));
+        let _ = core().set_setting("window_maximized".into(), window.is_maximized().to_string());
+    }
+    window.connect_close_request(|w| {
+        save(w);
+        glib::Propagation::Proceed
+    });
+    app.connect_shutdown(glib::clone!(
+        #[weak]
+        window,
+        move |_| save(&window)
+    ));
+}
+
 fn build(app: &adw::Application) -> Rc<Ui> {
     let b = view!("window");
     let window: adw::ApplicationWindow = get(&b, "window");
@@ -415,6 +441,7 @@ fn build(app: &adw::Application) -> Rc<Ui> {
     if crate::sandbox() {
         window.set_title(Some("Todav (sandbox)"));
     }
+    restore_size(&window, app);
 
     let css = gtk::CssProvider::new();
     css.load_from_string(CSS);
