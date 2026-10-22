@@ -19,8 +19,10 @@ fn main() {
         .success();
     assert!(ok, "blueprint-compiler failed");
 
-    // Fallback icons, embedded in the binary.
+    // Fallback icons, the app icon and metainfo (for About), embedded in the binary.
     println!("cargo::rerun-if-changed=icons");
+    println!("cargo::rerun-if-changed=../data/io.github.selfref.Todav.svg");
+    println!("cargo::rerun-if-changed=../data/io.github.selfref.Todav.metainfo.xml");
     let ok = Command::new("glib-compile-resources")
         .args(["--sourcedir", "icons", "--target"])
         .arg(format!("{out}/icons.gresource"))

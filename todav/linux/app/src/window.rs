@@ -162,6 +162,18 @@ pub fn setup_actions(app: &adw::Application) {
             get::<adw::Dialog>(&view!("shortcuts"), "dialog").present(Some(&ui.window));
         }
     });
+    // Filled from the metainfo file (bundled, see icons/icons.gresource.xml).
+    let about = gio::SimpleAction::new("about", None);
+    about.connect_activate(|_, _| {
+        let Some(ui) = ui() else { return };
+        let d = adw::AboutDialog::from_appdata(
+            "/io/github/selfref/Todav/metainfo.xml",
+            Some(env!("CARGO_PKG_VERSION")),
+        );
+        d.set_copyright("© 2026 SelfRef");
+        d.present(Some(&ui.window));
+    });
+    app.add_action(&about);
     app.add_action(&sync);
     app.add_action(&quit);
     app.add_action(&show);
