@@ -1,12 +1,15 @@
 using Gtk 4.0;
 using Adw 1;
 
-// A new event or an existing one: what, where, which calendar, when, how it repeats, notes and
-// reminders.
+// A new event or an existing one, laid out as the task dialog: what, where, which calendar and
+// notes; then when, how it repeats and its reminders. One column when narrow.
 Adw.Dialog dialog {
   title: "Event";
-  content-width: 520;
-  content-height: 680;
+  content-width: 760;
+  content-height: 640;
+  // Breakpoints need a minimum size; the smallest GNOME supports.
+  width-request: 360;
+  height-request: 294;
   default-widget: save;
   focus-widget: summary;
 
@@ -32,16 +35,19 @@ Adw.Dialog dialog {
       hscrollbar-policy: never;
       propagate-natural-height: true;
 
-      Adw.Clamp {
-        maximum-size: 560;
+      Gtk.Box columns {
+        vexpand: true;
+        spacing: 18;
+        homogeneous: true;
+        margin-top: 12;
+        margin-bottom: 18;
+        margin-start: 18;
+        margin-end: 18;
 
+        // The notes fill what the rows above them leave.
         Gtk.Box {
           orientation: vertical;
           spacing: 18;
-          margin-top: 12;
-          margin-bottom: 18;
-          margin-start: 12;
-          margin-end: 12;
 
           Adw.PreferencesGroup {
             Adw.EntryRow summary {
@@ -61,90 +67,134 @@ Adw.Dialog dialog {
           }
 
           Adw.PreferencesGroup {
+            title: "Notes";
+            vexpand: true;
+
+            Gtk.ScrolledWindow {
+              vexpand: true;
+              height-request: 160;
+              hscrollbar-policy: never;
+              styles ["card"]
+
+              Gtk.TextView description {
+                wrap-mode: word_char;
+                top-margin: 12;
+                bottom-margin: 12;
+                left-margin: 12;
+                right-margin: 12;
+                styles ["inline"]
+              }
+            }
+          }
+        }
+
+        Gtk.Box {
+          orientation: vertical;
+          spacing: 18;
+          valign: start;
+
+          // Start and end as the task's dates: a calendar, and the time unless all day. Their
+          // subtitles say what is picked.
+          Adw.PreferencesGroup {
             Adw.SwitchRow all_day {
               title: "All Day";
             }
 
-            Adw.ActionRow start_row {
+            Adw.ExpanderRow start {
               title: "Starts";
+              expanded: true;
 
-              [suffix]
-              Gtk.MenuButton start_date {
-                valign: center;
-                popover: Gtk.Popover {
-                  Gtk.Calendar start_cal {}
-                };
+              Gtk.ListBoxRow {
+                activatable: false;
+
+                Gtk.Calendar start_cal {
+                  margin-top: 6;
+                  margin-bottom: 6;
+                  margin-start: 6;
+                  margin-end: 6;
+                }
               }
 
-              [suffix]
-              Gtk.Box start_time {
-                valign: center;
-                spacing: 4;
+              Adw.ActionRow start_time {
+                title: "Time";
 
-                Gtk.SpinButton start_hour {
-                  numeric: true;
-                  wrap: true;
-                  adjustment: Gtk.Adjustment {
-                    lower: 0;
-                    upper: 23;
-                    step-increment: 1;
-                  };
-                }
+                [suffix]
+                Gtk.Box {
+                  spacing: 6;
+                  valign: center;
 
-                Gtk.Label {
-                  label: ":";
-                }
+                  Gtk.SpinButton start_hour {
+                    numeric: true;
+                    wrap: true;
+                    adjustment: Gtk.Adjustment {
+                      lower: 0;
+                      upper: 23;
+                      step-increment: 1;
+                    };
+                  }
 
-                Gtk.SpinButton start_minute {
-                  numeric: true;
-                  wrap: true;
-                  adjustment: Gtk.Adjustment {
-                    lower: 0;
-                    upper: 59;
-                    step-increment: 5;
-                  };
+                  Gtk.Label {
+                    label: ":";
+                  }
+
+                  Gtk.SpinButton start_minute {
+                    numeric: true;
+                    wrap: true;
+                    adjustment: Gtk.Adjustment {
+                      lower: 0;
+                      upper: 59;
+                      step-increment: 5;
+                    };
+                  }
                 }
               }
             }
 
-            Adw.ActionRow end_row {
+            Adw.ExpanderRow end {
               title: "Ends";
 
-              [suffix]
-              Gtk.MenuButton end_date {
-                valign: center;
-                popover: Gtk.Popover {
-                  Gtk.Calendar end_cal {}
-                };
+              Gtk.ListBoxRow {
+                activatable: false;
+
+                Gtk.Calendar end_cal {
+                  margin-top: 6;
+                  margin-bottom: 6;
+                  margin-start: 6;
+                  margin-end: 6;
+                }
               }
 
-              [suffix]
-              Gtk.Box end_time {
-                valign: center;
-                spacing: 4;
+              Adw.ActionRow end_time {
+                title: "Time";
 
-                Gtk.SpinButton end_hour {
-                  numeric: true;
-                  wrap: true;
-                  adjustment: Gtk.Adjustment {
-                    lower: 0;
-                    upper: 23;
-                    step-increment: 1;
-                  };
-                }
+                [suffix]
+                Gtk.Box {
+                  spacing: 6;
+                  valign: center;
 
-                Gtk.Label {
-                  label: ":";
-                }
+                  Gtk.SpinButton end_hour {
+                    numeric: true;
+                    wrap: true;
+                    adjustment: Gtk.Adjustment {
+                      lower: 0;
+                      upper: 23;
+                      step-increment: 1;
+                    };
+                  }
 
-                Gtk.SpinButton end_minute {
-                  numeric: true;
-                  wrap: true;
-                  adjustment: Gtk.Adjustment {
-                    lower: 0;
-                    upper: 59;
-                    step-increment: 5;
-                  };
+                  Gtk.Label {
+                    label: ":";
+                  }
+
+                  Gtk.SpinButton end_minute {
+                    numeric: true;
+                    wrap: true;
+                    adjustment: Gtk.Adjustment {
+                      lower: 0;
+                      upper: 59;
+                      step-increment: 5;
+                    };
+                  }
                 }
               }
             }
@@ -183,26 +233,7 @@ Adw.Dialog dialog {
             }
           }
 
-          Adw.PreferencesGroup {
-            title: "Notes";
-
-            Gtk.ScrolledWindow {
-              height-request: 100;
-              hscrollbar-policy: never;
-              styles ["card"]
-
-              Gtk.TextView description {
-                wrap-mode: word_char;
-                top-margin: 12;
-                bottom-margin: 12;
-                left-margin: 12;
-                right-margin: 12;
-                styles ["inline"]
-              }
-            }
-          }
-
-          // Reminders (ui/reminder.blp) go above the button.
+          // Reminders (ui/reminder.blp) go above the button; they count from the start.
           Gtk.ListBox reminders {
             selection-mode: none;
             styles ["boxed-list"]
@@ -226,4 +257,15 @@ Adw.Dialog dialog {
       }
     };
   };
+
+  Adw.Breakpoint {
+    condition ("max-width: 560sp")
+
+    // One column: the dates collapse, so the event's own fields come first.
+    setters {
+      columns.orientation: vertical;
+      columns.homogeneous: false;
+      start.expanded: false;
+    }
+  }
 }

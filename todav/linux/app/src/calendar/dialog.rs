@@ -56,23 +56,6 @@ pub(super) fn ask_scope(
     d.present(Some(parent));
 }
 
-/// A date button and its calendar: the button shows the picked date.
-fn date_picker(button: &gtk::MenuButton, cal: &gtk::Calendar, at: i64) {
-    cal.select_day(&dates::fields(at));
-    let show = {
-        let (button, cal) = (button.clone(), cal.clone());
-        move || button.set_label(&fmt(dates::midnight(&cal.date()), "%a %-d %b %Y"))
-    };
-    show();
-    let (b, s) = (button.clone(), show.clone());
-    cal.connect_day_selected(move |_| {
-        s();
-        b.popdown();
-    });
-    // Moving the month or year in the calendar changes the date too.
-    cal.connect_notify_local(None, move |_, _| show());
-}
-
 /// Open the dialog on an existing occurrence (`Some(e)`) or a new event at `time`; returns its
 /// title field.
 pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::EntryRow {
@@ -83,17 +66,18 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
     let calendar: adw::ComboRow = get(&b, "calendar");
     let calendars: gtk::StringList = get(&b, "calendars");
     let all_day: adw::SwitchRow = get(&b, "all_day");
-    let (start_date, start_cal): (gtk::MenuButton, gtk::Calendar) =
-        (get(&b, "start_date"), get(&b, "start_cal"));
-    let (end_date, end_cal): (gtk::MenuButton, gtk::Calendar) =
-        (get(&b, "end_date"), get(&b, "end_cal"));
+    let (start_row, end_row): (adw::ExpanderRow, adw::ExpanderRow) =
+        (get(&b, "start"), get(&b, "end"));
+    let (start_cal, end_cal): (gtk::Calendar, gtk::Calendar) =
+        (get(&b, "start_cal"), get(&b, "end_cal"));
     let spins: [gtk::SpinButton; 4] = [
         get(&b, "start_hour"),
         get(&b, "start_minute"),
         get(&b, "end_hour"),
         get(&b, "end_minute"),
     ];
-    let (start_time, end_time): (gtk::Box, gtk::Box) = (get(&b, "start_time"), get(&b, "end_time"));
+    let (start_time, end_time): (adw::ActionRow, adw::ActionRow) =
+        (get(&b, "start_time"), get(&b, "end_time"));
     let repeat: adw::ComboRow = get(&b, "repeat");
     let repeats: gtk::StringList = get(&b, "repeats");
     let interval: adw::SpinRow = get(&b, "interval");
@@ -107,6 +91,10 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
     });
     for s in &spins {
         crate::window::two_digits(s);
+        crate::window::scroll_past(s.upcast_ref());
+    }
+    for c in [&start_cal, &end_cal, &until_cal] {
+        crate::window::scroll_past(c.upcast_ref());
     }
 
     // Calendars we may write to; the event's own, or the one used last.
@@ -138,17 +126,13 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
             .set_text(e.description.as_deref().unwrap_or_default());
     }
     all_day.set_active(time.all_day);
-    date_picker(&start_date, &start_cal, time.start);
+    start_cal.select_day(&dates::fields(time.start));
     // An all-day event's last day is the one before its end.
-    date_picker(
-        &end_date,
-        &end_cal,
-        if time.all_day {
-            time.end - DAY
-        } else {
-            time.end
-        },
-    );
+    end_cal.select_day(&dates::fields(if time.all_day {
+        time.end - DAY
+    } else {
+        time.end
+    }));
     // An all-day event's times, should it get some: 9:00 for the default length.
     let (from, to) = if time.all_day {
         let at = 9 * 3600;
@@ -296,6 +280,30 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
         let t = read2();
         len2.set(t.end - t.start);
     });
+
+    // The rows say when it starts and ends, as the task dialog's dates; connected last, so they
+    // show the end moved with the start.
+    let show_dates = {
+        let read = read.clone();
+        let now = core().local_now();
+        move || {
+            let t = read();
+            let last = if t.all_day { t.end - DAY } else { t.end };
+            start_row.set_subtitle(&dates::label(t.start, t.all_day, now));
+            end_row.set_subtitle(&dates::label(last, t.all_day, now));
+        }
+    };
+    show_dates();
+    for cal in [&start_cal, &end_cal] {
+        // Day, month or year: moving the month changes the date too.
+        let s = show_dates.clone();
+        cal.connect_notify_local(None, move |_, _| s());
+    }
+    for spin in &spins {
+        let s = show_dates.clone();
+        spin.connect_value_changed(move |_| s());
+    }
+    all_day.connect_active_notify(move |_| show_dates());
 
     let d = dialog.downgrade();
     get::<gtk::Button>(&b, "cancel").connect_clicked(move |_| {
