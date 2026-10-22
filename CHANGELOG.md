@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   desktop notifications with "Mark as Done", and an Upcoming page across lists.
 - A calendar with Month, Week and Agenda views: create, edit, move and delete
   events, repeating ones too (this occurrence, the following or all), with
-  reminders.
+  reminders. Weeks start on the day your region's formats say.
 - Time-blocking: drag tasks from "To Plan" onto an hour or a day, move and
   resize blocks in the week, drop them back to unplan.
 - Click an event or task on the calendar for its details, where an event's

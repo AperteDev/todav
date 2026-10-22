@@ -5,6 +5,7 @@ mod connection;
 mod dates;
 mod dbus;
 mod goa;
+mod i18n;
 mod lists;
 mod reminders;
 mod settings;

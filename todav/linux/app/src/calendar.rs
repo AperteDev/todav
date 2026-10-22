@@ -1061,10 +1061,15 @@ fn capitalized(s: &str) -> String {
         .map_or(String::new(), |f| f.to_uppercase().chain(c).collect())
 }
 
-/// Weeks start on Monday. ponytail: fixed; take the locale's first weekday if someone needs Sunday.
+/// Midnight of the first day of the week holding `day`, the locale's first weekday.
 fn week_start(day: i64) -> i64 {
-    // 1970-01-01, day 0, was a Thursday.
-    day - (day.div_euclid(DAY) + 3).rem_euclid(7) * DAY
+    week_start_on(day, crate::i18n::first_weekday())
+}
+
+/// The same with weeks starting on `first` (0 = Sunday).
+fn week_start_on(day: i64, first: i64) -> i64 {
+    // 1970-01-01, day 0, was a Thursday (4).
+    day - (day.div_euclid(DAY) + 4 - first).rem_euclid(7) * DAY
 }
 
 fn clear(w: &impl IsA<gtk::Widget>) {
@@ -2052,10 +2057,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn weeks_start_on_monday() {
+    fn weeks_start_on_the_locales_day() {
         let at = |s| todav_core::ical::parse_time(s).unwrap();
-        assert_eq!(week_start(at("20261021")), at("20261019")); // a Wednesday
-        assert_eq!(week_start(at("20261019")), at("20261019"));
-        assert_eq!(week_start(at("20261025")), at("20261019")); // Sunday
+        // Monday first.
+        assert_eq!(week_start_on(at("20261021"), 1), at("20261019")); // a Wednesday
+        assert_eq!(week_start_on(at("20261019"), 1), at("20261019"));
+        assert_eq!(week_start_on(at("20261025"), 1), at("20261019")); // Sunday
+        // Sunday first.
+        assert_eq!(week_start_on(at("20261021"), 0), at("20261018"));
+        assert_eq!(week_start_on(at("20261025"), 0), at("20261025"));
+        assert_eq!(week_start_on(at("20261024"), 0), at("20261018")); // Saturday
     }
 }

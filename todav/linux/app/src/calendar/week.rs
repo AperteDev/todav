@@ -11,7 +11,7 @@ const GUTTER: i32 = 56;
 /// Minutes a dropped task snaps to.
 const SNAP: i64 = 15;
 
-/// Where a block goes: day of the week (0 = Monday), minutes into the day, and its column among
+/// Where a block goes: day of the week (0 = the week's first day), minutes into the day, and its column among
 /// the blocks it overlaps.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct Geo {
