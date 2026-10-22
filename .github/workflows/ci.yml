@@ -55,6 +55,69 @@ jobs:
           bundle: io.github.selfref.Todav.flatpak
           artifact-name: todav-flatpak
 
+  tarball:
+    name: Tarball
+    runs-on: ubuntu-24.04
+    # The oldest supported GNOME (49, for libadwaita 1.8): its glibc keeps the binary running on
+    # newer distributions, the .deb's Ubuntu among them. Move on when it reaches its end of life.
+    container: fedora:43
+    steps:
+      - name: Install the build dependencies
+        run: >-
+          dnf install -y --setopt=install_weak_deps=False
+          git gcc make python3 gtk4-devel libadwaita-devel libsecret-devel glib2-devel
+          blueprint-compiler
+      - uses: actions/checkout@v7
+      - name: Set the release version
+        if: env.VERSION != ''
+        run: python3 scripts/release.py "$VERSION" > /dev/null
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: make -C todav/linux stage PREFIX=/usr DESTDIR="$PWD/target/stage"
+      # Files only: extracted into /, directory entries would reset the system's own.
+      - name: Pack the staged tree
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          (cd target/stage && find . ! -type d | sort) |
+            tar -C target/stage -czf "target/todav-$version-$(uname -m).tar.gz" -T -
+      - uses: actions/upload-artifact@v7
+        with:
+          name: todav-tarball
+          path: target/todav-*.tar.gz
+          if-no-files-found: error
+
+  deb:
+    name: Debian package
+    needs: tarball
+    runs-on: ubuntu-24.04
+    # The Ubuntu LTS the package is for; dpkg-shlibdeps names its libraries.
+    container: ubuntu:26.04
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Install the packaging tools and the libraries the app links to
+        run: >-
+          apt-get update && apt-get install -y --no-install-recommends
+          dpkg-dev libgtk-4-1 libadwaita-1-0 libsecret-1-0
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: todav-tarball
+          path: target
+      - name: Build the package from the tarball's tree
+        run: |
+          tarball=$(ls target/todav-*.tar.gz)
+          version=$(basename "$tarball" | sed 's/^todav-\(.*\)-[^-]*\.tar\.gz$/\1/')
+          mkdir target/stage && tar -C target/stage -xzf "$tarball"
+          scripts/deb.sh target/stage "$version" target/deb
+      - name: Install it, so its dependencies are checked
+        run: apt-get install -y ./target/deb/*.deb
+      - uses: actions/upload-artifact@v7
+        with:
+          name: todav-deb
+          path: target/deb/*.deb
+          if-no-files-found: error
+
   extension:
     name: GNOME Shell extension
     runs-on: ubuntu-24.04

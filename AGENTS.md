@@ -12,12 +12,16 @@
   change.
 - Releases are cut by the manual Release workflow (`.github/workflows/release.yml`): with the
   version given, `scripts/release.py` sets it in `Cargo.toml`, the metainfo and the extension's
-  `metadata.json` and moves the `Unreleased` section under it; CI builds the Flatpak bundle and
-  the extension zip, then it commits `chore(release): X`, tags `vX` and publishes them. Don't
-  bump versions by hand.
+  `metadata.json` and moves the `Unreleased` section under it; CI builds the packages, then it
+  commits `chore(release): X`, tags `vX` and publishes them. Don't bump versions by hand.
 - CI (`.github/workflows/ci.yml`) runs on every push: `cargo fmt --check`, clippy with
-  warnings as errors and the unit tests on Fedora (GNOME 51), plus the two packages. Run the
-  same before committing.
+  warnings as errors and the unit tests on Fedora (GNOME 51), plus the packages: the Flatpak
+  bundle, a tarball of the system-wide tree (`make -C todav/linux stage`, built on the oldest
+  supported GNOME, now Fedora 43), the `.deb` made from it on Ubuntu 26.04 (`scripts/deb.sh`)
+  and the extension zip. Run the checks before committing.
+- The lowest supported GNOME is 49 (libadwaita 1.8, for `Adw.ShortcutsDialog`). A newer
+  widget raises it: update the README, `scripts/deb.sh`'s libadwaita version and the
+  tarball's build distribution together.
 
 ## Settings
 

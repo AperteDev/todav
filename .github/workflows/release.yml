@@ -44,15 +44,13 @@ jobs:
           pattern: todav-*
           path: dist
           merge-multiple: true
+      # The Flatpak bundle, the tarball, the .deb and the extension zip.
       - name: Checksums
         working-directory: dist
-        run: sha256sum io.github.selfref.Todav.flatpak todav@selfref.dev.shell-extension.zip > SHA256SUMS
+        run: sha256sum * > SHA256SUMS
       - name: Publish the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-
-          gh release create "v$VERSION"
-          dist/io.github.selfref.Todav.flatpak
-          dist/todav@selfref.dev.shell-extension.zip
-          dist/SHA256SUMS
+          gh release create "v$VERSION" dist/*
           --title "v$VERSION" --notes-file "$RUNNER_TEMP/notes.md"
