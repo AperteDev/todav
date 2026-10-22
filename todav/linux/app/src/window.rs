@@ -2063,7 +2063,7 @@ fn delete_button(t: &Task) -> gtk::Button {
     del
 }
 
-fn delete_task(t: &Task) {
+pub fn delete_task(t: &Task) {
     if core().delete_task(t.uid.clone()).is_ok() {
         request_sync();
         undo_toast(&format!("“{}” deleted", t.summary));
@@ -2498,6 +2498,11 @@ fn priority_row(p: Option<i64>) -> u32 {
         Some(6..=9) => 1,
         _ => 0,
     }
+}
+
+/// The priority as the edit dialog names it; none when not set.
+pub fn priority_name(p: Option<i64>) -> Option<&'static str> {
+    [None, Some("Low"), Some("Medium"), Some("High")][priority_row(p) as usize]
 }
 
 fn priority_value(row: u32) -> Option<i64> {

@@ -60,6 +60,12 @@ pub fn mini_dots() -> bool {
     core().setting("mini_dots".into()).as_deref() != Some("false")
 }
 
+/// Whether a double click on a calendar item edits it (`double_click_edit`; on unless turned
+/// off). Off, a click shows its details at once, not after the double-click time.
+pub fn double_click_edit() -> bool {
+    core().setting("double_click_edit".into()).as_deref() != Some("false")
+}
+
 /// The GNOME extension's options (Preferences → Extension, synced like the rest) with their
 /// defaults; it reads them over D-Bus. `ext_list` is the list it shows (empty: the first).
 pub const EXTENSION: [(&str, &str); 10] = [
@@ -261,6 +267,11 @@ pub fn present(parent: &impl IsA<gtk::Widget>) {
     dots.connect_active_notify(|d| {
         let _ = core().set_setting("mini_dots".into(), d.is_active().to_string());
         crate::calendar::refresh();
+    });
+    let double: adw::SwitchRow = get(&b, "double_click_edit");
+    double.set_active(double_click_edit());
+    double.connect_active_notify(|d| {
+        let _ = core().set_setting("double_click_edit".into(), d.is_active().to_string());
     });
     // The extension: its switches carry the setting's name as their id.
     connect_choice(&b, "ext_columns", &["double", "single"]);

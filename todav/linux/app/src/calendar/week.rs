@@ -553,7 +553,7 @@ fn block(c: &Rc<Cal>, i: &Item, geo: Geo) -> gtk::Widget {
     };
     match i {
         Item::Event(e) => {
-            let b = gtk::MenuButton::builder()
+            let b = gtk::Button::builder()
                 .child(&label(text(&e.summary, e.start)))
                 .has_frame(false)
                 .build();
@@ -565,12 +565,7 @@ fn block(c: &Rc<Cal>, i: &Item, geo: Geo) -> gtk::Widget {
                 b.add_css_class("cancelled");
             }
             drag_event(c, &b, e);
-            let (weak, e) = (Rc::downgrade(c), e.clone());
-            b.set_create_popup_func(move |b| {
-                if let Some(c) = weak.upgrade() {
-                    b.set_popover(Some(&details(&c, &e)));
-                }
-            });
+            event_clicks(&b, e);
             b.upcast()
         }
         Item::Task(t) => {

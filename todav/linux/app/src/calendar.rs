@@ -39,16 +39,16 @@ const CSS: &str = "
 @keyframes day-flash { from { background-color: transparent; } 50% { background-color: alpha(@accent_bg_color, 0.3); } to { background-color: transparent; } }
 .flash { animation: day-flash 900ms ease-in-out 2; border-radius: 6px; }
 .chip { padding: 0 6px; min-height: 22px; border-radius: 6px; font-size: smaller; }
-.chip button, .more button { font-weight: normal; }
-menubutton.chip > button, menubutton.more > button { min-height: 0; min-width: 0; padding: 0; }
-/* A task is a button itself: its colour is its background, so hover and press tint over it. */
-button.chip.task { min-width: 0; font-weight: normal; }
-button.chip.task:hover { background-image: linear-gradient(alpha(currentColor, 0.07), alpha(currentColor, 0.07)); }
-button.chip.task:active { background-image: linear-gradient(alpha(currentColor, 0.16), alpha(currentColor, 0.16)); }
-/* An event's button fills it, so its hover does too. */
-menubutton.chip, menubutton.more { padding: 0; }
-menubutton.chip > button, menubutton.more > button { padding: 0 6px; border-radius: 6px; }
-menubutton.block > button { padding: 2px 6px; }
+.more button { font-weight: normal; }
+menubutton.more > button { min-height: 0; min-width: 0; padding: 0; }
+/* An event or task is a button itself: its colour is its background, so hover and press tint
+   over it. */
+button.chip { min-width: 0; font-weight: normal; }
+button.chip:hover { background-image: linear-gradient(alpha(currentColor, 0.07), alpha(currentColor, 0.07)); }
+button.chip:active { background-image: linear-gradient(alpha(currentColor, 0.16), alpha(currentColor, 0.16)); }
+/* The +N more button fills its place, so its hover does too. */
+menubutton.more { padding: 0; }
+menubutton.more > button { padding: 0 6px; border-radius: 6px; }
 .mini { padding: 6px; }
 .mini .weekday { font-size: smaller; opacity: 0.6; padding: 4px 0; }
 .mini button.day { min-width: 32px; min-height: 32px; padding: 0; font-weight: normal; font-feature-settings: 'tnum'; }
@@ -61,8 +61,8 @@ menubutton.block > button { padding: 2px 6px; }
 .mini .day box { min-height: 4px; }
 .mini button.day.selected .dot { background-color: @accent_fg_color; }
 /* Ends of a bar that goes on into the next or previous week (or past a full day) are square. */
-.chip.from-before, menubutton.chip.from-before > button { border-top-left-radius: 0; border-bottom-left-radius: 0; }
-.chip.goes-on, menubutton.chip.goes-on > button { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.chip.from-before { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.chip.goes-on { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 /* The check takes no more than itself, leaving the room to the title. */
 .chip.task checkbutton { padding: 0; }
 .chip.task check { min-width: 14px; min-height: 14px; margin: 0 4px 0 0; padding: 0; }
@@ -1245,7 +1245,7 @@ fn chip(c: &Rc<Cal>, i: &Item) -> gtk::Widget {
                 .xalign(0.0)
                 .ellipsize(gtk::pango::EllipsizeMode::End)
                 .build();
-            let b = gtk::MenuButton::builder()
+            let b = gtk::Button::builder()
                 .child(&label)
                 .has_frame(false)
                 .build();
@@ -1259,12 +1259,7 @@ fn chip(c: &Rc<Cal>, i: &Item) -> gtk::Widget {
                 b.add_css_class("cancelled");
             }
             drag_event(c, &b, e);
-            let (weak, e) = (Rc::downgrade(c), e.clone());
-            b.set_create_popup_func(move |b| {
-                if let Some(c) = weak.upgrade() {
-                    b.set_popover(Some(&details(&c, &e)));
-                }
-            });
+            event_clicks(&b, e);
             b.upcast()
         }
         Item::Task(t) => {
@@ -1284,9 +1279,9 @@ fn chip(c: &Rc<Cal>, i: &Item) -> gtk::Widget {
     }
 }
 
-/// A task on the calendar: one button, opening it, that holds its check (`check_align`ed,
-/// ticking it) and `label`.
-fn task_chip(c: &Cal, t: &Task, label: &gtk::Label, check_align: gtk::Align) -> gtk::Button {
+/// A task on the calendar: one button, showing its details, that holds its check
+/// (`check_align`ed, ticking it) and `label`.
+fn task_chip(c: &Rc<Cal>, t: &Task, label: &gtk::Label, check_align: gtk::Align) -> gtk::Button {
     let check = gtk::CheckButton::builder()
         .active(t.done)
         .valign(check_align)
@@ -1317,8 +1312,6 @@ fn task_chip(c: &Cal, t: &Task, label: &gtk::Label, check_align: gtk::Align) -> 
     if t.done {
         b.add_css_class("done");
     }
-    let task = t.clone();
-    b.connect_clicked(move |_| crate::window::edit_task(&task));
     // A button takes clicks in the capture phase, before its children; in the bubble phase the
     // check, being deeper, gets its own clicks first.
     let controllers = b.observe_controllers();
@@ -1327,6 +1320,14 @@ fn task_chip(c: &Cal, t: &Task, label: &gtk::Label, check_align: gtk::Align) -> 
             g.set_propagation_phase(gtk::PropagationPhase::Bubble);
         }
     }
+    // After the above, which would move its gesture to the bubble phase too.
+    let (task, task2) = (t.clone(), t.clone());
+    let open = on_clicks(
+        &b,
+        move || cal().map(|c| task_details(&c, &task)),
+        move || crate::window::edit_task(&task2),
+    );
+    b.connect_clicked(move |_| open());
     drag_task(&b, t);
     b
 }
@@ -1359,6 +1360,31 @@ fn span_text(e: &Event) -> String {
     }
 }
 
+/// A task's dates in words: its slot as an event's time when planned within a day, else when
+/// it starts and is due.
+fn task_when(t: &Task) -> Vec<String> {
+    let at = |t: i64, all_day: bool| {
+        let date = fmt(t, "%A %-d %B %Y");
+        if all_day {
+            date
+        } else {
+            format!("{date}, {}", fmt(t, "%H:%M"))
+        }
+    };
+    match (t.start, t.due) {
+        (Some(s), Some(d))
+            if !t.start_all_day && !t.due_all_day && fmt(s, "%F") == fmt(d, "%F") =>
+        {
+            vec![format!("{} – {}", at(s, false), fmt(d, "%H:%M"))]
+        }
+        (start, due) => start
+            .map(|s| format!("Starts {}", at(s, t.start_all_day)))
+            .into_iter()
+            .chain(due.map(|d| format!("Due {}", at(d, t.due_all_day))))
+            .collect(),
+    }
+}
+
 /// An event's or task's tooltip (markup): the whole title, when, where and in which list; the
 /// views cut titles short.
 fn tooltip(c: &Cal, i: &Item) -> String {
@@ -1376,26 +1402,7 @@ fn tooltip(c: &Cal, i: &Item) -> String {
             }
         }
         Item::Task(t) => {
-            let at = |t: i64, all_day: bool| {
-                let date = fmt(t, "%A %-d %B %Y");
-                if all_day {
-                    date
-                } else {
-                    format!("{date}, {}", fmt(t, "%H:%M"))
-                }
-            };
-            match (t.start, t.due) {
-                // Planned into a slot of one day: as an event's time.
-                (Some(s), Some(d))
-                    if !t.start_all_day && !t.due_all_day && fmt(s, "%F") == fmt(d, "%F") =>
-                {
-                    lines.push(format!("{} – {}", at(s, false), fmt(d, "%H:%M")))
-                }
-                (start, due) => {
-                    lines.extend(start.map(|s| format!("Starts {}", at(s, t.start_all_day))));
-                    lines.extend(due.map(|d| format!("Due {}", at(d, t.due_all_day))));
-                }
-            }
+            lines.extend(task_when(t));
             lines.extend(t.category.clone().filter(|c| !c.is_empty()));
             if t.done {
                 lines.push("Completed".into());
@@ -1414,38 +1421,83 @@ fn tooltip(c: &Cal, i: &Item) -> String {
     text
 }
 
-/// The tasks for an event: tick them, add one (to the task list used last, due when the event
-/// starts).
-fn event_tasks(e: &Event) -> gtk::Box {
+/// A heading counting done/all of `tasks`, a box to tick each, and (with `add`) a field adding
+/// one: `add` makes it from the title typed. The event's tasks, a task's subtasks.
+fn checklist(
+    title: &'static str,
+    hint: &str,
+    tasks: Rc<dyn Fn() -> Vec<Task>>,
+    add: Option<Box<dyn Fn(String) -> Option<Task>>>,
+) -> gtk::Box {
     let b = gtk::Box::new(gtk::Orientation::Vertical, 2);
     let head = gtk::Label::builder().xalign(0.0).margin_top(4).build();
     head.add_css_class("heading");
-    head.set_label(&tasks_heading(&e.uid));
+    let count: Rc<dyn Fn()> = {
+        let (tasks, head) = (tasks.clone(), head.clone());
+        Rc::new(move || {
+            let all = tasks();
+            head.set_label(&match all.len() {
+                0 => title.to_string(),
+                n => format!("{title} · {}/{n}", all.iter().filter(|t| t.done).count()),
+            });
+        })
+    };
+    count();
     b.append(&head);
     let list = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    for t in core().event_tasks(e.uid.clone()) {
-        list.append(&task_check(&t, &head));
+    for t in tasks() {
+        list.append(&check_row(&t, count.clone()));
     }
     b.append(&list);
-    let entry = gtk::Entry::builder()
-        .placeholder_text("Add a task for this event")
+    if let Some(add) = add {
+        let entry = gtk::Entry::builder().placeholder_text(hint).build();
+        entry.connect_activate(move |entry| {
+            let text = entry.text().trim().to_string();
+            if text.is_empty() {
+                return;
+            }
+            if let Some(t) = add(text) {
+                entry.set_text("");
+                list.append(&check_row(&t, count.clone()));
+                count();
+                request_sync();
+            }
+        });
+        b.append(&entry);
+    }
+    b
+}
+
+/// A task to tick; `count` updates the heading above it.
+fn check_row(t: &Task, count: Rc<dyn Fn()>) -> gtk::CheckButton {
+    let check = gtk::CheckButton::builder()
+        .label(&t.summary)
+        .active(t.done)
         .build();
+    let uid = t.uid.clone();
+    check.connect_toggled(move |c| {
+        if core().set_done(uid.clone(), c.is_active()).is_ok() {
+            count();
+            request_sync();
+        }
+    });
+    check
+}
+
+/// The tasks for an event: tick them, add one (to the task list used last, due when the event
+/// starts).
+fn event_tasks(e: &Event) -> gtk::Box {
+    let uid = e.uid.clone();
     let ev = e.clone();
-    entry.connect_activate(move |entry| {
-        let text = entry.text().trim().to_string();
+    let add = move |text: String| {
         let lists = core().lists();
         let last = core().setting("last_list".into());
-        let Some(list_href) = lists
+        let list_href = lists
             .iter()
             .find(|l| Some(&l.href) == last.as_ref())
-            .or(lists.first())
-            .map(|l| l.href.clone())
-        else {
-            return;
-        };
-        if text.is_empty() {
-            return;
-        }
+            .or(lists.first())?
+            .href
+            .clone();
         let start = crate::settings::order().task_start;
         let patch = TaskPatch {
             event: Some(Some(ev.uid.clone())),
@@ -1459,70 +1511,239 @@ fn event_tasks(e: &Event) -> gtk::Box {
             let t = core().add_task(list_href, text, None, None, start)?;
             core().update_task(t.uid.clone(), patch).map(|_| t)
         });
-        if let Ok(t) = added {
-            entry.set_text("");
-            if let Some(t) = core().task(t.uid) {
-                list.append(&task_check(&t, &head));
-            }
-            head.set_label(&tasks_heading(&ev.uid));
-            request_sync();
+        added.ok().and_then(|t| core().task(t.uid))
+    };
+    checklist(
+        "Tasks",
+        "Add a task for this event",
+        Rc::new(move || core().event_tasks(uid.clone())),
+        Some(Box::new(add)),
+    )
+}
+
+/// A task's subtasks: tick them, add one.
+fn subtasks(t: &Task) -> gtk::Box {
+    let (list, uid) = (t.list_href.clone(), t.uid.clone());
+    let all = {
+        let (list, uid) = (list.clone(), uid.clone());
+        move || {
+            core()
+                .tasks(list.clone(), true)
+                .into_iter()
+                .filter(|s| s.parent_uid.as_ref() == Some(&uid))
+                .collect()
         }
-    });
-    b.append(&entry);
-    b
+    };
+    let add = move |text: String| {
+        let start = crate::settings::order().sub_start;
+        core()
+            .add_task(list.clone(), text, None, Some(uid.clone()), start)
+            .ok()
+    };
+    checklist(
+        "Subtasks",
+        "Add a subtask",
+        Rc::new(all),
+        Some(Box::new(add)),
+    )
 }
 
-/// "Tasks · done/all" for an event.
-fn tasks_heading(event_uid: &str) -> String {
-    let tasks = core().event_tasks(event_uid.into());
-    match tasks.len() {
-        0 => "Tasks".into(),
-        n => format!("Tasks · {}/{n}", tasks.iter().filter(|t| t.done).count()),
-    }
-}
-
-/// A task of an event, to tick; `head` shows the count.
-fn task_check(t: &Task, head: &gtk::Label) -> gtk::CheckButton {
-    let check = gtk::CheckButton::builder()
-        .label(&t.summary)
-        .active(t.done)
-        .build();
-    let (uid, event, head) = (
-        t.uid.clone(),
-        t.event_uid.clone().unwrap_or_default(),
-        head.clone(),
-    );
-    check.connect_toggled(move |c| {
-        if core().set_done(uid.clone(), c.is_active()).is_ok() {
-            head.set_label(&tasks_heading(&event));
-            request_sync();
-        }
-    });
-    check
-}
-
-/// An event's details: what, when, where, which calendar, notes, tasks.
-fn details(c: &Cal, e: &Event) -> gtk::Popover {
+/// The content of a details popover, and an icon-led line of it.
+fn details_box() -> gtk::Box {
     let b = gtk::Box::new(gtk::Orientation::Vertical, 8);
     b.set_margin_start(6);
     b.set_margin_end(6);
     b.set_margin_top(6);
     b.set_margin_bottom(6);
     b.set_width_request(280);
-    let line = |icon: &str, text: &str| {
-        let r = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-        let i = gtk::Image::from_icon_name(icon);
-        i.set_valign(gtk::Align::Start);
-        r.append(&i);
-        let l = gtk::Label::builder()
-            .label(text)
-            .xalign(0.0)
-            .wrap(true)
-            .wrap_mode(gtk::pango::WrapMode::WordChar)
+    b
+}
+
+fn line(icon: &str, text: &str) -> gtk::Box {
+    let r = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let i = gtk::Image::from_icon_name(icon);
+    i.set_valign(gtk::Align::Start);
+    r.append(&i);
+    let l = gtk::Label::builder()
+        .label(text)
+        .xalign(0.0)
+        .wrap(true)
+        .wrap_mode(gtk::pango::WrapMode::WordChar)
+        .build();
+    r.append(&l);
+    r
+}
+
+/// The collection's dot and `name`.
+fn which(list: &str, name: &str) -> gtk::Box {
+    let which = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let dot = gtk::Box::builder().valign(gtk::Align::Center).build();
+    dot.add_css_class("dot");
+    dot.add_css_class(&class(list));
+    which.append(&dot);
+    which.append(&gtk::Label::new(Some(name)));
+    which
+}
+
+/// When the reminders go off, one a line.
+fn reminders_line(at: &[i64]) -> Option<gtk::Box> {
+    let now = core().local_now();
+    let at: Vec<String> = at.iter().map(|r| dates::label(*r, false, now)).collect();
+    (!at.is_empty()).then(|| line("alarm-symbolic", &at.join("\n")))
+}
+
+/// What a details popover's Delete and Edit… buttons do.
+type Buttons = (Box<dyn Fn()>, Box<dyn Fn()>);
+
+/// A details popover holding `b`, with Delete and Edit… under it when `buttons` are given.
+/// Changes made in it (a task ticked or added) redraw the views once it closes, not under it.
+fn details_popover(b: &gtk::Box, buttons: Option<Buttons>) -> gtk::Popover {
+    let pop = gtk::Popover::builder().child(b).build();
+    pop.connect_show(|_| {
+        if let Some(c) = cal() {
+            c.holding.set(true);
+        }
+    });
+    pop.connect_closed(|_| {
+        if let Some(c) = cal() {
+            c.holding.set(false);
+            if c.pending.replace(false) {
+                glib::idle_add_local_once(refresh);
+            }
+        }
+    });
+    if let Some((on_delete, on_edit)) = buttons {
+        let row = gtk::Box::builder()
+            .spacing(6)
+            .halign(gtk::Align::End)
+            .margin_top(4)
             .build();
-        r.append(&l);
-        r
+        let delete = gtk::Button::builder()
+            .icon_name("user-trash-symbolic")
+            .tooltip_text("Delete")
+            .build();
+        delete.add_css_class("flat");
+        let edit = gtk::Button::builder().label("Edit…").build();
+        let p = pop.downgrade();
+        delete.connect_clicked(move |_| {
+            if let Some(p) = p.upgrade() {
+                p.popdown();
+            }
+            on_delete();
+        });
+        let p = pop.downgrade();
+        edit.connect_clicked(move |_| {
+            if let Some(p) = p.upgrade() {
+                p.popdown();
+            }
+            on_edit();
+        });
+        row.append(&delete);
+        row.append(&edit);
+        b.append(&row);
+    }
+    pop
+}
+
+/// Clicks on `w`, an item on the calendar: one shows its `details`, two open `edit`. The details
+/// wait out the double-click time, as their popover's grab would take a second click; with
+/// "Edit on double click" off they show at once and two clicks do nothing more. Returns
+/// what `w`'s clicked (or activated) signal does; a check in `w` ticks however fast.
+fn on_clicks(
+    w: &impl IsA<gtk::Widget>,
+    details: impl Fn() -> Option<gtk::Popover> + 'static,
+    edit: impl Fn() + 'static,
+) -> impl Fn() + 'static {
+    let pending: Rc<RefCell<Option<glib::SourceId>>> = Rc::default();
+    // The second click's own clicked signal, after `edit`.
+    let skip = Rc::new(Cell::new(false));
+    let click = gtk::GestureClick::new();
+    click.set_propagation_phase(gtk::PropagationPhase::Capture);
+    let (p, s) = (pending.clone(), skip.clone());
+    click.connect_pressed(move |g, n, x, y| {
+        let on_check = g
+            .widget()
+            .and_then(|w| w.pick(x, y, gtk::PickFlags::DEFAULT))
+            .is_some_and(|t| t.ancestor(gtk::CheckButton::static_type()).is_some());
+        if n != 2 || on_check || !crate::settings::double_click_edit() {
+            s.set(false);
+            return;
+        }
+        if let Some(id) = p.take() {
+            id.remove();
+        }
+        s.set(true);
+        edit();
+    });
+    w.add_controller(click);
+    let w = w.upcast_ref::<gtk::Widget>().downgrade();
+    let details = Rc::new(details);
+    move || {
+        if skip.replace(false) {
+            return;
+        }
+        // Without editing on a double click there is nothing to wait for.
+        if !crate::settings::double_click_edit() {
+            if let (Some(w), Some(pop)) = (w.upgrade(), details()) {
+                pop_up(pop, &w);
+            }
+            return;
+        }
+        let wait = gtk::Settings::default().map_or(400, |s| s.gtk_double_click_time());
+        let (w, details, p) = (w.clone(), details.clone(), pending.clone());
+        let id = glib::timeout_add_local_once(
+            std::time::Duration::from_millis(wait.max(0) as u64),
+            move || {
+                p.take();
+                if let (Some(w), Some(pop)) = (w.upgrade(), details()) {
+                    pop_up(pop, &w);
+                }
+            },
+        );
+        if let Some(old) = pending.replace(Some(id)) {
+            old.remove();
+        }
+    }
+}
+
+/// An event's button: a click shows its details, a double click edits it.
+fn event_clicks(b: &gtk::Button, e: &Event) {
+    let (ev, ev2) = (e.clone(), e.clone());
+    let open = on_clicks(
+        b,
+        move || cal().map(|c| details(&c, &ev)),
+        move || edit_event(&ev2),
+    );
+    b.connect_clicked(move |_| open());
+}
+
+/// Edit an event, if its calendar may be written to.
+fn edit_event(e: &Event) {
+    let Some(c) = cal() else { return };
+    if !writable(&c, &e.list_href) {
+        return;
+    }
+    let time = EventTime {
+        start: e.start,
+        end: e.end,
+        all_day: e.all_day,
     };
+    dialog::open(&c, Some(e.clone()), time);
+}
+
+/// Show `pop` from `parent`, which is not a menu button.
+fn pop_up(pop: gtk::Popover, parent: &impl IsA<gtk::Widget>) {
+    pop.set_parent(parent);
+    pop.connect_closed(|p| {
+        let p = p.clone();
+        glib::idle_add_local_once(move || p.unparent());
+    });
+    pop.popup();
+}
+
+/// An event's details: what, when, where, which calendar, notes, tasks.
+fn details(c: &Cal, e: &Event) -> gtk::Popover {
+    let b = details_box();
     let title = gtk::Label::builder()
         .label(&e.summary)
         .xalign(0.0)
@@ -1537,70 +1758,19 @@ fn details(c: &Cal, e: &Event) -> gtk::Popover {
     if let Some(l) = &e.location {
         b.append(&line("mark-location-symbolic", l));
     }
-    let which = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-    let dot = gtk::Box::builder().valign(gtk::Align::Center).build();
-    dot.add_css_class("dot");
-    dot.add_css_class(&class(&e.list_href));
-    which.append(&dot);
-    which.append(&gtk::Label::new(Some(&list_name(c, &e.list_href))));
-    b.append(&which);
-    if !e.reminders.is_empty() {
-        let at: Vec<String> = e
-            .reminders
-            .iter()
-            .map(|r| dates::label(*r, false, core().local_now()))
-            .collect();
-        b.append(&line("alarm-symbolic", &at.join("\n")));
+    b.append(&which(&e.list_href, &list_name(c, &e.list_href)));
+    if let Some(r) = reminders_line(&e.reminders) {
+        b.append(&r);
     }
     if let Some(d) = &e.description {
         b.append(&line("text-x-generic-symbolic", d));
     }
     b.append(&event_tasks(e));
-    let pop = gtk::Popover::builder().child(&b).build();
-    // Changes made here (a task ticked or added) redraw the views once it closes, not under it.
-    pop.connect_show(|_| {
-        if let Some(c) = cal() {
-            c.holding.set(true);
-        }
-    });
-    pop.connect_closed(|_| {
-        if let Some(c) = cal() {
-            c.holding.set(false);
-            if c.pending.replace(false) {
-                glib::idle_add_local_once(refresh);
-            }
-        }
-    });
-    if writable(c, &e.list_href) {
-        let buttons = gtk::Box::builder()
-            .spacing(6)
-            .halign(gtk::Align::End)
-            .margin_top(4)
-            .build();
-        let delete = gtk::Button::builder()
-            .icon_name("user-trash-symbolic")
-            .tooltip_text("Delete")
-            .build();
-        delete.add_css_class("flat");
-        let edit = gtk::Button::builder().label("Edit…").build();
-        let (p, ev) = (pop.downgrade(), e.clone());
-        edit.connect_clicked(move |_| {
-            if let Some(p) = p.upgrade() {
-                p.popdown();
-            }
-            if let Some(c) = cal() {
-                let time = EventTime {
-                    start: ev.start,
-                    end: ev.end,
-                    all_day: ev.all_day,
-                };
-                dialog::open(&c, Some(ev.clone()), time);
-            }
-        });
-        let (p, ev) = (pop.downgrade(), e.clone());
-        delete.connect_clicked(move |_| {
-            let Some(p) = p.upgrade() else { return };
-            p.popdown();
+    let buttons = writable(c, &e.list_href).then(|| {
+        let ev = e.clone();
+        let on_edit = move || edit_event(&ev);
+        let ev = e.clone();
+        let on_delete = move || {
             let ev = ev.clone();
             let del = move |scope: Scope| match core().delete_event(
                 ev.list_href.clone(),
@@ -1620,12 +1790,83 @@ fn details(c: &Cal, e: &Event) -> gtk::Popover {
                 }
                 _ => del(Scope::All),
             }
-        });
-        buttons.append(&delete);
-        buttons.append(&edit);
-        b.append(&buttons);
+        };
+        (
+            Box::new(on_delete) as Box<dyn Fn()>,
+            Box::new(on_edit) as Box<dyn Fn()>,
+        )
+    });
+    details_popover(&b, buttons)
+}
+
+/// A task's details, as an event's: tick it, when, which list and category, its event, notes,
+/// and a task's subtasks (a subtask names its task instead).
+fn task_details(c: &Cal, t: &Task) -> gtk::Popover {
+    let b = details_box();
+    let check = gtk::CheckButton::builder()
+        .active(t.done)
+        .valign(gtk::Align::Center)
+        .tooltip_text("Done")
+        .build();
+    let uid = t.uid.clone();
+    check.connect_toggled(move |b| {
+        if core().set_done(uid.clone(), b.is_active()).is_ok() {
+            request_sync();
+        }
+    });
+    let title = gtk::Label::builder()
+        .label(&t.summary)
+        .xalign(0.0)
+        .wrap(true)
+        .hexpand(true)
+        .build();
+    title.add_css_class("title-4");
+    let head = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    head.append(&check);
+    head.append(&title);
+    b.append(&head);
+    if let Some(e) = &t.sync_error {
+        b.append(&line(
+            "dialog-warning-symbolic",
+            &format!(
+                "Not saved on the server: {}",
+                crate::window::server_reason(e)
+            ),
+        ));
     }
-    pop
+    let when = task_when(t);
+    if !when.is_empty() {
+        b.append(&line("x-office-calendar-symbolic", &when.join("\n")));
+    }
+    let name = match t.category.as_deref().filter(|c| !c.is_empty()) {
+        Some(cat) => format!("{} · {cat}", list_name(c, &t.list_href)),
+        None => list_name(c, &t.list_href),
+    };
+    b.append(&which(&t.list_href, &name));
+    if let Some(p) = crate::window::priority_name(t.priority) {
+        b.append(&line("emblem-important-symbolic", &format!("{p} priority")));
+    }
+    if let Some(e) = t.event_uid.clone().and_then(|e| core().event(e)) {
+        b.append(&line("insert-link-symbolic", &format!("For {}", e.summary)));
+    }
+    if let Some(r) = reminders_line(&t.reminders) {
+        b.append(&r);
+    }
+    if let Some(d) = t.description.as_deref().filter(|d| !d.is_empty()) {
+        b.append(&line("text-x-generic-symbolic", d));
+    }
+    match t.parent_uid.clone().and_then(|p| core().task(p)) {
+        Some(parent) => b.append(&line(
+            "view-list-bullet-symbolic",
+            &format!("Subtask of {}", parent.summary),
+        )),
+        None => b.append(&subtasks(t)),
+    }
+    let task = t.clone();
+    let on_delete = move || crate::window::delete_task(&task);
+    let task = t.clone();
+    let on_edit = move || crate::window::edit_task(&task);
+    details_popover(&b, Some((Box::new(on_delete), Box::new(on_edit))))
 }
 
 fn render_agenda(c: &Rc<Cal>) {
@@ -1651,7 +1892,7 @@ fn render_agenda(c: &Rc<Cal>) {
             .title(glib::markup_escape_text(&day_title(day, "%A %-d %B")))
             .build();
         for i in here {
-            group.add(&agenda_row(c, i));
+            group.add(&agenda_row(i));
         }
         flash_if(c, &group, day);
         c.agenda.append(&group);
@@ -1730,11 +1971,7 @@ fn render_search(c: &Rc<Cal>) {
             c.agenda.append(&g);
             group = Some((day, g));
         }
-        group
-            .as_ref()
-            .unwrap()
-            .1
-            .add(&agenda_row(c, &Item::Event(e)));
+        group.as_ref().unwrap().1.add(&agenda_row(&Item::Event(e)));
     }
     if group.is_none() {
         let empty = adw::StatusPage::builder()
@@ -1747,7 +1984,7 @@ fn render_search(c: &Rc<Cal>) {
     }
 }
 
-fn agenda_row(c: &Rc<Cal>, i: &Item) -> adw::ActionRow {
+fn agenda_row(i: &Item) -> adw::ActionRow {
     let row = adw::ActionRow::builder()
         .use_markup(false)
         .activatable(true)
@@ -1769,17 +2006,13 @@ fn agenda_row(c: &Rc<Cal>, i: &Item) -> adw::ActionRow {
             };
             row.set_subtitle(&sub);
             row.add_prefix(&dot);
-            let (weak, e) = (Rc::downgrade(c), e.clone());
-            row.connect_activated(move |row| {
-                let Some(c) = weak.upgrade() else { return };
-                let pop = details(&c, &e);
-                pop.set_parent(row);
-                pop.connect_closed(|p| {
-                    let p = p.clone();
-                    glib::idle_add_local_once(move || p.unparent());
-                });
-                pop.popup();
-            });
+            let (ev, ev2) = (e.clone(), e.clone());
+            let open = on_clicks(
+                &row,
+                move || cal().map(|c| details(&c, &ev)),
+                move || edit_event(&ev2),
+            );
+            row.connect_activated(move |_| open());
         }
         Item::Task(t) => {
             row.set_title(&t.summary);
@@ -1801,8 +2034,13 @@ fn agenda_row(c: &Rc<Cal>, i: &Item) -> adw::ActionRow {
             });
             row.add_prefix(&check);
             row.add_prefix(&dot);
-            let task = t.clone();
-            row.connect_activated(move |_| crate::window::edit_task(&task));
+            let (task, task2) = (t.clone(), t.clone());
+            let open = on_clicks(
+                &row,
+                move || cal().map(|c| task_details(&c, &task)),
+                move || crate::window::edit_task(&task2),
+            );
+            row.connect_activated(move |_| open());
         }
     }
     row
