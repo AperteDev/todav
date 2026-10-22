@@ -1,5 +1,11 @@
 # Agent notes
 
+## Architecture
+
+- `docs/ARCHITECTURE.md` holds the architecture, the design decisions and the plan (progress,
+  roadmap, open questions). Read it before working on a feature, and update it in the same
+  change when the work changes what it says: a decision made, a step done, a plan dropped.
+
 ## Settings
 
 - Client settings are synced between devices by default. Any new setting syncs unless it only

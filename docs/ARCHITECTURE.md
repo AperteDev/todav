@@ -1,6 +1,6 @@
-# Todav — Implementation Plan
+# Todav — Architecture and Plan
 
-Oct 8, 2026 · @Kris
+Oct 8, 2026 · @Kris · updated Oct 22, 2026
 
 ## Overview
 
@@ -18,19 +18,17 @@ Todav is meant to become a tasks + calendar app (VEVENT next to VTODO, same CalD
 **Non-goals (v1)**
 
 - Multi-user sharing, assignees, comments.
-- Recurring tasks, reminders/alarms, attachments.
-- iOS, web front-end, non-Nextcloud servers (the core stays server-agnostic where cheap, but only Nextcloud is tested).
+- Recurring tasks, attachments.
+- iOS, web front-end.
 
 **Principles for the agent**
 
 - The Rust core is the only place with sync, push, parsing and conflict logic. Front-ends are thin: they render state and call commands.
-- Every feature lands in the core with tests against a real Nextcloud (docker compose in `infra/`) before any UI uses it.
+- Every feature lands in the core with tests against a real Nextcloud (the Test account, see [Progress](#progress)) before any UI uses it.
 - Push is best-effort by spec; polling with `sync-token` stays as the safety net everywhere.
 - When in doubt, do the simpler thing and leave a `TODO(v2)` comment rather than a configuration option.
 
 ## Architecture
-
-&#91;embedded content: nomorepo architecture: server, push transport, two apps, two satellites\]
 
 Nextcloud is the only source of truth and both apps talk to it over plain CalDAV; ntfy only carries "something changed" signals, after which the app runs a sync-token pull. The GNOME extension and the Pebble watch hold no data of their own and go through their host app.
 
@@ -52,31 +50,14 @@ Storage is plain CalDAV: one calendar per list, one VTODO per task. Categories a
 | Task | `VTODO` resource (`<uid>.ics`) | `UID`, `SUMMARY`, `STATUS`, `COMPLETED`, `PRIORITY`, `DUE`, `DESCRIPTION` |
 | Category (Groceries, Home, Electronics, Mountains, Car) | `CATEGORIES` on the VTODO | Exactly one category per task in v1; multiple are read but the first is used for grouping |
 | Subtask | `RELATED-TO;RELTYPE=PARENT:<parent uid>` | Depth 1 only in UI; deeper nesting is read and preserved but flattened |
-| Manual order | `X-TODAV-ORDER` (integer) | Fallback: `CREATED` timestamp |
-| Category metadata (order, icon, colour) | `todav/config.json` in Nextcloud Files via WebDAV | One file, fetched with `If-None-Match`; also pushed by notify\_push-free polling once per app start |
+| Manual order | `X-APPLE-SORT-ORDER` (integer), shared with Nextcloud Tasks | Fallback: `CREATED` timestamp; the old `X-TODAV-ORDER` is read and dropped on the next reorder |
+| Event | `VEVENT` resource in a calendar that supports it | See [Calendar](#calendar-in-todav) |
+| Category metadata (order, icon) | `todav/config.json` in Nextcloud Files via WebDAV | One file, fetched with `If-None-Match` on sync |
+| Client settings | `.config/todav/settings.json` in Nextcloud Files | Merged per key on every sync, newer wins; device-only keys stay local |
 | Server change cursor | `sync-token` per calendar | Stored locally; `sync-collection` REPORT (RFC 6578) on every sync |
 | Push identity | `DAV:Push` `topic` per calendar | Maps incoming push to a calendar |
 
-**Local schema (SQLite, in the core)**
-
-```sql
-CREATE TABLE lists (
-  href TEXT PRIMARY KEY, display_name TEXT, color TEXT,
-  ctag TEXT, sync_token TEXT, push_topic TEXT,
-  push_registration_href TEXT, push_expires INTEGER
-);
-CREATE TABLE tasks (
-  uid TEXT PRIMARY KEY, list_href TEXT NOT NULL REFERENCES lists(href),
-  etag TEXT, href TEXT, raw_ics TEXT NOT NULL,
-  summary TEXT NOT NULL, status TEXT NOT NULL, completed_at INTEGER,
-  category TEXT, parent_uid TEXT, priority INTEGER, due INTEGER,
-  sort_order INTEGER, last_modified INTEGER,
-  dirty INTEGER NOT NULL DEFAULT 0,     -- 0 clean, 1 modified, 2 deleted locally
-  deleted_remote INTEGER NOT NULL DEFAULT 0
-);
-CREATE INDEX tasks_list_cat ON tasks(list_href, category, status);
-CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT);  -- config.json cache, device id, etc.
-```
+**Local schema**: SQLite in the core (`todav/core/src/store.rs`, migrations by `PRAGMA user_version`): `lists`, `tasks`, `events` (raw iCalendar plus derived columns, a dirty flag for the push queue), `alarms` (reminders in local time) and `kv` (config/settings cache, push keys, setting change times).
 
 `raw_ics` keeps the full original VTODO so properties the app does not understand survive a round trip. On write, the core patches the known properties in `raw_ics` and bumps `DTSTAMP`/`LAST-MODIFIED`/`SEQUENCE`.
 
@@ -104,46 +85,39 @@ One monorepo, one Cargo workspace at the root. Each app has its own top-level di
 <repo>/
   Cargo.toml                 # workspace: todav/core, todav/cli, todav/linux/app
   todav/
-    core/                    # todav-core (library)
+    core/                    # todav-core (library), flat modules in src/
       src/
-        lib.rs               # public API + UniFFI exports
-        caldav/              # PROPFIND/REPORT/PUT/DELETE, XML builders + parsers
-        ical/                # minimal VTODO reader/writer
-        store/               # SQLite schema, migrations, queries
-        sync/                # engine: pull (sync-token), push (dirty queue), conflicts
-        push/                # WebDAV-Push registration, ntfy transport (Linux), message decode
-        config/              # todav/config.json fetch/parse
-        model.rs             # List, Task, Category, Change events
-      tests/                 # integration tests against docker Nextcloud
-      todav.udl              # UniFFI interface (or proc-macro exports)
+        lib.rs               # public API (Client), change events
+        caldav.rs            # PROPFIND/REPORT/PUT/DELETE, MKCALENDAR, XML tree + multistatus
+        ical.rs              # VTODO/VEVENT reader/writer, unknown properties kept
+        rrule.rs, tz.rs      # recurrence expansion, VTIMEZONE offsets
+        event.rs             # events, occurrences, event reminders
+        store.rs             # SQLite schema, migrations, queries
+        sync.rs              # engine: pull (sync-token), push (dirty queue), conflicts
+        push.rs              # WebDAV-Push registration, aes128gcm decryption, ntfy listener
+        config.rs            # todav/config.json (categories)
+        settings.rs          # synced client settings
+        login.rs             # Login Flow v2, app password sign-in
+        undo.rs              # undo history of local changes
+        json.rs              # minimal JSON (no serde)
     cli/                     # todav-cli: thin debugging/scripting front-end
     linux/
-      app/                   # GTK4 + libadwaita app (Rust, gtk4-rs)
-      data/                  # .desktop, metainfo, icons, gschema
-      flatpak/               # io.github.<you>.Todav.json
+      app/                   # GTK4 + libadwaita app (Rust, gtk4-rs); Blueprint views in ui/
+      data/                  # .desktop, metainfo, icons, D-Bus service
+      flatpak/               # io.github.selfref.Todav.json
     gnome-extension/         # GNOME Shell extension (GJS), talks D-Bus to the Linux app
-    android/
-      app/                   # Kotlin + Jetpack Compose
-      core/                  # Gradle module: UniFFI-generated Kotlin + libtodav_core.so
-      pebble/                # PebbleKit companion code (part of app module, separate package)
-    pebble/                  # Pebble watchapp (C, Pebble SDK)
+    android/                 # planned: app (Compose), core (UniFFI module), pebble companion
+    pebble/                  # planned: Pebble watchapp (C, Pebble SDK)
   notav/                     # Notav (planned, not started)
-  infra/
-    docker-compose.yml       # Nextcloud + Redis + ntfy + dav_push for tests
-    nextcloud-setup.sh       # occ: enable tasks, dav_push; create test user + calendars
-  scripts/
-    migrate-categories.py    # one-off migration (see Migration)
-  docs/
-    ARCHITECTURE.md, SYNC.md, PUSH.md, PEBBLE_PROTOCOL.md
 ```
 
 **Tooling**
 
-- Rust stable; `cargo clippy -D warnings`, `cargo fmt`, `cargo test`.
-- Android: Gradle, Kotlin, `cargo-ndk` to build `.so` for arm64-v8a (and x86\_64 for the emulator); UniFFI bindgen in a Gradle task.
-- Linux: `cargo build -p todav-linux`; Flatpak manifest builds from the workspace with `cargo --offline` and a vendored sources JSON.
-- Pebble: the open-source Pebble SDK toolchain (`pebble build`), pinned version in `pebble/README.md`.
-- CI (GitHub Actions): core tests with the docker stack, clippy, Android debug build, Pebble build. No signing in CI.
+- Rust stable; `cargo clippy -D warnings`, `cargo fmt`, `cargo test` (`--features integration` for the tests against the server).
+- Linux: `make -C todav/linux install` (per-user) or `make -C todav/linux flatpak`; the build needs `blueprint-compiler` and `glib-compile-resources`. Flathub will need a generated `cargo-sources.json` for an offline build.
+- Android (planned): Gradle, Kotlin, `cargo-ndk` to build `.so` for arm64-v8a (and x86\_64 for the emulator); UniFFI bindgen in a Gradle task.
+- Pebble (planned): the open-source Pebble SDK toolchain (`pebble build`), pinned version in `pebble/README.md`.
+- CI (GitHub Actions, not set up yet): unit tests, clippy, fmt; later the Android debug build and Pebble build. No signing in CI.
 
 **Dependency policy** (keep it short)
 
@@ -156,6 +130,8 @@ One monorepo, one Cargo workspace at the root. Each app has its own top-level di
 | ntfy stream (Linux push) | — (`ureq`) | ntfy's `/<topic>/json` NDJSON stream over plain HTTP; no WebSocket crate needed |
 | Web Push decryption | `ring` (HKDF, AES-128-GCM, RNG; already pulled in by rustls) + `p256` (static-key ECDH) | `dav_push` always encrypts (RFC 8291); `ece` drags in OpenSSL, ring can't load a stored ECDH key |
 | iCalendar | hand-written in `todav/core/src/ical.rs` | Full iCal crates are large; VTODO needs \~15 properties, line folding and escaping |
+| Linux UI | `gtk4`, `libadwaita` | The platform toolkit; D-Bus, GOA and notifications go through `gio` from the same bindings |
+| Linux secrets | `libsecret` | App passwords in the Secret Service |
 
 Anything beyond this table needs a one-line justification in the PR.
 
@@ -163,7 +139,7 @@ Anything beyond this table needs a one-line justification in the PR.
 
 The core owns all state and all network I/O. Front-ends get a `Client` handle, call commands, and subscribe to change events. The API is synchronous and blocking; callers run it on a background thread (GTK: `gio::spawn_blocking`, Android: coroutine on `Dispatchers.IO`).
 
-**Public API (UniFFI surface)**
+**Public API (UniFFI surface)**: the first sketch below; the real API in `todav/core/src/lib.rs` has grown since (events, lists and calendars, settings, login, undo).
 
 ```rust
 pub struct Client { /* SQLite conn, http agent, account */ }
@@ -205,7 +181,7 @@ impl Client {
 2. `ical` — parse/serialize VCALENDAR with one VTODO. Handles line folding (75 octets), escaping (`\,` `\;` `\n`), `TZID` and `VALUE=DATE` on `DUE`, `RELATED-TO` with `RELTYPE`, multi-value `CATEGORIES`, unknown properties preserved verbatim. Property-tested against ics files exported from Nextcloud Tasks, Tasks.org and Errands.
 3. `store` — rusqlite, migrations by `PRAGMA user_version`, one write transaction per command.
 4. `sync` — the engine below.
-5. `push` — WebDAV-Push registration per calendar; on Linux also the ntfy WebSocket listener (`push::ntfy::listen(url, token, on_message)`); on Android the app receives the message via UnifiedPush and hands bytes to `push_decode`.
+5. `push` — WebDAV-Push registration per calendar; on Linux also the ntfy listener (`push::listen`, the topic's JSON stream over HTTP); on Android the app receives the message via UnifiedPush and hands bytes to `push_decode`.
 6. `config` — fetch `todav/config.json` with `If-None-Match`, cache in `kv`, create it with defaults if 404.
 
 **Sync engine**
@@ -235,39 +211,41 @@ impl Client {
 
 - Store the `Location` header as `push_registration_href` and `push_expires`. Re-register when less than 25% of the lifetime is left or when the push resource changes (new UnifiedPush endpoint, new ntfy topic). `DELETE` old registrations.
 - Polling fallback stays on: every 30 min in the background, every 60 s while a window is focused; a successful push resets the timer.
-- `push_decode` accepts raw body bytes; if the first byte is not `{`/`<` and an `aes128gcm` content-encoding was indicated, decrypt with the stored keys (`ece`). Output is the list of topics (one in practice).
+- `push_decode` accepts raw body bytes; if the first byte is not `{`/`<` and an `aes128gcm` content-encoding was indicated, decrypt with the stored keys (`ring` + `p256`). Output is the list of topics (one in practice).
 
 **Testing**
 
 - Unit: `ical` round-trips, sync-engine state machine with a fake server trait.
-- Integration: `infra/docker-compose.yml` brings up Nextcloud + Tasks + dav\_push + ntfy; tests create a calendar, write via Nextcloud's own API, assert the core sees it after `sync()`, then after a push message. Run with `cargo test --features integration`.
+- Integration: against the real instance (see [Progress](#progress)); each test makes or reuses its own `it-<name>` calendar, writes through a second client, asserts the core sees it after `sync()`, then after a push message. Run with `cargo test -p todav-core --features integration`.
 
-**CLI** (`todav-cli`): `login`, `ls`, `add`, `done`, `sync`, `push-register`, `listen` (ntfy loop → sync). Used to validate the core before any GUI exists and as a debugging aid later.
+**CLI** (`todav`): `lists`, `ls`, `add`, `done`, `undo`, `rm`, `sync`, `push-register`, `listen` (ntfy loop → sync); the account comes from `.env`. Used to validate the core before any GUI exists and as a debugging aid later.
 
 ## Linux app (GTK4 + libadwaita)
 
 A single Rust binary (`todav-linux`) that is both the GUI and a background service: it keeps the ntfy connection open, runs sync, and exposes a small D-Bus interface the GNOME extension uses. There is no separate daemon.
 
-**Stack**: `gtk4-rs`, `libadwaita-rs`, `zbus` for D-Bus (the only extra dependency; it is the standard Rust D-Bus crate and also used by many GNOME apps). Settings in `GSettings` (account URL, user, ntfy topic); the app password in the Secret Service via `libsecret` (through `gio`/`secret` bindings, or `oo7` if lighter). State in `$XDG_DATA_HOME/todav/core.sqlite` via the core.
+**Stack**: `gtk4-rs`, `libadwaita-rs`, `libsecret`; D-Bus, GNOME Online Accounts and notifications through `gio`. Static views are Blueprint files in `ui/`. No GSettings: settings live in the core (`Client::setting`, synced). The app password in the Secret Service; a GOA account's password stays in GOA. State in `$XDG_DATA_HOME/todav/core.sqlite` via the core.
 
 **UI**
 
-- `AdwNavigationSplitView`: lists on the left (name, open count), tasks on the right.
-- Task page: an `AdwPreferencesGroup`-style group per category in config order; rows are `AdwActionRow` with a `GtkCheckButton` prefix; subtasks indented under their parent row; done tasks collapsed in a "Done (n)" group at the bottom.
-- Entry at the top of the list: type, Enter → `add_task` with the category of the last-added or currently expanded group; `Ctrl+K` category picker.
-- Drag-and-drop reorders within a category → `reorder`.
-- Toast for sync errors; a subtle "syncing" spinner in the header; manual refresh `F5`.
+- Welcome page to sign in: GNOME Online Accounts, browser (Login Flow v2) or login name + app password; optional ntfy server.
+- Tasks | Calendar switcher in the header. Tasks page: `AdwNavigationSplitView` with Upcoming, the lists (colour, open count) and categories in the sidebar; tasks grouped by category (or tags, or ungrouped), subtasks in expander rows, completed ones in a "Completed" expander or at the end.
+- Entry at the top of the list: type, Enter → `add_task`; `Ctrl+K` category picker. Edit dialog for dates, reminders, priority, category, event link and notes.
+- Drag and drop reorders, moves between categories, makes and promotes subtasks.
+- Type to search; `Ctrl+Z` undo; Keyboard Shortcuts dialog. Toasts for sync errors; the sync button turns into a spinner while syncing.
+- Calendar page: see [Calendar](#calendar-in-todav).
+- Preferences: General (style, start page, account, push, settings sync), Tasks, Calendar, Extension.
 
 **Process model**
 
 - `GtkApplication` with `HOLD` flag so the process stays alive when the window closes (`--gapplication-service` on login via autostart `.desktop` with `X-GNOME-Autostart`). Closing the window hides it; quitting is explicit (menu or `Ctrl+Q`).
-- Background thread: `core::push::ntfy::listen` loop → on message `sync_topic` → emit `Changed` → UI refreshes via `glib::MainContext::channel`.
-- Fallback timer: `glib::timeout_add_seconds` 60 s focused / 1800 s hidden → `sync()`.
+- Background thread: `push::listen` loop → on message `sync_topic` → emit `Changed` → UI refreshes on the main thread.
+- Fallback timer: every 60 s while the window is focused, every 30 min otherwise → `sync()`. Reminders are checked every 30 s and shown as notifications.
 
-**D-Bus interface** (session bus, name `io.github.<you>.Todav`, path `/io/github/<you>/Todav`)
+**D-Bus interface** (session bus, name `io.github.selfref.Todav`, path `/io/github/selfref/Todav`)
 
 ```xml
-<interface name="io.github.<you>.Todav1">
+<interface name="io.github.selfref.Todav1">
   <method name="GetLists">   <arg direction="out" type="a(ssus)"/> </method>           <!-- href, name, open_count, colour -->
   <method name="GetTasks">   <arg direction="in" name="list" type="s"/>
                              <arg direction="out" type="a(sssbu)"/> </method>          <!-- uid, summary, category, done, depth -->
@@ -287,7 +265,7 @@ A single Rust binary (`todav-linux`) that is both the GUI and a background servi
 
 The interface returns small tuples, not JSON, so the extension needs no parsing library. D-Bus activation (`DBusActivatable=true` + a service file) lets the extension start the app on demand.
 
-**Packaging**: Flatpak on `org.gnome.Platform` 48 (or the current stable). Permissions: `--share=network`, `--talk-name=org.freedesktop.secrets`, `--own-name=io.github.<you>.Todav`. The ntfy WebSocket needs nothing extra.
+**Packaging**: Flatpak on `org.gnome.Platform` 51 (`todav/linux/flatpak/`). Permissions: `--share=network`, `--talk-name=org.freedesktop.secrets`, `--talk-name=org.gnome.OnlineAccounts`; autostart through the Background portal. Not on Flathub yet.
 
 ## GNOME Shell extension
 
@@ -309,7 +287,7 @@ A panel indicator with a read-only view of a list and a month calendar; clicking
 - `metadata.json`: `shell-version` 48–51; no GSettings schema.
 - `Gio.DBusProxy.makeProxyWrapper(interfaceXml)` from the XML in the Linux section; copy the XML verbatim into `dbus.js`.
 - The task list scrolls; at most 100 tasks, then "+ n more".
-- Install: `make install` copies to `~/.local/share/gnome-shell/extensions/todav@<you>`; no extensions.gnome.org submission in v1.
+- Install: `make install` copies to `~/.local/share/gnome-shell/extensions/todav@selfref.dev` (`make link` for development); no extensions.gnome.org submission in v1.
 
 **Non-goals**: ticking or editing tasks (read-only for now), reordering, categories.
 
@@ -450,11 +428,25 @@ Deviation: no docker stack (`infra/`) for now — integration runs against the r
 - [x] M4 Linux app (`todav/linux/app`): login via browser (Login Flow v2), app password in Secret Service (libsecret), lists sidebar, grouped tasks, add with category (Ctrl+K), tick, delete, edit dialog, Done expander, F5/Ctrl+Q, hide on close, `--gapplication-service`, sync worker + ntfy listener + 60 s/30 min fallback timer, D-Bus API. `make -C todav/linux install` (desktop file, D-Bus activation, autostart). No GSettings: settings live in the core's kv. Verified via Broadway + D-Bus
 - [x] Drag-and-drop reorder, app icon (`todav/linux/data/*.svg`, also the extension's panel icon)
 - [x] M4 leftovers: undo for delete (toast; a delete already on the server is re-created), Flatpak (`todav/linux/flatpak/`, GNOME 51, `make -C todav/linux flatpak`; autostart through the Background portal; builds with network, Flathub needs a generated `cargo-sources.json`)
-- [x] M5 GNOME extension (`todav/gnome-extension/`, ESM, Shell 48–51): pinned list, category sections, tick keeps menu open, add entry, list switcher, open app, warning on sync error. `make -C todav/gnome-extension install`. Verified in a nested headless Shell
+- [x] M5 GNOME extension (`todav/gnome-extension/`, ESM, Shell 48–51): pinned list, category sections, add entry, list switcher, open app, warning on sync error. `make -C todav/gnome-extension install`. Verified in a nested headless Shell. Since reworked into the read-only two-column menu with a month calendar (see [GNOME Shell extension](#gnome-shell-extension)), options in the app's Preferences
 - [x] Dates: due date (+ optional time) and reminders (one `VALARM` each, `TRIGGER;RELATED=END`; presets or a custom time span; synced settings for the default new reminder and the time all-day reminders go off; local times in an `alarms` table) in the edit dialog; due tag on rows (red when overdue, bell with a reminder); "Upcoming" sidebar page across lists (Overdue, Today, Tomorrow, weekdays, Later); notifications for each reminder from the background service with "Mark as Done". Times are local wall-clock in the core (`to_local`/`to_utc` through SQLite's `localtime`); TZID times are read as local
-- [ ] Calendar: events (VEVENT) next to tasks — see the Calendar section for the steps
+- [x] Calendar: events (VEVENT) next to tasks — see the Calendar section for the steps
+- [x] Sign-in through GNOME Online Accounts and with a login name + app password; synced client settings (`.config/todav/settings.json`, device-only keys, "Sync settings with server"); undo history (`Client::undo`, `Client::together`) with Ctrl+Z; create, rename, recolour and delete lists and calendars; search; keyboard shortcuts; About dialog from the metainfo; new app and symbolic icons
+- [x] README and CONTRIBUTING
+- [ ] `docs/`, CI, Flathub (generated `cargo-sources.json`), extensions.gnome.org
 - [ ] M6 Android (+ UniFFI exports) → M7 Pebble
-- [ ] Non-functional (last): README, `docs/`, CI, Flatpak
+
+## Roadmap
+
+Public in the README as planned work; order not fixed.
+
+- [ ] **Multiple accounts**: several servers or users side by side; the core holds one account today (`Client::account`), and lists, push registrations and settings would need an account key.
+- [ ] **Offline mode**: use Todav without a server (local-only lists), and move them to an account later.
+- [ ] **More services** besides Nextcloud: other CalDAV servers first (Radicale, Baïkal, Fastmail, iCloud…), which mostly means login without Login Flow v2, settings/categories without Nextcloud Files, and polling where there is no WebDAV-Push.
+- [ ] **Android app**: M6 above.
+- [ ] **Nested subtasks**: more than one level; deeper `RELATED-TO` nesting is read and kept today, but the UI shows one level (the calendar's task popover lists a task's subtasks only).
+- [ ] **Advanced notifications**: configurable, beyond the reminder notifications the background service shows now; details to be specified.
+- [ ] **Starred tasks**: details to be specified.
 
 ## Milestones
 
@@ -462,12 +454,12 @@ Each milestone ends with something you can use daily; nothing is started before 
 
 | # | Milestone | Done when |
 | --- | --- | --- |
-| 0 | Infra | `docker compose up` in `infra/` gives Nextcloud + Tasks + dav\_push + ntfy; `nextcloud-setup.sh` seeds a user and three lists; a push from a web edit reaches `test_client`-style listener |
-| 1 | Core read/write | `todav-cli ls/add/done/sync` round-trips against the docker stack; `ical` round-trip tests pass on exports from Nextcloud Tasks, Tasks.org, Errands |
-| 2 | Core push | `todav-cli listen` registers WebDAV-Push with an ntfy topic and syncs within 5 s of a web edit; registration refresh works across expiry |
+| 0 | Infra | Dropped: tests run against the real instance (see [Progress](#progress)) |
+| 1 | Core read/write | `todav ls/add/done/sync` round-trips against the server; `ical` round-trip tests pass on exports from Nextcloud Tasks, Tasks.org, Errands |
+| 2 | Core push | `todav listen` registers WebDAV-Push with an ntfy topic and syncs within 5 s of a web edit; registration refresh works across expiry |
 | 3 | Migration | Dropped: tasks are rewritten by hand |
 | 4 | Linux app | GTK app replaces Errands for daily use; survives window close; D-Bus interface answers `GetTasks`; Flatpak builds |
-| 5 | GNOME extension | Popup shows the pinned list, ticks and adds; count label updates on `Changed` |
+| 5 | GNOME extension | Popup shows the pinned list and adds; count label updates on `Changed` |
 | 6 | Android app | Replaces Tasks.org for daily use; UnifiedPush via ntfy delivers in background; widget works |
 | 7 | Pebble | Watch lists, ticks, works offline; snapshot refresh after a push on the phone |
 | 8 | Polish | Conflict log visible in app settings; crash-free for 2 weeks; `docs/` complete |
@@ -475,15 +467,15 @@ Each milestone ends with something you can use daily; nothing is started before 
 ## Open questions and risks
 
 - [x] **dav\_push encryption** — resolved: `dav_push` (v1.0.3) *requires* `subscription-public-key type="p256dh"` + `auth-secret` and always sends aes128gcm. Namespace is `https://bitfire.at/webdav-push` (props `transports`, `topic`), registration is `POST <calendar>` with `push-register`, `201` + `Location`, max expiry 1 week, unregister = `DELETE <Location>`, echo suppression via `Push-Dont-Notify: "<Location>"`. Implemented in `todav/core/src/push.rs`, verified against the RFC 8291 test vector. Original note: the WebDAV-Push draft leaves RFC 8291 message encryption as TODO, while DAVx5 states its pushes are end-to-end encrypted. Before writing `core/push`, read `nc_ext_dav_push`'s registration handler and capture one real DAVx5 ↔ Nextcloud exchange (dav\_push debug log). If keys are required: add `client-public-key`/`auth-secret` to the registration XML, generate P-256 keys in the core, store them in `kv`, and pull in `ece`. If not: skip encryption on this private server and note it in `docs/PUSH.md`.
-- [ ] **dav\_push stability**: app-store build may lag GitHub; pin a git commit in `infra/` and in the server. Fallback if it misbehaves: a 50-line Nextcloud app that listens to `CalendarObject{Created,Updated,Deleted}Event` and `POST`s the topic to ntfy directly (the core's listener code stays identical).
+- [ ] **dav\_push stability**: app-store build may lag GitHub; pin a git commit on the server. Fallback if it misbehaves: a 50-line Nextcloud app that listens to `CalendarObject{Created,Updated,Deleted}Event` and `POST`s the topic to ntfy directly (the core's listener code stays identical).
 - [ ] **ntfy topic security**: topics must be random (22+ chars) and the ntfy server should have ACLs so only the owner can subscribe; the Linux app authenticates with an ntfy token stored in the Secret Service.
 - [ ] **Pebble SDK toolchain**: confirm the current open-source SDK builds for the user's watch model and that the Core Devices Pebble app forwards PebbleKit intents; otherwise fall back to the legacy Pebble app for the companion test.
-- [ ] **GNOME Shell version**: target the Shell version installed on the user's machine; GJS APIs for popup menus moved between 45 and 48.
+- [x] **GNOME Shell version**: the extension targets Shell 48–51 (ESM); GJS APIs for popup menus moved between 45 and 48.
 - [x] **Nextcloud Tasks compatibility**: manual order is stored in Nextcloud Tasks' own `X-APPLE-SORT-ORDER`, so both share one order; `X-TODAV-ORDER` is still read and dropped on the next reorder.
 
 **Verification checklist for the agent** (run before marking any milestone done)
 
-- [ ] `cargo test` incl. integration against the docker stack is green.
+- [ ] `cargo test` incl. integration against the server (`--features integration`) is green.
 - [ ] A task created in Nextcloud Tasks web appears in the client under test within 5 s with the app in the background (Linux hidden window / Android not running).
 - [ ] A task ticked on device A shows ticked on device B within 5 s; ticking the same task on both while offline resolves to "done" after reconnect.
 - [ ] Killing the network for 10 min and restoring it produces no duplicates and no lost edits.
