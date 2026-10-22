@@ -30,8 +30,12 @@
 .todav-mark-icon { icon-size: 10px; }
 .todav-task.done { text-decoration: line-through; }
 
-.todav-next-icon { icon-size: 16px; }
 .todav-entry { margin-top: 6px; }
+
+/* The agenda: an event's dot takes a task circle's room, the times line up. */
+.todav-agenda { max-height: 220px; margin-top: 4px; }
+.todav-mark-slot { width: 18px; }
+.todav-time { min-width: 40px; font-size: 0.9em; font-feature-settings: "tnum"; color: rgba(128, 128, 128, 1); }
 
 .todav-month { spacing: 2px; margin-top: 4px; }
 .todav-month-title { font-weight: bold; }
@@ -39,3 +43,8 @@
 .todav-weekday { font-size: 0.8em; padding: 2px 0; }
 .todav-day { width: 30px; height: 28px; border-radius: 99px; font-size: 0.9em; font-feature-settings: "tnum"; }
 .todav-day.today { background-color: -st-accent-color; color: -st-accent-fg-color; font-weight: bold; }
+/* With dots: a taller day, three dots at most under its number. */
+.todav-day.dotted { height: 34px; border-radius: 10px; }
+.todav-day-dots { spacing: 2px; height: 4px; margin-top: 1px; }
+.todav-day-dot { width: 4px; height: 4px; border-radius: 99px; }
+.todav-day.today .todav-day-dot { background-color: -st-accent-fg-color; }

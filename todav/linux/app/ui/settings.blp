@@ -310,12 +310,19 @@ Adw.PreferencesDialog dialog {
     Adw.PreferencesGroup {
       title: "Calendar";
 
-      Adw.SwitchRow ext_next_event {
-        title: "Next event";
-      }
-
       Adw.SwitchRow ext_month {
         title: "Month calendar";
+      }
+
+      Adw.SwitchRow ext_month_dots {
+        title: "Dots in the month";
+        subtitle: "Mark the days that have events or tasks";
+        sensitive: bind ext_month.active;
+      }
+
+      Adw.SwitchRow ext_agenda {
+        title: "Agenda";
+        subtitle: "Events and tasks of the coming week, under the month";
       }
 
       Adw.SwitchRow ext_add_event {

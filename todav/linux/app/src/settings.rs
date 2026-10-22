@@ -62,13 +62,14 @@ pub fn mini_dots() -> bool {
 
 /// The GNOME extension's options (Preferences → Extension, synced like the rest) with their
 /// defaults; it reads them over D-Bus. `ext_list` is the list it shows (empty: the first).
-pub const EXTENSION: [(&str, &str); 9] = [
+pub const EXTENSION: [(&str, &str); 10] = [
     ("ext_columns", "double"),
     ("ext_tasks", "true"),
     ("ext_subtasks", "true"),
     ("ext_add_task", "true"),
-    ("ext_next_event", "true"),
     ("ext_month", "true"),
+    ("ext_month_dots", "true"),
+    ("ext_agenda", "true"),
     ("ext_add_event", "true"),
     ("ext_open", "true"),
     ("ext_list", ""),

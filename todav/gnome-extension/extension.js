@@ -18,6 +18,9 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import {BUS_NAME, OBJECT_PATH, TodavProxy} from './dbus.js';
 
 const MAX_TASKS = 100;
+/// Days the agenda covers, from today.
+const AGENDA_DAYS = 7;
+const DAY = 86400;
 const {HORIZONTAL, VERTICAL} = Clutter.Orientation;
 const CENTER = Clutter.ActorAlign.CENTER;
 /// What St draws dimmed (it has no CSS opacity): done tasks, other months' days, weekdays.
@@ -39,6 +42,11 @@ function row(children, style_class = 'todav-row') {
     const content = new St.BoxLayout({x_expand: true});
     children.forEach(c => content.add_child(c));
     return new St.Button({style_class, child: content, can_focus: true, x_expand: true});
+}
+
+/// The app's day key: local midnight, counted as if it were UTC (its wall-clock seconds).
+function dayKey(date) {
+    return GLib.DateTime.new_utc(date.get_year(), date.get_month(), date.get_day_of_month(), 0, 0, 0).to_unix();
 }
 
 function entry(hint, done) {
@@ -157,7 +165,7 @@ class TodavIndicator extends PanelMenu.Button {
         }
         const {on, settings, pinned} = data;
         const tasks = on('tasks') || on('add_task') ? await this._tasksColumn(data) : null;
-        const calendar = on('next_event') || on('month') || on('add_event') ? await this._calendarColumn(on) : null;
+        const calendar = on('month') || on('agenda') || on('add_event') ? await this._calendarColumn(on) : null;
         this.menu.removeAll();
 
         // Side by side (tasks left), or one under the other.
@@ -280,27 +288,69 @@ class TodavIndicator extends PanelMenu.Button {
 
     async _calendarColumn(on) {
         const col = new St.BoxLayout({style_class: 'todav-column', orientation: VERTICAL, x_expand: true});
-        if (on('next_event')) {
-            // The event on now or next, opening the calendar on its day.
-            const [[title, when, start]] = await this._proxy.GetNextEventAsync().catch(() => [['', '', 0]]);
-            if (title) {
-                const icon = new St.Icon({icon_name: 'x-office-calendar-symbolic', style_class: 'todav-next-icon'});
-                const next = row([icon, label(`${when} · ${title}`, 'todav-next', {x_expand: true})]);
-                next.connect('clicked', () => this._open(p => p.ShowDayAsync(start)));
-                col.add_child(next);
-            } else {
-                col.add_child(label('No events in the week ahead', 'todav-empty'));
-            }
-        }
         if (on('month'))
-            col.add_child(this._monthView());
+            col.add_child(this._monthView(on('month_dots')));
+        if (on('agenda'))
+            col.add_child(await this._agenda());
         if (on('add_event'))
             col.add_child(entry('Add an event…', text => this._open(p => p.NewEventAsync(text))));
         return col;
     }
 
-    /// This month (arrows turn it); a day opens the calendar there.
-    _monthView() {
+    /// The coming week's events and dated tasks under their days; one opens the calendar there.
+    async _agenda() {
+        const [items] = await this._proxy.GetAgendaAsync(AGENDA_DAYS).catch(e => {
+            logError(e, 'Todav: cannot read the agenda');
+            return [[]];
+        });
+        const content = new St.BoxLayout({orientation: VERTICAL, x_expand: true});
+        const today = dayKey(GLib.DateTime.new_now_local());
+        let shown = null;
+        for (const [day, time, title, color, task, done] of items) {
+            if (day !== shown) {
+                shown = day;
+                const date = GLib.DateTime.new_from_unix_utc(day).format('%A %-d %B');
+                const when = ['Today', 'Tomorrow'][(day - today) / DAY];
+                const heading = when ? `${when} · ${date}` : date.charAt(0).toUpperCase() + date.slice(1);
+                content.add_child(label(heading, 'todav-category'));
+            }
+            content.add_child(this._agendaRow(day, time, title, color, task, done));
+        }
+        if (items.length === 0)
+            content.add_child(label('Nothing planned this week', 'todav-empty'));
+        const scroll = new St.ScrollView({
+            style_class: 'todav-agenda',
+            hscrollbar_policy: St.PolicyType.NEVER,
+            vscrollbar_policy: St.PolicyType.AUTOMATIC,
+            overlay_scrollbars: true,
+            x_expand: true,
+        });
+        scroll.child = content;
+        return scroll;
+    }
+
+    /// An event's dot or a task's circle (checked when done) in its calendar's colour, its time
+    /// and title.
+    _agendaRow(day, time, title, color, task, done) {
+        let mark;
+        if (task) {
+            mark = new St.Bin({style_class: 'todav-mark', style: `border-color: ${color};`, y_align: CENTER});
+            if (done)
+                mark.child = new St.Icon({icon_name: 'object-select-symbolic', style_class: 'todav-mark-icon'});
+        } else {
+            mark = new St.Bin({style_class: 'todav-mark-slot', child: dot(color), y_align: CENTER});
+        }
+        const name = label(title, done ? 'todav-task done' : 'todav-task', {x_expand: true});
+        if (done)
+            name.opacity = DIM;
+        const item = row([mark, label(time, 'todav-time'), name]);
+        item.connect('clicked', () => this._open(p => p.ShowDayAsync(day)));
+        return item;
+    }
+
+    /// This month (arrows turn it), with dots for what the days hold when `dots`; a day opens
+    /// the calendar there.
+    _monthView(dots) {
         const today = GLib.DateTime.new_now_local();
         this._month ??= GLib.DateTime.new_local(today.get_year(), today.get_month(), 1, 0, 0, 0);
         const view = new St.BoxLayout({style_class: 'todav-month', orientation: VERTICAL});
@@ -337,17 +387,38 @@ class TodavIndicator extends PanelMenu.Button {
                 layout.attach(weekday, i, 0, 1, 1);
             }
             const weeks = Math.ceil((offset + days) / 7);
+            const marks = [];
             for (let i = 0; i < weeks * 7; i++) {
                 const d = start.add_days(i);
                 const [y, m, n] = [d.get_year(), d.get_month(), d.get_day_of_month()];
                 const isToday = y === today.get_year() && m === today.get_month() && n === today.get_day_of_month();
-                const day = new St.Button({label: `${n}`, style_class: isToday ? 'todav-day today' : 'todav-day', can_focus: true, x_align: CENTER});
+                const content = new St.BoxLayout({orientation: VERTICAL, x_align: CENTER, y_align: CENTER});
+                content.add_child(new St.Label({text: `${n}`, x_align: CENTER}));
+                // Under the number, a dot for each calendar with something that day.
+                if (dots) {
+                    const box = new St.BoxLayout({style_class: 'todav-day-dots', x_align: CENTER});
+                    content.add_child(box);
+                    marks.push([box, isToday]);
+                }
+                const classes = ['todav-day', isToday && 'today', dots && 'dotted'].filter(Boolean);
+                const day = new St.Button({child: content, style_class: classes.join(' '), can_focus: true, x_align: CENTER});
                 if (m !== first.get_month())
                     day.opacity = DIM;
-                // The app counts days in local wall-clock seconds.
-                day.connect('clicked', () => this._open(p => p.ShowDayAsync(GLib.DateTime.new_utc(y, m, n, 0, 0, 0).to_unix())));
+                day.connect('clicked', () => this._open(p => p.ShowDayAsync(dayKey(d))));
                 layout.attach(day, i % 7, 1 + Math.floor(i / 7), 1, 1);
             }
+            if (!dots)
+                return;
+            this._proxy.GetDaysAsync(dayKey(start), weeks * 7).then(([colors]) => {
+                // Turned to another month meanwhile: those days are gone.
+                if (this._month !== first)
+                    return;
+                colors.forEach((list, i) => list.forEach(color => {
+                    // On today's fill they take its text colour (see the CSS).
+                    const [box, isToday] = marks[i];
+                    box.add_child(new St.Widget({style_class: 'todav-day-dot', style: isToday ? '' : `background-color: ${color};`}));
+                }));
+            }).catch(e => logError(e, 'Todav: cannot read the days'));
         };
         fill();
         return view;

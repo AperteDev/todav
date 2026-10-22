@@ -432,15 +432,65 @@ fn new_event() -> Option<adw::EntryRow> {
     Some(dialog::open(&c, None, time))
 }
 
-/// The timed event on now or next within a week, in the calendars shown (for the extension).
-pub fn next_event() -> Option<Event> {
-    let hidden = hidden();
-    let now = core().local_now();
+/// For the extension's month: the colours of `day_lists` for each of `days` days from `from`.
+pub fn day_colors(from: i64, days: i64) -> Vec<Vec<String>> {
+    let colors = colors();
+    let all = items(from, from + days * DAY);
+    (0..days)
+        .map(|n| {
+            day_lists(&all, from + n * DAY)
+                .into_iter()
+                .map(|l| colors.get(l).cloned().unwrap_or_default())
+                .collect()
+        })
+        .collect()
+}
+
+/// For the extension's agenda: what is on each of `days` days from today, as the Agenda view
+/// lists it: (day, time, title, colour, is a task, done).
+pub fn agenda(days: i64) -> Vec<(i64, String, String, String, bool, bool)> {
+    let colors = colors();
+    let from = today();
+    let all = items(from, from + days * DAY);
+    let mut out = Vec::new();
+    for day in (0..days).map(|n| from + n * DAY) {
+        for i in all.iter().filter(|i| on_day(i, day)) {
+            let color = colors.get(i.list()).cloned().unwrap_or_default();
+            out.push(match i {
+                Item::Event(e) => {
+                    // A day inside a longer event: all of it, or until it ends.
+                    let time = if e.all_day || (e.start < day && e.end >= day + DAY) {
+                        "All day".to_string()
+                    } else if e.start < day {
+                        format!("Until {}", fmt(e.end, "%H:%M"))
+                    } else {
+                        fmt(e.start, "%H:%M")
+                    };
+                    (day, time, e.summary.clone(), color, false, false)
+                }
+                Item::Task(t) => {
+                    let (at, all_day) = when(t);
+                    let time = if all_day {
+                        String::new()
+                    } else {
+                        fmt(at, "%H:%M")
+                    };
+                    (day, time, t.summary.clone(), color, true, t.done)
+                }
+            });
+        }
+    }
+    out
+}
+
+/// Every collection's colour as the app shows it, by href.
+fn colors() -> HashMap<String, String> {
     core()
-        .events(now, now + 7 * DAY)
+        .calendars()
         .into_iter()
-        .filter(|e| !e.all_day && !e.cancelled && e.end > now && !hidden.contains(&e.list_href))
-        .min_by_key(|e| e.start)
+        .chain(core().lists())
+        .map(|l| (l.href.clone(), crate::lists::color(&l)))
+        .collect()
 }
 
 /// Today's events in the calendars shown, for the Tasks page's Upcoming.
@@ -958,6 +1008,17 @@ fn on_day(i: &Item, day: i64) -> bool {
         Item::Event(e) => e.start < day + DAY && (e.end > day || e.start >= day),
         Item::Task(t) => (day..day + DAY).contains(&when(t).0),
     }
+}
+
+/// The collections with something on `day` among `all`, three at most: a month day's dots.
+fn day_lists(all: &[Item], day: i64) -> Vec<&str> {
+    let mut lists: Vec<&str> = Vec::new();
+    for i in all.iter().filter(|i| on_day(i, day)) {
+        if lists.len() < 3 && !lists.contains(&i.list()) {
+            lists.push(i.list());
+        }
+    }
+    lists
 }
 
 fn fmt(t: i64, f: &str) -> String {

@@ -15,7 +15,8 @@ const XML: &str = r#"<node>
   <method name="AddTask"><arg direction="in" name="list" type="s"/><arg direction="in" name="summary" type="s"/><arg direction="out" type="s"/></method>
   <method name="ShowList"><arg direction="in" name="list" type="s"/></method>
   <method name="ShowTask"><arg direction="in" name="uid" type="s"/></method>
-  <method name="GetNextEvent"><arg direction="out" type="(ssx)"/></method>
+  <method name="GetDays"><arg direction="in" name="from" type="x"/><arg direction="in" name="days" type="u"/><arg direction="out" type="aas"/></method>
+  <method name="GetAgenda"><arg direction="in" name="days" type="u"/><arg direction="out" type="a(xsssbb)"/></method>
   <method name="ShowDay"><arg direction="in" name="at" type="x"/></method>
   <method name="NewEvent"><arg direction="in" name="summary" type="s"/></method>
   <method name="GetSettings"><arg direction="out" type="a{ss}"/></method>
@@ -137,23 +138,19 @@ fn call(method: &str, params: &glib::Variant) -> Result<Option<glib::Variant>, S
             c.set_setting(key, value).map_err(|e| e.to_string())?;
             None
         }
-        // (title, when in words, start in local time for ShowDay); an empty title: none.
-        "GetNextEvent" => {
-            let next = crate::calendar::next_event().map(|e| {
-                let now = c.local_now();
-                let when = if e.start <= now {
-                    let until = crate::dates::fields(e.end)
-                        .format("%H:%M")
-                        .map(String::from);
-                    format!("Now, until {}", until.unwrap_or_default())
-                } else if e.start - now < 3600 {
-                    format!("In {} min", (e.start - now + 59) / 60)
-                } else {
-                    crate::dates::label(e.start, false, now)
-                };
-                (e.summary, when, e.start)
-            });
-            Some((next.unwrap_or_default(),).to_variant())
+        // For each of `days` days from `from` (local midnight), the colours of the calendars
+        // with something on it: the month's dots.
+        "GetDays" => {
+            let (from, days) = params.get::<(i64, u32)>().ok_or_else(bad)?;
+            let days = crate::calendar::day_colors(from, i64::from(days.min(42)));
+            Some((days,).to_variant())
+        }
+        // (day as local midnight for ShowDay, time, title, colour, is a task, done) for each
+        // thing on the `days` days from today, in the calendars shown.
+        "GetAgenda" => {
+            let (days,) = params.get::<(u32,)>().ok_or_else(bad)?;
+            let items = crate::calendar::agenda(i64::from(days.min(31)));
+            Some((items,).to_variant())
         }
         "ShowDay" => {
             let (at,) = params.get::<(i64,)>().ok_or_else(bad)?;

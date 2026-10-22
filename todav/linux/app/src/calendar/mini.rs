@@ -102,18 +102,14 @@ fn render(c: &Rc<Cal>) {
             .spacing(2)
             .halign(gtk::Align::Center)
             .build();
-        let mut lists: Vec<&str> = Vec::new();
-        for i in all.iter().filter(|i| on_day(i, day)) {
-            if lists.len() < 3 && !lists.contains(&i.list()) {
-                lists.push(i.list());
-                let dot = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-                dot.add_css_class("dot");
-                // On the selected day's fill they take its text colour (see the CSS).
-                if !selected {
-                    dot.add_css_class(&class(i.list()));
-                }
-                dots.append(&dot);
+        for list in day_lists(&all, day) {
+            let dot = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+            dot.add_css_class("dot");
+            // On the selected day's fill they take its text colour (see the CSS).
+            if !selected {
+                dot.add_css_class(&class(list));
             }
+            dots.append(&dot);
         }
         let content = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
