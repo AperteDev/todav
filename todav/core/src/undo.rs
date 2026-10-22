@@ -67,6 +67,14 @@ impl Journal {
         }
     }
 
+    /// Drop what was in list `href`, now deleted: there is nowhere to put it back.
+    pub fn forget_list(&mut self, href: &str) {
+        for s in &mut self.steps {
+            s.before.retain(|b| b.list_href != href);
+        }
+        self.steps.retain(|s| !s.before.is_empty());
+    }
+
     pub fn last(&self) -> Option<u64> {
         self.steps.last().map(|s| s.id)
     }

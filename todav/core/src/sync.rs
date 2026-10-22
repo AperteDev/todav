@@ -77,6 +77,47 @@ impl Client {
         }
     }
 
+    /// A new task list, or calendar of events (`events`), on the server; returns its href.
+    pub fn create_list(&self, name: String, color: String, events: bool) -> Result<String> {
+        let _guard = self.sync_lock.lock().unwrap();
+        let dav = self.dav()?;
+        let href = format!(
+            "{}/{}/",
+            dav.home()?.trim_end_matches('/'),
+            crate::new_uid()
+        );
+        dav.mkcalendar(&href, &name, &color, events)?;
+        self.save_lists(&dav.discover()?)?;
+        self.emit(&href, Vec::new());
+        Ok(href)
+    }
+
+    /// Rename and recolour list `href`, on the server and here.
+    pub fn edit_list(&self, href: String, name: String, color: String) -> Result<()> {
+        let _guard = self.sync_lock.lock().unwrap();
+        self.dav()?.proppatch(&href, &name, &color)?;
+        self.db.lock().unwrap().execute(
+            "UPDATE lists SET display_name = ?2, color = ?3 WHERE href = ?1",
+            params![href, name, color],
+        )?;
+        self.emit(&href, Vec::new());
+        Ok(())
+    }
+
+    /// Delete list `href` and everything in it, on the server (Nextcloud keeps it in its trash
+    /// bin for a while) and here; changes to it can no longer be undone.
+    pub fn delete_list(&self, href: String) -> Result<()> {
+        let _guard = self.sync_lock.lock().unwrap();
+        self.dav()?.delete(&href, None, None)?;
+        self.db
+            .lock()
+            .unwrap()
+            .execute("DELETE FROM lists WHERE href = ?", [&href])?;
+        self.journal.lock().unwrap().forget_list(&href);
+        self.emit(&href, Vec::new());
+        Ok(())
+    }
+
     fn save_lists(&self, remote: &[RemoteList]) -> Result<()> {
         let db = self.db.lock().unwrap();
         let tx = db.unchecked_transaction()?;

@@ -342,6 +342,42 @@ fn push_delivers_changes_and_refreshes_registration() {
 }
 
 #[test]
+fn lists_are_created_renamed_and_deleted() {
+    let (url, user, pass) = env();
+    let dir = std::env::temp_dir().join(format!("todav-it-lists-{}", now()));
+    let c = Client::open(dir.to_string_lossy().to_string()).unwrap();
+    c.set_account(url, user, pass).unwrap();
+    let href = c
+        .create_list("it-new & <list>".into(), "#B6469D".into(), false)
+        .unwrap();
+    let find = || c.lists().into_iter().find(|l| l.href == href);
+    let l = find().expect("the new list is here at once");
+    assert_eq!(
+        (l.display_name.as_str(), l.color.as_deref()),
+        ("it-new & <list>", Some("#B6469D"))
+    );
+    assert!(c.calendars().iter().all(|l| l.href != href), "tasks only");
+
+    c.edit_list(href.clone(), "it-renamed".into(), "#0082C9".into())
+        .unwrap();
+    c.sync().unwrap();
+    let l = find().unwrap();
+    assert_eq!(
+        (l.display_name.as_str(), l.color.as_deref()),
+        ("it-renamed", Some("#0082C9")),
+        "the server has it too"
+    );
+
+    c.add_task(href.clone(), "Inside".into(), None, None, false)
+        .unwrap();
+    c.delete_list(href.clone()).unwrap();
+    assert!(find().is_none());
+    assert!(!c.undo(None).unwrap(), "nothing left to undo in it");
+    c.sync().unwrap();
+    assert!(find().is_none(), "gone on the server");
+}
+
+#[test]
 fn password_login_checks_the_credentials() {
     let (url, user, pass) = env();
     let host = url.trim_start_matches("https://").to_string() + "/";

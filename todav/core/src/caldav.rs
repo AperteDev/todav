@@ -351,13 +351,17 @@ impl Dav {
             .ok_or_else(|| Error::Parse("no current-user-principal".into()))
     }
 
-    pub fn discover(&self) -> Result<Vec<RemoteList>> {
+    /// The collection the user's calendars are in.
+    pub fn home(&self) -> Result<String> {
         let principal = self.principal()?;
         let p = self.propfind(&principal, "0", "<c:calendar-home-set/>")?;
-        let home = p
-            .first()
+        p.first()
             .and_then(|r| r.props.find_text(DAV, "href"))
-            .ok_or_else(|| Error::Parse("no calendar-home-set".into()))?;
+            .ok_or_else(|| Error::Parse("no calendar-home-set".into()))
+    }
+
+    pub fn discover(&self) -> Result<Vec<RemoteList>> {
+        let home = self.home()?;
         let props = format!(
             r#"<d:resourcetype/><d:displayname/><d:sync-token/><cs:getctag/><a:calendar-color/><c:supported-calendar-component-set/><d:current-user-privilege-set/><p:transports xmlns:p="{PUSH}"/><p:topic xmlns:p="{PUSH}"/>"#
         );
@@ -479,6 +483,46 @@ impl Dav {
         }
     }
 
+    /// Create calendar `href` for tasks, or for events (`events`); which it holds stays.
+    pub fn mkcalendar(&self, href: &str, name: &str, color: &str, events: bool) -> Result<()> {
+        let comp = if events { "VEVENT" } else { "VTODO" };
+        let body = format!(
+            r#"<?xml version="1.0" encoding="utf-8"?><c:mkcalendar xmlns:d="DAV:" xmlns:c="{CALDAV}" xmlns:a="{APPLE}"><d:set><d:prop>{}<c:supported-calendar-component-set><c:comp name="{comp}"/></c:supported-calendar-component-set></d:prop></d:set></c:mkcalendar>"#,
+            name_and_color(name, color)
+        );
+        let r = self.request("MKCALENDAR", href, &[], &body)?;
+        match r.status {
+            200..=299 => Ok(()),
+            s => Err(Error::Http(s, r.body)),
+        }
+    }
+
+    /// Rename and recolour calendar `href`.
+    pub fn proppatch(&self, href: &str, name: &str, color: &str) -> Result<()> {
+        let body = format!(
+            r#"<?xml version="1.0" encoding="utf-8"?><d:propertyupdate xmlns:d="DAV:" xmlns:a="{APPLE}"><d:set><d:prop>{}</d:prop></d:set></d:propertyupdate>"#,
+            name_and_color(name, color)
+        );
+        let r = self.request("PROPPATCH", href, &[], &body)?;
+        if r.status != 207 {
+            return Err(Error::Http(r.status, r.body));
+        }
+        // Each property has its own status: the first that is not 200 is the answer.
+        let root = Element::parse(&r.body)?;
+        let refused = root
+            .children(DAV, "response")
+            .flat_map(|r| r.children(DAV, "propstat"))
+            .filter_map(|ps| ps.find_text(DAV, "status"))
+            .find(|s| s.split_whitespace().nth(1) != Some("200"));
+        match refused {
+            Some(s) => {
+                let code = s.split_whitespace().nth(1).and_then(|c| c.parse().ok());
+                Err(Error::Http(code.unwrap_or(403), s))
+            }
+            None => Ok(()),
+        }
+    }
+
     /// GET a resource: (etag, body), or None if gone.
     pub fn get(&self, href: &str) -> Result<Option<(Option<String>, String)>> {
         let r = self.request("GET", href, &[], "")?;
@@ -488,6 +532,14 @@ impl Dav {
             s => Err(Error::Http(s, r.body)),
         }
     }
+}
+
+fn name_and_color(name: &str, color: &str) -> String {
+    format!(
+        "<d:displayname>{}</d:displayname><a:calendar-color>{}</a:calendar-color>",
+        xml_escape(name),
+        xml_escape(color)
+    )
 }
 
 pub fn xml_escape(s: &str) -> String {
