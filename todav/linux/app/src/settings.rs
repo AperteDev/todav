@@ -396,7 +396,7 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
         move |copy: bool| {
             let server = url_text(&c.server);
             if server.is_empty() {
-                d.add_toast(crate::window::note("Enter the Nextcloud server first"));
+                d.add_toast(crate::window::note(crate::window::NO_SERVER));
                 return;
             }
             let button = if sign_in.is_visible() {
@@ -436,7 +436,7 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
     password.connect_activate(move |_, _| {
         let server = url_text(&c.server);
         if server.is_empty() {
-            d.add_toast(crate::window::note("Enter the Nextcloud server first"));
+            d.add_toast(crate::window::note(crate::window::NO_SERVER));
             return;
         }
         let (dd, show) = (d.clone(), describe_.clone());

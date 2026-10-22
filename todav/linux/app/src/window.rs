@@ -599,7 +599,7 @@ fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
         let Some(ui) = weak.upgrade() else { return };
         let server = url_text(&ui.conn.server);
         if server.is_empty() {
-            toast("Enter the Nextcloud server first");
+            toast(NO_SERVER);
             return;
         }
         let u = ui.clone();
@@ -669,6 +669,9 @@ fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
     });
 }
 
+/// What every way of signing in says when the server field is empty.
+pub const NO_SERVER: &str = "Enter the Nextcloud server first";
+
 /// Full URL from a scheme picker and host entry; empty stays empty, a typed scheme wins over the picker.
 pub fn url_text((scheme, row): &(gtk::DropDown, adw::EntryRow)) -> String {
     let host = row.text().trim().to_string();
@@ -687,6 +690,10 @@ pub fn url_text((scheme, row): &(gtk::DropDown, adw::EntryRow)) -> String {
 /// the clipboard instead of opening the browser.
 fn start_login(ui: &Rc<Ui>, copy: bool) {
     let server = url_text(&ui.conn.server);
+    if server.is_empty() {
+        toast(NO_SERVER);
+        return;
+    }
     ui.login.set_sensitive(false);
     ui.login.set_label(if copy {
         "Waiting for Sign-In…"
