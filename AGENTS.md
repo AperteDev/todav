@@ -6,6 +6,19 @@
   roadmap, open questions). Read it before working on a feature, and update it in the same
   change when the work changes what it says: a decision made, a step done, a plan dropped.
 
+## Releases
+
+- Add user-visible changes to `CHANGELOG.md` under `Unreleased`, in the same commit as the
+  change.
+- Releases are cut by the manual Release workflow (`.github/workflows/release.yml`): with the
+  version given, `scripts/release.py` sets it in `Cargo.toml`, the metainfo and the extension's
+  `metadata.json` and moves the `Unreleased` section under it; CI builds the Flatpak bundle and
+  the extension zip, then it commits `chore(release): X`, tags `vX` and publishes them. Don't
+  bump versions by hand.
+- CI (`.github/workflows/ci.yml`) runs on every push: `cargo fmt --check`, clippy with
+  warnings as errors and the unit tests on Fedora (GNOME 51), plus the two packages. Run the
+  same before committing.
+
 ## Settings
 
 - Client settings are synced between devices by default. Any new setting syncs unless it only

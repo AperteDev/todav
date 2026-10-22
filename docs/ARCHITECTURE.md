@@ -117,7 +117,7 @@ One monorepo, one Cargo workspace at the root. Each app has its own top-level di
 - Linux: `make -C todav/linux install` (per-user) or `make -C todav/linux flatpak`; the build needs `blueprint-compiler` and `glib-compile-resources`. Flathub will need a generated `cargo-sources.json` for an offline build.
 - Android (planned): Gradle, Kotlin, `cargo-ndk` to build `.so` for arm64-v8a (and x86\_64 for the emulator); UniFFI bindgen in a Gradle task.
 - Pebble (planned): the open-source Pebble SDK toolchain (`pebble build`), pinned version in `pebble/README.md`.
-- CI (GitHub Actions, not set up yet): unit tests, clippy, fmt; later the Android debug build and Pebble build. No signing in CI.
+- CI (GitHub Actions, `.github/workflows/`): fmt, clippy, unit tests, the Flatpak bundle and the extension zip on every push; releases by the manual Release workflow (see [Progress](#progress)). Later the Android debug build and Pebble build. No signing in CI.
 
 **Dependency policy** (keep it short)
 
@@ -437,7 +437,8 @@ Deviation: no docker stack (`infra/`) for now — integration runs against the r
 - [x] Calendar: events (VEVENT) next to tasks — see the Calendar section for the steps
 - [x] Sign-in through GNOME Online Accounts and with a login name + app password; synced client settings (`.config/todav/settings.json`, device-only keys, "Sync settings with server"); undo history (`Client::undo`, `Client::together`) with Ctrl+Z; create, rename, recolour and delete lists and calendars; search; keyboard shortcuts; About dialog from the metainfo; new app and symbolic icons
 - [x] README and CONTRIBUTING
-- [ ] `docs/`, CI, Flathub (generated `cargo-sources.json`), extensions.gnome.org
+- [x] CI and releases (GitHub Actions): every push runs fmt, clippy `-D warnings` and the unit tests on Fedora 45 (GNOME 51), and builds the Flatpak bundle (Flathub's GNOME 51 builder image) and the extension zip; the manual Release workflow builds them with the version set by `scripts/release.py`, then commits `chore(release): X`, tags `vX` and publishes a GitHub release with the changelog section as notes. One version for the workspace (`[workspace.package]`), the metainfo and the extension
+- [ ] `docs/`, Flathub (generated `cargo-sources.json`), extensions.gnome.org
 - [ ] M6 Android (+ UniFFI exports) → M7 Pebble
 
 ## Roadmap

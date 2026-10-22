@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  # The Release workflow builds through this one, with the version it releases.
+  workflow_call:
+    inputs:
+      version:
+        description: Version to build as (scripts/release.py sets it), such as 0.2.0
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  VERSION: ${{ inputs.version }}
+
+jobs:
+  check:
+    name: Check and test
+    runs-on: ubuntu-24.04
+    # GNOME 51's GTK and libadwaita, which the app builds against.
+    container: fedora:45
+    steps:
+      - name: Install the build dependencies
+        run: >-
+          dnf install -y --setopt=install_weak_deps=False
+          git gcc gtk4-devel libadwaita-devel libsecret-devel glib2-devel blueprint-compiler
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      # Unit tests; the integration tests need a Nextcloud account.
+      - run: cargo test --workspace --locked
+
+  flatpak:
+    name: Flatpak
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-51
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set the release version
+        if: env.VERSION != ''
+        run: python3 scripts/release.py "$VERSION" > /dev/null
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          manifest-path: todav/linux/flatpak/io.github.selfref.Todav.json
+          bundle: io.github.selfref.Todav.flatpak
+          artifact-name: todav-flatpak
+
+  extension:
+    name: GNOME Shell extension
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set the release version
+        if: env.VERSION != ''
+        run: python3 scripts/release.py "$VERSION" > /dev/null
+      - run: make -C todav/gnome-extension pack
+      - uses: actions/upload-artifact@v7
+        with:
+          name: todav-extension
+          path: target/todav@selfref.dev.shell-extension.zip
+          if-no-files-found: error
