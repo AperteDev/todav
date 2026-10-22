@@ -1,0 +1,68 @@
+using Gtk 4.0;
+using Adw 1;
+
+// A new task list or calendar, or one to rename, recolour or delete (src/lists.rs).
+Adw.Dialog dialog {
+  content-width: 380;
+  default-widget: save;
+  focus-widget: name;
+
+  child: Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {
+      show-start-title-buttons: false;
+      show-end-title-buttons: false;
+
+      [start]
+      Gtk.Button cancel {
+        label: "Cancel";
+      }
+
+      [end]
+      Gtk.Button save {
+        label: "Save";
+        sensitive: false;
+        styles ["suggested-action"]
+      }
+    }
+
+    [top]
+    Adw.Banner error {}
+
+    content: Gtk.Box {
+      orientation: vertical;
+      spacing: 18;
+      margin-top: 12;
+      margin-bottom: 18;
+      margin-start: 12;
+      margin-end: 12;
+
+      Adw.PreferencesGroup {
+        Adw.EntryRow name {
+          title: "Name";
+          activates-default: true;
+        }
+      }
+
+      Adw.PreferencesGroup {
+        title: "Color";
+
+        // Nextcloud's presets, then a custom colour (filled in code).
+        Gtk.Grid colors {
+          halign: center;
+          column-spacing: 8;
+          row-spacing: 8;
+        }
+      }
+
+      Gtk.ListBox delete_box {
+        selection-mode: none;
+        styles ["boxed-list"]
+
+        Adw.ButtonRow delete {
+          styles ["destructive-action"]
+        }
+      }
+    };
+  };
+}

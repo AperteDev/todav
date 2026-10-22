@@ -117,6 +117,19 @@ Adw.ApplicationWindow window {
                         styles ["navigation-sidebar"]
                       }
 
+                      Gtk.Button {
+                        action-name: "win.new-list";
+                        margin-start: 6;
+                        margin-end: 6;
+                        styles ["flat"]
+
+                        Adw.ButtonContent {
+                          icon-name: "list-add-symbolic";
+                          label: "New List";
+                          halign: start;
+                        }
+                      }
+
                       // Filled per list; hidden when the list has no categories.
                       Gtk.Box cat_section {
                         orientation: vertical;

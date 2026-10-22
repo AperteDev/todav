@@ -110,7 +110,7 @@ fn render(c: &Rc<Cal>) {
                 dot.add_css_class("dot");
                 // On the selected day's fill they take its text colour (see the CSS).
                 if !selected {
-                    dot.add_css_class(&class(c, i.list()));
+                    dot.add_css_class(&class(i.list()));
                 }
                 dots.append(&dot);
             }

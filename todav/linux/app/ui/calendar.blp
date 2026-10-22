@@ -83,26 +83,39 @@ Adw.NavigationSplitView split {
             styles ["card", "mini"]
           }
 
-          // Each section folds under its heading, as the Tasks page's categories do.
-          Gtk.ToggleButton calendars_toggle {
-            active: true;
+          // Each section folds under its heading, as the Tasks page's categories do; "+" adds
+          // one.
+          Gtk.Box {
+            spacing: 2;
             margin-start: 6;
             margin-end: 6;
-            styles ["flat", "cat-toggle"]
 
-            Gtk.Box {
-              spacing: 6;
+            Gtk.ToggleButton calendars_toggle {
+              active: true;
+              hexpand: true;
+              styles ["flat", "cat-toggle"]
 
-              Gtk.Label {
-                label: "Calendars";
-                xalign: 0;
-                hexpand: true;
-                styles ["heading"]
+              Gtk.Box {
+                spacing: 6;
+
+                Gtk.Label {
+                  label: "Calendars";
+                  xalign: 0;
+                  hexpand: true;
+                  styles ["heading"]
+                }
+
+                Gtk.Image {
+                  icon-name: "pan-down-symbolic";
+                }
               }
+            }
 
-              Gtk.Image {
-                icon-name: "pan-down-symbolic";
-              }
+            Gtk.Button {
+              icon-name: "list-add-symbolic";
+              tooltip-text: "New Calendar";
+              action-name: "win.new-calendar";
+              styles ["flat"]
             }
           }
 
@@ -116,25 +129,37 @@ Adw.NavigationSplitView split {
             }
           }
 
-          Gtk.ToggleButton task_heading {
-            active: true;
+          Gtk.Box task_head {
+            spacing: 2;
             margin-start: 6;
             margin-end: 6;
-            styles ["flat", "cat-toggle"]
 
-            Gtk.Box {
-              spacing: 6;
+            Gtk.ToggleButton task_heading {
+              active: true;
+              hexpand: true;
+              styles ["flat", "cat-toggle"]
 
-              Gtk.Label {
-                label: "Task lists";
-                xalign: 0;
-                hexpand: true;
-                styles ["heading"]
+              Gtk.Box {
+                spacing: 6;
+
+                Gtk.Label {
+                  label: "Task lists";
+                  xalign: 0;
+                  hexpand: true;
+                  styles ["heading"]
+                }
+
+                Gtk.Image {
+                  icon-name: "pan-down-symbolic";
+                }
               }
+            }
 
-              Gtk.Image {
-                icon-name: "pan-down-symbolic";
-              }
+            Gtk.Button {
+              icon-name: "list-add-symbolic";
+              tooltip-text: "New List";
+              action-name: "win.new-list";
+              styles ["flat"]
             }
           }
 

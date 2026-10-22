@@ -7,6 +7,7 @@ mod dialog;
 mod mini;
 mod week;
 
+use crate::lists::class;
 use crate::settings::duration;
 use crate::window::{get, view};
 use crate::{core, dates, request_sync};
@@ -118,7 +119,7 @@ struct Cal {
     split: adw::NavigationSplitView,
     mini: mini::Mini,
     calendars: gtk::ListBox,
-    task_heading: gtk::ToggleButton,
+    task_head: gtk::Box,
     task_lists: gtk::ListBox,
     title: adw::WindowTitle,
     sync_state: gtk::Stack,
@@ -153,9 +154,7 @@ struct Cal {
     pending: Cell<bool>,
     /// Midnight of the day the views are around (the selected day).
     anchor: Cell<i64>,
-    /// Calendar colours, rebuilt with the sidebar.
-    colors: gtk::CssProvider,
-    /// Index of each collection's colour class (`cal-<i>`), by href.
+    /// The collections the sidebar shows, in its order.
     lists: RefCell<Vec<List>>,
     /// The hidden ones the sidebar rows show.
     hidden: RefCell<HashSet<String>>,
@@ -214,19 +213,13 @@ pub fn build(views: &adw::ViewStack) {
         &css,
         gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
     );
-    let colors = gtk::CssProvider::new();
-    gtk::style_context_add_provider_for_display(
-        &display,
-        &colors,
-        gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
-    );
 
     let c = Rc::new(Cal {
         stack: views.clone(),
         split,
         mini: mini::Mini::new(&get(&b, "mini")),
         calendars: get(&b, "calendars"),
-        task_heading: get(&b, "task_heading"),
+        task_head: get(&b, "task_head"),
         task_lists: get(&b, "task_lists"),
         title: get(&b, "title"),
         sync_state: get(&b, "sync_state"),
@@ -260,7 +253,6 @@ pub fn build(views: &adw::ViewStack) {
         holding: Cell::new(false),
         pending: Cell::new(false),
         anchor: Cell::new(today()),
-        colors,
         lists: RefCell::new(Vec::new()),
         hidden: RefCell::new(HashSet::new()),
     });
@@ -277,6 +269,10 @@ pub fn build(views: &adw::ViewStack) {
                 set_hidden([href.as_str()], !hidden().contains(href));
                 glib::idle_add_local_once(refresh);
             }
+        });
+        crate::lists::context_menu(list, move |row| {
+            let c = cal()?;
+            section(&c, events).get(row.index() as usize).cloned()
         });
     }
     // The Month / Week / Agenda choice in the bottom bar, when it is there.
@@ -527,7 +523,7 @@ fn render_plan(c: &Rc<Cal>, until: i64) {
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         let dot = gtk::Box::builder().valign(gtk::Align::Center).build();
         dot.add_css_class("dot");
-        dot.add_css_class(&class(c, &t.list_href));
+        dot.add_css_class(&class(&t.list_href));
         row.append(&dot);
         let name = gtk::Label::builder()
             .label(&t.summary)
@@ -861,19 +857,9 @@ fn set_hidden<'a>(hrefs: impl IntoIterator<Item = &'a str>, hide: bool) {
     let _ = core().set_setting("hidden_calendars".into(), v.join("\n"));
 }
 
-/// A colour from the server, if it is one (it goes into CSS).
-fn color(l: &List) -> String {
-    l.color
-        .as_deref()
-        .filter(|c| {
-            c.len() <= 9 && c.starts_with('#') && c[1..].chars().all(|x| x.is_ascii_hexdigit())
-        })
-        .unwrap_or("#3584e4")
-        .to_string()
-}
-
-/// Every collection with its colour class, and a sidebar row each to show or hide it.
+/// Every collection's colour class, and a sidebar row each to show or hide it.
 fn refresh_calendars(c: &Rc<Cal>) {
+    crate::lists::paint();
     let mut all = core().calendars();
     for l in core().lists() {
         if !all.iter().any(|a| a.href == l.href) {
@@ -885,27 +871,11 @@ fn refresh_calendars(c: &Rc<Cal>) {
     if *c.lists.borrow() == all && *c.hidden.borrow() == hidden {
         return;
     }
-    let css: String = all
-        .iter()
-        .enumerate()
-        .map(|(i, l)| {
-            let col = color(l);
-            format!(
-                ".dot.cal-{i}, .chip.all-day.cal-{i} {{ background-color: {col}; }}
-                 .chip.all-day.cal-{i} {{ color: white; }}
-                 .chip.cal-{i}:not(.all-day) {{ background-color: alpha({col}, 0.18); }}\n"
-            )
-        })
-        .collect();
-    c.colors.load_from_string(&css);
     c.calendars.remove_all();
     c.task_lists.remove_all();
-    for (i, l) in all.iter().enumerate() {
+    for l in &all {
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-        let dot = gtk::Box::builder().valign(gtk::Align::Center).build();
-        dot.add_css_class("dot");
-        dot.add_css_class(&format!("cal-{i}"));
-        row.append(&dot);
+        row.append(&crate::lists::dot(&l.href));
         let name = gtk::Label::builder()
             .label(&l.display_name)
             .xalign(0.0)
@@ -932,7 +902,7 @@ fn refresh_calendars(c: &Rc<Cal>) {
         }
     }
     let lists_only = all.iter().any(|l| !l.holds_events);
-    c.task_heading.set_visible(lists_only);
+    c.task_head.set_visible(lists_only);
     c.task_lists.set_visible(lists_only);
     *c.lists.borrow_mut() = all;
     *c.hidden.borrow_mut() = hidden;
@@ -946,16 +916,6 @@ fn section(c: &Cal, events: bool) -> Vec<String> {
         .filter(|l| l.holds_events == events)
         .map(|l| l.href.clone())
         .collect()
-}
-
-fn class(c: &Cal, list: &str) -> String {
-    let i = c
-        .lists
-        .borrow()
-        .iter()
-        .position(|l| l.href == list)
-        .unwrap_or(0);
-    format!("cal-{i}")
 }
 
 fn list_name(c: &Cal, list: &str) -> String {
@@ -1190,7 +1150,7 @@ fn chip(c: &Rc<Cal>, i: &Item) -> gtk::Widget {
                 .has_frame(false)
                 .build();
             b.add_css_class("chip");
-            b.add_css_class(&class(c, &e.list_href));
+            b.add_css_class(&class(&e.list_href));
             b.set_tooltip_markup(Some(&tooltip(c, i)));
             if e.all_day {
                 b.add_css_class("all-day");
@@ -1250,7 +1210,7 @@ fn task_chip(c: &Cal, t: &Task, label: &gtk::Label, check_align: gtk::Align) -> 
         .child(&content)
         .has_frame(false)
         .build();
-    for cls in ["chip", "task", &class(c, &t.list_href)] {
+    for cls in ["chip", "task", &class(&t.list_href)] {
         b.add_css_class(cls);
     }
     b.set_tooltip_markup(Some(&tooltip(c, &Item::Task(t.clone()))));
@@ -1480,7 +1440,7 @@ fn details(c: &Cal, e: &Event) -> gtk::Popover {
     let which = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     let dot = gtk::Box::builder().valign(gtk::Align::Center).build();
     dot.add_css_class("dot");
-    dot.add_css_class(&class(c, &e.list_href));
+    dot.add_css_class(&class(&e.list_href));
     which.append(&dot);
     which.append(&gtk::Label::new(Some(&list_name(c, &e.list_href))));
     b.append(&which);
@@ -1693,7 +1653,7 @@ fn agenda_row(c: &Rc<Cal>, i: &Item) -> adw::ActionRow {
         .build();
     let dot = gtk::Box::builder().valign(gtk::Align::Center).build();
     dot.add_css_class("dot");
-    dot.add_css_class(&class(c, i.list()));
+    dot.add_css_class(&class(i.list()));
     match i {
         Item::Event(e) => {
             row.set_title(&e.summary);

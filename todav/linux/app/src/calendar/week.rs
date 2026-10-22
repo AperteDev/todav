@@ -557,7 +557,7 @@ fn block(c: &Rc<Cal>, i: &Item, geo: Geo) -> gtk::Widget {
                 .build();
             b.add_css_class("block");
             b.add_css_class("chip");
-            b.add_css_class(&class(c, &e.list_href));
+            b.add_css_class(&class(&e.list_href));
             b.set_tooltip_markup(Some(&tooltip(c, i)));
             if e.cancelled {
                 b.add_css_class("cancelled");

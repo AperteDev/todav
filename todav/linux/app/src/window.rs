@@ -72,6 +72,8 @@ struct Ui {
     /// Set while refresh_tasks rewrites the picker, so "New Category…" handling ignores it.
     cat_busy: Rc<Cell<bool>>,
     hrefs: RefCell<Vec<String>>,
+    /// Name and colour of each list's row, to notice when they change.
+    looks: RefCell<Vec<(String, Option<String>)>>,
     current: RefCell<Option<String>>,
     title: adw::WindowTitle,
     sync_state: gtk::Stack,
@@ -356,6 +358,7 @@ fn build(app: &adw::Application) -> Rc<Ui> {
         new_cats: RefCell::new(Vec::new()),
         cat_busy: Rc::new(Cell::new(false)),
         hrefs: RefCell::new(Vec::new()),
+        looks: RefCell::new(Vec::new()),
         current: RefCell::new(None),
         query: RefCell::new(String::new()),
         title: get(&b, "title"),
@@ -480,6 +483,13 @@ fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
             refresh_tasks(&ui);
         }
         ui.split.set_show_content(true);
+    });
+    crate::lists::setup(&ui.window);
+    let weak = Rc::downgrade(ui);
+    crate::lists::context_menu(&ui.sidebar, move |row| {
+        let ui = weak.upgrade()?;
+        let href = ui.hrefs.borrow().get(row.index() as usize).cloned();
+        href.filter(|h| h != UPCOMING)
     });
 
     // Clicking the selected category clears the filter.
@@ -848,7 +858,9 @@ fn refresh_lists(ui: &Rc<Ui>) {
         let last = core().setting("last_list".into()).filter(|l| valid(l));
         *ui.current.borrow_mut() = last.or_else(|| lists.first().map(|l| l.href.clone()));
     }
+    crate::lists::paint();
     ui.sidebar.remove_all();
+    *ui.looks.borrow_mut() = looks(&lists);
     *ui.hrefs.borrow_mut() = (!lists.is_empty())
         .then(|| UPCOMING.to_string())
         .into_iter()
@@ -870,6 +882,11 @@ fn refresh_lists(ui: &Rc<Ui>) {
     }
     for l in &lists {
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+        // As wide as the Upcoming icon above.
+        let dot = crate::lists::dot(&l.href);
+        dot.set_margin_start(3);
+        dot.set_margin_end(3);
+        row.append(&dot);
         let name = gtk::Label::builder()
             .label(&l.display_name)
             .xalign(0.0)
@@ -900,6 +917,7 @@ fn refresh_sidebar_counts(ui: &Rc<Ui>) {
         .iter()
         .map(|l| &l.href)
         .ne(ui.hrefs.borrow().iter().skip(1))
+        || looks(&lists) != *ui.looks.borrow()
     {
         return refresh_lists(ui);
     }
@@ -916,6 +934,13 @@ fn refresh_sidebar_counts(ui: &Rc<Ui>) {
             c.set_label(&n.to_string());
         }
     }
+}
+
+fn looks(lists: &[todav_core::List]) -> Vec<(String, Option<String>)> {
+    lists
+        .iter()
+        .map(|l| (l.display_name.clone(), l.color.clone()))
+        .collect()
 }
 
 /// Open tasks due today or earlier.
