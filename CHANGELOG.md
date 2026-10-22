@@ -1,0 +1,38 @@
+# Changelog
+
+All notable changes to this project will be documented in this file. The
+format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
+the project follows [Semantic Versioning](https://semver.org/).
+
+## Unreleased
+
+The first release.
+
+### Added
+
+- Tasks and events in your Nextcloud over CalDAV, kept in a local copy: the app
+  works offline and syncs in the background, and push through WebDAV Push and
+  ntfy brings changes from other devices within seconds.
+- Sign in through GNOME Online Accounts, in the browser (Nextcloud Login Flow),
+  or with a login name and app password; passwords stay in the keyring.
+- Task lists: create, rename, recolour and delete them; categories as groups or
+  tags with a sidebar filter; subtasks; manual order by drag and drop, shared
+  with Nextcloud Tasks; sorting by due date.
+- Tasks: due dates and start times, priority, notes, several reminders each as
+  desktop notifications with "Mark as Done", and an Upcoming page across lists.
+- A calendar with Month, Week and Agenda views: create, edit, move and delete
+  events, repeating ones too (this occurrence, the following or all), with
+  reminders.
+- Time-blocking: drag tasks from "To Plan" onto an hour or a day, move and
+  resize blocks in the week, drop them back to unplan.
+- Click an event or task on the calendar for its details, where an event's
+  tasks and a task's subtasks can be ticked and added; double-click to edit it
+  ("Edit on double click" in Preferences turns this off for instant details).
+- Tasks linked to events, and today's events at the top of Upcoming.
+- Search across tasks and events, undo with Ctrl+Z, keyboard shortcuts.
+- Preferences synced between devices through Nextcloud Files.
+- Runs in the background and starts with the session; a Flatpak build.
+- A GNOME Shell extension: the open-task count in the top bar, and a menu with a
+  task list, a month calendar with dots for what each day holds and the coming
+  week's agenda; it adds tasks and events and opens the app where you click.
+  Its options are in the app's Preferences.

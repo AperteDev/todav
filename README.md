@@ -6,6 +6,10 @@
 
 <p align="center">Tasks and calendar for GNOME, kept in your Nextcloud.</p>
 
+<p align="center">
+  <a href="https://github.com/SelfRef/todav/actions/workflows/ci.yml"><img src="https://github.com/SelfRef/todav/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+</p>
+
 Todav is a task list and calendar app for the GNOME desktop. Your tasks and events stay in your
 own Nextcloud as plain CalDAV, so the Nextcloud Tasks and Calendar web apps, DAVx⁵, Thunderbird
 and other CalDAV clients keep seeing the same data. Todav adds a fast desktop app on top: it
@@ -85,8 +89,15 @@ seconds.
 
 ## Getting started
 
-There are no packages yet: [build and install](#building-and-installing) Todav from source,
-then:
+Download the Flatpak bundle and the GNOME Shell extension from the
+[latest release](https://github.com/SelfRef/todav/releases/latest) and install them:
+
+```sh
+flatpak install --user io.github.selfref.Todav.flatpak  # the GNOME 51 runtime comes from Flathub
+gnome-extensions install todav@selfref.dev.shell-extension.zip  # then log out and back in
+```
+
+Or [build and install](#building-and-installing) Todav from source. Then:
 
 1. Open Todav and sign in to your Nextcloud: pick a GNOME Online Accounts account, sign in in the
    browser, or use a login name and app password.
@@ -139,6 +150,10 @@ make -C todav/gnome-extension install
 ```
 
 A Flatpak manifest is included too: `make -C todav/linux flatpak` (needs `flatpak-builder`).
+
+Every push is checked and packaged by [CI](.github/workflows/ci.yml); releases are made by the
+manual [Release](.github/workflows/release.yml) workflow and listed in the
+[changelog](CHANGELOG.md).
 
 ## License
 
