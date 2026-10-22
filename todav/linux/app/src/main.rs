@@ -400,30 +400,68 @@ fn main() -> glib::ExitCode {
     client.subscribe(Box::new(Listener));
     let _ = CORE.set(Arc::new(client));
 
-    let app = adw::Application::builder()
-        .application_id(APP_ID)
-        .flags(if sandbox() {
-            gio::ApplicationFlags::NON_UNIQUE
-        } else {
-            gio::ApplicationFlags::empty()
-        })
+    let app: App = glib::Object::builder()
+        .property("application-id", APP_ID)
+        .property(
+            "flags",
+            if sandbox() {
+                gio::ApplicationFlags::NON_UNIQUE
+            } else {
+                gio::ApplicationFlags::empty()
+            },
+        )
         .build();
     app.connect_startup(|app| {
         // Keep running as a background service after the window closes; quit is explicit.
         std::mem::forget(app.hold());
-        // First: the bus name is already ours, so calls arriving before this would fail.
-        if let (Some(conn), Some(path)) = (app.dbus_connection(), app.dbus_object_path()) {
-            dbus::register(&conn, &path);
-            if std::path::Path::new("/.flatpak-info").exists() {
-                request_autostart(&conn);
-            }
+        if let Some(conn) = app.dbus_connection()
+            && std::path::Path::new("/.flatpak-info").exists()
+        {
+            request_autostart(&conn);
         }
-        window::setup_actions(app);
+        window::setup_actions(app.upcast_ref());
         settings::apply_color_scheme();
         if restore_account() {
             start_background();
         }
     });
-    app.connect_activate(window::present);
+    app.connect_activate(|app| window::present(app.upcast_ref()));
     app.run()
+}
+
+glib::wrapper! {
+    /// The application, exporting the D-Bus API before it takes its bus name.
+    pub struct App(ObjectSubclass<imp::App>)
+        @extends adw::Application, gtk::Application, gio::Application,
+        @implements gio::ActionGroup, gio::ActionMap;
+}
+
+mod imp {
+    use adw::subclass::prelude::*;
+    use gtk::{gio, glib};
+
+    #[derive(Default)]
+    pub struct App;
+
+    #[glib::object_subclass]
+    impl ObjectSubclass for App {
+        const NAME: &'static str = "TodavApp";
+        type Type = super::App;
+        type ParentType = adw::Application;
+    }
+
+    impl ObjectImpl for App {}
+
+    impl ApplicationImpl for App {
+        // Before the bus name is ours: a call that starts the app (D-Bus activation, from the
+        // extension) waits for the name, and would otherwise find no interface yet.
+        fn dbus_register(&self, conn: &gio::DBusConnection, path: &str) -> Result<(), glib::Error> {
+            self.parent_dbus_register(conn, path)?;
+            crate::dbus::register(conn, path);
+            Ok(())
+        }
+    }
+
+    impl GtkApplicationImpl for App {}
+    impl AdwApplicationImpl for App {}
 }
