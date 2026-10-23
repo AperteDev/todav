@@ -3,9 +3,9 @@
 //! display, applied at once), Calendar and Extension.
 
 use crate::connection::Connection;
+use crate::core;
 use crate::i18n::{gettext, gettext_noop};
 use crate::window::{get, toast, url_text, view};
-use crate::{core, request_sync};
 use adw::prelude::*;
 use gtk::{gio, glib};
 use std::rc::Rc;
@@ -238,7 +238,7 @@ pub fn present(parent: &impl IsA<gtk::Widget>) {
         sync.set_active(core().setting(key.into()).as_deref() != Some("false"));
         sync.connect_active_notify(move |s| {
             let _ = core().set_setting(key.into(), s.is_active().to_string());
-            request_sync(); // turning it on pulls the server's settings right away
+            crate::sync_now(); // turning it on pulls the server's settings right away
         });
     }
     let style: adw::ToggleGroup = get(&b, "color_scheme");
@@ -653,7 +653,7 @@ fn move_account(old: String, user: String, password: String, new: String) {
         match r {
             Ok(Ok(())) => {
                 toast(&gettext("Nextcloud server changed"));
-                request_sync();
+                crate::sync_now();
                 crate::restart_push(); // register push on the new server now, not within the hour
             }
             Ok(Err(e)) => toast(&e),

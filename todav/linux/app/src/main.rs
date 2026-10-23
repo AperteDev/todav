@@ -31,8 +31,16 @@ pub fn core() -> &'static Arc<Client> {
     CORE.get().expect("core opened at startup")
 }
 
-/// Ask the worker for a full sync; requests arriving while one runs are coalesced.
+/// After an edit: sync if it left something for the server (edits in lists on this device
+/// leave nothing, so no sync runs for them).
 pub fn request_sync() {
+    if core().pending() {
+        sync_now();
+    }
+}
+
+/// Ask the worker for a full sync; requests arriving while one runs are coalesced.
+pub fn sync_now() {
     if let Some(tx) = SYNC.get() {
         let _ = tx.send(());
     }
@@ -310,7 +318,7 @@ pub fn restart_push() {
 /// Start the sync worker and, if an ntfy server is configured, the push listener. Idempotent.
 pub fn start_background() {
     if SYNC.get().is_some() {
-        request_sync();
+        sync_now();
         return;
     }
     let (tx, rx) = channel::<()>();
@@ -326,7 +334,7 @@ pub fn start_background() {
             set_state(&core().sync());
         }
     });
-    request_sync();
+    sync_now();
 
     restart_push();
 
@@ -341,7 +349,7 @@ pub fn start_background() {
     glib::timeout_add_seconds_local(60, move || {
         ticks += 1;
         if window::is_active() || ticks.is_multiple_of(30) {
-            request_sync();
+            sync_now();
         }
         glib::ControlFlow::Continue
     });

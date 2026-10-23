@@ -133,7 +133,7 @@ pub fn is_active() -> bool {
 
 pub fn setup_actions(app: &adw::Application) {
     let sync = gio::SimpleAction::new("sync", None);
-    sync.connect_activate(|_, _| request_sync());
+    sync.connect_activate(|_, _| crate::sync_now());
     let quit = gio::SimpleAction::new("quit", None);
     quit.connect_activate(glib::clone!(
         #[weak]

@@ -161,7 +161,7 @@ fn call(method: &str, params: &glib::Variant) -> Result<Option<glib::Variant>, S
             None
         }
         "Sync" => {
-            request_sync();
+            crate::sync_now();
             None
         }
         m => return Err(format!("unknown method {m}")),
