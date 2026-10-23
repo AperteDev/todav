@@ -154,10 +154,9 @@ Todav is under active development. Planned:
 - **More services** besides Nextcloud
 - **Android app**
 
-Ideas, bug reports and discussions are welcome: open an
-[issue](https://github.com/SelfRef/todav/issues) or start a
-[discussion](https://github.com/SelfRef/todav/discussions). See
-[CONTRIBUTING.md](CONTRIBUTING.md) before working on a pull request.
+Ideas, questions and bug reports are welcome: open an
+[issue](https://github.com/SelfRef/todav/issues). See [CONTRIBUTING.md](CONTRIBUTING.md) before
+working on a pull request.
 
 ## Translations
 
