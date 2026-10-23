@@ -44,6 +44,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upcoming shows in the sidebar only while some task has a due date, as
   Important does while some task has high priority.
 
+### Fixed
+
+- A task dropped on the "Add a task" field no longer types its internal ID
+  into it.
+
 ## [1.1.0] - 2026-10-22
 
 ### Fixed

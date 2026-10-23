@@ -667,6 +667,7 @@ fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
             add.remove_css_class("suggested-action");
         }
     });
+    ui.entry.add_controller(task_drop(ui, |_| false, false)); // tasks are not text to type
 
     let weak = Rc::downgrade(ui);
     ui.entry.connect_activate(move |entry| {
