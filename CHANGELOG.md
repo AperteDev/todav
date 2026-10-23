@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Move tasks to another list and events to another calendar by dropping them on
   it in the sidebar; a task takes its subtasks along.
 - A list picker in the task dialog, to move a task to another list.
+- A star on every task, coloured by its priority; its menu sets the priority.
+  As in Nextcloud Tasks, a starred task is one of high priority.
+- An Important page with the high-priority tasks of every list.
+- "Priority, highest first" to sort tasks and subtasks.
+- Pin tasks to the top of their list, in a Pinned group (shared with Nextcloud
+  Tasks' pins).
 
 ### Changed
 

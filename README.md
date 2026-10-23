@@ -38,7 +38,10 @@ seconds.
 - Categories (CalDAV `CATEGORIES`), shown as groups or tags, with a category filter in the
   sidebar.
 - Subtasks, manual order by drag and drop (the same order Nextcloud Tasks uses), sorting by due
-  date, priority and notes.
+  date or priority, and notes.
+- Priority on a star, coloured by its level and set from its menu, as Nextcloud Tasks stars
+  tasks; an Important page with the high-priority tasks of every list.
+- Pinned tasks stay at the top of their list.
 - Move a task, with its subtasks, to another list: drop it on the list in the sidebar or pick
   the list in the task dialog.
 - Due dates with optional times, start times, and several reminders per task, delivered as
@@ -147,7 +150,7 @@ Todav is under active development. Planned:
 - **Multiple accounts**
 - **Nested subtasks**, more than one level deep
 - **Advanced notifications**, configurable
-- **Starred tasks**
+- **Advanced search, filtering and sorting**
 - **More services** besides Nextcloud
 - **Android app**
 

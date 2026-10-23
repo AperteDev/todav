@@ -14,12 +14,13 @@ use todav_core::Sort;
 type UrlRow = (gtk::DropDown, adw::EntryRow);
 
 /// Setting values for the "Sort" rows, in row order.
-const SORTS: [(&str, Sort); 5] = [
+const SORTS: [(&str, Sort); 6] = [
     ("manual", Sort::Manual),
     ("newest", Sort::Newest),
     ("oldest", Sort::Oldest),
     ("due_soonest", Sort::DueSoonest),
     ("due_latest", Sort::DueLatest),
+    ("priority", Sort::Priority),
 ];
 
 fn sort_index(key: &str) -> u32 {

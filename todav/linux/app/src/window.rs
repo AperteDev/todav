@@ -16,8 +16,13 @@ use todav_core::{CategoryGroup, Due, Sort, Task, TaskPatch};
 /// subtasks'); drop targets show a line where the task will land
 /// instead of GTK's frame around the target, and "+" buttons taking the dragged task are outlined,
 /// as is the sidebar category it is over. A "warning" banner is tinted amber (libadwaita's are
-/// grey, from `--banner-color`).
+/// grey, from `--banner-color`). A task's star takes its priority's colour, as in Nextcloud Tasks;
+/// a pin is accented while pinned.
 const CSS: &str = "
+menubutton.priority-high > button { color: @error_color; }
+menubutton.priority-medium > button { color: @yellow_5; }
+menubutton.priority-low > button { color: @blue_3; }
+button.pinned { color: @accent_color; }
 splitbutton.pill { border-radius: 9999px; }
 splitbutton.pill > button { padding: 10px 20px 10px 32px; border-radius: 9999px 0 0 9999px; }
 splitbutton.pill > menubutton > button { padding: 10px 16px 10px 12px; border-radius: 0 9999px 9999px 0; }
@@ -54,6 +59,10 @@ fn other() -> String {
 /// Sidebar entry for the Upcoming page (tasks with a due date in every list), kept among the
 /// list hrefs.
 const UPCOMING: &str = "upcoming";
+/// Sidebar entry for the Important page (high-priority tasks of every list).
+const IMPORTANT: &str = "important";
+/// The pages above the lists, in sidebar order.
+const PAGES: [&str; 2] = [UPCOMING, IMPORTANT];
 
 /// Completed tasks shown in the "Completed" expander, newest first.
 const DONE_SHOWN: usize = 50;
@@ -337,8 +346,8 @@ pub fn on_event(ev: &Event) {
             glib::idle_add_local_once(move || {
                 refresh_sidebar_counts(&ui);
                 let current = ui.current.borrow().clone();
-                let mixed = current.as_deref() == Some(UPCOMING) || !ui.query.borrow().is_empty();
-                if current.as_deref() == Some(&list) || mixed {
+                let page = current.as_deref().is_some_and(|c| PAGES.contains(&c));
+                if current.as_deref() == Some(&list) || page || !ui.query.borrow().is_empty() {
                     refresh_tasks(&ui);
                 }
                 crate::calendar::refresh();
@@ -604,7 +613,7 @@ fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
     crate::lists::context_menu(&ui.sidebar, move |row| {
         let ui = weak.upgrade()?;
         let href = ui.hrefs.borrow().get(row.index() as usize).cloned();
-        href.filter(|h| h != UPCOMING)
+        href.filter(|h| !PAGES.contains(&h.as_str()))
     });
 
     // Clicking the selected category clears the filter.
@@ -1032,7 +1041,8 @@ fn refresh_lists(ui: &Rc<Ui>) {
         sync.set_enabled(core().account().is_some());
     }
     let lists = crate::lists::by_place(core().lists());
-    let valid = |h: &str| !lists.is_empty() && (h == UPCOMING || lists.iter().any(|l| l.href == h));
+    let valid =
+        |h: &str| !lists.is_empty() && (PAGES.contains(&h) || lists.iter().any(|l| l.href == h));
     if ui.current.borrow().as_deref().is_none_or(|c| !valid(c)) {
         let last = core().setting("last_list".into()).filter(|l| valid(l));
         *ui.current.borrow_mut() = last.or_else(|| lists.first().map(|l| l.href.clone()));
@@ -1040,20 +1050,30 @@ fn refresh_lists(ui: &Rc<Ui>) {
     crate::lists::paint();
     ui.sidebar.remove_all();
     *ui.looks.borrow_mut() = looks(&lists);
-    *ui.hrefs.borrow_mut() = (!lists.is_empty())
-        .then(|| UPCOMING.to_string())
-        .into_iter()
+    let pages = if lists.is_empty() {
+        &[][..]
+    } else {
+        &PAGES[..]
+    };
+    *ui.hrefs.borrow_mut() = pages
+        .iter()
+        .map(|p| p.to_string())
         .chain(lists.iter().map(|l| l.href.clone()))
         .collect();
-    if !lists.is_empty() {
+    for (page, n) in pages.iter().zip(page_counts()) {
+        let (icon, title) = if *page == UPCOMING {
+            ("x-office-calendar-symbolic", gettext("Upcoming"))
+        } else {
+            ("starred-symbolic", gettext("Important"))
+        };
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
-        row.append(&gtk::Image::from_icon_name("x-office-calendar-symbolic"));
+        row.append(&gtk::Image::from_icon_name(icon));
         let name = gtk::Label::builder()
-            .label(gettext("Upcoming"))
+            .label(title)
             .xalign(0.0)
             .hexpand(true)
             .build();
-        let count = gtk::Label::new(Some(&upcoming_count().to_string()));
+        let count = gtk::Label::new(Some(&n.to_string()));
         count.add_css_class("dim-label");
         row.append(&name);
         row.append(&count);
@@ -1084,8 +1104,8 @@ fn refresh_lists(ui: &Rc<Ui>) {
             list_drop(ui, &r, &l.href);
         }
     }
-    // Upcoming first, then the lists grouped by where they are kept.
-    crate::lists::set_headings(&ui.sidebar, 1, crate::lists::headings(&lists));
+    // Upcoming and Important first, then the lists grouped by where they are kept.
+    crate::lists::set_headings(&ui.sidebar, pages.len(), crate::lists::headings(&lists));
     let current = ui.current.borrow().clone();
     if let Some(i) = ui
         .hrefs
@@ -1136,13 +1156,14 @@ fn refresh_sidebar_counts(ui: &Rc<Ui>) {
     if lists
         .iter()
         .map(|l| &l.href)
-        .ne(ui.hrefs.borrow().iter().skip(1))
+        .ne(ui.hrefs.borrow().iter().skip(PAGES.len()))
         || looks(&lists) != *ui.looks.borrow()
     {
         return refresh_lists(ui);
     }
-    let counts =
-        std::iter::once(upcoming_count()).chain(lists.iter().map(|l| l.open_count as usize));
+    let counts = page_counts()
+        .into_iter()
+        .chain(lists.iter().map(|l| l.open_count as usize));
     for (i, n) in counts.take(ui.hrefs.borrow().len()).enumerate() {
         let count = ui
             .sidebar
@@ -1161,6 +1182,11 @@ fn looks(lists: &[todav_core::List]) -> Vec<(String, Option<String>)> {
         .iter()
         .map(|l| (l.display_name.clone(), l.color.clone()))
         .collect()
+}
+
+/// The sidebar counts of `PAGES`: Upcoming's tasks due today or earlier, every Important one.
+fn page_counts() -> [usize; 2] {
+    [upcoming_count(), core().important().len()]
 }
 
 /// Open tasks due today or earlier.
@@ -1203,7 +1229,7 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
     };
     // Upcoming and search results mix lists: count subtasks in all of them.
     let query = ui.query.borrow().clone();
-    let mixed = href == UPCOMING || !query.is_empty();
+    let mixed = PAGES.contains(&href.as_str()) || !query.is_empty();
     let all: Vec<Task> = if mixed {
         let lists = core().lists().into_iter();
         lists.flat_map(|l| core().tasks(l.href, true)).collect()
@@ -1221,6 +1247,10 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
     if href == UPCOMING {
         ui.cat_section.set_visible(false);
         return rebuild_upcoming(ui);
+    }
+    if href == IMPORTANT {
+        ui.cat_section.set_visible(false);
+        return rebuild_important(ui);
     }
     let list = core().lists().into_iter().find(|l| l.href == href);
     ui.title
@@ -1337,28 +1367,35 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
         }]
     };
 
-    // A list without categories is one plain list; otherwise every group, "Other" too, has a header.
-    let titled = grouping && !names.is_empty();
-    let mut any = false;
+    // Pinned top-level tasks first, in a group of their own, in the list's overall order; the
+    // sidebar filter goes by each top-level task's category (a group's name in "group").
+    let all_open = core().ungrouped_by(href.clone(), order.tasks, order.subtasks, done_view);
+    let pinned: Vec<_> = trees(&all_open)
+        .into_iter()
+        .filter(|(root, _)| root.pinned && shown(root.category.as_ref()))
+        .collect();
+    let mut sections: Vec<(Option<String>, Vec<_>)> = Vec::new();
     for g in &groups {
-        // The sidebar filter goes by each top-level task's category (a group's name in "group").
-        let trees: Vec<_> = trees(&g.tasks)
+        let rest: Vec<_> = trees(&g.tasks)
             .into_iter()
-            .filter(|(root, _)| shown(root.category.as_ref()))
+            .filter(|(root, _)| !root.pinned && shown(root.category.as_ref()))
             .collect();
-        if trees.is_empty() {
-            continue;
+        if !rest.is_empty() {
+            sections.push((g.name.clone(), rest));
         }
-        any = true;
-        let group = adw::PreferencesGroup::new();
-        if titled {
-            group.set_title(&glib::markup_escape_text(
-                &g.name.clone().unwrap_or_else(other),
-            ));
-        }
+    }
+    // A list without categories is one plain list; otherwise every group, "Other" too, has a
+    // header. Under "Pinned", the rest of a plain list is headed "Tasks".
+    let titled = grouping && !names.is_empty();
+    let any = !pinned.is_empty() || !sections.is_empty();
+    let add_trees = |group: &adw::PreferencesGroup,
+                     trees: &[(&Task, Vec<(usize, &Task)>)],
+                     cat: Option<&Option<String>>| {
         for (i, (root, subs)) in trees.iter().enumerate() {
             let slot = Slot {
-                group: g.name.clone(),
+                // In Pinned (no `cat`), each its own category.
+                group: cat.cloned().unwrap_or_else(|| root.category.clone()),
+                pinned: cat.is_none(),
                 root: true,
                 next: trees.get(i + 1).map(|(t, _)| t.uid.clone()),
             };
@@ -1372,6 +1409,24 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
                 group.add(&tree_row(ui, root, subs, order.sub_start, slot));
             }
         }
+    };
+    if !pinned.is_empty() {
+        let group = adw::PreferencesGroup::builder()
+            .title(gettext("Pinned"))
+            .build();
+        add_trees(&group, &pinned, None);
+        ui.groups.append(&group);
+    }
+    for (name, trees) in &sections {
+        let group = adw::PreferencesGroup::new();
+        if titled {
+            group.set_title(&glib::markup_escape_text(
+                &name.clone().unwrap_or_else(other),
+            ));
+        } else if !pinned.is_empty() {
+            group.set_title(&gettext("Tasks"));
+        }
+        add_trees(&group, trees, Some(name));
         ui.groups.append(&group);
     }
 
@@ -1467,6 +1522,36 @@ fn rebuild_upcoming(ui: &Rc<Ui>) {
             .icon_name("x-office-calendar-symbolic")
             .title(gettext("Nothing Scheduled"))
             .description(gettext("Tasks with a due date show up here"))
+            .build();
+        empty.add_css_class("compact");
+        ui.groups.append(&empty);
+    }
+}
+
+/// Open tasks of high priority (starred in Nextcloud Tasks) from every list: a group per list,
+/// highest first.
+fn rebuild_important(ui: &Rc<Ui>) {
+    let tasks = core().important();
+    ui.title.set_title(&gettext("Important"));
+    ui.title.set_subtitle(&open_count(tasks.len() as u64));
+    for l in crate::lists::by_place(core().lists()) {
+        let here: Vec<&Task> = tasks.iter().filter(|t| t.list_href == l.href).collect();
+        if here.is_empty() {
+            continue;
+        }
+        let group = adw::PreferencesGroup::builder()
+            .title(glib::markup_escape_text(&l.display_name))
+            .build();
+        for t in here {
+            group.add(&task_row(ui, t, 0, None));
+        }
+        ui.groups.append(&group);
+    }
+    if tasks.is_empty() {
+        let empty = adw::StatusPage::builder()
+            .icon_name("starred-symbolic")
+            .title(gettext("No Important Tasks"))
+            .description(gettext("Tasks of high priority show up here"))
             .build();
         empty.add_css_class("compact");
         ui.groups.append(&empty);
@@ -1638,6 +1723,8 @@ fn task_row(ui: &Rc<Ui>, t: &Task, indent: usize, slot: Option<Slot>) -> adw::Ac
         row.add_css_class("task-done");
     }
     row.add_prefix(&done_check(t));
+    // Top-level rows of a list page can be pinned.
+    let pinnable = slot.as_ref().is_some_and(|s| s.root);
     if let Some(slot) = slot {
         // ActionRow puts each new prefix to the left of the previous ones (ExpanderRow: right).
         connect_dnd(ui, &row, t, slot, |h| row.add_prefix(h));
@@ -1659,11 +1746,20 @@ fn task_row(ui: &Rc<Ui>, t: &Task, indent: usize, slot: Option<Slot>) -> adw::Ac
     }
     // Subtasks have no category of their own: the top-level task's decides. The Upcoming page
     // and search results mix lists, so they leave categories alone.
-    let mixed = ui.current.borrow().as_deref() == Some(UPCOMING) || !ui.query.borrow().is_empty();
+    let mixed = ui
+        .current
+        .borrow()
+        .as_deref()
+        .is_some_and(|c| PAGES.contains(&c))
+        || !ui.query.borrow().is_empty();
     let sub = indent > 0 || mixed;
     if let Some(tag) = tag(ui, t).filter(|_| indent == 0) {
         row.add_suffix(&tag);
     }
+    if pinnable {
+        row.add_suffix(&pin_button(t));
+    }
+    row.add_suffix(&star_button(t));
     row.add_suffix(&delete_button(t));
     let (weak, task) = (Rc::downgrade(ui), t.clone());
     row.connect_activated(move |_| {
@@ -1710,7 +1806,7 @@ fn tree_row(
     if root.done {
         row.add_css_class("task-done"); // kept in place
     }
-    let slot_group = slot.group.clone();
+    let (slot_group, slot_pinned) = (slot.group.clone(), slot.pinned);
     connect_dnd(ui, &row, root, slot, |h| row.add_prefix(h));
     row.add_prefix(&done_check(root));
     if let Some(d) = subtitle(root) {
@@ -1732,6 +1828,8 @@ fn tree_row(
     row.add_suffix(&edit);
     row.add_suffix(&delete_button(root));
     // ExpanderRow puts each new suffix to the left of the previous ones.
+    row.add_suffix(&star_button(root));
+    row.add_suffix(&pin_button(root));
     if let Some(tag) = tag(ui, root) {
         row.add_suffix(&tag);
     }
@@ -1795,6 +1893,7 @@ fn tree_row(
     for (i, (depth, t)) in subs.iter().enumerate() {
         let slot = Slot {
             group: slot_group.clone(),
+            pinned: slot_pinned,
             root: false,
             next: subs[i + 1..]
                 .iter()
@@ -1812,8 +1911,11 @@ fn tree_row(
 /// Where a row sits, for drag and drop.
 #[derive(Clone)]
 struct Slot {
-    /// Category group the row is shown in; None is "Other".
+    /// Category group the row is shown in; None is "Other". In the Pinned group: its own
+    /// category.
     group: Option<String>,
+    /// In the Pinned group (top-level tasks pinned to the top of the list) or under one there.
+    pinned: bool,
     /// A top-level row (otherwise a subtask, movable only among its siblings).
     root: bool,
     /// The row after it that a drop below lands in front of; None means last.
@@ -2071,20 +2173,23 @@ fn stays_put(d: &Task, ds: &Slot, t: &Task, ts: &Slot, above: bool) -> bool {
     };
     ds.root == ts.root
         && ds.group == ts.group
+        && ds.pinned == ts.pinned
         && d.parent_uid == t.parent_uid
         && (before == Some(&d.uid) || before == ds.next.as_ref())
 }
 
-/// Top-level tasks move within and between groups (changing category); a subtask dropped among
-/// them is promoted. A task without subtasks dropped among subtasks joins them under their
-/// parent. Reordering only means something in manual order.
+/// Top-level tasks move within and between groups (changing category; into Pinned and out of it,
+/// pinning and unpinning); a subtask dropped among them is promoted. A task without subtasks
+/// dropped among subtasks joins them under their parent. Reordering only means something in
+/// manual order.
 fn can_drop(d: &Task, ds: &Slot, t: &Task, ts: &Slot) -> bool {
     let order = crate::settings::order();
     if d.uid == t.uid {
         return false;
     }
     if ts.root {
-        return !ds.root || ds.group != ts.group || order.tasks == Sort::Manual;
+        let elsewhere = ds.group != ts.group || ds.pinned != ts.pinned;
+        return !ds.root || elsewhere || order.tasks == Sort::Manual;
     }
     if d.parent_uid == t.parent_uid {
         return order.subtasks == Sort::Manual;
@@ -2099,7 +2204,15 @@ fn drop_task(d: &Task, ds: &Slot, t: &Task, ts: &Slot, above: bool) -> todav_cor
     if promote {
         core().promote(d.uid.clone())?;
     }
-    if ts.root && (promote || ds.group != ts.group) {
+    if ts.root && d.pinned != ts.pinned {
+        let patch = TaskPatch {
+            pinned: Some(ts.pinned),
+            ..Default::default()
+        };
+        core().update_task(d.uid.clone(), patch)?;
+    }
+    // Pinned tasks keep their category.
+    if ts.root && !ts.pinned && (promote || ds.group != ts.group) {
         set_category(&d.uid, ts.group.clone())?;
     }
     if !ts.root && d.parent_uid != t.parent_uid {
@@ -2211,6 +2324,89 @@ fn done_check(t: &Task) -> gtk::CheckButton {
         }
     });
     check
+}
+
+/// Priority levels as the star's menu and the edit dialog's picker list them, by action target.
+const PRIORITIES: [&str; 4] = ["none", "low", "medium", "high"];
+
+/// A star coloured by the task's priority (high, medium, low as Nextcloud Tasks colours them;
+/// outlined without one); its menu sets the priority as the edit dialog does.
+fn star_button(t: &Task) -> gtk::MenuButton {
+    let level = priority_row(t.priority);
+    let b = gtk::MenuButton::builder()
+        .icon_name(if level == 0 {
+            "non-starred-symbolic"
+        } else {
+            "starred-symbolic"
+        })
+        .valign(gtk::Align::Center)
+        .tooltip_text(priority_text(t.priority).unwrap_or_else(|| gettext("Priority")))
+        .build();
+    b.add_css_class("flat");
+    if level > 0 {
+        b.add_css_class(&format!("priority-{}", PRIORITIES[level as usize]));
+    }
+    let menu = gio::Menu::new();
+    let labels = [
+        pgettext("priority", "None"),
+        pgettext("priority", "Low"),
+        pgettext("priority", "Medium"),
+        pgettext("priority", "High"),
+    ];
+    for (label, target) in labels.iter().zip(PRIORITIES) {
+        menu.append(Some(label), Some(&format!("task.priority::{target}")));
+    }
+    b.set_menu_model(Some(&menu));
+    let state = PRIORITIES[level as usize].to_variant();
+    let action = gio::SimpleAction::new_stateful("priority", Some(glib::VariantTy::STRING), &state);
+    let uid = t.uid.clone();
+    action.connect_change_state(move |_, v| {
+        let Some(row) = v
+            .and_then(|v| v.str())
+            .and_then(|s| PRIORITIES.iter().position(|p| *p == s))
+        else {
+            return;
+        };
+        if row as u32 == level {
+            return;
+        }
+        let patch = TaskPatch {
+            priority: Some(priority_value(row as u32)),
+            ..Default::default()
+        };
+        if core().update_task(uid.clone(), patch).is_ok() {
+            request_sync();
+        }
+    });
+    let actions = gio::SimpleActionGroup::new();
+    actions.add_action(&action);
+    b.insert_action_group("task", Some(&actions));
+    b
+}
+
+/// Pins a top-level task to the top of its list (X-PINNED, as Nextcloud Tasks pins).
+fn pin_button(t: &Task) -> gtk::Button {
+    let b = icon_button(
+        "view-pin-symbolic",
+        &if t.pinned {
+            gettext("Unpin")
+        } else {
+            gettext("Pin")
+        },
+    );
+    // Dimmed until pinned, as the outlined star is until starred.
+    b.add_css_class(if t.pinned { "pinned" } else { "dim-label" });
+    let (uid, pinned) = (t.uid.clone(), t.pinned);
+    b.connect_clicked(move |_| {
+        let patch = TaskPatch {
+            pinned: Some(!pinned),
+            ..Default::default()
+        };
+        if core().update_task(uid.clone(), patch).is_ok() {
+            request_sync();
+        }
+    });
+    b
 }
 
 fn delete_button(t: &Task) -> gtk::Button {

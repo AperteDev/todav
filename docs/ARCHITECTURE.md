@@ -465,7 +465,8 @@ Public in the README as planned work; order not fixed.
 - [ ] **Android app**: M6 above.
 - [ ] **Nested subtasks**: more than one level; deeper `RELATED-TO` nesting is read and kept today, but the UI shows one level (the calendar's task popover lists a task's subtasks only).
 - [ ] **Advanced notifications**: configurable, beyond the reminder notifications the background service shows now; details to be specified.
-- [ ] **Starred tasks**: details to be specified.
+- [x] **Starred tasks**: as Nextcloud Tasks does it, starred is high priority (1–4), no property of its own. Each task row has a star coloured by its priority (red high, yellow medium, blue low, outlined without one) whose menu sets the level as the edit dialog does (1, 5, 9 or none); the Important page lists the open high-priority tasks of every list by list (`Client::important`); "Priority, highest first" is a sort for tasks and subtasks. Pinning is Nextcloud's `X-PINNED:true` (`Task::pinned`, a `pinned` column): pinned top-level tasks open the list in a "Pinned" group, in the list's overall order and filtered by the category filter; dropping a task into it pins it, dragging one out unpins it (and sets the category of the group it lands in).
+- [ ] **Advanced search, filtering and sorting**: details to be specified.
 
 ## Milestones
 
