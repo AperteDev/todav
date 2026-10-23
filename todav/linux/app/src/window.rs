@@ -1031,7 +1031,7 @@ fn refresh_lists(ui: &Rc<Ui>) {
     {
         sync.set_enabled(core().account().is_some());
     }
-    let lists = core().lists();
+    let lists = crate::lists::by_place(core().lists());
     let valid = |h: &str| !lists.is_empty() && (h == UPCOMING || lists.iter().any(|l| l.href == h));
     if ui.current.borrow().as_deref().is_none_or(|c| !valid(c)) {
         let last = core().setting("last_list".into()).filter(|l| valid(l));
@@ -1074,9 +1074,14 @@ fn refresh_lists(ui: &Rc<Ui>) {
         let count = gtk::Label::new(Some(&l.open_count.to_string()));
         count.add_css_class("dim-label");
         row.append(&name);
-        row.append(&count);
+        if l.local {
+            row.append(&crate::lists::local_mark());
+        }
+        row.append(&count); // last: refresh_sidebar_counts updates it
         ui.sidebar.append(&row);
     }
+    // Upcoming first, then the lists grouped by where they are kept.
+    crate::lists::set_headings(&ui.sidebar, 1, crate::lists::headings(&lists));
     let current = ui.current.borrow().clone();
     if let Some(i) = ui
         .hrefs
@@ -1091,7 +1096,7 @@ fn refresh_lists(ui: &Rc<Ui>) {
 }
 
 fn refresh_sidebar_counts(ui: &Rc<Ui>) {
-    let lists = core().lists();
+    let lists = crate::lists::by_place(core().lists());
     if lists
         .iter()
         .map(|l| &l.href)

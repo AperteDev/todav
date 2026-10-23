@@ -189,6 +189,78 @@ pub fn context_menu(
     rows.add_controller(hold);
 }
 
+/// Where a list is kept, as its group is headed: the account ("user@host"), or this device.
+pub fn place(local: bool) -> String {
+    match core().account().filter(|_| !local) {
+        Some(a) => {
+            let host = a.url.split_once("://").map_or(a.url.as_str(), |(_, h)| h);
+            format!("{}@{}", a.user, host.trim_end_matches('/'))
+        }
+        None => gettext("On This Device"),
+    }
+}
+
+/// Where new lists can go, as (heading, local): the account, then this device in local mode.
+/// ponytail: one account; several would give a place each.
+pub fn places() -> Vec<(String, bool)> {
+    let account = core().account().map(|_| (place(false), false));
+    let device = crate::local_mode().then(|| (place(true), true));
+    account.into_iter().chain(device).collect()
+}
+
+/// Lists grouped by where they are kept: the account's, then this device's, each group in
+/// the order given.
+pub fn by_place(mut lists: Vec<List>) -> Vec<List> {
+    lists.sort_by_key(|l| l.local);
+    lists
+}
+
+/// The heading over each of `lists` (as `by_place` orders them): its place on the first of a
+/// group, when they are in more than one place.
+pub fn headings(lists: &[List]) -> Vec<Option<String>> {
+    let mixed = lists.iter().any(|l| l.local) && lists.iter().any(|l| !l.local);
+    (0..lists.len())
+        .map(|i| {
+            let first = i == 0 || lists[i - 1].local != lists[i].local;
+            (mixed && first).then(|| place(lists[i].local))
+        })
+        .collect()
+}
+
+/// A heading above sidebar rows, as libadwaita's sidebars head their sections.
+pub fn heading_label(text: &str) -> gtk::Label {
+    let label = gtk::Label::builder()
+        .label(text)
+        .xalign(0.0)
+        .ellipsize(gtk::pango::EllipsizeMode::End)
+        .margin_start(12)
+        .margin_end(12)
+        .margin_top(12)
+        .margin_bottom(6)
+        .build();
+    label.add_css_class("caption-heading");
+    label.add_css_class("dim-label");
+    label
+}
+
+/// Head the rows of `rows` with `headings`, one per row from row `skip` on.
+pub fn set_headings(rows: &gtk::ListBox, skip: usize, headings: Vec<Option<String>>) {
+    rows.set_header_func(move |row, _| {
+        let text = (row.index() as usize)
+            .checked_sub(skip)
+            .and_then(|i| headings.get(i).cloned().flatten());
+        row.set_header(text.map(|t| heading_label(&t)).as_ref());
+    });
+}
+
+/// The mark after a list kept on this device only.
+pub fn local_mark() -> gtk::Image {
+    let mark = gtk::Image::from_icon_name("chain-broken-symbolic");
+    mark.set_tooltip_text(Some(&gettext("On this device only")));
+    mark.add_css_class("dim-label");
+    mark
+}
+
 /// "On this device only" on the welcome page: local mode on, and the first time a task list
 /// with a task to start from and an empty calendar; lists kept from before just show again.
 pub fn start_local() {
@@ -365,6 +437,15 @@ pub fn open(parent: &gtk::Widget, list: Option<List>, events: bool) {
         });
     }
 
+    // A new one: on the account or this device, picked when both are there.
+    let places = places();
+    let place: adw::ComboRow = get(&b, "place");
+    let names: gtk::StringList = get(&b, "places");
+    for (heading, _) in &places {
+        names.append(heading);
+    }
+    place.set_visible(list.is_none() && places.len() > 1);
+
     let s = save.clone();
     name.connect_changed(move |e| s.set_sensitive(!e.text().trim().is_empty()));
     if let Some(l) = &list {
@@ -405,12 +486,15 @@ pub fn open(parent: &gtk::Widget, list: Option<List>, events: bool) {
             return;
         }
         let (c, href) = (chosen.borrow().clone(), href.clone());
+        let local = places
+            .get(place.selected() as usize)
+            .is_some_and(|(_, local)| *local);
         busy2(true);
         let (d, fail) = (d.clone(), fail2.clone());
         glib::spawn_future_local(async move {
             let r = gio::spawn_blocking(move || match href {
                 Some(h) => core().edit_list(h, n, c).map(|_| None),
-                None => core().create_list(n, c, events, false).map(Some),
+                None => core().create_list(n, c, events, local).map(Some),
             })
             .await;
             match r {
@@ -502,8 +586,10 @@ fn delete_question(l: &List) -> String {
     let what = what
         .replace("{name}", &l.display_name)
         .replace("{n}", &n.to_string());
-    format!(
-        "{what} {}",
+    let back = if l.local {
+        gettext("It is on this device only and cannot be restored.")
+    } else {
         gettext("It can be restored from the trash bin in Nextcloud Calendar.")
-    )
+    };
+    format!("{what} {back}")
 }

@@ -959,7 +959,8 @@ fn refresh_calendars(c: &Rc<Cal>) {
             all.push(l);
         }
     }
-    all.sort_by_key(|l| (!l.holds_events, l.display_name.to_lowercase()));
+    // Calendars, then task lists, each grouped by where they are kept (this device last).
+    all.sort_by_key(|l| (!l.holds_events, l.local, l.display_name.to_lowercase()));
     let hidden = hidden();
     if *c.lists.borrow() == all && *c.hidden.borrow() == hidden {
         return;
@@ -976,6 +977,9 @@ fn refresh_calendars(c: &Rc<Cal>) {
             .ellipsize(gtk::pango::EllipsizeMode::End)
             .build();
         row.append(&name);
+        if l.local {
+            row.append(&crate::lists::local_mark());
+        }
         // A mark when shown (the row toggles it, see `build`); kept in place when hidden.
         let shown = !hidden.contains(&l.href);
         let mark = gtk::Image::builder()
@@ -993,6 +997,14 @@ fn refresh_calendars(c: &Rc<Cal>) {
         } else {
             c.task_lists.append(&row);
         }
+    }
+    for (rows, events) in [(&c.calendars, true), (&c.task_lists, false)] {
+        let section: Vec<List> = all
+            .iter()
+            .filter(|l| l.holds_events == events)
+            .cloned()
+            .collect();
+        crate::lists::set_headings(rows, 0, crate::lists::headings(&section));
     }
     let lists_only = all.iter().any(|l| !l.holds_events);
     c.task_head.set_visible(lists_only);

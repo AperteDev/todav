@@ -42,6 +42,13 @@ Adw.Dialog dialog {
           title: _("Name");
           activates-default: true;
         }
+
+        // Where a new one goes, when there is a choice (local mode with an account).
+        Adw.ComboRow place {
+          title: _("Save to");
+          visible: false;
+          model: Gtk.StringList places {};
+        }
       }
 
       Adw.PreferencesGroup {
