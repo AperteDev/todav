@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Priority, highest first" to sort tasks and subtasks.
 - Pin tasks to the top of their list, in a Pinned group (shared with Nextcloud
   Tasks' pins).
+- "Stars" and "Pins" in Preferences → Tasks turn either off; pinned tasks stay
+  pinned for other apps.
 
 ### Changed
 
@@ -35,6 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Preferences.
 - Times on the calendar are dimmer than titles and come after them, at the end
   of one-line entries, as in GNOME Calendar.
+- Upcoming shows in the sidebar only while some task has a due date, as
+  Important does while some task has high priority.
 
 ## [1.1.0] - 2026-10-22
 

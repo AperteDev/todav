@@ -253,6 +253,14 @@ pub fn set_syncing(state: &gtk::Stack, on: bool) {
     state.set_visible_child_name(if on { "syncing" } else { "idle" });
 }
 
+/// Rebuild the sidebar (when its pages change) and the task page.
+pub fn refresh_all() {
+    if let Some(ui) = ui() {
+        refresh_sidebar_counts(&ui);
+        refresh_tasks(&ui);
+    }
+}
+
 /// Rebuild the task page, e.g. after the task order changed.
 pub fn refresh() {
     if let Some(ui) = ui() {
@@ -1041,8 +1049,8 @@ fn refresh_lists(ui: &Rc<Ui>) {
         sync.set_enabled(core().account().is_some());
     }
     let lists = crate::lists::by_place(core().lists());
-    let valid =
-        |h: &str| !lists.is_empty() && (PAGES.contains(&h) || lists.iter().any(|l| l.href == h));
+    let pages = pages(&lists);
+    let valid = |h: &str| pages.iter().any(|(p, _)| *p == h) || lists.iter().any(|l| l.href == h);
     if ui.current.borrow().as_deref().is_none_or(|c| !valid(c)) {
         let last = core().setting("last_list".into()).filter(|l| valid(l));
         *ui.current.borrow_mut() = last.or_else(|| lists.first().map(|l| l.href.clone()));
@@ -1050,17 +1058,8 @@ fn refresh_lists(ui: &Rc<Ui>) {
     crate::lists::paint();
     ui.sidebar.remove_all();
     *ui.looks.borrow_mut() = looks(&lists);
-    let pages = if lists.is_empty() {
-        &[][..]
-    } else {
-        &PAGES[..]
-    };
-    *ui.hrefs.borrow_mut() = pages
-        .iter()
-        .map(|p| p.to_string())
-        .chain(lists.iter().map(|l| l.href.clone()))
-        .collect();
-    for (page, n) in pages.iter().zip(page_counts()) {
+    *ui.hrefs.borrow_mut() = sidebar_hrefs(&pages, &lists);
+    for (page, n) in &pages {
         let (icon, title) = if *page == UPCOMING {
             ("x-office-calendar-symbolic", gettext("Upcoming"))
         } else {
@@ -1153,16 +1152,14 @@ fn list_drop(ui: &Rc<Ui>, row: &gtk::ListBoxRow, href: &str) {
 
 fn refresh_sidebar_counts(ui: &Rc<Ui>) {
     let lists = crate::lists::by_place(core().lists());
-    if lists
-        .iter()
-        .map(|l| &l.href)
-        .ne(ui.hrefs.borrow().iter().skip(PAGES.len()))
-        || looks(&lists) != *ui.looks.borrow()
-    {
+    let pages = pages(&lists);
+    // A page appearing or going (its first or last task) rebuilds the sidebar too.
+    if sidebar_hrefs(&pages, &lists) != *ui.hrefs.borrow() || looks(&lists) != *ui.looks.borrow() {
         return refresh_lists(ui);
     }
-    let counts = page_counts()
-        .into_iter()
+    let counts = pages
+        .iter()
+        .map(|(_, n)| *n)
         .chain(lists.iter().map(|l| l.open_count as usize));
     for (i, n) in counts.take(ui.hrefs.borrow().len()).enumerate() {
         let count = ui
@@ -1184,19 +1181,35 @@ fn looks(lists: &[todav_core::List]) -> Vec<(String, Option<String>)> {
         .collect()
 }
 
-/// The sidebar counts of `PAGES`: Upcoming's tasks due today or earlier, every Important one.
-fn page_counts() -> [usize; 2] {
-    [upcoming_count(), core().important().len()]
+/// The pages shown above `lists`, with their sidebar counts: Upcoming while a task has a due
+/// date (counting those due today or earlier), Important while one is of high priority (with
+/// stars on).
+fn pages(lists: &[todav_core::List]) -> Vec<(&'static str, usize)> {
+    if lists.is_empty() {
+        return Vec::new();
+    }
+    let now = core().local_now();
+    let upcoming = core().upcoming();
+    let important = if crate::settings::stars() {
+        core().important().len()
+    } else {
+        0
+    };
+    let pressing = upcoming.iter().filter(|t| dates::pressing(t, now)).count();
+    [
+        (UPCOMING, !upcoming.is_empty(), pressing),
+        (IMPORTANT, important > 0, important),
+    ]
+    .into_iter()
+    .filter(|(_, shown, _)| *shown)
+    .map(|(page, _, n)| (page, n))
+    .collect()
 }
 
-/// Open tasks due today or earlier.
-fn upcoming_count() -> usize {
-    let now = core().local_now();
-    core()
-        .upcoming()
-        .iter()
-        .filter(|t| dates::pressing(t, now))
-        .count()
+/// The sidebar rows' hrefs: the pages, then the lists.
+fn sidebar_hrefs(pages: &[(&str, usize)], lists: &[todav_core::List]) -> Vec<String> {
+    let pages = pages.iter().map(|(p, _)| p.to_string());
+    pages.chain(lists.iter().map(|l| l.href.clone())).collect()
 }
 
 /// Rebuild the task page where it is scrolled to. The rebuild destroys the focused widget when
@@ -1369,16 +1382,18 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
 
     // Pinned top-level tasks first, in a group of their own, in the list's overall order; the
     // sidebar filter goes by each top-level task's category (a group's name in "group").
+    // With pins turned off, pinned tasks show among the others.
+    let pins = crate::settings::pins();
     let all_open = core().ungrouped_by(href.clone(), order.tasks, order.subtasks, done_view);
     let pinned: Vec<_> = trees(&all_open)
         .into_iter()
-        .filter(|(root, _)| root.pinned && shown(root.category.as_ref()))
+        .filter(|(root, _)| pins && root.pinned && shown(root.category.as_ref()))
         .collect();
     let mut sections: Vec<(Option<String>, Vec<_>)> = Vec::new();
     for g in &groups {
         let rest: Vec<_> = trees(&g.tasks)
             .into_iter()
-            .filter(|(root, _)| !root.pinned && shown(root.category.as_ref()))
+            .filter(|(root, _)| !(pins && root.pinned) && shown(root.category.as_ref()))
             .collect();
         if !rest.is_empty() {
             sections.push((g.name.clone(), rest));
@@ -1724,7 +1739,7 @@ fn task_row(ui: &Rc<Ui>, t: &Task, indent: usize, slot: Option<Slot>) -> adw::Ac
     }
     row.add_prefix(&done_check(t));
     // Top-level rows of a list page can be pinned.
-    let pinnable = slot.as_ref().is_some_and(|s| s.root);
+    let pinnable = slot.as_ref().is_some_and(|s| s.root) && crate::settings::pins();
     if let Some(slot) = slot {
         // ActionRow puts each new prefix to the left of the previous ones (ExpanderRow: right).
         connect_dnd(ui, &row, t, slot, |h| row.add_prefix(h));
@@ -1759,7 +1774,9 @@ fn task_row(ui: &Rc<Ui>, t: &Task, indent: usize, slot: Option<Slot>) -> adw::Ac
     if pinnable {
         row.add_suffix(&pin_button(t));
     }
-    row.add_suffix(&star_button(t));
+    if crate::settings::stars() {
+        row.add_suffix(&star_button(t));
+    }
     row.add_suffix(&delete_button(t));
     let (weak, task) = (Rc::downgrade(ui), t.clone());
     row.connect_activated(move |_| {
@@ -1828,8 +1845,12 @@ fn tree_row(
     row.add_suffix(&edit);
     row.add_suffix(&delete_button(root));
     // ExpanderRow puts each new suffix to the left of the previous ones.
-    row.add_suffix(&star_button(root));
-    row.add_suffix(&pin_button(root));
+    if crate::settings::stars() {
+        row.add_suffix(&star_button(root));
+    }
+    if crate::settings::pins() {
+        row.add_suffix(&pin_button(root));
+    }
     if let Some(tag) = tag(ui, root) {
         row.add_suffix(&tag);
     }

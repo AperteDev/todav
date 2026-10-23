@@ -173,6 +173,20 @@ Adw.PreferencesDialog dialog {
     }
 
     Adw.PreferencesGroup {
+      title: _("Stars and Pins");
+
+      Adw.SwitchRow show_stars {
+        title: _("Stars");
+        subtitle: _("A star with each task’s priority, and the Important page");
+      }
+
+      Adw.SwitchRow show_pins {
+        title: _("Pins");
+        subtitle: _("Pin tasks to the top of their list");
+      }
+    }
+
+    Adw.PreferencesGroup {
       title: _("Subtasks");
 
       Adw.ComboRow sub_sort {

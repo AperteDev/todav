@@ -58,6 +58,18 @@ pub fn apply_color_scheme() {
     adw::StyleManager::default().set_color_scheme(scheme);
 }
 
+/// Stars on tasks for their priority, and the Important page (`show_stars`; on unless turned
+/// off).
+pub fn stars() -> bool {
+    core().setting("show_stars".into()).as_deref() != Some("false")
+}
+
+/// Pins on tasks and the Pinned group (`show_pins`; on unless turned off). Off, pinned tasks
+/// stay pinned (X-PINNED) and show among the others.
+pub fn pins() -> bool {
+    core().setting("show_pins".into()).as_deref() != Some("false")
+}
+
 /// Whether the sidebar month marks days with dots (`mini_dots`; on unless turned off).
 pub fn mini_dots() -> bool {
     core().setting("mini_dots".into()).as_deref() != Some("false")
@@ -283,6 +295,15 @@ pub fn present(parent: &impl IsA<gtk::Widget>) {
         row.set_active(core().setting((*key).into()).as_deref() != Some("false"));
         row.connect_active_notify(move |r| {
             let _ = core().set_setting((*key).into(), r.is_active().to_string());
+        });
+    }
+    // Stars and pins, on unless turned off; the sidebar may gain or lose Important.
+    for key in ["show_stars", "show_pins"] {
+        let row: adw::SwitchRow = get(&b, key);
+        row.set_active(core().setting(key.into()).as_deref() != Some("false"));
+        row.connect_active_notify(move |r| {
+            let _ = core().set_setting(key.into(), r.is_active().to_string());
+            crate::window::refresh_all();
         });
     }
     let handles: adw::SwitchRow = get(&b, "drag_handles");
