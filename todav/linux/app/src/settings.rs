@@ -528,8 +528,8 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
     conn
 }
 
-/// The "Local lists and calendars" switch. Off hides those lists, nothing is deleted; with no
-/// account that leaves nothing to show, so it asks first and goes back to the welcome page.
+/// The "Local lists and calendars" switch. Off hides those lists, nothing is deleted: when
+/// there are some it asks first; with no account it goes back to the welcome page.
 fn connect_local(b: &gtk::Builder, dialog: &adw::PreferencesDialog) {
     let row: adw::SwitchRow = get(b, "local_mode");
     row.set_active(crate::local_mode());
@@ -539,20 +539,29 @@ fn connect_local(b: &gtk::Builder, dialog: &adw::PreferencesDialog) {
         if on == crate::local_mode() {
             return; // put back after Cancel
         }
-        if on || core().account().is_some() {
+        let account = core().account().is_some();
+        let mut all = core().lists();
+        all.extend(core().calendars());
+        let dialog = d.clone();
+        let apply = move |on: bool| {
             let _ = core().set_setting("local_mode".into(), on.to_string());
-            crate::window::account_changed();
-            crate::calendar::refresh();
-            return;
+            if account {
+                crate::window::account_changed();
+                crate::calendar::refresh();
+            } else {
+                dialog.close();
+                crate::window::show_welcome();
+            }
+        };
+        if on || (account && !all.iter().any(|l| l.local)) {
+            return apply(on);
         }
         let (d, r) = (d.clone(), r.clone());
         glib::spawn_future_local(async move {
             let alert = adw::AlertDialog::new(
                 Some(&gettext("Turn Off Local Lists?")),
                 Some(&gettext(
-                    "With no account connected, Todav goes back to the welcome page. Your local \
-                     lists and calendars are hidden, not deleted: choose “On This Device Only” \
-                     there to see them again.",
+                    "Local lists and calendars will be hidden until you turn them on again.",
                 )),
             );
             alert.add_responses(&[
@@ -563,9 +572,7 @@ fn connect_local(b: &gtk::Builder, dialog: &adw::PreferencesDialog) {
             alert.set_default_response(Some("cancel"));
             alert.set_close_response("cancel");
             if alert.choose_future(Some(&d)).await == "off" {
-                let _ = core().set_setting("local_mode".into(), "false".into());
-                d.close();
-                crate::window::show_welcome();
+                apply(false);
             } else {
                 r.set_active(true);
             }

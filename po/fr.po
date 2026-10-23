@@ -293,7 +293,7 @@ msgid "The event repeats."
 msgstr "L’événement se répète."
 
 #: todav/linux/app/src/calendar/dialog.rs:82 todav/linux/app/src/lists.rs:531
-#: todav/linux/app/src/settings.rs:559 todav/linux/app/ui/edit-dialog.blp:23
+#: todav/linux/app/src/settings.rs:568 todav/linux/app/ui/edit-dialog.blp:23
 #: todav/linux/app/ui/event-dialog.blp:24 todav/linux/app/ui/list-dialog.blp:18
 #: todav/linux/app/ui/new-category.blp:18
 #: todav/linux/app/ui/password-login.blp:19 todav/linux/app/ui/settings.blp:69
@@ -522,7 +522,7 @@ msgstr "La déconnexion a échoué"
 msgid "Online Accounts has no password for this account"
 msgstr "Comptes en ligne n’a pas de mot de passe pour ce compte"
 
-#: todav/linux/app/src/main.rs:272 todav/linux/app/src/settings.rs:640
+#: todav/linux/app/src/main.rs:272 todav/linux/app/src/settings.rs:647
 #, rust-format
 msgid "Cannot save password: {error}"
 msgstr "Impossible d’enregistrer le mot de passe : {error}"
@@ -586,7 +586,7 @@ msgid "GNOME Online Accounts"
 msgstr "Comptes en ligne GNOME"
 
 #: todav/linux/app/src/settings.rs:367 todav/linux/app/src/settings.rs:409
-#: todav/linux/app/src/settings.rs:582
+#: todav/linux/app/src/settings.rs:589
 #, rust-format
 msgid "Signed in as {name}"
 msgstr "Connecté en tant que {name}"
@@ -607,48 +607,44 @@ msgstr "En attente de la connexion…"
 msgid "Waiting for Browser…"
 msgstr "En attente du navigateur…"
 
-#: todav/linux/app/src/settings.rs:551
+#: todav/linux/app/src/settings.rs:562
 msgid "Turn Off Local Lists?"
 msgstr "Désactiver les listes locales ?"
 
-#: todav/linux/app/src/settings.rs:553
-msgid ""
-"With no account connected, Todav goes back to the welcome page. Your local "
-"lists and calendars are hidden, not deleted: choose “On This Device Only” "
-"there to see them again."
+#: todav/linux/app/src/settings.rs:564
+msgid "Local lists and calendars will be hidden until you turn them on again."
 msgstr ""
-"Sans compte connecté, Todav revient à la page d’accueil. Vos listes et "
-"agendas locaux sont masqués, pas supprimés : choisissez-y « Sur cet appareil "
-"uniquement » pour les retrouver."
+"Les listes et agendas locaux seront masqués jusqu’à ce que vous les "
+"réactiviez."
 
-#: todav/linux/app/src/settings.rs:560
+#: todav/linux/app/src/settings.rs:569
 msgid "Turn Off"
 msgstr "Désactiver"
 
-#: todav/linux/app/src/settings.rs:616
+#: todav/linux/app/src/settings.rs:623
 msgid "Connection works"
 msgstr "La connexion fonctionne"
 
-#: todav/linux/app/src/settings.rs:617
+#: todav/linux/app/src/settings.rs:624
 #, rust-format
 msgid "Test failed: {error}"
 msgstr "Le test a échoué : {error}"
 
-#: todav/linux/app/src/settings.rs:618
+#: todav/linux/app/src/settings.rs:625
 msgid "Test failed"
 msgstr "Le test a échoué"
 
-#: todav/linux/app/src/settings.rs:632
+#: todav/linux/app/src/settings.rs:639
 #, rust-format
 msgid "Server not changed, cannot upload pending changes: {error}"
 msgstr ""
 "Serveur inchangé, impossible d’envoyer les modifications en attente : {error}"
 
-#: todav/linux/app/src/settings.rs:648
+#: todav/linux/app/src/settings.rs:655
 msgid "Nextcloud server changed"
 msgstr "Serveur Nextcloud modifié"
 
-#: todav/linux/app/src/settings.rs:653
+#: todav/linux/app/src/settings.rs:660
 msgid "Changing the server failed"
 msgstr "Le changement de serveur a échoué"
 
@@ -1610,6 +1606,15 @@ msgstr ""
 #: todav/linux/data/io.github.selfref.Todav.metainfo.xml:23
 msgid "SelfRef"
 msgstr "SelfRef"
+
+#~ msgid ""
+#~ "With no account connected, Todav goes back to the welcome page. Your "
+#~ "local lists and calendars are hidden, not deleted: choose “On This Device "
+#~ "Only” there to see them again."
+#~ msgstr ""
+#~ "Sans compte connecté, Todav revient à la page d’accueil. Vos listes et "
+#~ "agendas locaux sont masqués, pas supprimés : choisissez-y « Sur cet "
+#~ "appareil uniquement » pour les retrouver."
 
 #~ msgid "On this device only"
 #~ msgstr "Uniquement sur cet appareil"
