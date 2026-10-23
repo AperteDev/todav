@@ -1927,13 +1927,32 @@ fn entry_at(subs: &[(usize, &Task)], uid: &str, start: bool) -> Option<(usize, u
 }
 
 /// "Add subtask" entry under `parent`, a task `depth` levels deep; new subtasks go first with
-/// `start`. Under a subtask, Escape closes it.
+/// `start`. Under a subtask, Escape closes it. A task dropped on it goes where a new subtask
+/// would.
 fn sub_entry(ui: &Rc<Ui>, parent: &Task, depth: usize, start: bool) -> adw::EntryRow {
     let entry = adw::EntryRow::builder()
         .title(gettext("Add subtask"))
         .build();
     entry.set_margin_start(INDENT * (depth as i32 + 1));
     entry.add_prefix(&gtk::Image::from_icon_name("list-add-symbolic"));
+    let p = parent.clone();
+    let drop = task_drop(ui, move |d| can_join(d, &p), start);
+    let (weak, p) = (Rc::downgrade(ui), parent.clone());
+    drop.connect_drop(move |dt, _, _, _| {
+        let (Some(ui), Some(w)) = (weak.upgrade(), dt.widget()) else {
+            return false;
+        };
+        unmark(&ui, &w);
+        let Some((d, _)) = ui.dragging.take().filter(|(d, _)| can_join(d, &p)) else {
+            return false;
+        };
+        match core().together(|| adopt(&d, &p)) {
+            Ok(()) => request_sync(),
+            Err(e) => ui.toasts.add_toast(note(&e.to_string())),
+        }
+        true
+    });
+    entry.add_controller(drop);
     if ui.focus_sub.borrow().as_ref() == Some(&parent.uid) {
         ui.focus_sub.take();
         let e = entry.clone();
@@ -2114,6 +2133,38 @@ fn connect_dnd(
     row.add_controller(drop);
 }
 
+/// A drop target for an entry, taking dragged tasks before its text does (which would insert
+/// the task's UID): those `ok` takes get a line above the entry, or `below` it; others are refused.
+fn task_drop(ui: &Rc<Ui>, ok: impl Fn(&Task) -> bool + 'static, below: bool) -> gtk::DropTarget {
+    let drop = gtk::DropTarget::new(glib::Type::STRING, gtk::gdk::DragAction::MOVE);
+    drop.set_propagation_phase(gtk::PropagationPhase::Capture);
+    let weak = Rc::downgrade(ui);
+    drop.connect_accept(move |_, _| {
+        weak.upgrade()
+            .is_some_and(|ui| ui.dragging.borrow().is_some())
+    });
+    let weak = Rc::downgrade(ui);
+    drop.connect_motion(move |dt, _, _| {
+        let (Some(ui), Some(w)) = (weak.upgrade(), dt.widget()) else {
+            return gtk::gdk::DragAction::empty();
+        };
+        if ui.dragging.borrow().as_ref().is_some_and(|(d, _)| ok(d)) {
+            mark(&ui, &w, below);
+            gtk::gdk::DragAction::MOVE
+        } else {
+            unmark(&ui, &w);
+            gtk::gdk::DragAction::empty()
+        }
+    });
+    let weak = Rc::downgrade(ui);
+    drop.connect_leave(move |dt| {
+        if let (Some(ui), Some(w)) = (weak.upgrade(), dt.widget()) {
+            unmark(&ui, &w);
+        }
+    });
+    drop
+}
+
 /// Is the pointer over something nested in row `w` with its own drag or drop handling: a
 /// subtask row, an "Add subtask" entry or a "+" button?
 fn nested_row(w: &gtk::Widget, x: f64, y: f64) -> bool {
@@ -2205,11 +2256,22 @@ fn can_adopt(d: &Task, parent: &Task) -> bool {
     d.parent_uid.as_ref() != Some(&parent.uid) && !core().within(parent.uid.clone(), d.uid.clone())
 }
 
-/// Make `d` a subtask of `parent`, first or last among its subtasks as new subtasks would be.
+/// `d` can be dropped on `parent`'s "Add subtask" entry: as `can_adopt`, or to move to the end
+/// of its siblings in manual order.
+fn can_join(d: &Task, parent: &Task) -> bool {
+    let manual = crate::settings::order().subtasks == Sort::Manual;
+    (manual || d.parent_uid.as_ref() != Some(&parent.uid))
+        && !core().within(parent.uid.clone(), d.uid.clone())
+}
+
+/// Make `d` a subtask of `parent` (if it is not one yet), first or last among its subtasks as
+/// new subtasks would be.
 fn adopt(d: &Task, parent: &Task) -> todav_core::Result<()> {
-    core().set_parent(d.uid.clone(), parent.uid.clone())?;
-    if d.category.is_some() {
-        set_category(&d.uid, None)?; // the top-level task's category decides
+    if d.parent_uid.as_ref() != Some(&parent.uid) {
+        core().set_parent(d.uid.clone(), parent.uid.clone())?;
+        if d.category.is_some() {
+            set_category(&d.uid, None)?; // the top-level task's category decides
+        }
     }
     let order = crate::settings::order();
     if order.subtasks == Sort::Manual {

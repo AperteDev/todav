@@ -29,8 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Stars" and "Pins" in Preferences → Tasks turn either off; pinned tasks stay
   pinned for other apps.
 - Nested subtasks, any number of levels deep: a subtask's "+" adds subtasks to
-  it, and a task dropped on a "+" moves there with its own subtasks. The task
-  details on the calendar list a subtask's subtasks too.
+  it, and a task dropped on a "+" moves there with its own subtasks; dropped on
+  an "Add subtask" field, it goes where a new subtask would. The task details
+  on the calendar list a subtask's subtasks too.
 
 ### Changed
 
