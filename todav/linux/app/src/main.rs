@@ -43,6 +43,17 @@ pub fn logged_in() -> bool {
     SYNC.get().is_some() && core().account().is_some()
 }
 
+/// Lists and calendars kept on this device are shown and can be added (Preferences →
+/// Accounts); without an account, the app runs with those alone.
+pub fn local_mode() -> bool {
+    core().setting("local_mode".into()).as_deref() == Some("true")
+}
+
+/// The main window has something to show: an account, or local mode.
+pub fn ready() -> bool {
+    SYNC.get().is_some() && (core().account().is_some() || local_mode())
+}
+
 pub fn sync_state() -> String {
     SYNC_STATE.lock().unwrap().clone()
 }
@@ -287,7 +298,7 @@ pub fn restart_push() {
     core().stop_listening();
     let url = core().setting("ntfy_url".into()).unwrap_or_default();
     *PUSH_URL.lock().unwrap() = url.clone();
-    if let Some(ntfy) = Some(url).filter(|u| !u.is_empty()) {
+    if let Some(ntfy) = Some(url).filter(|u| !u.is_empty() && core().account().is_some()) {
         std::thread::spawn(move || {
             // Blocks until the next restart_push; reconnects internally.
             let _ = core().listen(ntfy, &|r| set_state(&r));
@@ -436,7 +447,7 @@ fn main() -> glib::ExitCode {
         }
         window::setup_actions(app.upcast_ref());
         settings::apply_color_scheme();
-        if restore_account() {
+        if restore_account() || local_mode() {
             start_background();
         }
     });

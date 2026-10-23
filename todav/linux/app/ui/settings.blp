@@ -45,6 +45,11 @@ Adw.PreferencesDialog dialog {
         model: Gtk.StringList { strings [_("Last used"), _("Tasks"), _("Calendar")] };
       }
     }
+  }
+
+  Adw.PreferencesPage {
+    title: _("Accounts");
+    icon-name: "system-users-symbolic";
 
     // The status row, then the shared connection rows (ui/connection.blp).
     Adw.PreferencesGroup account {
@@ -86,7 +91,7 @@ Adw.PreferencesDialog dialog {
       }
     }
 
-    Adw.PreferencesGroup {
+    Adw.PreferencesGroup push {
       title: _("Push");
       description: _("Changes are applied when this window closes");
 
@@ -109,7 +114,7 @@ Adw.PreferencesDialog dialog {
       }
     }
 
-    Adw.PreferencesGroup {
+    Adw.PreferencesGroup sync {
       title: _("Sync");
 
       Adw.SwitchRow sync_settings {
@@ -123,6 +128,16 @@ Adw.PreferencesDialog dialog {
         subtitle: _("Use the same push server on all devices");
         active: true;
         sensitive: bind sync_settings.active;
+      }
+    }
+
+    // Kept on this device only (setting `local_mode`); off hides those lists, nothing is deleted.
+    Adw.PreferencesGroup {
+      title: _("On This Device");
+
+      Adw.SwitchRow local_mode {
+        title: _("Local lists and calendars");
+        subtitle: _("Kept on this device only, never synced");
       }
     }
   }

@@ -87,6 +87,14 @@ seconds.
   Files (can be turned off; server addresses stay on each device). The order of each list's
   categories is kept next to it, in `todav/config.json`.
 
+**On this device only**
+
+- Use Todav without an account: choose "On This Device Only" when it starts, and your task lists
+  and calendars stay on this computer.
+- With an account too, turn on "Local lists and calendars" (Preferences → Accounts) to keep some
+  lists and calendars off the server, next to the synced ones. Turning it off hides them without
+  deleting anything.
+
 ## Getting started
 
 Todav needs GNOME 49 or newer. The GNOME Shell extension is optional.
@@ -122,17 +130,17 @@ Log out and back in, then turn the extension on in Extensions (or
 Todav from source. Then:
 
 1. Open Todav and sign in to your Nextcloud: pick a GNOME Online Accounts account, sign in in the
-   browser, or use a login name and app password.
+   browser, or use a login name and app password. Or choose "On This Device Only" to start
+   without an account.
 2. Your task lists and calendars appear, and new ones can be created from the sidebar.
 3. For instant updates, install the WebDAV Push app on your Nextcloud and enter your ntfy server
-   in Preferences → General → Push.
+   in Preferences → Accounts → Push.
 
 ## What's next
 
 Todav is under active development. Planned:
 
 - **Multiple accounts**
-- **Offline mode**
 - **Nested subtasks**, more than one level deep
 - **Advanced notifications**, configurable
 - **Starred tasks**

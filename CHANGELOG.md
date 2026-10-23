@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Use Todav without an account: "On This Device Only" on the welcome page keeps
+  your task lists and calendars on this computer, starting with a task list and
+  a calendar.
+- "Local lists and calendars" in Preferences → Accounts: keep lists and
+  calendars on this device only, next to the synced ones. Turning it off hides
+  them; nothing is deleted.
+
+### Changed
+
+- The welcome page asks first how to use Todav (GNOME Online Accounts, a
+  Nextcloud server or this device only), then for the account.
+- The account, push and sync settings moved to a new Accounts page in
+  Preferences.
+
 ## [1.1.0] - 2026-10-22
 
 ### Fixed

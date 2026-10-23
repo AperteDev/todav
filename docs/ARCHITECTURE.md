@@ -229,13 +229,21 @@ A single Rust binary (`todav-linux`) that is both the GUI and a background servi
 
 **UI**
 
-- Welcome page to sign in: GNOME Online Accounts, browser (Login Flow v2) or login name + app password; optional ntfy server.
+- Welcome page in two steps (`AdwNavigationView`): first how to use Todav (GNOME Online Accounts, a Nextcloud server, or "On This Device Only"), then the account to connect: the GOA account, or the server to sign in to with the browser (Login Flow v2) or a login name + app password; optional ntfy server. "On This Device Only" turns local mode on and, the first time, creates a task list with a sample task and an empty calendar (see [Local lists](#local-lists)).
 - Tasks | Calendar switcher in the header. Tasks page: `AdwNavigationSplitView` with Upcoming, the lists (colour, open count) and categories in the sidebar; tasks grouped by category (or tags, or ungrouped), subtasks in expander rows, completed ones in a "Completed" expander or at the end.
 - Entry at the top of the list: type, Enter → `add_task`; `Ctrl+K` category picker. Edit dialog for dates, reminders, priority, category, event link and notes.
 - Drag and drop reorders, moves between categories, makes and promotes subtasks.
 - Type to search; `Ctrl+Z` undo; Keyboard Shortcuts dialog. Toasts for sync errors; the sync button turns into a spinner while syncing.
 - Calendar page: see [Calendar](#calendar-in-todav).
-- Preferences: General (style, start page, account, push, settings sync), Tasks, Calendar, Extension.
+- Preferences: General (style, start page), Accounts (account, push, settings sync, local lists), Tasks, Calendar, Extension.
+
+**Local lists**
+
+- Lists and calendars kept on this device only, for use without an account or next to the server's. Their href is `local:<uid>/` (`store::LOCAL`) in the same `lists` table, so tasks and events in them are stored like any other; `List::local` marks them.
+- Never synced: the upload queue (`store::dirty`) skips them, so items in them keep `dirty` set and no href; refreshing the server's calendars, signing in and signing out leave them alone; creating, editing and deleting a local list never calls the server. Moving an event from a local calendar to a server one uploads it (it is new there), and moving one back deletes the server copy.
+- Shown only in local mode (the device-only `local_mode` setting, Preferences → Accounts, off by default). The core filters them out of every query while it is off (`shown` in `lib.rs`), so the app, the extension and reminders all ignore them; nothing is deleted. Turning it off with no account goes back to the welcome page, after a warning.
+- Without an account the app runs on them alone: the background service starts for reminders and D-Bus, sync and push stay off, and the sync buttons are greyed out.
+- Not done: moving a whole list between the account and the device (single events move with the calendar picker).
 
 **Process model**
 
@@ -449,7 +457,7 @@ Deviation: no docker stack (`infra/`) for now — integration runs against the r
 Public in the README as planned work; order not fixed.
 
 - [ ] **Multiple accounts**: several servers or users side by side; the core holds one account today (`Client::account`), and lists, push registrations and settings would need an account key.
-- [ ] **Offline mode**: use Todav without a server (local-only lists), and move them to an account later.
+- [x] **Offline mode**: use Todav without a server, or keep some lists on the device next to the account's ("Local lists and calendars", see [Local lists](#local-lists)). Not done: moving a whole list between the device and an account.
 - [ ] **More services** besides Nextcloud: other CalDAV servers first (Radicale, Baïkal, Fastmail, iCloud…), which mostly means login without Login Flow v2, settings/categories without Nextcloud Files, and polling where there is no WebDAV-Push.
 - [ ] **Android app**: M6 above.
 - [ ] **Nested subtasks**: more than one level; deeper `RELATED-TO` nesting is read and kept today, but the UI shows one level (the calendar's task popover lists a task's subtasks only).

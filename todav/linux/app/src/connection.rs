@@ -9,7 +9,7 @@ use std::rc::Rc;
 
 pub struct Connection {
     pub goa: adw::SwitchRow,
-    account: adw::ComboRow,
+    pub account: adw::ComboRow,
     pub server: (gtk::DropDown, adw::EntryRow),
     accounts: Vec<goa::Account>,
 }
@@ -68,6 +68,11 @@ impl Connection {
 
     pub fn has_accounts(&self) -> bool {
         !self.accounts.is_empty()
+    }
+
+    /// The GOA accounts' names, for the welcome page's choice.
+    pub fn account_names(&self) -> Vec<String> {
+        self.accounts.iter().map(|a| a.name.clone()).collect()
     }
 
     /// The chosen GOA account; None means a server signed in to here.

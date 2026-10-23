@@ -1,5 +1,6 @@
-//! Preferences dialog: General (account, server addresses with connection tests, applied on
-//! close; sync; what opens at start), Tasks (order and display, applied at once) and Calendar.
+//! Preferences dialog: General (style, what opens at start), Accounts (account, server
+//! addresses with connection tests, applied on close; sync; local lists), Tasks (order and
+//! display, applied at once), Calendar and Extension.
 
 use crate::connection::Connection;
 use crate::i18n::{gettext, gettext_noop};
@@ -296,6 +297,7 @@ pub fn present(parent: &impl IsA<gtk::Widget>) {
         Some(gettext_noop("Also places the “Add subtask” field")),
     );
     connect_reminders(&b);
+    connect_local(&b, &dialog);
     set_url(&server, &old_server);
     set_url(&ntfy, &old_ntfy);
 
@@ -343,6 +345,8 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
     let icon: gtk::Image = get(b, "status_icon");
     let sign_in: adw::SplitButton = get(b, "sign_in");
     let sign_out: adw::SplitButton = get(b, "sign_out");
+    // Push and sync are about the account: only with one (local mode runs without).
+    let server_groups: [adw::PreferencesGroup; 2] = [get(b, "push"), get(b, "sync")];
     // Everything here shows the actual connection, the switch included.
     let describe = {
         let (conn, sign_in, sign_out) = (conn.clone(), sign_in.clone(), sign_out.clone());
@@ -369,6 +373,9 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
                 }
             }
             icon.set_visible(acc.is_some());
+            for g in &server_groups {
+                g.set_sensitive(acc.is_some());
+            }
             sign_out.set_visible(acc.is_some() && !goa);
             sign_in.set_visible(acc.is_none());
             conn.goa.set_active(goa); // its handler sees nothing to change
@@ -519,6 +526,51 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
     // A sign-in still waiting for the browser stops with the dialog.
     dialog.connect_closed(|_| crate::window::cancel_login());
     conn
+}
+
+/// The "Local lists and calendars" switch. Off hides those lists, nothing is deleted; with no
+/// account that leaves nothing to show, so it asks first and goes back to the welcome page.
+fn connect_local(b: &gtk::Builder, dialog: &adw::PreferencesDialog) {
+    let row: adw::SwitchRow = get(b, "local_mode");
+    row.set_active(crate::local_mode());
+    let d = dialog.clone();
+    row.connect_active_notify(move |r| {
+        let on = r.is_active();
+        if on == crate::local_mode() {
+            return; // put back after Cancel
+        }
+        if on || core().account().is_some() {
+            let _ = core().set_setting("local_mode".into(), on.to_string());
+            crate::window::account_changed();
+            crate::calendar::refresh();
+            return;
+        }
+        let (d, r) = (d.clone(), r.clone());
+        glib::spawn_future_local(async move {
+            let alert = adw::AlertDialog::new(
+                Some(&gettext("Turn Off Local Lists?")),
+                Some(&gettext(
+                    "With no account connected, Todav goes back to the welcome page. Your local \
+                     lists and calendars are hidden, not deleted: choose “On This Device Only” \
+                     there to see them again.",
+                )),
+            );
+            alert.add_responses(&[
+                ("cancel", &gettext("Cancel")),
+                ("off", &gettext("Turn Off")),
+            ]);
+            alert.set_response_appearance("off", adw::ResponseAppearance::Destructive);
+            alert.set_default_response(Some("cancel"));
+            alert.set_close_response("cancel");
+            if alert.choose_future(Some(&d)).await == "off" {
+                let _ = core().set_setting("local_mode".into(), "false".into());
+                d.close();
+                crate::window::show_welcome();
+            } else {
+                r.set_active(true);
+            }
+        });
+    });
 }
 
 /// Connect with credentials from a sign-in here; the message for a toast.

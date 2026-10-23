@@ -189,6 +189,37 @@ pub fn context_menu(
     rows.add_controller(hold);
 }
 
+/// "On this device only" on the welcome page: local mode on, and the first time a task list
+/// with a task to start from and an empty calendar; lists kept from before just show again.
+pub fn start_local() {
+    let _ = core().set_setting("local_mode".into(), "true".into());
+    let mut all = core().lists();
+    all.extend(core().calendars());
+    if !all.iter().any(|l| l.local) {
+        let start = || -> todav_core::Result<()> {
+            let list = core().create_list(gettext("Tasks"), PRESETS[8].into(), false, true)?;
+            let uid = core()
+                .add_task(list, gettext("Welcome to Todav"), None, None, false)?
+                .uid;
+            let note = gettext(
+                "Tick tasks off when done; open one to add a due date, reminders or subtasks.",
+            );
+            let patch = todav_core::TaskPatch {
+                description: Some(note),
+                ..Default::default()
+            };
+            core().update_task(uid, patch)?;
+            core().create_list(gettext("Calendar"), PRESETS[0].into(), true, true)?;
+            Ok(())
+        };
+        if let Err(e) = start() {
+            crate::window::toast(&e.to_string());
+        }
+    }
+    crate::start_background();
+    crate::window::account_changed();
+}
+
 /// "#rrggbb" (or with alpha) as "#RRGGBB", to compare with the presets and to save.
 fn normal(c: &str) -> String {
     c.get(..7).unwrap_or(c).to_ascii_uppercase()

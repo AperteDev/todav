@@ -109,7 +109,8 @@ struct Ui {
     /// Task whose row pulses (opened from the extension), until when: rebuilds in between, as
     /// after the sync that showing the window starts, pulse the new row.
     flash: RefCell<Option<(String, std::time::Instant)>>,
-    /// Welcome page: GNOME Online Accounts or a server to sign in to.
+    /// Welcome page: how to use Todav, then GNOME Online Accounts or a server to sign in to.
+    welcome: adw::NavigationView,
     conn: Rc<crate::connection::Connection>,
     ntfy: (gtk::DropDown, adw::EntryRow),
     connect_goa: gtk::Button,
@@ -205,19 +206,24 @@ pub fn present(app: &adw::Application) {
         UI.with(|u| *u.borrow_mut() = Some(ui.clone()));
         ui
     });
-    let logged_in = crate::logged_in();
+    let ready = crate::ready();
     ui.stack
-        .set_visible_child_name(if logged_in { "main" } else { "login" });
-    if logged_in {
+        .set_visible_child_name(if ready { "main" } else { "login" });
+    if ready {
         refresh_lists(&ui);
     }
     ui.window.present();
 }
 
-/// Disconnected: back to the welcome page.
+/// Disconnected: back to the welcome page, at its first step; in local mode, to the lists
+/// on this device instead.
 pub fn show_welcome() {
+    if crate::local_mode() {
+        return account_changed();
+    }
     if let Some(ui) = ui() {
         ui.current.take();
+        ui.welcome.pop_to_tag("choose");
         ui.stack.set_visible_child_name("login");
         refresh_lists(&ui); // empties the sidebar
     }
@@ -484,6 +490,7 @@ fn build(app: &adw::Application) -> Rc<Ui> {
         adopters: RefCell::new(Vec::new()),
         focus_sub: RefCell::new(None),
         flash: RefCell::new(None),
+        welcome: get(&b, "welcome"),
         conn: crate::connection::Connection::new(true, None),
         ntfy: (get(&b, "ntfy_scheme"), get(&b, "ntfy")),
         connect_goa: get(&b, "connect_goa"),
@@ -682,16 +689,7 @@ fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
             connect_goa(&ui);
         }
     });
-    let weak = Rc::downgrade(ui);
-    let show_buttons = move || {
-        if let Some(ui) = weak.upgrade() {
-            let goa = ui.conn.chosen().is_some();
-            ui.connect_goa.set_visible(goa);
-            ui.login.set_visible(!goa);
-        }
-    };
-    show_buttons();
-    ui.conn.connect_changed(show_buttons);
+    connect_welcome(ui, b);
     let weak = Rc::downgrade(ui);
     let copy = gio::SimpleAction::new("copy-login", None);
     copy.connect_activate(move |_, _| {
@@ -723,7 +721,7 @@ fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
     let weak = Rc::downgrade(ui);
     let prefs = gio::SimpleAction::new("preferences", None);
     prefs.connect_activate(move |_, _| {
-        if let Some(ui) = weak.upgrade().filter(|_| crate::logged_in()) {
+        if let Some(ui) = weak.upgrade().filter(|_| crate::ready()) {
             crate::settings::present(&ui.window);
         }
     });
@@ -771,6 +769,61 @@ fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
     let weak = Rc::downgrade(ui);
     ui.cancel_login.connect_clicked(move |_| {
         cancel_login(); // the running sign-in sees it is stale and stops
+        if let Some(ui) = weak.upgrade() {
+            reset_login(&ui);
+        }
+    });
+}
+
+/// The welcome page's first step: GNOME Online Accounts or a server lead to the second, where
+/// the account is picked or signed in to; "On this device only" starts local mode at once.
+fn connect_welcome(ui: &Rc<Ui>, b: &gtk::Builder) {
+    let page: adw::NavigationPage = get(b, "connect_page");
+    let status: adw::StatusPage = get(b, "connect_status");
+    let use_goa: adw::ActionRow = get(b, "use_goa");
+    // The switch is the choice made on the first step.
+    ui.conn.goa.set_visible(false);
+    match ui.conn.account_names().as_slice() {
+        [] => use_goa.set_subtitle(&gettext(
+            "No Nextcloud account in Settings → Online Accounts",
+        )),
+        names => use_goa.set_subtitle(&names.join(", ")),
+    }
+    use_goa.set_sensitive(ui.conn.has_accounts());
+
+    let open = {
+        let ui = ui.clone();
+        move |goa: bool| {
+            ui.conn.goa.set_active(goa);
+            // Shown even for one account, as what Connect connects to.
+            ui.conn.account.set_visible(goa);
+            ui.connect_goa.set_visible(goa);
+            ui.login.set_visible(!goa);
+            if goa {
+                page.set_title(&gettext("GNOME Online Accounts"));
+                status.set_icon_name(Some("goa-panel-symbolic"));
+                status.set_description(Some(&gettext(
+                    "Connect with a Nextcloud account from GNOME Settings",
+                )));
+            } else {
+                page.set_title(&gettext("Nextcloud Server"));
+                status.set_icon_name(Some("network-server-symbolic"));
+                status.set_description(Some(&gettext(
+                    "Sign in to your Nextcloud; Todav gets an app password of its own",
+                )));
+            }
+            ui.welcome.push_by_tag("connect");
+        }
+    };
+    let o = open.clone();
+    use_goa.connect_activated(move |_| o(true));
+    get::<adw::ActionRow>(b, "use_server").connect_activated(move |_| open(false));
+    get::<adw::ActionRow>(b, "use_local").connect_activated(|_| crate::lists::start_local());
+
+    // Back to the first step: a sign-in waiting for the browser stops.
+    let weak = Rc::downgrade(ui);
+    ui.welcome.connect_popped(move |_, _| {
+        cancel_login();
         if let Some(ui) = weak.upgrade() {
             reset_login(&ui);
         }
@@ -971,6 +1024,13 @@ pub fn password_login(
 }
 
 fn refresh_lists(ui: &Rc<Ui>) {
+    // Nothing to sync without an account (local mode): the sync buttons are greyed out.
+    if let Some(sync) = gio::Application::default()
+        .and_then(|a| a.lookup_action("sync"))
+        .and_downcast::<gio::SimpleAction>()
+    {
+        sync.set_enabled(core().account().is_some());
+    }
     let lists = core().lists();
     let valid = |h: &str| !lists.is_empty() && (h == UPCOMING || lists.iter().any(|l| l.href == h));
     if ui.current.borrow().as_deref().is_none_or(|c| !valid(c)) {
