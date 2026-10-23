@@ -4,7 +4,7 @@ Oct 8, 2026 · @Kris · updated Oct 22, 2026
 
 ## Overview
 
-Todav is a personal, local-first task list synced through Nextcloud CalDAV (VTODO) with near-instant push via WebDAV-Push (`dav_push`) and a self-hosted ntfy server. One Rust core drives four front-ends: a GTK4/libadwaita app on Linux, a GNOME Shell extension for quick preview, an Android app, and a Pebble watchapp fed by the Android app.
+Todav is a personal, local-first task list synced through Nextcloud CalDAV (VTODO) with near-instant push via WebDAV-Push (`dav_push`) and a self-hosted ntfy server. One Rust core drives the front-ends: a GTK4/libadwaita app on Linux, a GNOME Shell extension for quick preview, an Android app, a Pebble watchapp fed by the Android app, and a Windows app (planned, see [Roadmap](#roadmap)).
 
 Todav is meant to become a tasks + calendar app (VEVENT next to VTODO, same CalDAV calendars). Notes and journal go in a sibling app, [Notav](#notav-notes--journal-planned), in the same repository.
 
@@ -108,6 +108,7 @@ One monorepo, one Cargo workspace at the root. Each app has its own top-level di
     gnome-extension/         # GNOME Shell extension (GJS), talks D-Bus to the Linux app
     android/                 # planned: app (Compose), core (UniFFI module), pebble companion
     pebble/                  # planned: Pebble watchapp (C, Pebble SDK)
+    windows/                 # planned: WinUI 3 app
   notav/                     # Notav (planned, not started)
 ```
 
@@ -463,6 +464,7 @@ Public in the README as planned work; order not fixed.
 - [x] **Offline mode**: use Todav without a server, or keep some lists on the device next to the account's ("Local lists and calendars", see [Local lists](#local-lists)). Not done: moving a whole list between the device and an account.
 - [ ] **More services** besides Nextcloud: other CalDAV servers first (Radicale, Baïkal, Fastmail, iCloud…), which mostly means login without Login Flow v2, settings/categories without Nextcloud Files, and polling where there is no WebDAV-Push.
 - [ ] **Android app**: M6 above.
+- [ ] **Windows app**: a native WinUI 3 front-end over the same Rust core (bindings as for Android), with what the Linux app does in the background: push over ntfy, reminder notifications, starting with the session. Details to be specified.
 - [x] **Nested subtasks**: any depth, as `RELATED-TO` allows. Rows indent per level inside the top-level task's expander (no expander per level); every subtask has a "+" for adding to it and taking dropped tasks; the calendar's task popover shows a subtask's task and its own subtasks.
 - [ ] **Advanced notifications**: configurable, beyond the reminder notifications the background service shows now; details to be specified.
 - [x] **Starred tasks**: as Nextcloud Tasks does it, starred is high priority (1–4), no property of its own. Each task row has a star coloured by its priority (red high, yellow medium, blue low, outlined without one) whose menu sets the level as the edit dialog does (1, 5, 9 or none); the Important page lists the open high-priority tasks of every list by list (`Client::important`); "Priority, highest first" is a sort for tasks and subtasks. Pinning is Nextcloud's `X-PINNED:true` (`Task::pinned`, a `pinned` column): pinned top-level tasks open the list in a "Pinned" group, in the list's overall order and filtered by the category filter; dropping a task into it pins it, dragging one out unpins it (and sets the category of the group it lands in). Synced "Stars" (`show_stars`) and "Pins" (`show_pins`) in Preferences → Tasks, on by default, hide the stars with the Important page, and the pins with the Pinned group (X-PINNED is left as it is).

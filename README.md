@@ -152,6 +152,7 @@ Todav is under active development. Planned:
 - **Advanced search, filtering and sorting**
 - **More services** besides Nextcloud
 - **Android app**
+- **Windows app**
 
 Ideas, questions and bug reports are welcome: open an
 [issue](https://github.com/SelfRef/todav/issues). See [CONTRIBUTING.md](CONTRIBUTING.md) before
