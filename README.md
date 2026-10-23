@@ -37,7 +37,7 @@ seconds.
 - Task lists from your Nextcloud calendars; create, rename, recolour and delete lists.
 - Categories (CalDAV `CATEGORIES`), shown as groups or tags, with a category filter in the
   sidebar.
-- Subtasks, manual order by drag and drop (the same order Nextcloud Tasks uses), sorting by due
+- Subtasks, nested to any depth, manual order by drag and drop (the same order Nextcloud Tasks uses), sorting by due
   date or priority, and notes.
 - Priority on a star, coloured by its level and set from its menu, as Nextcloud Tasks stars
   tasks; an Important page with the high-priority tasks of every list.
@@ -148,7 +148,6 @@ Todav from source. Then:
 Todav is under active development. Planned:
 
 - **Multiple accounts**
-- **Nested subtasks**, more than one level deep
 - **Advanced notifications**, configurable
 - **Advanced search, filtering and sorting**
 - **More services** besides Nextcloud

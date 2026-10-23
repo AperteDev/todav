@@ -98,7 +98,8 @@ struct Ui {
     groups: gtk::Box,
     /// Root tasks whose subtasks are shown; kept across rebuilds of the task page.
     expanded: RefCell<HashSet<String>>,
-    /// Root task shown as an expander for its first subtask, before it has any.
+    /// Task given an "Add subtask" entry by its "+": a root task shown as an expander for its
+    /// first subtask, before it has any; a subtask until Escape or another "+".
     adding: RefCell<Option<String>>,
     /// Rows show their category as a tag (the "Show as tags" category view).
     tags: Cell<bool>,
@@ -113,7 +114,7 @@ struct Ui {
     adopters: RefCell<Vec<(gtk::Widget, Task, Option<adw::ExpanderRow>)>>,
     /// Drop line: (row under the pointer, row showing the line, its class).
     drop_mark: RefCell<Option<(gtk::Widget, gtk::Widget, &'static str)>>,
-    /// Root task whose "Add subtask" entry takes focus after the next rebuild.
+    /// Task whose "Add subtask" entry takes focus after the next rebuild.
     focus_sub: RefCell<Option<String>>,
     /// Task whose row pulses (opened from the extension), until when: rebuilds in between, as
     /// after the sync that showing the window starts, pulse the new row.
@@ -1790,6 +1791,12 @@ fn task_row(ui: &Rc<Ui>, t: &Task, indent: usize, slot: Option<Slot>) -> adw::Ac
 /// A root task without subtasks: its "+" turns it into a `tree_row` ready for the first one.
 fn leaf_row(ui: &Rc<Ui>, t: &Task, slot: Slot) -> adw::ActionRow {
     let row = task_row(ui, t, 0, Some(slot));
+    row.add_suffix(&add_button(ui, t));
+    row
+}
+
+/// "+" giving task `t` an "Add subtask" entry, and taking tasks dropped on it as its subtasks.
+fn add_button(ui: &Rc<Ui>, t: &Task) -> gtk::Button {
     let add = icon_button("list-add-symbolic", &gettext("Add Subtask"));
     let (weak, uid) = (Rc::downgrade(ui), t.uid.clone());
     add.connect_clicked(move |_| {
@@ -1801,8 +1808,7 @@ fn leaf_row(ui: &Rc<Ui>, t: &Task, slot: Slot) -> adw::ActionRow {
         glib::idle_add_local_once(move || refresh_tasks(&ui));
     });
     adopt_target(ui, &add, t, None);
-    row.add_suffix(&add);
-    row
+    add
 }
 
 /// A root task with its subtasks and an entry for adding more.
@@ -1879,39 +1885,16 @@ fn tree_row(
         }
     });
 
-    let entry = adw::EntryRow::builder()
-        .title(gettext("Add subtask"))
-        .build();
-    entry.set_margin_start(INDENT);
-    entry.add_prefix(&gtk::Image::from_icon_name("list-add-symbolic"));
-    if ui.focus_sub.borrow().as_ref() == Some(&root.uid) {
-        ui.focus_sub.take();
-        let e = entry.clone();
-        glib::idle_add_local_once(move || {
-            e.grab_focus();
-        });
-    }
-    let (weak, root) = (Rc::downgrade(ui), root.clone());
-    entry.connect_entry_activated(move |e| {
-        let Some(ui) = weak.upgrade() else { return };
-        let text = e.text().trim().to_string();
-        if text.is_empty() {
-            return;
-        }
-        let parent = Some(root.uid.clone());
-        match core().add_task(root.list_href.clone(), text, None, parent, start) {
-            Ok(_) => {
-                e.set_text("");
-                *ui.focus_sub.borrow_mut() = Some(root.uid.clone()); // keep typing after the rebuild
-                request_sync();
-            }
-            Err(err) => ui.toasts.add_toast(note(&err.to_string())),
-        }
-    });
     if start {
-        row.add_row(&entry);
+        row.add_row(&sub_entry(ui, root, 0, start));
     }
+    // A subtask given an entry by its "+".
+    let at = (ui.adding.borrow().as_deref()).and_then(|uid| entry_at(subs, uid, start));
+    let nested_entry = |p: usize| sub_entry(ui, subs[p].1, subs[p].0, start);
     for (i, (depth, t)) in subs.iter().enumerate() {
+        if let Some((_, p)) = at.filter(|a| a.0 == i) {
+            row.add_row(&nested_entry(p));
+        }
         let slot = Slot {
             group: slot_group.clone(),
             pinned: slot_pinned,
@@ -1921,12 +1904,77 @@ fn tree_row(
                 .find(|(_, s)| s.parent_uid == t.parent_uid)
                 .map(|(_, s)| s.uid.clone()),
         };
-        row.add_row(&task_row(ui, t, *depth, Some(slot)));
+        let sub = task_row(ui, t, *depth, Some(slot));
+        sub.add_suffix(&add_button(ui, t));
+        row.add_row(&sub);
+    }
+    if let Some((_, p)) = at.filter(|a| a.0 == subs.len()) {
+        row.add_row(&nested_entry(p));
     }
     if !start {
-        row.add_row(&entry);
+        row.add_row(&sub_entry(ui, root, 0, start));
     }
     row
+}
+
+/// Where the "Add subtask" entry of subtask `uid` goes in a tree's depth-first `subs`: (the
+/// row it goes in front of, `subs.len()` for last; `uid`'s index). First among its subtasks
+/// with `start`, otherwise after them.
+fn entry_at(subs: &[(usize, &Task)], uid: &str, start: bool) -> Option<(usize, usize)> {
+    let p = subs.iter().position(|(_, t)| t.uid == uid)?;
+    let below = subs[p + 1..].iter().take_while(|(d, _)| *d > subs[p].0);
+    Some((if start { p + 1 } else { p + 1 + below.count() }, p))
+}
+
+/// "Add subtask" entry under `parent`, a task `depth` levels deep; new subtasks go first with
+/// `start`. Under a subtask, Escape closes it.
+fn sub_entry(ui: &Rc<Ui>, parent: &Task, depth: usize, start: bool) -> adw::EntryRow {
+    let entry = adw::EntryRow::builder()
+        .title(gettext("Add subtask"))
+        .build();
+    entry.set_margin_start(INDENT * (depth as i32 + 1));
+    entry.add_prefix(&gtk::Image::from_icon_name("list-add-symbolic"));
+    if ui.focus_sub.borrow().as_ref() == Some(&parent.uid) {
+        ui.focus_sub.take();
+        let e = entry.clone();
+        glib::idle_add_local_once(move || {
+            e.grab_focus();
+        });
+    }
+    if depth > 0 {
+        let keys = gtk::EventControllerKey::new();
+        keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+        let weak = Rc::downgrade(ui);
+        keys.connect_key_pressed(move |_, key, _, _| {
+            if key != gtk::gdk::Key::Escape {
+                return glib::Propagation::Proceed;
+            }
+            if let Some(ui) = weak.upgrade() {
+                ui.adding.take();
+                glib::idle_add_local_once(move || refresh_tasks(&ui));
+            }
+            glib::Propagation::Stop
+        });
+        entry.add_controller(keys);
+    }
+    let (weak, parent) = (Rc::downgrade(ui), parent.clone());
+    entry.connect_entry_activated(move |e| {
+        let Some(ui) = weak.upgrade() else { return };
+        let text = e.text().trim().to_string();
+        if text.is_empty() {
+            return;
+        }
+        let p = Some(parent.uid.clone());
+        match core().add_task(parent.list_href.clone(), text, None, p, start) {
+            Ok(_) => {
+                e.set_text("");
+                *ui.focus_sub.borrow_mut() = Some(parent.uid.clone()); // keep typing after the rebuild
+                request_sync();
+            }
+            Err(err) => ui.toasts.add_toast(note(&err.to_string())),
+        }
+    });
+    entry
 }
 
 /// Where a row sits, for drag and drop.
@@ -2151,17 +2199,10 @@ fn adopt_target(
     w.add_controller(drop);
 }
 
-/// `d` can become a subtask of `parent` unless it already is one or is `parent`, or has
-/// subtasks of its own (nested trees are not supported yet).
+/// `d` can become a subtask of `parent`, its own subtasks coming along, unless it already is
+/// one or `parent` is in its tree.
 fn can_adopt(d: &Task, parent: &Task) -> bool {
-    d.uid != parent.uid && d.parent_uid.as_ref() != Some(&parent.uid) && !has_subtasks(d)
-}
-
-fn has_subtasks(t: &Task) -> bool {
-    core()
-        .tasks(t.list_href.clone(), true)
-        .iter()
-        .any(|s| s.parent_uid.as_ref() == Some(&t.uid))
+    d.parent_uid.as_ref() != Some(&parent.uid) && !core().within(parent.uid.clone(), d.uid.clone())
 }
 
 /// Make `d` a subtask of `parent`, first or last among its subtasks as new subtasks would be.
@@ -2200,9 +2241,9 @@ fn stays_put(d: &Task, ds: &Slot, t: &Task, ts: &Slot, above: bool) -> bool {
 }
 
 /// Top-level tasks move within and between groups (changing category; into Pinned and out of it,
-/// pinning and unpinning); a subtask dropped among them is promoted. A task without subtasks
-/// dropped among subtasks joins them under their parent. Reordering only means something in
-/// manual order.
+/// pinning and unpinning); a subtask dropped among them is promoted. A task dropped among
+/// subtasks joins them under their parent, with its own subtasks, unless that is inside its
+/// tree. Reordering only means something in manual order.
 fn can_drop(d: &Task, ds: &Slot, t: &Task, ts: &Slot) -> bool {
     let order = crate::settings::order();
     if d.uid == t.uid {
@@ -2215,7 +2256,7 @@ fn can_drop(d: &Task, ds: &Slot, t: &Task, ts: &Slot) -> bool {
     if d.parent_uid == t.parent_uid {
         return order.subtasks == Sort::Manual;
     }
-    !has_subtasks(d) // nested trees are not supported yet
+    !core().within(t.uid.clone(), d.uid.clone())
 }
 
 /// Move dragged task `d` above or below target `t`.
@@ -3004,5 +3045,29 @@ pub(crate) mod tests {
                 ("c", vec![]),
             ]
         );
+    }
+
+    #[test]
+    fn a_subtasks_entry_goes_first_among_its_subtasks_or_after_them() {
+        let (a1, a1x, a1xy, a2) = (
+            task("a1", Some("a")),
+            task("a1x", Some("a1")),
+            task("a1xy", Some("a1x")),
+            task("a2", Some("a")),
+        );
+        let subs = [(1, &a1), (2, &a1x), (3, &a1xy), (1, &a2)];
+        assert_eq!(entry_at(&subs, "a1", true), Some((1, 0)));
+        assert_eq!(
+            entry_at(&subs, "a1", false),
+            Some((3, 0)),
+            "after a1x and a1xy"
+        );
+        assert_eq!(
+            entry_at(&subs, "a1xy", false),
+            Some((3, 2)),
+            "no subtasks yet"
+        );
+        assert_eq!(entry_at(&subs, "a2", false), Some((4, 3)), "last");
+        assert_eq!(entry_at(&subs, "b", false), None, "another tree");
     }
 }

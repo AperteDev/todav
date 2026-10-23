@@ -1867,7 +1867,7 @@ fn details(c: &Cal, e: &Event) -> gtk::Popover {
 }
 
 /// A task's details, as an event's: tick it, when, which list and category, its event, notes,
-/// and a task's subtasks (a subtask names its task instead).
+/// the task a subtask is under, and its own subtasks.
 fn task_details(c: &Cal, t: &Task) -> gtk::Popover {
     let b = details_box();
     let check = gtk::CheckButton::builder()
@@ -1923,13 +1923,13 @@ fn task_details(c: &Cal, t: &Task) -> gtk::Popover {
     if let Some(d) = t.description.as_deref().filter(|d| !d.is_empty()) {
         b.append(&line("text-x-generic-symbolic", d));
     }
-    match t.parent_uid.clone().and_then(|p| core().task(p)) {
-        Some(parent) => b.append(&line(
+    if let Some(parent) = t.parent_uid.clone().and_then(|p| core().task(p)) {
+        b.append(&line(
             "view-list-bullet-symbolic",
             &gettext("Subtask of {task}").replace("{task}", &parent.summary),
-        )),
-        None => b.append(&subtasks(t)),
+        ));
     }
+    b.append(&subtasks(t));
     let task = t.clone();
     let on_delete = move || crate::window::delete_task(&task);
     let task = t.clone();
