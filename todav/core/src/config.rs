@@ -13,7 +13,7 @@ pub struct CategoryMeta {
 /// Display order of top-level tasks or of subtasks among their siblings.
 /// `Manual` is the stored order (X-APPLE-SORT-ORDER, shared with Nextcloud Tasks); `Newest` and
 /// `Oldest` sort by creation time, `DueSoonest` and `DueLatest` by due date with undated tasks
-/// last, in manual order.
+/// last, in manual order; `Priority` highest first (1), tasks without one last.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum Sort {
     #[default]
@@ -22,6 +22,7 @@ pub enum Sort {
     Oldest,
     DueSoonest,
     DueLatest,
+    Priority,
 }
 
 impl Sort {
@@ -33,6 +34,7 @@ impl Sort {
             Sort::Oldest => tasks.sort_by_key(|t| t.created.unwrap_or(0)),
             Sort::DueSoonest => tasks.sort_by_key(|t| (t.due.is_none(), t.due)),
             Sort::DueLatest => tasks.sort_by_key(|t| (t.due.is_none(), std::cmp::Reverse(t.due))),
+            Sort::Priority => tasks.sort_by_key(|t| t.priority.filter(|p| *p > 0).unwrap_or(10)),
         }
     }
 }
@@ -385,6 +387,7 @@ mod tests {
             start_all_day: false,
             event_uid: None,
             sync_error: None,
+            pinned: false,
         }
     }
 
@@ -458,6 +461,23 @@ mod tests {
         assert_eq!(ids(&tasks), ["soon", "late", "x", "y"]);
         Sort::DueLatest.apply(&mut tasks);
         assert_eq!(ids(&tasks), ["late", "soon", "x", "y"]);
+    }
+
+    #[test]
+    fn priority_sort_puts_the_highest_first_and_none_last() {
+        let p = |uid, priority| Task {
+            priority,
+            ..task(uid, None, None)
+        };
+        let mut tasks = vec![
+            p("x", None),
+            p("low", Some(9)),
+            p("high", Some(1)),
+            p("mid", Some(5)),
+        ];
+        Sort::Priority.apply(&mut tasks);
+        let ids: Vec<_> = tasks.iter().map(|t| t.uid.as_str()).collect();
+        assert_eq!(ids, ["high", "mid", "low", "x"]);
     }
 
     #[test]

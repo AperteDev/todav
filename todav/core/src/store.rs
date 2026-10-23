@@ -86,6 +86,10 @@ CREATE TABLE moved (
   href TEXT PRIMARY KEY, etag TEXT, list_href TEXT NOT NULL, uid TEXT NOT NULL
 );
 "#,
+    // X-PINNED (Nextcloud Tasks): pinned tasks come first in their list.
+    r#"
+ALTER TABLE tasks ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;
+"#,
 ];
 
 /// RELTYPE of the RELATED-TO linking a task to the event it is for (a custom type: PARENT would
@@ -279,7 +283,7 @@ pub fn lists(db: &Connection) -> Result<Vec<List>> {
 const TASK_COLS: &str = "uid, list_href, summary, description, status, completed_at, category, parent_uid, priority, due, due_all_day,
   (SELECT group_concat(at) FROM (SELECT at FROM alarms a WHERE a.uid = tasks.uid ORDER BY at)),
   sort_order, created, last_modified, start, start_all_day, event_uid,
-  CASE WHEN refused_ics IS raw_ics THEN sync_error END";
+  CASE WHEN refused_ics IS raw_ics THEN sync_error END, pinned";
 
 fn task_row(r: &rusqlite::Row) -> rusqlite::Result<Task> {
     let status: String = r.get(4)?;
@@ -309,6 +313,7 @@ fn task_row(r: &rusqlite::Row) -> rusqlite::Result<Task> {
         start_all_day: r.get(16)?,
         event_uid: r.get(17)?,
         sync_error: r.get(18)?,
+        pinned: r.get(19)?,
     })
 }
 
@@ -338,6 +343,18 @@ pub fn upcoming(db: &Connection) -> Result<Vec<Task>> {
         "SELECT {TASK_COLS} FROM tasks WHERE dirty != 2 AND due IS NOT NULL
            AND status NOT IN ('COMPLETED', 'CANCELLED')
          ORDER BY due, COALESCE(sort_order, created, 0), uid"
+    ))?;
+    let rows = st.query_map([], task_row)?;
+    Ok(rows.collect::<rusqlite::Result<_>>()?)
+}
+
+/// Open tasks of high priority (1 to 4, what Nextcloud Tasks stars) in every list, highest
+/// first.
+pub fn important(db: &Connection) -> Result<Vec<Task>> {
+    let mut st = db.prepare(&format!(
+        "SELECT {TASK_COLS} FROM tasks WHERE dirty != 2 AND priority BETWEEN 1 AND 4
+           AND status NOT IN ('COMPLETED', 'CANCELLED')
+         ORDER BY priority, COALESCE(sort_order, created, 0), created, uid"
     ))?;
     let rows = st.query_map([], task_row)?;
     Ok(rows.collect::<rusqlite::Result<_>>()?)
@@ -496,8 +513,8 @@ pub fn save(
     db.execute(
         "INSERT OR REPLACE INTO tasks (uid, list_href, etag, href, raw_ics, summary, description, status,
            completed_at, category, parent_uid, priority, due, sort_order, created, last_modified, dirty,
-           due_all_day, start, start_all_day, event_uid)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)",
+           due_all_day, start, start_all_day, event_uid, pinned)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
         params![
             uid,
             list_href,
@@ -522,6 +539,7 @@ pub fn save(
             start.map(|(s, _)| s),
             start.is_some_and(|(_, all_day)| all_day),
             cal.related(EVENT_LINK),
+            cal.text("X-PINNED").as_deref() == Some("true"),
         ],
     )?;
     db.execute("DELETE FROM alarms WHERE uid = ?", [&uid])?;

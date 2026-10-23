@@ -102,6 +102,8 @@ pub struct Task {
     pub event_uid: Option<String>,
     /// Why the server refused this version of the task; it is not uploaded until edited.
     pub sync_error: Option<String>,
+    /// Shown first in its list (X-PINNED, as Nextcloud Tasks pins).
+    pub pinned: bool,
 }
 
 /// Fields left `None` are untouched; `Some("")` clears description/category.
@@ -120,6 +122,7 @@ pub struct TaskPatch {
     pub event: Option<Option<String>>,
     /// PRIORITY, 1 (highest) to 9 (lowest); Some(None) clears it.
     pub priority: Option<Option<i64>>,
+    pub pinned: Option<bool>,
 }
 
 /// A due date in local time; `all_day`: a date without a time (`at` is its midnight).
@@ -481,6 +484,13 @@ impl Client {
         shown(&db, store::upcoming(&db).unwrap_or_default())
     }
 
+    /// Open tasks of high priority (1 to 4, starred in Nextcloud Tasks) in every list, highest
+    /// first.
+    pub fn important(&self) -> Vec<Task> {
+        let db = self.db.lock().unwrap();
+        shown(&db, store::important(&db).unwrap_or_default())
+    }
+
     /// Tasks, done ones too, due or starting in `[from, to)` (local times): what the calendar shows.
     pub fn scheduled(&self, from: i64, to: i64) -> Vec<Task> {
         let db = self.db.lock().unwrap();
@@ -650,6 +660,9 @@ impl Client {
             }
             if let Some(p) = patch.priority {
                 cal.set("PRIORITY", "", p.map(|p| p.to_string()).as_deref());
+            }
+            if let Some(p) = patch.pinned {
+                cal.set("X-PINNED", "", p.then_some("true"));
             }
             if let Some(r) = patch.reminders.as_ref().filter(|_| patch.due != Some(None)) {
                 let v: Vec<String> = r.iter().map(|o| ical::fmt_duration(*o)).collect();
@@ -1168,8 +1181,25 @@ mod tests {
         };
         c.update_task(uid.clone(), priority(Some(1))).unwrap();
         assert_eq!(c.task(uid.clone()).unwrap().priority, Some(1));
+        assert_eq!(c.important().len(), 1, "high priority is important");
+        c.update_task(uid.clone(), priority(Some(5))).unwrap();
+        assert!(c.important().is_empty());
         c.update_task(uid.clone(), priority(None)).unwrap();
-        assert_eq!(c.task(uid).unwrap().priority, None);
+        assert_eq!(c.task(uid.clone()).unwrap().priority, None);
+        // Pinned as Nextcloud Tasks pins: X-PINNED, gone when unpinned.
+        let pin = |p| TaskPatch {
+            pinned: Some(p),
+            ..Default::default()
+        };
+        c.update_task(uid.clone(), pin(true)).unwrap();
+        let raw = || {
+            store::raw(&c.db.lock().unwrap(), Kind::Task, "", &uid)
+                .unwrap()
+                .unwrap()
+        };
+        assert!(c.task(uid.clone()).unwrap().pinned && raw().raw_ics.contains("X-PINNED:true"));
+        c.update_task(uid.clone(), pin(false)).unwrap();
+        assert!(!c.task(uid.clone()).unwrap().pinned && !raw().raw_ics.contains("X-PINNED"));
     }
 
     #[test]

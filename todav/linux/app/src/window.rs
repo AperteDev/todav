@@ -2732,6 +2732,7 @@ pub(crate) mod tests {
             start_all_day: false,
             event_uid: None,
             sync_error: None,
+            pinned: false,
         }
     }
 
