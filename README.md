@@ -143,7 +143,7 @@ Todav from source. Then:
 3. For instant updates, install the WebDAV Push app on your Nextcloud and enter your ntfy server
    in Preferences → Accounts → Push.
 
-## What's next
+## Roadmap
 
 Todav is under active development. Planned:
 
