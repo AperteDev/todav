@@ -343,6 +343,49 @@ impl Client {
         Ok(())
     }
 
+    /// Move a task, with its subtasks, to another list. Each goes there as a new item; a server
+    /// copy left behind is deleted on the next push (`moved`).
+    pub fn move_task(&self, uid: String, to: String) -> Result<()> {
+        let from = {
+            let db = self.db.lock().unwrap();
+            let raw = store::raw(&db, Kind::Task, "", &uid)?
+                .ok_or_else(|| Error::NotFound(uid.clone()))?;
+            if raw.list_href == to {
+                return Ok(());
+            }
+            let all = store::tasks(&db, &raw.list_href, true)?;
+            let mut tree = vec![uid.clone()];
+            let mut i = 0;
+            while i < tree.len() {
+                let p = tree[i].clone();
+                let kids = all.iter().filter(|t| t.parent_uid.as_ref() == Some(&p));
+                tree.extend(kids.map(|t| t.uid.clone()));
+                i += 1;
+            }
+            self.together(|| -> Result<()> {
+                for u in &tree {
+                    let Some(r) = store::raw(&db, Kind::Task, "", u)? else {
+                        continue;
+                    };
+                    let cal = Calendar::parse(&r.raw_ics).ok_or_else(|| Error::Parse(u.clone()))?;
+                    self.remember(&db, Kind::Task, "", u)?;
+                    if let Some(href) = &r.href {
+                        db.execute(
+                            "INSERT OR REPLACE INTO moved (href, etag, list_href, uid) VALUES (?1, ?2, ?3, ?4)",
+                            rusqlite::params![href, r.etag, r.list_href, u],
+                        )?;
+                    }
+                    store::save(&db, &to, None, None, &cal, store::MODIFIED)?;
+                }
+                Ok(())
+            })?;
+            raw.list_href
+        };
+        self.emit(&from, vec![uid.clone()]);
+        self.emit(&to, vec![uid]);
+        Ok(())
+    }
+
     /// The password is kept in memory only; front-ends keep it in the platform keyring.
     pub fn set_account(&self, url: String, user: String, app_password: String) -> Result<()> {
         let db = self.db.lock().unwrap();
@@ -352,6 +395,7 @@ impl Client {
             // Different account: its copy belongs to the old one (lists on this device stay).
             db.execute_batch(&format!(
                 "DELETE FROM tasks WHERE list_href NOT LIKE '{0}%'; DELETE FROM lists WHERE href NOT LIKE '{0}%';
+                 DELETE FROM moved;
                  DELETE FROM kv WHERE key LIKE 'config_%' OR key IN ('push_resource', 'conflict_log');",
                 store::LOCAL
             ))?;
@@ -376,6 +420,7 @@ impl Client {
         let db = self.db.lock().unwrap();
         db.execute_batch(&format!(
             "DELETE FROM tasks WHERE list_href NOT LIKE '{0}%'; DELETE FROM lists WHERE href NOT LIKE '{0}%';
+             DELETE FROM moved;
              DELETE FROM kv WHERE key LIKE 'config_%' OR key LIKE 'account_%' OR key IN ('push_resource', 'conflict_log');",
             store::LOCAL
         ))?;
@@ -677,19 +722,45 @@ impl Client {
                 let now = store::raw(&db, b.kind, &b.list_href, &b.uid)?
                     .filter(|r| r.dirty != store::DELETED);
                 match (b.raw_ics, now) {
-                    (Some(ics), Some(r)) if r.raw_ics == ics => continue,
+                    (Some(ics), Some(r)) if r.raw_ics == ics && r.list_href == b.list_href => {
+                        continue;
+                    }
                     (Some(ics), _) => {
                         let mut cal =
                             Calendar::parse(&ics).ok_or_else(|| Error::Parse(b.uid.clone()))?;
                         touch(&mut cal); // newer than what it replaces, wherever that went
                         // A pending delete still holds the resource's href.
                         let r = store::raw(&db, b.kind, &b.list_href, &b.uid)?;
-                        let r = r.as_ref();
+                        let (mut href, mut etag) = r
+                            .as_ref()
+                            .map_or((None, None), |r| (r.href.clone(), r.etag.clone()));
+                        // A task moved to another list comes back: its copy there goes, and
+                        // its server copy here stays if not deleted yet.
+                        if let Some(r) = r.filter(|r| r.list_href != b.list_href) {
+                            if let Some(h) = &r.href {
+                                db.execute(
+                                    "INSERT OR REPLACE INTO moved (href, etag, list_href, uid) VALUES (?1, ?2, ?3, ?4)",
+                                    rusqlite::params![h, r.etag, r.list_href, r.uid],
+                                )?;
+                            }
+                            (href, etag) = db
+                                .query_row(
+                                    "SELECT href, etag FROM moved WHERE list_href = ?1 AND uid = ?2",
+                                    [&b.list_href, &b.uid],
+                                    |row| Ok((row.get(0)?, row.get(1)?)),
+                                )
+                                .map_or((None, None), |(h, e)| (Some(h), e));
+                            db.execute(
+                                "DELETE FROM moved WHERE list_href = ?1 AND uid = ?2",
+                                [&b.list_href, &b.uid],
+                            )?;
+                            changed.push((r.list_href, b.uid.clone()));
+                        }
                         store::save(
                             &db,
                             &b.list_href,
-                            r.and_then(|r| r.href.as_deref()),
-                            r.and_then(|r| r.etag.as_deref()),
+                            href.as_deref(),
+                            etag.as_deref(),
                             &cal,
                             store::MODIFIED,
                         )?;
@@ -1192,7 +1263,7 @@ mod tests {
             .unwrap()
             .uid;
         let queue = || store::dirty(&c.db.lock().unwrap()).unwrap();
-        assert!(queue().is_empty(), "never uploaded");
+        assert!(queue().is_empty() && !c.pending(), "never uploaded");
 
         // Signing in and out drops the server copy only.
         c.set_account("https://x".into(), "u".into(), "p".into())
@@ -1238,5 +1309,57 @@ mod tests {
         c.delete_list(list).unwrap();
         c.delete_list(cal).unwrap();
         assert!(c.calendars().iter().all(|l| !l.local));
+    }
+
+    #[test]
+    fn a_moved_task_takes_its_subtasks_and_undo_brings_it_back() {
+        let dir = std::env::temp_dir().join(format!("todav-test-move-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        c.db.lock()
+            .unwrap()
+            .execute_batch(
+                "INSERT INTO lists (href, display_name) VALUES ('/a/', 'A'), ('/b/', 'B')",
+            )
+            .unwrap();
+        let add = |s: &str, parent: Option<String>| {
+            c.add_task("/a/".into(), s.into(), None, parent, false)
+                .unwrap()
+                .uid
+        };
+        let parent = add("p", None);
+        let sub = add("s", Some(parent.clone()));
+        // The parent is on the server already, the subtask not yet.
+        let raw = |uid: &str| {
+            store::raw(&c.db.lock().unwrap(), Kind::Task, "", uid)
+                .unwrap()
+                .unwrap()
+        };
+        let row = raw(&parent);
+        store::set_sync_state(&c.db.lock().unwrap(), &row, Some("/a/p.ics"), Some("e"), 0).unwrap();
+
+        c.move_task(parent.clone(), "/b/".into()).unwrap();
+        assert_eq!(
+            (raw(&parent).list_href, raw(&sub).list_href),
+            ("/b/".into(), "/b/".into())
+        );
+        assert_eq!(raw(&parent).href, None, "a new item there");
+        let moved = || -> Vec<String> {
+            let db = c.db.lock().unwrap();
+            let mut st = db.prepare("SELECT href FROM moved").unwrap();
+            st.query_map([], |r| r.get(0))
+                .unwrap()
+                .map(|r| r.unwrap())
+                .collect()
+        };
+        assert_eq!(moved(), ["/a/p.ics"]);
+        assert!(c.pending());
+
+        // Back where it was, with its server copy, which is no longer deleted.
+        c.undo(None).unwrap();
+        assert_eq!(raw(&parent).list_href, "/a/");
+        assert_eq!(raw(&parent).href.as_deref(), Some("/a/p.ics"));
+        assert_eq!(raw(&sub).list_href, "/a/");
+        assert!(moved().is_empty());
     }
 }

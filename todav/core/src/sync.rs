@@ -53,6 +53,14 @@ impl Client {
         Ok(report)
     }
 
+    /// Something waits for the server: edits in synced lists, or old copies of moved tasks.
+    /// Edits in lists on this device never do.
+    pub fn pending(&self) -> bool {
+        let db = self.db.lock().unwrap();
+        let moved = db.query_row("SELECT EXISTS (SELECT 1 FROM moved)", [], |r| r.get(0));
+        moved.unwrap_or(false) || store::dirty(&db).is_ok_and(|d| !d.is_empty())
+    }
+
     pub fn sync_list(&self, list_href: String) -> Result<SyncReport> {
         let _guard = self.sync_lock.lock().unwrap();
         let mut report = self.push_dirty()?;
@@ -176,6 +184,26 @@ impl Client {
     fn push_dirty(&self) -> Result<SyncReport> {
         let dav = self.dav()?;
         let mut report = SyncReport::default();
+        // Copies of moved tasks go first, so the new one can take the same UID elsewhere.
+        let moved: Vec<(String, String)> = self
+            .db
+            .lock()
+            .unwrap()
+            .prepare("SELECT href, list_href FROM moved")?
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .collect::<rusqlite::Result<_>>()?;
+        for (href, list) in moved {
+            let reg = self.registration(&list);
+            // ponytail: no If-Match, so an edit made elsewhere since is lost with the old copy;
+            // fetch and merge first if that turns out to matter.
+            match dav.delete(&href, None, reg.as_deref()) {
+                Ok(()) => report.pushed += 1,
+                Err(e) if refusal(&e).is_some() => {} // kept there; nothing more to try
+                Err(e) => return Err(e),
+            }
+            let db = self.db.lock().unwrap();
+            db.execute("DELETE FROM moved WHERE href = ?", [&href])?;
+        }
         let dirty = store::dirty(&self.db.lock().unwrap())?;
         for t in dirty {
             let reg = self.registration(&t.list_href);

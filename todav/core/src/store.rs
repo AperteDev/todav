@@ -79,6 +79,13 @@ ALTER TABLE tasks ADD COLUMN refused_ics TEXT;
 ALTER TABLE events ADD COLUMN sync_error TEXT;
 ALTER TABLE events ADD COLUMN refused_ics TEXT;
 "#,
+    // Tasks moved to another list leave their old server copy here until the next push deletes
+    // it: tasks are keyed by UID, so the row itself went with the task.
+    r#"
+CREATE TABLE moved (
+  href TEXT PRIMARY KEY, etag TEXT, list_href TEXT NOT NULL, uid TEXT NOT NULL
+);
+"#,
 ];
 
 /// RELTYPE of the RELATED-TO linking a task to the event it is for (a custom type: PARENT would
