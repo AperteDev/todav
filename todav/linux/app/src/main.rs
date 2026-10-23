@@ -283,7 +283,8 @@ pub async fn switch_account(target: Target) -> Result<(), String> {
     })
     .await
     .map_err(|_| i18n::gettext("Connecting failed"))??;
-    let running = logged_in();
+    // Already running (another account, or local mode alone): only sync and push need to start.
+    let running = SYNC.get().is_some();
     start_background();
     if running {
         restart_push(); // registers push for the new account's lists
