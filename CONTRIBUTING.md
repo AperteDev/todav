@@ -10,11 +10,13 @@ how to reproduce the problem.
 
 ## Pull requests
 
-Please **don't open a pull request before the change has been agreed** in an issue. Todav is developed along a plan, and an unannounced pull request may clash with work
-in progress or go in a different direction, so it might not be merged. Describe what you'd like
-to change first; once we agree on it, a pull request is welcome.
+Todav is developed along a plan, and I prefer to make feature changes myself: for a feature,
+open an issue describing it rather than a pull request. A pull request for a bug fix or another
+small change may be accepted, but please **don't open one before it has been agreed** in an
+issue; an unannounced pull request may clash with work in progress or go in a different
+direction, so it might not be merged.
 
-When you open one:
+When one has been agreed:
 
 - Keep it to one change, and follow the style of the surrounding code.
 - Run `cargo fmt`, `cargo clippy` and `cargo test`.
