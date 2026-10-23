@@ -2356,7 +2356,7 @@ fn star_button(t: &Task) -> gtk::MenuButton {
     let level = priority_row(t.priority);
     let b = gtk::MenuButton::builder()
         .icon_name(if level == 0 {
-            "non-starred-symbolic"
+            "star-outline-symbolic"
         } else {
             "starred-symbolic"
         })
@@ -2364,9 +2364,11 @@ fn star_button(t: &Task) -> gtk::MenuButton {
         .tooltip_text(priority_text(t.priority).unwrap_or_else(|| gettext("Priority")))
         .build();
     b.add_css_class("flat");
-    if level > 0 {
-        b.add_css_class(&format!("priority-{}", PRIORITIES[level as usize]));
-    }
+    // Without a priority, as grey as an unpinned pin.
+    b.add_css_class(&match level {
+        0 => "dim-label".to_string(),
+        _ => format!("priority-{}", PRIORITIES[level as usize]),
+    });
     let menu = gio::Menu::new();
     let labels = [
         pgettext("priority", "None"),
