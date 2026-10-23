@@ -118,6 +118,10 @@ impl Kind {
     }
 }
 
+/// How the href of a list kept on this device only starts; it has no server copy, and what is
+/// in it never enters the upload queue (`dirty`).
+pub const LOCAL: &str = "local:";
+
 pub const CLEAN: i64 = 0;
 pub const MODIFIED: i64 = 1;
 pub const DELETED: i64 = 2;
@@ -250,8 +254,10 @@ pub fn lists(db: &Connection) -> Result<Vec<List>> {
          FROM lists l ORDER BY l.display_name COLLATE NOCASE",
     )?;
     let rows = st.query_map([], |r| {
+        let href: String = r.get(0)?;
         Ok(List {
-            href: r.get(0)?,
+            local: href.starts_with(LOCAL),
+            href,
             display_name: r.get(1)?,
             color: r.get(2)?,
             open_count: r.get(3)?,
@@ -449,7 +455,8 @@ pub fn dirty(db: &Connection) -> Result<Vec<RawObject>> {
     for kind in [Kind::Task, Kind::Event] {
         // Not a version the server refused: it would refuse it again.
         let sql = format!(
-            "SELECT {RAW_COLS} FROM {} WHERE dirty != 0 AND refused_ics IS NOT raw_ics",
+            "SELECT {RAW_COLS} FROM {} WHERE dirty != 0 AND refused_ics IS NOT raw_ics
+               AND list_href NOT LIKE '{LOCAL}%'",
             kind.table()
         );
         let rows = db

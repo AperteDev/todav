@@ -38,6 +38,41 @@ pub struct List {
     pub holds_events: bool,
     /// We may change it (shared read-only calendars and Birthdays may not).
     pub writable: bool,
+    /// Kept on this device only, never synced (`store::LOCAL`).
+    pub local: bool,
+}
+
+/// Something in a list; hidden with it (see `shown`).
+trait InList {
+    fn list_href(&self) -> &str;
+}
+
+impl InList for List {
+    fn list_href(&self) -> &str {
+        &self.href
+    }
+}
+
+impl InList for Task {
+    fn list_href(&self) -> &str {
+        &self.list_href
+    }
+}
+
+impl InList for Event {
+    fn list_href(&self) -> &str {
+        &self.list_href
+    }
+}
+
+/// Local lists and what is in them are hidden while local mode (the `local_mode` setting) is
+/// off; nothing is deleted, turning it on shows them again.
+fn shown<T: InList>(db: &Connection, mut v: Vec<T>) -> Vec<T> {
+    let on = store::kv_get(db, "setting_local_mode").ok().flatten();
+    if on.as_deref() != Some("true") {
+        v.retain(|x| !x.list_href().starts_with(store::LOCAL));
+    }
+    v
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -314,11 +349,12 @@ impl Client {
         if store::kv_get(&db, "account_url")?.as_deref() != Some(&url)
             || store::kv_get(&db, "account_user")?.as_deref() != Some(&user)
         {
-            // Different account: local data belongs to the old one.
-            db.execute_batch(
-                "DELETE FROM tasks; DELETE FROM lists;
+            // Different account: its copy belongs to the old one (lists on this device stay).
+            db.execute_batch(&format!(
+                "DELETE FROM tasks WHERE list_href NOT LIKE '{0}%'; DELETE FROM lists WHERE href NOT LIKE '{0}%';
                  DELETE FROM kv WHERE key LIKE 'config_%' OR key IN ('push_resource', 'conflict_log');",
-            )?;
+                store::LOCAL
+            ))?;
         }
         store::kv_set(&db, "account_url", &url)?;
         store::kv_set(&db, "account_user", &user)?;
@@ -334,14 +370,15 @@ impl Client {
         })
     }
 
-    /// Forget the account and all local data (keeps device keys).
+    /// Forget the account and its local copy (keeps device keys and the local lists).
     pub fn logout(&self) -> Result<()> {
         let _ = self.push_unregister();
         let db = self.db.lock().unwrap();
-        db.execute_batch(
-            "DELETE FROM tasks; DELETE FROM lists;
+        db.execute_batch(&format!(
+            "DELETE FROM tasks WHERE list_href NOT LIKE '{0}%'; DELETE FROM lists WHERE href NOT LIKE '{0}%';
              DELETE FROM kv WHERE key LIKE 'config_%' OR key LIKE 'account_%' OR key IN ('push_resource', 'conflict_log');",
-        )?;
+            store::LOCAL
+        ))?;
         *self.dav.lock().unwrap() = None;
         Ok(())
     }
@@ -352,19 +389,22 @@ impl Client {
 
     /// Task lists.
     pub fn lists(&self) -> Vec<List> {
-        let all = store::lists(&self.db.lock().unwrap()).unwrap_or_default();
+        let db = self.db.lock().unwrap();
+        let all = shown(&db, store::lists(&db).unwrap_or_default());
         all.into_iter().filter(|l| l.holds_tasks).collect()
     }
 
     /// Calendars of events.
     pub fn calendars(&self) -> Vec<List> {
-        let all = store::lists(&self.db.lock().unwrap()).unwrap_or_default();
+        let db = self.db.lock().unwrap();
+        let all = shown(&db, store::lists(&db).unwrap_or_default());
         all.into_iter().filter(|l| l.holds_events).collect()
     }
 
     /// Occurrences of every event overlapping `[from, to)` (local times), soonest first.
     pub fn events(&self, from: i64, to: i64) -> Vec<Event> {
-        store::events(&self.db.lock().unwrap(), from, to).unwrap_or_default()
+        let db = self.db.lock().unwrap();
+        shown(&db, store::events(&db, from, to).unwrap_or_default())
     }
 
     /// Event occurrences with a reminder going off after `from` and at `to` at the latest
@@ -377,43 +417,55 @@ impl Client {
     }
 
     pub fn tasks(&self, list_href: String, include_done: bool) -> Vec<Task> {
-        store::tasks(&self.db.lock().unwrap(), &list_href, include_done).unwrap_or_default()
+        let db = self.db.lock().unwrap();
+        shown(
+            &db,
+            store::tasks(&db, &list_href, include_done).unwrap_or_default(),
+        )
     }
 
     pub fn task(&self, uid: String) -> Option<Task> {
-        store::task(&self.db.lock().unwrap(), &uid).ok()?
+        let db = self.db.lock().unwrap();
+        let t = store::task(&db, &uid).ok()??;
+        shown(&db, vec![t]).pop()
     }
 
     /// Open tasks with a due date in every list, soonest first.
     pub fn upcoming(&self) -> Vec<Task> {
-        store::upcoming(&self.db.lock().unwrap()).unwrap_or_default()
+        let db = self.db.lock().unwrap();
+        shown(&db, store::upcoming(&db).unwrap_or_default())
     }
 
     /// Tasks, done ones too, due or starting in `[from, to)` (local times): what the calendar shows.
     pub fn scheduled(&self, from: i64, to: i64) -> Vec<Task> {
-        store::scheduled(&self.db.lock().unwrap(), from, to).unwrap_or_default()
+        let db = self.db.lock().unwrap();
+        shown(&db, store::scheduled(&db, from, to).unwrap_or_default())
     }
 
     /// The event with this UID: its next occurrence from now (within a year), else its first.
     pub fn event(&self, uid: String) -> Option<Event> {
         let db = self.db.lock().unwrap();
         let now = store::to_local(&db, now()).unwrap_or_else(|_| now());
-        store::event_by_uid(&db, &uid, now).ok()?
+        let e = store::event_by_uid(&db, &uid, now).ok()??;
+        shown(&db, vec![e]).pop()
     }
 
     /// Tasks (done ones too) for the event with this UID.
     pub fn event_tasks(&self, event_uid: String) -> Vec<Task> {
-        store::event_tasks(&self.db.lock().unwrap(), &event_uid).unwrap_or_default()
+        let db = self.db.lock().unwrap();
+        shown(&db, store::event_tasks(&db, &event_uid).unwrap_or_default())
     }
 
     /// Open tasks with no time slot yet: undated, or due by a date before `until`.
     pub fn unscheduled(&self, until: i64) -> Vec<Task> {
-        store::unscheduled(&self.db.lock().unwrap(), until).unwrap_or_default()
+        let db = self.db.lock().unwrap();
+        shown(&db, store::unscheduled(&db, until).unwrap_or_default())
     }
 
     /// Open tasks with a reminder going off after `from` and at `to` at the latest (local times).
     pub fn reminders(&self, from: i64, to: i64) -> Vec<Task> {
-        store::reminders(&self.db.lock().unwrap(), from, to).unwrap_or_default()
+        let db = self.db.lock().unwrap();
+        shown(&db, store::reminders(&db, from, to).unwrap_or_default())
     }
 
     /// Now in local time, as task dates are.
@@ -1122,5 +1174,69 @@ mod tests {
         store::delete(&c.db.lock().unwrap(), &row).unwrap();
         c.undo(None).unwrap();
         assert_eq!(c.task(uid).unwrap().summary, "a");
+    }
+
+    #[test]
+    fn local_lists_stay_on_the_device() {
+        let dir = std::env::temp_dir().join(format!("todav-test-local-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let list = c
+            .create_list("L".into(), "#fff".into(), false, true)
+            .unwrap();
+        assert!(c.lists().is_empty(), "hidden while local mode is off");
+        c.set_setting("local_mode".into(), "true".into()).unwrap();
+        assert!(c.lists()[0].local);
+        let uid = c
+            .add_task(list.clone(), "a".into(), None, None, false)
+            .unwrap()
+            .uid;
+        let queue = || store::dirty(&c.db.lock().unwrap()).unwrap();
+        assert!(queue().is_empty(), "never uploaded");
+
+        // Signing in and out drops the server copy only.
+        c.set_account("https://x".into(), "u".into(), "p".into())
+            .unwrap();
+        c.logout().unwrap();
+        assert_eq!(c.tasks(list.clone(), true).len(), 1);
+
+        // Deleted outright, nothing waits for the server.
+        c.delete_task(uid.clone()).unwrap();
+        assert!(
+            store::raw(&c.db.lock().unwrap(), Kind::Task, "", &uid)
+                .unwrap()
+                .is_none()
+        );
+
+        // An event moved to a server calendar is uploaded, and one moved back is deleted there.
+        let cal = c
+            .create_list("C".into(), "#fff".into(), true, true)
+            .unwrap();
+        c.db.lock()
+            .unwrap()
+            .execute(
+                "INSERT INTO lists (href, display_name) VALUES ('/r/', 'R')",
+                [],
+            )
+            .unwrap();
+        let time = EventTime {
+            start: 0,
+            end: 3600,
+            all_day: false,
+        };
+        let ev = c.add_event(cal.clone(), "e".into(), time, vec![]).unwrap();
+        c.move_event(cal.clone(), ev.clone(), "/r/".into()).unwrap();
+        assert_eq!(queue()[0].list_href, "/r/");
+        let row = queue().remove(0);
+        store::set_sync_state(&c.db.lock().unwrap(), &row, Some("/r/e.ics"), Some("x"), 0).unwrap();
+        c.move_event("/r/".into(), ev, cal.clone()).unwrap();
+        assert_eq!(
+            queue().iter().map(|r| r.dirty).collect::<Vec<_>>(),
+            [store::DELETED]
+        );
+
+        c.delete_list(list).unwrap();
+        c.delete_list(cal).unwrap();
+        assert!(c.calendars().iter().all(|l| !l.local));
     }
 }

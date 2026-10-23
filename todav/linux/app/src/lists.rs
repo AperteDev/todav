@@ -379,7 +379,7 @@ pub fn open(parent: &gtk::Widget, list: Option<List>, events: bool) {
         glib::spawn_future_local(async move {
             let r = gio::spawn_blocking(move || match href {
                 Some(h) => core().edit_list(h, n, c).map(|_| None),
-                None => core().create_list(n, c, events).map(Some),
+                None => core().create_list(n, c, events, false).map(Some),
             })
             .await;
             match r {

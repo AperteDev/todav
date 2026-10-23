@@ -77,8 +77,25 @@ impl Client {
         }
     }
 
-    /// A new task list, or calendar of events (`events`), on the server; returns its href.
-    pub fn create_list(&self, name: String, color: String, events: bool) -> Result<String> {
+    /// A new task list, or calendar of events (`events`), on the server or on this device only
+    /// (`local`); returns its href.
+    pub fn create_list(
+        &self,
+        name: String,
+        color: String,
+        events: bool,
+        local: bool,
+    ) -> Result<String> {
+        if local {
+            let href = format!("{}{}/", store::LOCAL, crate::new_uid());
+            self.db.lock().unwrap().execute(
+                "INSERT INTO lists (href, display_name, color, has_tasks, has_events)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![href, name, color, !events, events],
+            )?;
+            self.emit(&href, Vec::new());
+            return Ok(href);
+        }
         let _guard = self.sync_lock.lock().unwrap();
         let dav = self.dav()?;
         let href = format!(
@@ -95,7 +112,9 @@ impl Client {
     /// Rename and recolour list `href`, on the server and here.
     pub fn edit_list(&self, href: String, name: String, color: String) -> Result<()> {
         let _guard = self.sync_lock.lock().unwrap();
-        self.dav()?.proppatch(&href, &name, &color)?;
+        if !href.starts_with(store::LOCAL) {
+            self.dav()?.proppatch(&href, &name, &color)?;
+        }
         self.db.lock().unwrap().execute(
             "UPDATE lists SET display_name = ?2, color = ?3 WHERE href = ?1",
             params![href, name, color],
@@ -108,7 +127,9 @@ impl Client {
     /// bin for a while) and here; changes to it can no longer be undone.
     pub fn delete_list(&self, href: String) -> Result<()> {
         let _guard = self.sync_lock.lock().unwrap();
-        self.dav()?.delete(&href, None, None)?;
+        if !href.starts_with(store::LOCAL) {
+            self.dav()?.delete(&href, None, None)?;
+        }
         self.db
             .lock()
             .unwrap()
@@ -144,7 +165,8 @@ impl Client {
             .prepare("SELECT href FROM lists")?
             .query_map([], |r| r.get(0))?
             .collect::<rusqlite::Result<_>>()?;
-        for h in local.iter().filter(|h| !keep.contains(h.as_str())) {
+        let gone = |h: &&String| !keep.contains(h.as_str()) && !h.starts_with(store::LOCAL);
+        for h in local.iter().filter(gone) {
             tx.execute("DELETE FROM lists WHERE href = ?", [h])?;
         }
         tx.commit()?;

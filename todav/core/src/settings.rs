@@ -24,6 +24,8 @@ pub const DEVICE_ONLY: &[&str] = &[
     "calendar_mode",
     "window_size",
     "window_maximized",
+    // Local lists are on this device only, so is showing them.
+    "local_mode",
 ];
 
 /// key → (value, unix time of the last change)
