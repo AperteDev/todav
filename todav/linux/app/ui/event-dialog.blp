@@ -6,7 +6,8 @@ using Adw 1;
 Adw.Dialog dialog {
   title: _("Event");
   content-width: 760;
-  content-height: 640;
+  // Room for an expanded date with the repeat and reminders below it; smaller windows shrink it.
+  content-height: 760;
   // Breakpoints need a minimum size; the smallest GNOME supports.
   width-request: 360;
   height-request: 294;
