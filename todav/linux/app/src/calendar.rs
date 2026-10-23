@@ -977,9 +977,6 @@ fn refresh_calendars(c: &Rc<Cal>) {
             .ellipsize(gtk::pango::EllipsizeMode::End)
             .build();
         row.append(&name);
-        if l.local {
-            row.append(&crate::lists::local_mark());
-        }
         // A mark when shown (the row toggles it, see `build`); kept in place when hidden.
         let shown = !hidden.contains(&l.href);
         let mark = gtk::Image::builder()

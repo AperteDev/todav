@@ -1074,10 +1074,7 @@ fn refresh_lists(ui: &Rc<Ui>) {
         let count = gtk::Label::new(Some(&l.open_count.to_string()));
         count.add_css_class("dim-label");
         row.append(&name);
-        if l.local {
-            row.append(&crate::lists::local_mark());
-        }
-        row.append(&count); // last: refresh_sidebar_counts updates it
+        row.append(&count);
         ui.sidebar.append(&row);
     }
     // Upcoming first, then the lists grouped by where they are kept.

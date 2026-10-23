@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Todav\n"
 "Report-Msgid-Bugs-To: https://github.com/SelfRef/todav/issues\n"
-"POT-Creation-Date: 2026-10-23 10:10+0200\n"
+"POT-Creation-Date: 2026-10-23 10:12+0200\n"
 "PO-Revision-Date: 2026-10-22 21:00+0200\n"
 "Last-Translator: \n"
 "Language-Team: German\n"
@@ -79,13 +79,13 @@ msgstr "Alles erledigt"
 msgid "Add an event…"
 msgstr "Termin hinzufügen …"
 
-#: todav/gnome-extension/extension.js:341 todav/linux/app/src/calendar.rs:1943
+#: todav/gnome-extension/extension.js:341 todav/linux/app/src/calendar.rs:1940
 #: todav/linux/app/src/dates.rs:102 todav/linux/app/src/dates.rs:136
 #: todav/linux/app/ui/shortcuts.blp:79
 msgid "Today"
 msgstr "Heute"
 
-#: todav/gnome-extension/extension.js:341 todav/linux/app/src/calendar.rs:1944
+#: todav/gnome-extension/extension.js:341 todav/linux/app/src/calendar.rs:1941
 #: todav/linux/app/src/dates.rs:103 todav/linux/app/src/dates.rs:137
 msgid "Tomorrow"
 msgstr "Morgen"
@@ -94,7 +94,7 @@ msgstr "Morgen"
 msgid "Nothing planned this week"
 msgstr "Diese Woche ist nichts geplant"
 
-#: todav/linux/app/src/calendar.rs:210 todav/linux/app/src/lists.rs:284
+#: todav/linux/app/src/calendar.rs:210 todav/linux/app/src/lists.rs:276
 #: todav/linux/app/ui/calendar.blp:54 todav/linux/app/ui/calendar.blp:217
 #: todav/linux/app/ui/event-dialog.blp:65 todav/linux/app/ui/settings.blp:45
 #: todav/linux/app/ui/settings.blp:258 todav/linux/app/ui/settings.blp:331
@@ -102,8 +102,8 @@ msgstr "Diese Woche ist nichts geplant"
 msgid "Calendar"
 msgstr "Kalender"
 
-#: todav/linux/app/src/calendar.rs:470 todav/linux/app/src/calendar.rs:2027
-#: todav/linux/app/src/window.rs:1391
+#: todav/linux/app/src/calendar.rs:470 todav/linux/app/src/calendar.rs:2024
+#: todav/linux/app/src/window.rs:1388
 msgid "All day"
 msgstr "Ganztägig"
 
@@ -129,44 +129,44 @@ msgstr "Nichts zu planen"
 msgid "Move Repeating Event?"
 msgstr "Wiederkehrenden Termin verschieben?"
 
-#: todav/linux/app/src/calendar.rs:991
+#: todav/linux/app/src/calendar.rs:988
 msgid "Shown on the Calendar"
 msgstr "Im Kalender angezeigt"
 
-#: todav/linux/app/src/calendar.rs:993
+#: todav/linux/app/src/calendar.rs:990
 msgid "Hidden from the Calendar"
 msgstr "Im Kalender ausgeblendet"
 
-#: todav/linux/app/src/calendar.rs:1228
+#: todav/linux/app/src/calendar.rs:1225
 #, rust-format
 msgid "+{n} more"
 msgid_plural "+{n} more"
 msgstr[0] "+{n} weitere"
 msgstr[1] "+{n} weitere"
 
-#: todav/linux/app/src/calendar.rs:1406
+#: todav/linux/app/src/calendar.rs:1403
 #, rust-format
 msgid "Starts {date}"
 msgstr "Beginnt {date}"
 
-#: todav/linux/app/src/calendar.rs:1408 todav/linux/app/src/main.rs:365
+#: todav/linux/app/src/calendar.rs:1405 todav/linux/app/src/main.rs:366
 #, rust-format
 msgid "Due {date}"
 msgstr "Fällig {date}"
 
-#: todav/linux/app/src/calendar.rs:1426
+#: todav/linux/app/src/calendar.rs:1423
 msgid "Cancelled"
 msgstr "Abgesagt"
 
-#: todav/linux/app/src/calendar.rs:1433
+#: todav/linux/app/src/calendar.rs:1430
 msgid "Completed"
 msgstr "Erledigt"
 
-#: todav/linux/app/src/calendar.rs:1436 todav/linux/app/ui/edit-dialog.blp:64
+#: todav/linux/app/src/calendar.rs:1433 todav/linux/app/ui/edit-dialog.blp:64
 msgid "Not saved on the server"
 msgstr "Nicht auf dem Server gespeichert"
 
-#: todav/linux/app/src/calendar.rs:1542 todav/linux/app/src/lists.rs:272
+#: todav/linux/app/src/calendar.rs:1539 todav/linux/app/src/lists.rs:264
 #: todav/linux/app/ui/settings.blp:45 todav/linux/app/ui/settings.blp:146
 #: todav/linux/app/ui/settings.blp:150 todav/linux/app/ui/settings.blp:314
 #: todav/linux/app/ui/shortcuts.blp:57 todav/linux/app/ui/window.blp:167
@@ -174,93 +174,93 @@ msgstr "Nicht auf dem Server gespeichert"
 msgid "Tasks"
 msgstr "Aufgaben"
 
-#: todav/linux/app/src/calendar.rs:1543
+#: todav/linux/app/src/calendar.rs:1540
 msgid "Add a task for this event"
 msgstr "Aufgabe für diesen Termin hinzufügen"
 
-#: todav/linux/app/src/calendar.rs:1569 todav/linux/app/ui/settings.blp:176
+#: todav/linux/app/src/calendar.rs:1566 todav/linux/app/ui/settings.blp:176
 #: todav/linux/app/ui/settings.blp:321
 msgid "Subtasks"
 msgstr "Unteraufgaben"
 
-#: todav/linux/app/src/calendar.rs:1570
+#: todav/linux/app/src/calendar.rs:1567
 msgid "Add a subtask"
 msgstr "Unteraufgabe hinzufügen"
 
-#: todav/linux/app/src/calendar.rs:1645 todav/linux/app/src/lists.rs:540
-#: todav/linux/app/src/window.rs:2181
+#: todav/linux/app/src/calendar.rs:1642 todav/linux/app/src/lists.rs:532
+#: todav/linux/app/src/window.rs:2178
 msgid "Delete"
 msgstr "Löschen"
 
-#: todav/linux/app/src/calendar.rs:1649 todav/linux/app/src/lists.rs:151
+#: todav/linux/app/src/calendar.rs:1646 todav/linux/app/src/lists.rs:151
 msgid "Edit…"
 msgstr "Bearbeiten …"
 
-#: todav/linux/app/src/calendar.rs:1782
+#: todav/linux/app/src/calendar.rs:1779
 msgid "Repeats"
 msgstr "Wiederholt sich"
 
-#: todav/linux/app/src/calendar.rs:1810
+#: todav/linux/app/src/calendar.rs:1807
 #: todav/linux/app/src/calendar/dialog.rs:380
-#: todav/linux/app/src/window.rs:2190
+#: todav/linux/app/src/window.rs:2187
 #, rust-format
 msgid "“{title}” deleted"
 msgstr "„{title}“ gelöscht"
 
-#: todav/linux/app/src/calendar.rs:1817
+#: todav/linux/app/src/calendar.rs:1814
 #: todav/linux/app/src/calendar/dialog.rs:388
 msgid "Delete Repeating Event?"
 msgstr "Wiederkehrenden Termin löschen?"
 
-#: todav/linux/app/src/calendar.rs:1837
+#: todav/linux/app/src/calendar.rs:1834
 msgid "Done"
 msgstr "Erledigt"
 
-#: todav/linux/app/src/calendar.rs:1859 todav/linux/app/src/window.rs:1582
+#: todav/linux/app/src/calendar.rs:1856 todav/linux/app/src/window.rs:1579
 #, rust-format
 msgid "Not saved on the server: {reason}"
 msgstr "Nicht auf dem Server gespeichert: {reason}"
 
-#: todav/linux/app/src/calendar.rs:1878
+#: todav/linux/app/src/calendar.rs:1875
 #, rust-format
 msgid "For {event}"
 msgstr "Für {event}"
 
-#: todav/linux/app/src/calendar.rs:1890
+#: todav/linux/app/src/calendar.rs:1887
 #, rust-format
 msgid "Subtask of {task}"
 msgstr "Unteraufgabe von {task}"
 
-#: todav/linux/app/src/calendar.rs:1904 todav/linux/app/ui/settings.blp:266
+#: todav/linux/app/src/calendar.rs:1901 todav/linux/app/ui/settings.blp:266
 #: todav/linux/app/ui/settings.blp:344 todav/linux/app/ui/shortcuts.blp:104
 msgid "Agenda"
 msgstr "Agenda"
 
-#: todav/linux/app/src/calendar.rs:1932
+#: todav/linux/app/src/calendar.rs:1929
 msgid "Nothing Planned"
 msgstr "Nichts geplant"
 
-#: todav/linux/app/src/calendar.rs:1987 todav/linux/app/src/window.rs:1454
+#: todav/linux/app/src/calendar.rs:1984 todav/linux/app/src/window.rs:1451
 #: todav/linux/app/ui/shortcuts.blp:11
 msgid "Search"
 msgstr "Suchen"
 
-#: todav/linux/app/src/calendar.rs:1990
+#: todav/linux/app/src/calendar.rs:1987
 #, rust-format
 msgid "{n} event"
 msgid_plural "{n} events"
 msgstr[0] "{n} Termin"
 msgstr[1] "{n} Termine"
 
-#: todav/linux/app/src/calendar.rs:2007 todav/linux/app/src/window.rs:1475
+#: todav/linux/app/src/calendar.rs:2004 todav/linux/app/src/window.rs:1472
 msgid "No Results Found"
 msgstr "Keine Ergebnisse gefunden"
 
-#: todav/linux/app/src/calendar.rs:2008 todav/linux/app/src/window.rs:1476
+#: todav/linux/app/src/calendar.rs:2005 todav/linux/app/src/window.rs:1473
 msgid "Try a different search"
 msgstr "Versuchen Sie eine andere Suche"
 
-#: todav/linux/app/src/calendar.rs:2048
+#: todav/linux/app/src/calendar.rs:2045
 msgid "Task"
 msgstr "Aufgabe"
 
@@ -292,7 +292,7 @@ msgstr[1] "Jahre"
 msgid "The event repeats."
 msgstr "Der Termin wiederholt sich."
 
-#: todav/linux/app/src/calendar/dialog.rs:82 todav/linux/app/src/lists.rs:539
+#: todav/linux/app/src/calendar/dialog.rs:82 todav/linux/app/src/lists.rs:531
 #: todav/linux/app/src/settings.rs:559 todav/linux/app/ui/edit-dialog.blp:23
 #: todav/linux/app/ui/event-dialog.blp:24 todav/linux/app/ui/list-dialog.blp:18
 #: todav/linux/app/ui/new-category.blp:18
@@ -398,120 +398,116 @@ msgstr "Später"
 msgid "On This Device"
 msgstr "Auf diesem Gerät"
 
-#: todav/linux/app/src/lists.rs:259
-msgid "On this device only"
-msgstr "Nur auf diesem Gerät"
-
-#: todav/linux/app/src/lists.rs:274
+#: todav/linux/app/src/lists.rs:266
 msgid "Welcome to Todav"
 msgstr "Willkommen bei Todav"
 
-#: todav/linux/app/src/lists.rs:277
+#: todav/linux/app/src/lists.rs:269
 msgid ""
 "Tick tasks off when done; open one to add a due date, reminders or subtasks."
 msgstr ""
 "Haken Sie erledigte Aufgaben ab; öffnen Sie eine, um ein Fälligkeitsdatum, "
 "Erinnerungen oder Unteraufgaben hinzuzufügen."
 
-#: todav/linux/app/src/lists.rs:309
+#: todav/linux/app/src/lists.rs:301
 msgid "Edit Calendar"
 msgstr "Kalender bearbeiten"
 
-#: todav/linux/app/src/lists.rs:310 todav/linux/app/ui/calendar.blp:116
+#: todav/linux/app/src/lists.rs:302 todav/linux/app/ui/calendar.blp:116
 msgid "New Calendar"
 msgstr "Neuer Kalender"
 
-#: todav/linux/app/src/lists.rs:311
+#: todav/linux/app/src/lists.rs:303
 msgid "Edit List"
 msgstr "Liste bearbeiten"
 
-#: todav/linux/app/src/lists.rs:312 todav/linux/app/ui/calendar.blp:160
+#: todav/linux/app/src/lists.rs:304 todav/linux/app/ui/calendar.blp:160
 #: todav/linux/app/ui/window.blp:210
 msgid "New List"
 msgstr "Neue Liste"
 
-#: todav/linux/app/src/lists.rs:315 todav/linux/app/ui/edit-dialog.blp:28
+#: todav/linux/app/src/lists.rs:307 todav/linux/app/ui/edit-dialog.blp:28
 #: todav/linux/app/ui/event-dialog.blp:29 todav/linux/app/ui/list-dialog.blp:23
 msgid "Save"
 msgstr "Speichern"
 
-#: todav/linux/app/src/lists.rs:317 todav/linux/app/ui/new-category.blp:19
+#: todav/linux/app/src/lists.rs:309 todav/linux/app/ui/new-category.blp:19
 msgid "Create"
 msgstr "Erstellen"
 
-#: todav/linux/app/src/lists.rs:367
+#: todav/linux/app/src/lists.rs:359
 msgid "Custom Color…"
 msgstr "Eigene Farbe …"
 
-#: todav/linux/app/src/lists.rs:419
+#: todav/linux/app/src/lists.rs:411
 msgid "Custom Color"
 msgstr "Eigene Farbe"
 
-#: todav/linux/app/src/lists.rs:510
+#: todav/linux/app/src/lists.rs:502
 #, rust-format
 msgid "Not saved: {error}"
 msgstr "Nicht gespeichert: {error}"
 
-#: todav/linux/app/src/lists.rs:512
+#: todav/linux/app/src/lists.rs:504
 msgid "Not saved"
 msgstr "Nicht gespeichert"
 
-#: todav/linux/app/src/lists.rs:519
+#: todav/linux/app/src/lists.rs:511
 msgid "Delete Calendar"
 msgstr "Kalender löschen"
 
-#: todav/linux/app/src/lists.rs:521
+#: todav/linux/app/src/lists.rs:513
 msgid "Delete List"
 msgstr "Liste löschen"
 
-#: todav/linux/app/src/lists.rs:532
+#: todav/linux/app/src/lists.rs:524
 msgid "Delete Calendar?"
 msgstr "Kalender löschen?"
 
-#: todav/linux/app/src/lists.rs:534
+#: todav/linux/app/src/lists.rs:526
 msgid "Delete List?"
 msgstr "Liste löschen?"
 
-#: todav/linux/app/src/lists.rs:556
+#: todav/linux/app/src/lists.rs:548
 #, rust-format
 msgid "Not deleted: {error}"
 msgstr "Nicht gelöscht: {error}"
 
-#: todav/linux/app/src/lists.rs:558
+#: todav/linux/app/src/lists.rs:550
 msgid "Not deleted"
 msgstr "Nicht gelöscht"
 
-#: todav/linux/app/src/lists.rs:573
+#: todav/linux/app/src/lists.rs:565
 #, rust-format
 msgid "“{name}” will be deleted with its events."
 msgstr "„{name}“ wird mit seinen Terminen gelöscht."
 
-#: todav/linux/app/src/lists.rs:575
+#: todav/linux/app/src/lists.rs:567
 #, rust-format
 msgid "“{name}” will be deleted with its events and {n} task."
 msgid_plural "“{name}” will be deleted with its events and {n} tasks."
 msgstr[0] "„{name}“ wird mit seinen Terminen und {n} Aufgabe gelöscht."
 msgstr[1] "„{name}“ wird mit seinen Terminen und {n} Aufgaben gelöscht."
 
-#: todav/linux/app/src/lists.rs:579
+#: todav/linux/app/src/lists.rs:571
 #, rust-format
 msgid "“{name}” will be deleted."
 msgstr "„{name}“ wird gelöscht."
 
-#: todav/linux/app/src/lists.rs:581
+#: todav/linux/app/src/lists.rs:573
 #, rust-format
 msgid "“{name}” will be deleted with its {n} task."
 msgid_plural "“{name}” will be deleted with its {n} tasks."
 msgstr[0] "„{name}“ wird mit {n} Aufgabe gelöscht."
 msgstr[1] "„{name}“ wird mit {n} Aufgaben gelöscht."
 
-#: todav/linux/app/src/lists.rs:590
+#: todav/linux/app/src/lists.rs:582
 msgid "It is on this device only and cannot be restored."
 msgstr ""
 "Alles ist nur auf diesem Gerät gespeichert und kann nicht wiederhergestellt "
 "werden."
 
-#: todav/linux/app/src/lists.rs:592
+#: todav/linux/app/src/lists.rs:584
 msgid "It can be restored from the trash bin in Nextcloud Calendar."
 msgstr "Es kann im Papierkorb von Nextcloud Kalender wiederhergestellt werden."
 
@@ -537,11 +533,11 @@ msgstr "Passwort kann nicht gespeichert werden: {error}"
 msgid "Connecting failed"
 msgstr "Verbindung fehlgeschlagen"
 
-#: todav/linux/app/src/main.rs:371
+#: todav/linux/app/src/main.rs:372
 msgid "Mark as Done"
 msgstr "Als erledigt markieren"
 
-#: todav/linux/app/src/main.rs:398
+#: todav/linux/app/src/main.rs:399
 msgid "Sync tasks and receive changes in the background"
 msgstr "Aufgaben im Hintergrund synchronisieren und Änderungen empfangen"
 
@@ -679,7 +675,7 @@ msgstr "„{title}“ wurde nicht auf dem Server gespeichert"
 msgid "“{title}” was not saved on the server: {reason}"
 msgstr "„{title}“ wurde nicht auf dem Server gespeichert: {reason}"
 
-#: todav/linux/app/src/window.rs:382 todav/linux/app/src/window.rs:1689
+#: todav/linux/app/src/window.rs:382 todav/linux/app/src/window.rs:1686
 msgid "Edit"
 msgstr "Bearbeiten"
 
@@ -744,98 +740,98 @@ msgstr "Anmeldung fehlgeschlagen: {error}"
 msgid "Sign-in failed"
 msgstr "Anmeldung fehlgeschlagen"
 
-#: todav/linux/app/src/window.rs:1052 todav/linux/app/src/window.rs:1381
+#: todav/linux/app/src/window.rs:1052 todav/linux/app/src/window.rs:1378
 msgid "Upcoming"
 msgstr "Anstehend"
 
-#: todav/linux/app/src/window.rs:1218
+#: todav/linux/app/src/window.rs:1215
 msgid "New Category…"
 msgstr "Neue Kategorie …"
 
-#: todav/linux/app/src/window.rs:1218 todav/linux/app/ui/window.blp:351
+#: todav/linux/app/src/window.rs:1215 todav/linux/app/ui/window.blp:351
 msgid "No category"
 msgstr "Keine Kategorie"
 
-#: todav/linux/app/src/window.rs:1351
+#: todav/linux/app/src/window.rs:1348
 #, rust-format
 msgid "Completed ({n})"
 msgstr "Erledigt ({n})"
 
-#: todav/linux/app/src/window.rs:1364
+#: todav/linux/app/src/window.rs:1361
 msgid "All Done"
 msgstr "Alles erledigt"
 
-#: todav/linux/app/src/window.rs:1387
+#: todav/linux/app/src/window.rs:1384
 msgid "Today’s Events"
 msgstr "Heutige Termine"
 
-#: todav/linux/app/src/window.rs:1432
+#: todav/linux/app/src/window.rs:1429
 msgid "Nothing Scheduled"
 msgstr "Nichts terminiert"
 
-#: todav/linux/app/src/window.rs:1433
+#: todav/linux/app/src/window.rs:1430
 msgid "Tasks with a due date show up here"
 msgstr "Aufgaben mit Fälligkeitsdatum erscheinen hier"
 
-#: todav/linux/app/src/window.rs:1457
+#: todav/linux/app/src/window.rs:1454
 #, rust-format
 msgid "{n} task"
 msgid_plural "{n} tasks"
 msgstr[0] "{n} Aufgabe"
 msgstr[1] "{n} Aufgaben"
 
-#: todav/linux/app/src/window.rs:1485
+#: todav/linux/app/src/window.rs:1482
 #, rust-format
 msgid "{n} open"
 msgid_plural "{n} open"
 msgstr[0] "{n} offen"
 msgstr[1] "{n} offen"
 
-#: todav/linux/app/src/window.rs:1561
+#: todav/linux/app/src/window.rs:1558
 #, rust-format
 msgid "{done} of {all} subtask done"
 msgid_plural "{done} of {all} subtasks done"
 msgstr[0] "{done} von {all} Unteraufgabe erledigt"
 msgstr[1] "{done} von {all} Unteraufgaben erledigt"
 
-#: todav/linux/app/src/window.rs:1644 todav/linux/app/src/window.rs:1684
+#: todav/linux/app/src/window.rs:1641 todav/linux/app/src/window.rs:1681
 msgid "Add Subtask"
 msgstr "Unteraufgabe hinzufügen"
 
-#: todav/linux/app/src/window.rs:1728
+#: todav/linux/app/src/window.rs:1725
 msgid "Add subtask"
 msgstr "Unteraufgabe hinzufügen"
 
-#: todav/linux/app/src/window.rs:1848
+#: todav/linux/app/src/window.rs:1845
 msgid "Drag to Move"
 msgstr "Zum Verschieben ziehen"
 
-#: todav/linux/app/src/window.rs:2199 todav/linux/app/ui/shortcuts.blp:16
+#: todav/linux/app/src/window.rs:2196 todav/linux/app/ui/shortcuts.blp:16
 msgid "Undo"
 msgstr "Rückgängig"
 
-#: todav/linux/app/src/window.rs:2377
+#: todav/linux/app/src/window.rs:2374
 msgid "Start and due date need a time on both or on neither"
 msgstr ""
 "Beginn und Fälligkeit brauchen beide eine Uhrzeit oder keines von beiden"
 
-#: todav/linux/app/src/window.rs:2380
+#: todav/linux/app/src/window.rs:2377
 msgid "The task starts after it is due"
 msgstr "Die Aufgabe beginnt nach ihrer Fälligkeit"
 
-#: todav/linux/app/src/window.rs:2509
+#: todav/linux/app/src/window.rs:2506
 msgid "Add a Time"
 msgstr "Uhrzeit hinzufügen"
 
-#: todav/linux/app/src/window.rs:2630
+#: todav/linux/app/src/window.rs:2627
 msgid "Low priority"
 msgstr "Niedrige Priorität"
 
-#: todav/linux/app/src/window.rs:2631
+#: todav/linux/app/src/window.rs:2628
 msgid "Medium priority"
 msgstr "Mittlere Priorität"
 
-#: todav/linux/app/src/window.rs:2632
+#: todav/linux/app/src/window.rs:2629
 msgid "High priority"
 msgstr "Hohe Priorität"
 
@@ -1612,6 +1608,9 @@ msgstr "Verbindet sich über GNOME-Online-Konten oder eine Anmeldung im Browser"
 #: todav/linux/data/io.github.selfref.Todav.metainfo.xml:23
 msgid "SelfRef"
 msgstr "SelfRef"
+
+#~ msgid "On this device only"
+#~ msgstr "Nur auf diesem Gerät"
 
 #~ msgid "Tasks synced with your Nextcloud"
 #~ msgstr "Aufgaben, synchronisiert mit Ihrer Nextcloud"

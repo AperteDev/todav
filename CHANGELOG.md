@@ -14,8 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a calendar.
 - "Local lists and calendars" in Preferences → Accounts: keep lists and
   calendars on this device only, next to the synced ones. Turning it off hides
-  them; nothing is deleted. New lists and calendars ask where to go, and local
-  ones carry a broken-chain mark.
+  them; nothing is deleted. New lists and calendars ask where to go.
 - The sidebars and the event dialog's calendar picker group lists and calendars
   by where they are kept, those on this device last.
 

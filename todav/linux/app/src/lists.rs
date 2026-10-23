@@ -253,14 +253,6 @@ pub fn set_headings(rows: &gtk::ListBox, skip: usize, headings: Vec<Option<Strin
     });
 }
 
-/// The mark after a list kept on this device only.
-pub fn local_mark() -> gtk::Image {
-    let mark = gtk::Image::from_icon_name("chain-broken-symbolic");
-    mark.set_tooltip_text(Some(&gettext("On this device only")));
-    mark.add_css_class("dim-label");
-    mark
-}
-
 /// "On this device only" on the welcome page: local mode on, and the first time a task list
 /// with a task to start from and an empty calendar; lists kept from before just show again.
 pub fn start_local() {
