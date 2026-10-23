@@ -531,18 +531,19 @@ pub(super) fn render(c: &Rc<Cal>) -> i64 {
 
 /// An event (opens its details) or a planned task (tick, open, drag elsewhere) in the hours.
 fn block(c: &Rc<Cal>, i: &Item, geo: Geo) -> gtk::Widget {
-    let time = |t: i64| fmt(t, "%H:%M");
-    let text = |summary: &str, from: i64| {
-        // Short blocks get one line.
-        if geo.to - geo.from >= 45 {
-            format!("{summary}\n{}", time(from))
-        } else {
-            format!("{} {summary}", time(from))
+    // The title, then its time dimmer: below it, or at the end of a short block's one line.
+    let label = |summary: &str, from: i64| -> gtk::Widget {
+        let time = fmt(from, "%H:%M");
+        if geo.to - geo.from < 45 {
+            return super::one_line(summary, Some(time));
         }
-    };
-    let label = |s: String| {
+        let text = format!(
+            "{}\n<span alpha=\"55%\">{time}</span>",
+            glib::markup_escape_text(summary)
+        );
         gtk::Label::builder()
-            .label(&s)
+            .label(&text)
+            .use_markup(true)
             .xalign(0.0)
             .yalign(0.0)
             .wrap(true)
@@ -550,11 +551,12 @@ fn block(c: &Rc<Cal>, i: &Item, geo: Geo) -> gtk::Widget {
             .ellipsize(gtk::pango::EllipsizeMode::End)
             .vexpand(true)
             .build()
+            .upcast()
     };
     match i {
         Item::Event(e) => {
             let b = gtk::Button::builder()
-                .child(&label(text(&e.summary, e.start)))
+                .child(&label(&e.summary, e.start))
                 .has_frame(false)
                 .build();
             b.add_css_class("block");
@@ -569,7 +571,7 @@ fn block(c: &Rc<Cal>, i: &Item, geo: Geo) -> gtk::Widget {
             b.upcast()
         }
         Item::Task(t) => {
-            let b = task_chip(c, t, &label(text(&t.summary, when(t).0)), gtk::Align::Start);
+            let b = task_chip(c, t, &label(&t.summary, when(t).0), gtk::Align::Start);
             b.add_css_class("block");
             b.upcast()
         }

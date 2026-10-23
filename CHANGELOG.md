@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Nextcloud server or this device only), then for the account.
 - The account, push and sync settings moved to a new Accounts page in
   Preferences.
+- Times on the calendar are dimmer than titles and come after them, at the end
+  of one-line entries, as in GNOME Calendar.
 
 ## [1.1.0] - 2026-10-22
 

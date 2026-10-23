@@ -1293,22 +1293,33 @@ fn more_button(c: &Rc<Cal>, day: i64, rest: Vec<Item>) -> gtk::MenuButton {
     b
 }
 
+/// An item's title on one line, with its time (if any) dimmer at the end, as GNOME Calendar
+/// shows them.
+pub fn one_line(summary: &str, time: Option<String>) -> gtk::Widget {
+    let title = gtk::Label::builder()
+        .label(summary)
+        .xalign(0.0)
+        .hexpand(true)
+        .ellipsize(gtk::pango::EllipsizeMode::End)
+        .build();
+    let Some(time) = time else {
+        return title.upcast();
+    };
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    row.append(&title);
+    let time = gtk::Label::new(Some(&time));
+    time.add_css_class("dim-label");
+    row.append(&time);
+    row.upcast()
+}
+
 /// A month-day entry: an event (opens its details) or a task (tick, or open it).
 fn chip(c: &Rc<Cal>, i: &Item) -> gtk::Widget {
     match i {
         Item::Event(e) => {
-            let text = if e.all_day {
-                e.summary.clone()
-            } else {
-                format!("{} {}", fmt(e.start, "%H:%M"), e.summary)
-            };
-            let label = gtk::Label::builder()
-                .label(&text)
-                .xalign(0.0)
-                .ellipsize(gtk::pango::EllipsizeMode::End)
-                .build();
+            let time = (!e.all_day).then(|| fmt(e.start, "%H:%M"));
             let b = gtk::Button::builder()
-                .child(&label)
+                .child(&one_line(&e.summary, time))
                 .has_frame(false)
                 .build();
             b.add_css_class("chip");
@@ -1326,24 +1337,15 @@ fn chip(c: &Rc<Cal>, i: &Item) -> gtk::Widget {
         }
         Item::Task(t) => {
             let (at, all_day) = when(t);
-            let text = if all_day {
-                t.summary.clone()
-            } else {
-                format!("{} {}", fmt(at, "%H:%M"), t.summary)
-            };
-            let label = gtk::Label::builder()
-                .label(&text)
-                .xalign(0.0)
-                .ellipsize(gtk::pango::EllipsizeMode::End)
-                .build();
-            task_chip(c, t, &label, gtk::Align::Center).upcast()
+            let time = (!all_day).then(|| fmt(at, "%H:%M"));
+            task_chip(c, t, &one_line(&t.summary, time), gtk::Align::Center).upcast()
         }
     }
 }
 
 /// A task on the calendar: one button, showing its details, that holds its check
 /// (`check_align`ed, ticking it) and `label`.
-fn task_chip(c: &Rc<Cal>, t: &Task, label: &gtk::Label, check_align: gtk::Align) -> gtk::Button {
+fn task_chip(c: &Rc<Cal>, t: &Task, label: &gtk::Widget, check_align: gtk::Align) -> gtk::Button {
     let check = gtk::CheckButton::builder()
         .active(t.done)
         .valign(check_align)
