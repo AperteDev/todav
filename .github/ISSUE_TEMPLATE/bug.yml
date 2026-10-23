@@ -1,0 +1,65 @@
+name: Bug report
+description: Something in Todav or its GNOME Shell extension does not work as it should
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a task list
+        2. …
+  - type: input
+    id: version
+    attributes:
+      label: Todav version
+      description: Shown in About Todav (main menu).
+      placeholder: '1.1.0'
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Installed from
+      options:
+        - Flatpak
+        - AUR
+        - .deb package
+        - Tarball
+        - Built from source
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: Distribution and GNOME version
+      placeholder: 'Fedora 44, GNOME 50'
+    validations:
+      required: true
+  - type: dropdown
+    id: account
+    attributes:
+      label: Connected through
+      options:
+        - GNOME Online Accounts
+        - Browser sign-in or app password
+        - On this device only (no account)
+  - type: input
+    id: nextcloud
+    attributes:
+      label: Nextcloud version
+      description: With an account; and whether the WebDAV Push app and ntfy are used.
+      placeholder: '32, WebDAV Push with ntfy'
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: What Todav prints when started from a terminal with `todav-linux` (Flatpak `flatpak run io.github.selfref.Todav`), after quitting the running one with Ctrl+Q.
+      render: text
