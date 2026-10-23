@@ -39,6 +39,8 @@ seconds.
   sidebar.
 - Subtasks, manual order by drag and drop (the same order Nextcloud Tasks uses), sorting by due
   date, priority and notes.
+- Move a task, with its subtasks, to another list: drop it on the list in the sidebar or pick
+  the list in the task dialog.
 - Due dates with optional times, start times, and several reminders per task, delivered as
   desktop notifications with "Mark as Done".
 - An Upcoming page across all lists: Overdue, Today, Tomorrow, the coming days and later.
@@ -59,6 +61,8 @@ seconds.
   - **Resize** a block in the week view by dragging its top or bottom edge to change when it
     starts or ends.
   - **Unplan** a task by dropping it back on "To Plan".
+  - **Change calendar** by dropping an event on another calendar in the sidebar (a task on
+    another list).
 - Click an event or task for its details (a task's subtasks, an event's tasks, both addable
   there); double-click to edit it.
 - Tasks linked to events: an event lists its tasks, and a task shows its event.

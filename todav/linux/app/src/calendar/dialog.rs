@@ -7,41 +7,6 @@ use todav_core::{EventPatch, EventTime, Repeat, Scope};
 
 const FREQS: [Freq; 4] = [Freq::Daily, Freq::Weekly, Freq::Monthly, Freq::Yearly];
 
-/// Fill `row` with the names of `calendars` (as `lists::by_place` orders them), a section per
-/// place under its heading when they are in more than one.
-fn calendar_picker(row: &adw::ComboRow, calendars: &[List]) {
-    let headings = crate::lists::headings(calendars);
-    let sections = gio::ListStore::new::<gtk::StringList>();
-    let mut names = gtk::StringList::new(&[]);
-    for (l, heading) in calendars.iter().zip(&headings) {
-        if heading.is_some() || sections.n_items() == 0 {
-            names = gtk::StringList::new(&[]);
-            sections.append(&names);
-        }
-        names.append(&l.display_name);
-    }
-    row.set_model(Some(&gtk::FlattenListModel::new(Some(sections))));
-    if headings.iter().all(Option::is_none) {
-        return;
-    }
-    let factory = gtk::SignalListItemFactory::new();
-    factory.connect_setup(|_, h| {
-        if let Some(h) = h.downcast_ref::<gtk::ListHeader>() {
-            h.set_child(Some(&crate::lists::heading_label("")));
-        }
-    });
-    factory.connect_bind(move |_, h| {
-        let Some(h) = h.downcast_ref::<gtk::ListHeader>() else {
-            return;
-        };
-        let text = headings.get(h.start() as usize).cloned().flatten();
-        if let Some(label) = h.child().and_downcast::<gtk::Label>() {
-            label.set_label(&text.unwrap_or_default());
-        }
-    });
-    row.set_header_factory(Some(&factory));
-}
-
 /// The unit of "Every n …" for repeat choice `freq` (1 daily … 4 yearly), in `n`'s form.
 fn unit(freq: u32, n: u64) -> String {
     match freq {
@@ -150,7 +115,7 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
             .cloned()
             .collect(),
     );
-    calendar_picker(&calendar, &writable);
+    crate::lists::picker(&calendar, &writable);
     let pick = e
         .as_ref()
         .map(|e| e.list_href.clone())

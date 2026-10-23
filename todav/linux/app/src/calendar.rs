@@ -994,6 +994,13 @@ fn refresh_calendars(c: &Rc<Cal>) {
         } else {
             c.task_lists.append(&row);
         }
+        if let Some(r) = row
+            .parent()
+            .and_downcast::<gtk::ListBoxRow>()
+            .filter(|_| l.writable)
+        {
+            list_drop(&r, l);
+        }
     }
     for (rows, events) in [(&c.calendars, true), (&c.task_lists, false)] {
         let section: Vec<List> = all
@@ -1008,6 +1015,39 @@ fn refresh_calendars(c: &Rc<Cal>) {
     c.task_lists.set_visible(lists_only);
     *c.lists.borrow_mut() = all;
     *c.hidden.borrow_mut() = hidden;
+}
+
+/// Dropping an event on sidebar row `l` moves it to that calendar (all of a repeating one), a
+/// task moves to that list with its subtasks (a subtask leaves its parent first).
+fn list_drop(row: &gtk::ListBoxRow, l: &List) {
+    let drop = gtk::DropTarget::new(glib::Type::STRING, gdk::DragAction::MOVE);
+    let (tasks, events, href) = (l.holds_tasks, l.holds_events, l.href.clone());
+    drop.connect_accept(move |_, _| {
+        dragging().is_some_and(|i| match &i {
+            Item::Task(t) => tasks && t.list_href != href,
+            Item::Event(e) => events && e.list_href != href,
+        })
+    });
+    let href = l.href.clone();
+    drop.connect_drop(move |_, _, _, _| {
+        let Some(i) = dragging() else { return false };
+        let moved = match &i {
+            Item::Task(t) => core().together(|| {
+                if t.parent_uid.is_some() {
+                    core().promote(t.uid.clone())?;
+                }
+                core().move_task(t.uid.clone(), href.clone())
+            }),
+            Item::Event(e) => core().move_event(e.list_href.clone(), e.uid.clone(), href.clone()),
+        };
+        match moved {
+            Ok(()) => request_sync(),
+            Err(e) => crate::window::toast(&e.to_string()),
+        }
+        true
+    });
+    row.add_css_class("cat-drop");
+    row.add_controller(drop);
 }
 
 /// The hrefs of the calendars (`events`) or task lists, in sidebar order.

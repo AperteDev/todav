@@ -253,6 +253,41 @@ pub fn set_headings(rows: &gtk::ListBox, skip: usize, headings: Vec<Option<Strin
     });
 }
 
+/// Fill `row` with the names of `lists` (as `by_place` orders them), a section per place under
+/// its heading when they are in more than one: the task and event dialogs' list picker.
+pub fn picker(row: &adw::ComboRow, lists: &[List]) {
+    let headings = headings(lists);
+    let sections = gio::ListStore::new::<gtk::StringList>();
+    let mut names = gtk::StringList::new(&[]);
+    for (l, heading) in lists.iter().zip(&headings) {
+        if heading.is_some() || sections.n_items() == 0 {
+            names = gtk::StringList::new(&[]);
+            sections.append(&names);
+        }
+        names.append(&l.display_name);
+    }
+    row.set_model(Some(&gtk::FlattenListModel::new(Some(sections))));
+    if headings.iter().all(Option::is_none) {
+        return;
+    }
+    let factory = gtk::SignalListItemFactory::new();
+    factory.connect_setup(|_, h| {
+        if let Some(h) = h.downcast_ref::<gtk::ListHeader>() {
+            h.set_child(Some(&heading_label("")));
+        }
+    });
+    factory.connect_bind(move |_, h| {
+        let Some(h) = h.downcast_ref::<gtk::ListHeader>() else {
+            return;
+        };
+        let text = headings.get(h.start() as usize).cloned().flatten();
+        if let Some(label) = h.child().and_downcast::<gtk::Label>() {
+            label.set_label(&text.unwrap_or_default());
+        }
+    });
+    row.set_header_factory(Some(&factory));
+}
+
 /// "On this device only" on the welcome page: local mode on, and the first time a task list
 /// with a task to start from and an empty calendar; lists kept from before just show again.
 pub fn start_local() {

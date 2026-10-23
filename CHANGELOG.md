@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   them; nothing is deleted. New lists and calendars ask where to go.
 - The sidebars and the event dialog's calendar picker group lists and calendars
   by where they are kept, those on this device last.
+- Move tasks to another list and events to another calendar by dropping them on
+  it in the sidebar; a task takes its subtasks along.
+- A list picker in the task dialog, to move a task to another list.
 
 ### Changed
 

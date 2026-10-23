@@ -57,7 +57,7 @@ Storage is plain CalDAV: one calendar per list, one VTODO per task. Categories a
 | Server change cursor | `sync-token` per calendar | Stored locally; `sync-collection` REPORT (RFC 6578) on every sync |
 | Push identity | `DAV:Push` `topic` per calendar | Maps incoming push to a calendar |
 
-**Local schema**: SQLite in the core (`todav/core/src/store.rs`, migrations by `PRAGMA user_version`): `lists`, `tasks`, `events` (raw iCalendar plus derived columns, a dirty flag for the push queue), `alarms` (reminders in local time) and `kv` (config/settings cache, push keys, setting change times).
+**Local schema**: SQLite in the core (`todav/core/src/store.rs`, migrations by `PRAGMA user_version`): `lists`, `tasks`, `events` (raw iCalendar plus derived columns, a dirty flag for the push queue), `alarms` (reminders in local time), `moved` (server copies of tasks moved to another list, deleted on the next push) and `kv` (config/settings cache, push keys, setting change times).
 
 `raw_ics` keeps the full original VTODO so properties the app does not understand survive a round trip. On write, the core patches the known properties in `raw_ics` and bumps `DTSTAMP`/`LAST-MODIFIED`/`SEQUENCE`.
 
@@ -232,7 +232,9 @@ A single Rust binary (`todav-linux`) that is both the GUI and a background servi
 - Welcome page in two steps (`AdwNavigationView`): first how to use Todav (GNOME Online Accounts, a Nextcloud server, or "On This Device Only"), then the account to connect: the GOA account, or the server to sign in to with the browser (Login Flow v2) or a login name + app password; optional ntfy server. "On This Device Only" turns local mode on and, the first time, creates a task list with a sample task and an empty calendar (see [Local lists](#local-lists)).
 - Tasks | Calendar switcher in the header. Tasks page: `AdwNavigationSplitView` with Upcoming, the lists (colour, open count) and categories in the sidebar; tasks grouped by category (or tags, or ungrouped), subtasks in expander rows, completed ones in a "Completed" expander or at the end.
 - Entry at the top of the list: type, Enter → `add_task`; `Ctrl+K` category picker. Edit dialog for dates, reminders, priority, category, event link and notes.
-- Drag and drop reorders, moves between categories, makes and promotes subtasks.
+- Drag and drop reorders, moves between categories, makes and promotes subtasks, and moves a task to another list when dropped on it in the sidebar (also the edit dialog's list picker, `lists::picker`). On the Calendar page, an event dropped on a sidebar calendar moves there (`move_event`, the whole series), a task on a list likewise.
+- Moving a task (`Client::move_task`) takes its subtasks; a subtask dropped on a list leaves its parent first. Tasks are keyed by UID, so the row goes with the task and the old server copy waits in the `moved` table for the next push to delete it (before the uploads, so the UID is free in time); undo takes it back from there if it is still waiting.
+- After an edit, the app asks for a sync only when something waits for the server (`Client::pending`): edits in local lists never start one.
 - Type to search; `Ctrl+Z` undo; Keyboard Shortcuts dialog. Toasts for sync errors; the sync button turns into a spinner while syncing.
 - Calendar page: see [Calendar](#calendar-in-todav).
 - Preferences: General (style, start page), Accounts (account, push, settings sync, local lists), Tasks, Calendar, Extension.

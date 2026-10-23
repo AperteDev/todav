@@ -1076,6 +1076,13 @@ fn refresh_lists(ui: &Rc<Ui>) {
         row.append(&name);
         row.append(&count);
         ui.sidebar.append(&row);
+        if let Some(r) = row
+            .parent()
+            .and_downcast::<gtk::ListBoxRow>()
+            .filter(|_| l.writable)
+        {
+            list_drop(ui, &r, &l.href);
+        }
     }
     // Upcoming first, then the lists grouped by where they are kept.
     crate::lists::set_headings(&ui.sidebar, 1, crate::lists::headings(&lists));
@@ -1090,6 +1097,38 @@ fn refresh_lists(ui: &Rc<Ui>) {
             .select_row(ui.sidebar.row_at_index(i as i32).as_ref());
     }
     refresh_tasks(ui);
+}
+
+/// Dropping a task on the sidebar list `href` moves it there with its subtasks; a subtask
+/// leaves its parent first.
+fn list_drop(ui: &Rc<Ui>, row: &gtk::ListBoxRow, href: &str) {
+    let drop = gtk::DropTarget::new(glib::Type::STRING, gtk::gdk::DragAction::MOVE);
+    let (weak, h) = (Rc::downgrade(ui), href.to_string());
+    drop.connect_accept(move |_, _| {
+        weak.upgrade().is_some_and(|ui| {
+            let dragging = ui.dragging.borrow();
+            dragging.as_ref().is_some_and(|(d, _)| d.list_href != h)
+        })
+    });
+    let (weak, h) = (Rc::downgrade(ui), href.to_string());
+    drop.connect_drop(move |_, _, _, _| {
+        let Some((d, ds)) = weak.upgrade().and_then(|ui| ui.dragging.take()) else {
+            return false;
+        };
+        let moved = core().together(|| {
+            if !ds.root {
+                core().promote(d.uid.clone())?;
+            }
+            core().move_task(d.uid.clone(), h.clone())
+        });
+        match moved {
+            Ok(()) => request_sync(),
+            Err(e) => toast(&e.to_string()),
+        }
+        true
+    });
+    row.add_css_class("cat-drop");
+    row.add_controller(drop);
 }
 
 fn refresh_sidebar_counts(ui: &Rc<Ui>) {
@@ -2348,6 +2387,20 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
     let old_priority = priority_row(t.priority);
     priority.set_selected(old_priority);
 
+    // The list it is in, among those it can move to, grouped by where they are kept.
+    let list_row: adw::ComboRow = get(&b, "list");
+    let lists = crate::lists::by_place(
+        core()
+            .lists()
+            .into_iter()
+            .filter(|l| l.writable || l.href == t.list_href)
+            .collect(),
+    );
+    crate::lists::picker(&list_row, &lists);
+    let at = lists.iter().position(|l| l.href == t.list_href);
+    list_row.set_selected(at.unwrap_or(0) as u32);
+    list_row.set_visible(!sub);
+
     // The event it is for, with a way to unlink it.
     let event_row: adw::ActionRow = get(&b, "event");
     let linked = t.event_uid.clone().and_then(|e| core().event(e));
@@ -2436,8 +2489,20 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
             ..due_at()
         };
         let uid = task.uid.clone();
-        if core().update_task(uid.clone(), patch).is_ok() {
-            request_sync();
+        let to = lists
+            .get(list_row.selected() as usize)
+            .map(|l| l.href.clone())
+            .filter(|h| *h != task.list_href && !sub);
+        let saved = core().together(|| {
+            core().update_task(uid.clone(), patch)?;
+            match to {
+                Some(to) => core().move_task(uid.clone(), to),
+                None => Ok(()),
+            }
+        });
+        match saved {
+            Ok(()) => request_sync(),
+            Err(e) => toast(&e.to_string()),
         }
         if let Some(d) = d.upgrade() {
             d.close();

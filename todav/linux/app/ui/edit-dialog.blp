@@ -79,6 +79,12 @@ Adw.Dialog dialog {
               activates-default: true;
             }
 
+            // Its model is set in code, grouped by where the lists are kept; not for a subtask,
+            // which goes with its parent.
+            Adw.ComboRow list {
+              title: _("List");
+            }
+
             Adw.ComboRow category {
               title: _("Category");
               model: Gtk.StringList cats {};
