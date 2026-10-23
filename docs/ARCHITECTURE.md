@@ -464,6 +464,7 @@ Public in the README as planned work; order not fixed.
 - [x] **Offline mode**: use Todav without a server, or keep some lists on the device next to the account's ("Local lists and calendars", see [Local lists](#local-lists)). Not done: moving a whole list between the device and an account.
 - [ ] **More services** besides Nextcloud: other CalDAV servers first (Radicale, Baïkal, Fastmail, iCloud…), which mostly means login without Login Flow v2, settings/categories without Nextcloud Files, and polling where there is no WebDAV-Push.
 - [ ] **Android app**: M6 above.
+- [ ] **Pebble app**: M7 above, fed by the Android app (see [Pebble watchapp + companion](#pebble-watchapp--companion)).
 - [ ] **Windows app**: a native WinUI 3 front-end over the same Rust core (bindings as for Android), with what the Linux app does in the background: push over ntfy, reminder notifications, starting with the session. Details to be specified.
 - [x] **Nested subtasks**: any depth, as `RELATED-TO` allows. Rows indent per level inside the top-level task's expander (no expander per level); every subtask has a "+" for adding to it and taking dropped tasks; the calendar's task popover shows a subtask's task and its own subtasks.
 - [ ] **Advanced notifications**: configurable, beyond the reminder notifications the background service shows now; details to be specified.
