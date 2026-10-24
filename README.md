@@ -140,8 +140,8 @@ Todav from source. Then:
    browser, or use a login name and app password. Or choose "On This Device Only" to start
    without an account.
 2. Your task lists and calendars appear, and new ones can be created from the sidebar.
-3. For instant updates, install the WebDAV Push app on your Nextcloud and enter your ntfy server
-   in Preferences → Accounts → Push.
+3. For instant updates, install the [DAV Push](https://apps.nextcloud.com/apps/dav_push) app on
+   your Nextcloud and enter your ntfy server in Preferences → Accounts → Push.
 
 ## Roadmap
 
@@ -176,7 +176,7 @@ Todav is developed and tested mainly on this setup:
 - **Nextcloud** with its built-in CalDAV server (the Tasks and Calendar apps are optional, but
   handy as web fallbacks).
 - **GNOME** 49 to 51, with the app (GTK 4 + libadwaita) and the optional GNOME Shell extension.
-- Optionally, for instant updates: the [WebDAV Push](https://github.com/bitfireAT/nc_ext_dav_push)
+- Optionally, for instant updates: the [DAV Push](https://github.com/bitfireAT/nc_ext_dav_push)
   Nextcloud app (`dav_push`) and an [ntfy](https://ntfy.sh) server.
 
 Todav speaks standard CalDAV, but other servers and desktops are untested for now.
