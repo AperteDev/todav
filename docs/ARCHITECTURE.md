@@ -1,12 +1,12 @@
 # Todav — Architecture and Plan
 
-Oct 8, 2026 · @Kris · updated Oct 22, 2026
+Oct 8, 2026 · @Kris · updated Oct 24, 2026
 
 ## Overview
 
 Todav is a personal, local-first task list synced through Nextcloud CalDAV (VTODO) with near-instant push via WebDAV-Push (`dav_push`) and a self-hosted ntfy server. One Rust core drives the front-ends: a GTK4/libadwaita app on Linux, a GNOME Shell extension for quick preview, an Android app, a Pebble watchapp fed by the Android app, and a Windows app (planned, see [Roadmap](#roadmap)).
 
-Todav is meant to become a tasks + calendar app (VEVENT next to VTODO, same CalDAV calendars). Notes and journal go in a sibling app, [Notav](#notav-notes--journal-planned), in the same repository.
+Todav is meant to become a tasks + calendar app (VEVENT next to VTODO, same CalDAV calendars). Notes and journal go in a sibling app, [Notav](#notav-notes--journal-planned), in its own repository.
 
 **Goals**
 
@@ -79,7 +79,7 @@ Tasks whose category is not in config.json are grouped under "Other" at the end,
 
 ## Repository layout
 
-One monorepo, one Cargo workspace at the root. Each app has its own top-level directory with its core and front-ends; `notav/` (see [Notav](#notav-notes--journal-planned)) will sit next to `todav/`. Code both apps need moves into a shared crate at the root when Notav starts, not before.
+One Cargo workspace at the root, the app's core and front-ends under `todav/`. Notav has its own repository (see [Notav](#notav-notes--journal-planned)).
 
 ```text
 <repo>/
@@ -109,7 +109,6 @@ One monorepo, one Cargo workspace at the root. Each app has its own top-level di
     android/                 # planned: app (Compose), core (UniFFI module), pebble companion
     pebble/                  # planned: Pebble watchapp (C, Pebble SDK)
     windows/                 # planned: WinUI 3 app
-  notav/                     # Notav (planned, not started)
 ```
 
 **Tooling**
@@ -378,23 +377,22 @@ Dropped: existing tasks are rewritten by hand into categories.
 
 ## Notav (notes + journal, planned)
 
-Not started; nothing in the code yet. Notav (*notatka* + DAV) is a sibling app for notes and an Obsidian-style journal, with the same Nextcloud/GOA integration as Todav. It is a separate app, not a Todav view: different protocol, different UI (a Markdown editor), and each app stays small enough to finish.
+Notav (*notatka* + DAV) is a sibling app for notes and an Obsidian-style journal, kept as Markdown files in Nextcloud Files. It lives in its own repository, [SelfRef/notav](https://github.com/SelfRef/notav), whose `docs/ARCHITECTURE.md` holds its plan. Decided 2026-10-24: two repositories and no shared one for now.
 
-**Decisions so far**
+**Separate apps**: Notav has its own configuration and credentials: its own sign-in (its own app password, a GNOME Online Accounts account picked on its own), keyring entries under its own app ID, its own synced settings file (`.config/notav/settings.json`) and its own database. Neither app reads or writes the other's.
 
-- Name Notav, app ID `io.github.selfref.Notav`, code in `notav/` (same shape as `todav/`: core, cli, linux, …).
-- Storage: plain Markdown files in Nextcloud Files over WebDAV, so the Nextcloud Notes app and Obsidian (through the desktop sync client) can open the same folder. No proprietary format.
-- Journal: one daily note per day in a dated folder; `[[wiki links]]`, backlinks and tags are computed locally from the files.
-- Own synced settings file (`.config/notav/settings.json`), so the two apps never write the same file.
-- Shared code: when Notav starts, move what both apps need out of `todav/core` into a shared crate at the root: login (Login Flow v2, GOA), the HTTP/WebDAV client, synced settings, `json.rs`, push keys. Task and calendar logic stays in `todav/core`.
-- Cross-app: a note mentions a task with a `todav://task/<uid>` link; Todav opens it, and Notav shows its title and state through Todav's D-Bus API. No shared database.
+**Code in common is copied, not shared.** Notav starts from copies of the code here that is not about tasks or calendars:
 
-**Open questions**
+- core: `login.rs`, `json.rs`, the XML tree and multistatus parsing of `caldav.rs`, the push keys, Web Push decryption and ntfy stream of `push.rs`, the merge of `settings.rs`;
+- Linux: `goa.rs`, `i18n.rs`, the Secret Service helpers in `main.rs`, the welcome page and the login dialogs.
 
-- [ ] Change detection for files: Nextcloud Files has no `sync-collection`; compare folder ETags (they propagate upwards) and only descend into changed folders.
-- [ ] Push for files: `dav_push` covers CalDAV/CardDAV only; check whether Nextcloud's `notify_push` (or a small app posting to ntfy) can signal file changes. Polling as the fallback, as in Todav.
-- [ ] Folder layout and name of the notes root (reuse the Nextcloud Notes folder or a separate one), daily note format, attachments.
-- [ ] Editor: GtkSourceView with Markdown highlighting vs. a rendered/WYSIWYG view.
+A fix to one of these probably applies to the other app too: port it. They move into a shared crate in its own repository once copying costs more than sharing: when multiple accounts or other services (see [Roadmap](#roadmap)) rework the account layer, when a third app or a front-end of its own needs them, or when the same fix keeps being made twice.
+
+**Todav's side of the integration** (planned, not started; no shared database):
+
+- A note links a task as `todav://task/<uid>`. Todav handles the `todav` URI scheme (`x-scheme-handler/todav` in its desktop file) and opens the task as `ShowTask` does.
+- Notav shows a linked task's title and state through a new D-Bus method, `GetTask` (UID in; summary, done and list out).
+- Once Notav uses them, the scheme and these methods are a public interface: change them only in compatible ways.
 
 ## Calendar (in Todav)
 
