@@ -6,7 +6,7 @@ Oct 8, 2026 · @Kris · updated Oct 24, 2026
 
 Todav is a personal, local-first task list synced through Nextcloud CalDAV (VTODO) with near-instant push via WebDAV-Push (`dav_push`) and a self-hosted ntfy server. One Rust core drives the front-ends: a GTK4/libadwaita app on Linux, a GNOME Shell extension for quick preview, an Android app, a Pebble watchapp fed by the Android app, and a Windows app (planned, see [Roadmap](#roadmap)).
 
-Todav is meant to become a tasks + calendar app (VEVENT next to VTODO, same CalDAV calendars). Notes and journal go in a sibling app, [Notav](#notav-notes--journal-planned), in its own repository.
+Todav is meant to become a tasks + calendar app (VEVENT next to VTODO, same CalDAV calendars). Notes and journal go in a sibling app, Notav, with its own repository (see [Notav integration](#notav-integration-planned)).
 
 **Goals**
 
@@ -79,7 +79,7 @@ Tasks whose category is not in config.json are grouped under "Other" at the end,
 
 ## Repository layout
 
-One Cargo workspace at the root, the app's core and front-ends under `todav/`. Notav has its own repository (see [Notav](#notav-notes--journal-planned)).
+One Cargo workspace at the root, the app's core and front-ends under `todav/`. Notav has its own repository.
 
 ```text
 <repo>/
@@ -375,20 +375,11 @@ The watch is a remote control for the phone's local database: it never talks to 
 
 Dropped: existing tasks are rewritten by hand into categories.
 
-## Notav (notes + journal, planned)
+## Notav integration (planned)
 
-Notav (*notatka* + DAV) is a sibling app for notes and an Obsidian-style journal, kept as Markdown files in Nextcloud Files. It lives in its own repository, [SelfRef/notav](https://github.com/SelfRef/notav), whose `docs/ARCHITECTURE.md` holds its plan. Decided 2026-10-24: two repositories and no shared one for now.
+[Notav](https://github.com/SelfRef/notav) is a sibling app for notes and a journal, with its own repository and architecture (its `docs/ARCHITECTURE.md`). The two apps keep separate configuration and credentials, and neither reads or writes the other's. Some of Notav's code started as copies of Todav's, listed there under "Code from Todav".
 
-**Separate apps**: Notav has its own configuration and credentials: its own sign-in (its own app password, a GNOME Online Accounts account picked on its own), keyring entries under its own app ID, its own synced settings file (`.config/notav/settings.json`) and its own database. Neither app reads or writes the other's.
-
-**Code in common is copied, not shared.** Notav starts from copies of the code here that is not about tasks or calendars:
-
-- core: `login.rs`, `json.rs`, the XML tree and multistatus parsing of `caldav.rs`, the push keys, Web Push decryption and ntfy stream of `push.rs`, the merge of `settings.rs`;
-- Linux: `goa.rs`, `i18n.rs`, the Secret Service helpers in `main.rs`, the welcome page and the login dialogs.
-
-A fix to one of these probably applies to the other app too: port it. They move into a shared crate in its own repository once copying costs more than sharing: when multiple accounts or other services (see [Roadmap](#roadmap)) rework the account layer, when a third app or a front-end of its own needs them, or when the same fix keeps being made twice.
-
-**Todav's side of the integration** (planned, not started; no shared database):
+What Todav provides for it (not started):
 
 - A note links a task as `todav://task/<uid>`. Todav handles the `todav` URI scheme (`x-scheme-handler/todav` in its desktop file) and opens the task as `ShowTask` does.
 - Notav shows a linked task's title and state through a new D-Bus method, `GetTask` (UID in; summary, done and list out).

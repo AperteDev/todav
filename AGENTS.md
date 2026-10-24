@@ -6,9 +6,9 @@
   roadmap, open questions). Read it before working on a feature, and update it in the same
   change when the work changes what it says: a decision made, a step done, a plan dropped.
 - Notav (`SelfRef/notav`, cloned next to this repository) started from copies of some of this
-  code, listed in the Notav section of `docs/ARCHITECTURE.md`. A fix to one of those probably
-  applies there too: port it or say so. Notav keeps its own configuration and credentials;
-  never read or write its files, keyring entries or settings.
+  code, listed under "Code from Todav" in its `docs/ARCHITECTURE.md`. A fix to one of those
+  probably applies there too: port it or say so. Notav keeps its own configuration and
+  credentials; never read or write its files, keyring entries or settings.
 
 ## Releases
 
