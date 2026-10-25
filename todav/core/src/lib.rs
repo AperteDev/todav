@@ -427,6 +427,12 @@ impl Client {
         })
     }
 
+    /// Connected for this run: `set_account` gave the password. The account alone (`account`)
+    /// stays remembered without one, e.g. when the keyring no longer has it.
+    pub fn connected(&self) -> bool {
+        self.dav.lock().unwrap().is_some()
+    }
+
     /// Forget the account and its local copy (keeps device keys and the local lists).
     pub fn logout(&self) -> Result<()> {
         let _ = self.push_unregister();

@@ -48,20 +48,15 @@ pub fn sync_now() {
     }
 }
 
-/// True while an account is active and the background service runs.
-pub fn logged_in() -> bool {
-    SYNC.get().is_some() && core().account().is_some()
-}
-
 /// Lists and calendars kept on this device are shown and can be added (Preferences →
 /// Accounts); without an account, the app runs with those alone.
 pub fn local_mode() -> bool {
     core().setting("local_mode".into()).as_deref() == Some("true")
 }
 
-/// The main window has something to show: an account, or local mode.
+/// The main window has something to show: a connected account, or local mode.
 pub fn ready() -> bool {
-    SYNC.get().is_some() && (core().account().is_some() || local_mode())
+    SYNC.get().is_some() && (core().connected() || local_mode())
 }
 
 pub fn sync_state() -> String {
@@ -132,24 +127,44 @@ pub fn sandbox() -> bool {
     std::env::var_os("TODAV_SANDBOX").is_some()
 }
 
+/// The app ID before 1.2.1, which named the keyring schema: passwords saved under it are moved
+/// to the current one when first read.
+const OLD_APP_ID: &str = "io.github.selfref.Todav";
+
 fn schema() -> libsecret::Schema {
+    schema_for(APP_ID)
+}
+
+fn schema_for(app_id: &str) -> libsecret::Schema {
     let attrs = HashMap::from([
         ("url", libsecret::SchemaAttributeType::String),
         ("user", libsecret::SchemaAttributeType::String),
     ]);
     let name = if sandbox() {
-        format!("{APP_ID}.Sandbox")
+        format!("{app_id}.Sandbox")
     } else {
-        APP_ID.into()
+        app_id.into()
     };
     libsecret::Schema::new(&name, libsecret::SchemaFlags::NONE, attrs)
 }
 
 pub fn password_load(url: &str, user: &str) -> Option<String> {
     let attrs = HashMap::from([("url", url), ("user", user)]);
-    libsecret::password_lookup_sync(Some(&schema()), attrs, gio::Cancellable::NONE)
-        .ok()?
-        .map(|s| s.to_string())
+    let lookup = |schema: &libsecret::Schema| {
+        libsecret::password_lookup_sync(Some(schema), attrs.clone(), gio::Cancellable::NONE)
+            .ok()
+            .flatten()
+            .map(|s| s.to_string())
+    };
+    if let Some(pw) = lookup(&schema()) {
+        return Some(pw);
+    }
+    let old = schema_for(OLD_APP_ID);
+    let pw = lookup(&old)?;
+    if password_store(url, user, &pw).is_ok() {
+        let _ = libsecret::password_clear_sync(Some(&old), attrs, gio::Cancellable::NONE);
+    }
+    Some(pw)
 }
 
 pub fn password_store(url: &str, user: &str, password: &str) -> Result<(), glib::Error> {
@@ -237,7 +252,10 @@ fn pending_error(e: &todav_core::Error) -> String {
 
 pub async fn disconnect(force: bool) -> Result<(), String> {
     gio::spawn_blocking(move || -> Result<(), String> {
+        // Not connected (no password), there is nothing to upload with: only pending edits
+        // stop it, unless `force`.
         if core().account().is_some()
+            && (core().connected() || core().pending())
             && let Err(e) = core().sync()
             && !force
         {
@@ -273,7 +291,9 @@ pub async fn switch_account(target: Target) -> Result<(), String> {
             }
             Target::Manual(c) => (c.server, c.login_name, c.app_password, String::new()),
         };
-        if let Some(old) = core().account().filter(|_| logged_in())
+        // As in `disconnect`: without a connection, only pending edits make it try (and fail).
+        let upload = SYNC.get().is_some() && (core().connected() || core().pending());
+        if let Some(old) = core().account().filter(|_| upload)
             && (old.url.as_str(), old.user.as_str()) != (url.as_str(), user.as_str())
         {
             // A different account drops the local copy: pending edits must reach the old one.
@@ -317,7 +337,7 @@ pub fn restart_push() {
     let url = core().setting("ntfy_url".into()).unwrap_or_default();
     *PUSH_URL.lock().unwrap() = url.clone();
     *PUSH_ERROR.lock().unwrap() = None;
-    if let Some(ntfy) = Some(url).filter(|u| !u.is_empty() && core().account().is_some()) {
+    if let Some(ntfy) = Some(url).filter(|u| !u.is_empty() && core().connected()) {
         std::thread::spawn(move || {
             // Blocks until the next restart_push; reconnects internally.
             let _ = core().listen(ntfy, &|r| {
@@ -340,8 +360,8 @@ pub fn start_background() {
         while rx.recv().is_ok() {
             std::thread::sleep(Duration::from_millis(300)); // let a burst of edits settle
             while rx.try_recv().is_ok() {}
-            if core().account().is_none() {
-                continue; // disconnected: nothing to sync until the next account
+            if !core().connected() {
+                continue; // no account, or no password for it: nothing to sync until one connects
             }
             post(Event::SyncState("syncing".into()));
             set_state(&core().sync());

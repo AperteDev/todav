@@ -1142,7 +1142,7 @@ fn refresh_lists(ui: &Rc<Ui>) {
         .and_then(|a| a.lookup_action("sync"))
         .and_downcast::<gio::SimpleAction>()
     {
-        sync.set_enabled(core().account().is_some());
+        sync.set_enabled(core().connected());
     }
     let lists = crate::lists::by_place(core().lists());
     let pages = pages(&lists);

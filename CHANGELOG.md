@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- After updating to 1.2.1, Todav no longer asks to sign in again: the password saved by
+  earlier versions is found and kept.
+- An account whose password is missing no longer reports "Sync failed: no account
+  configured" in local mode; Preferences say it is not connected, and signing in again
+  reconnects it.
 - Extension: hovering over the menu no longer highlights all of it with themes that style
   hovered menu items, such as Blur my Shell's; only the row under the pointer is highlighted.
 

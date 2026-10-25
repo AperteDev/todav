@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Todav\n"
 "Report-Msgid-Bugs-To: https://github.com/AperteDev/todav/issues\n"
-"POT-Creation-Date: 2026-10-25 20:02+0100\n"
+"POT-Creation-Date: 2026-10-25 20:40+0100\n"
 "PO-Revision-Date: 2026-10-22 21:00+0200\n"
 "Last-Translator: \n"
 "Language-Team: Brazilian Portuguese\n"
@@ -101,7 +101,8 @@ msgstr "Opções no Todav"
 #: todav/gnome-extension/prefs.js:76
 msgid ""
 "This extension’s options are in Todav’s Preferences, on the Extension page."
-msgstr "As opções desta extensão estão nas Preferências do Todav, na página Extensão."
+msgstr ""
+"As opções desta extensão estão nas Preferências do Todav, na página Extensão."
 
 #: todav/linux/app/src/calendar.rs:210 todav/linux/app/src/lists.rs:311
 #: todav/linux/app/ui/calendar.blp:54 todav/linux/app/ui/calendar.blp:217
@@ -158,7 +159,7 @@ msgstr[1] "+{n} outros"
 msgid "Starts {date}"
 msgstr "Começa {date}"
 
-#: todav/linux/app/src/calendar.rs:1447 todav/linux/app/src/main.rs:387
+#: todav/linux/app/src/calendar.rs:1447 todav/linux/app/src/main.rs:407
 #, rust-format
 msgid "Due {date}"
 msgstr "Vence {date}"
@@ -302,7 +303,7 @@ msgid "The event repeats."
 msgstr "O evento se repete."
 
 #: todav/linux/app/src/calendar/dialog.rs:47 todav/linux/app/src/lists.rs:566
-#: todav/linux/app/src/settings.rs:756 todav/linux/app/ui/edit-dialog.blp:23
+#: todav/linux/app/src/settings.rs:777 todav/linux/app/ui/edit-dialog.blp:23
 #: todav/linux/app/ui/event-dialog.blp:25 todav/linux/app/ui/list-dialog.blp:18
 #: todav/linux/app/ui/new-category.blp:18
 #: todav/linux/app/ui/password-login.blp:19 todav/linux/app/ui/settings.blp:71
@@ -518,33 +519,33 @@ msgstr "Tudo fica somente neste dispositivo e não poderá ser restaurado."
 msgid "It can be restored from the trash bin in Nextcloud Calendar."
 msgstr "Pode ser restaurado da lixeira do Nextcloud Agenda."
 
-#: todav/linux/app/src/main.rs:235
+#: todav/linux/app/src/main.rs:250
 #, rust-format
 msgid "Cannot upload pending changes first: {error}"
 msgstr "Não foi possível enviar antes as alterações pendentes: {error}"
 
-#: todav/linux/app/src/main.rs:251
+#: todav/linux/app/src/main.rs:269
 msgid "Disconnecting failed"
 msgstr "Falha ao desconectar"
 
-#: todav/linux/app/src/main.rs:270
+#: todav/linux/app/src/main.rs:288
 msgid "Online Accounts has no password for this account"
 msgstr "Contas on-line não tem senha para esta conta"
 
-#: todav/linux/app/src/main.rs:289 todav/linux/app/src/settings.rs:835
+#: todav/linux/app/src/main.rs:309 todav/linux/app/src/settings.rs:856
 #, rust-format
 msgid "Cannot save password: {error}"
 msgstr "Não foi possível salvar a senha: {error}"
 
-#: todav/linux/app/src/main.rs:302
+#: todav/linux/app/src/main.rs:322
 msgid "Connecting failed"
 msgstr "Falha ao conectar"
 
-#: todav/linux/app/src/main.rs:393
+#: todav/linux/app/src/main.rs:413
 msgid "Mark as Done"
 msgstr "Marcar como concluída"
 
-#: todav/linux/app/src/main.rs:420
+#: todav/linux/app/src/main.rs:440
 msgid "Sync tasks and receive changes in the background"
 msgstr "Sincronizar tarefas e receber alterações em segundo plano"
 
@@ -652,76 +653,81 @@ msgstr "{server}, em modo de manutenção"
 msgid "Cannot reach the server: {error}"
 msgstr "Não foi possível alcançar o servidor: {error}"
 
-#: todav/linux/app/src/settings.rs:547 todav/linux/app/src/settings.rs:590
+#: todav/linux/app/src/settings.rs:551
+#, rust-format
+msgid "Account {name} is not connected"
+msgstr "A conta {name} não está conectada"
+
+#: todav/linux/app/src/settings.rs:556 todav/linux/app/src/settings.rs:611
 #, rust-format
 msgid "Connected as {name}"
 msgstr "Conectado como {name}"
 
-#: todav/linux/app/src/settings.rs:548 todav/linux/app/src/window.rs:916
+#: todav/linux/app/src/settings.rs:557 todav/linux/app/src/window.rs:916
 #: todav/linux/app/ui/window.blp:42
 msgid "GNOME Online Accounts"
 msgstr "Contas on-line do GNOME"
 
-#: todav/linux/app/src/settings.rs:551 todav/linux/app/src/settings.rs:597
-#: todav/linux/app/src/settings.rs:777
+#: todav/linux/app/src/settings.rs:560 todav/linux/app/src/settings.rs:618
+#: todav/linux/app/src/settings.rs:798
 #, rust-format
 msgid "Signed in as {name}"
 msgstr "Conectado como {name}"
 
-#: todav/linux/app/src/settings.rs:555
+#: todav/linux/app/src/settings.rs:564
 msgid "Not signed in"
 msgstr "Não conectado"
 
-#: todav/linux/app/src/settings.rs:601
+#: todav/linux/app/src/settings.rs:622
 msgid "Disconnected"
 msgstr "Desconectado"
 
-#: todav/linux/app/src/settings.rs:655 todav/linux/app/src/window.rs:975
+#: todav/linux/app/src/settings.rs:676 todav/linux/app/src/window.rs:975
 msgid "Waiting for Sign-In…"
 msgstr "Aguardando o login…"
 
-#: todav/linux/app/src/settings.rs:657 todav/linux/app/src/window.rs:977
+#: todav/linux/app/src/settings.rs:678 todav/linux/app/src/window.rs:977
 msgid "Waiting for Browser…"
 msgstr "Aguardando o navegador…"
 
-#: todav/linux/app/src/settings.rs:750
+#: todav/linux/app/src/settings.rs:771
 msgid "Turn Off Local Lists?"
 msgstr "Desativar as listas locais?"
 
-#: todav/linux/app/src/settings.rs:752
+#: todav/linux/app/src/settings.rs:773
 msgid "Local lists and calendars will be hidden until you turn them on again."
 msgstr ""
 "As listas e agendas locais ficarão ocultas até que você as ative de novo."
 
-#: todav/linux/app/src/settings.rs:757
+#: todav/linux/app/src/settings.rs:778
 msgid "Turn Off"
 msgstr "Desativar"
 
-#: todav/linux/app/src/settings.rs:811
+#: todav/linux/app/src/settings.rs:832
 msgid "Connection works"
 msgstr "A conexão funciona"
 
-#: todav/linux/app/src/settings.rs:812
+#: todav/linux/app/src/settings.rs:833
 #, rust-format
 msgid "Test failed: {error}"
 msgstr "O teste falhou: {error}"
 
-#: todav/linux/app/src/settings.rs:813
+#: todav/linux/app/src/settings.rs:834
 msgid "Test failed"
 msgstr "O teste falhou"
 
-#: todav/linux/app/src/settings.rs:827
+#: todav/linux/app/src/settings.rs:848
 #, rust-format
 msgid "Server not changed, cannot upload pending changes: {error}"
 msgstr ""
 "Servidor não alterado, não foi possível enviar as alterações pendentes: "
 "{error}"
 
-#: todav/linux/app/src/settings.rs:843
+#: todav/linux/app/src/settings.rs:864
 msgid "Nextcloud server changed"
 msgstr "Servidor Nextcloud alterado"
 
-#: todav/linux/app/src/settings.rs:848
+#: todav/linux/app/src/settings.rs:869
 msgid "Changing the server failed"
 msgstr "Não foi possível trocar o servidor"
 

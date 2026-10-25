@@ -542,7 +542,16 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
                     .split_once("://")
                     .map_or(a.url.clone(), |(_, h)| h.to_string())
             });
+            // Remembered but without a password (keyring cleared, GOA account gone): only in
+            // local mode, the app otherwise shows the welcome page. Sign In Again fixes it.
+            let connected = core().connected();
             match &acc {
+                Some(a) if !connected => {
+                    status.set_title(
+                        &gettext("Account {name} is not connected").replace("{name}", &a.user),
+                    );
+                    status.set_subtitle(&host);
+                }
                 Some(a) if goa => {
                     status.set_title(&gettext("Connected as {name}").replace("{name}", &a.user));
                     status.set_subtitle(&format!("{host} · {}", gettext("GNOME Online Accounts")));
@@ -557,11 +566,23 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
                 }
             }
             icon.set_visible(acc.is_some());
-            for g in &server_groups {
-                g.set_sensitive(acc.is_some());
+            icon.set_icon_name(Some(if connected {
+                "object-select-symbolic"
+            } else {
+                "dialog-warning-symbolic"
+            }));
+            for (class, on) in [("success", connected), ("warning", !connected)] {
+                if on {
+                    icon.add_css_class(class);
+                } else {
+                    icon.remove_css_class(class);
+                }
             }
-            server_status.set_visible(acc.is_some());
-            if acc.is_some() {
+            for g in &server_groups {
+                g.set_sensitive(connected);
+            }
+            server_status.set_visible(connected);
+            if connected {
                 check_server();
             }
             sign_out.set_visible(acc.is_some() && !goa);
@@ -727,7 +748,7 @@ fn connect_local(b: &gtk::Builder, dialog: &adw::PreferencesDialog) {
         if on == crate::local_mode() {
             return; // put back after Cancel
         }
-        let account = core().account().is_some();
+        let account = core().connected();
         let mut all = core().lists();
         all.extend(core().calendars());
         let dialog = d.clone();
