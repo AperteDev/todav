@@ -61,6 +61,14 @@ function holder(child, style_class = null) {
     return item;
 }
 
+/// Put `entry` at the bottom of `col`: side by side, both columns get the taller one's height, and
+/// the extra goes to a list (`y_expand`) or, without one, to a gap above, so the fields line up.
+function addAtBottom(col, entry) {
+    if (!col.get_children().some(c => c.y_expand))
+        col.add_child(new St.Widget({y_expand: true}));
+    col.add_child(entry);
+}
+
 function entry(hint, done) {
     const e = new St.Entry({hint_text: hint, can_focus: true, x_expand: true, style_class: 'todav-entry'});
     e.clutter_text.connect('activate', () => {
@@ -237,6 +245,7 @@ class TodavIndicator extends PanelMenu.Button {
             vscrollbar_policy: St.PolicyType.AUTOMATIC,
             overlay_scrollbars: true,
             x_expand: true,
+            y_expand: true,
         });
         const fill = async () => {
             const content = new St.BoxLayout({orientation: VERTICAL, x_expand: true});
@@ -260,7 +269,7 @@ class TodavIndicator extends PanelMenu.Button {
             await fill();
         }
         if (on('add_task')) {
-            col.add_child(entry(_('Add a task…'), text => {
+            addAtBottom(col, entry(_('Add a task…'), text => {
                 this._proxy.AddTaskAsync(href, text)
                     .then(() => on('tasks') && !this._choosing && fill())
                     .catch(e => logError(e, 'Todav: AddTask failed'));
@@ -324,7 +333,7 @@ class TodavIndicator extends PanelMenu.Button {
         if (on('agenda'))
             col.add_child(await this._agenda());
         if (on('add_event'))
-            col.add_child(entry(_('Add an event…'), text => this._open(p => p.NewEventAsync(text))));
+            addAtBottom(col, entry(_('Add an event…'), text => this._open(p => p.NewEventAsync(text))));
         return col;
     }
 
@@ -355,6 +364,7 @@ class TodavIndicator extends PanelMenu.Button {
             vscrollbar_policy: St.PolicyType.AUTOMATIC,
             overlay_scrollbars: true,
             x_expand: true,
+            y_expand: true,
         });
         scroll.child = content;
         return scroll;

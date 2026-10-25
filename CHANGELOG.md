@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A task's subtask count ("1/4") counts only its own subtasks; deeper ones count on their
   subtask's row.
+- Extension: with tasks and calendar side by side, the task list and the agenda take the
+  height their column has to spare, so the fields for adding a task and an event line up.
 
 ### Fixed
 
