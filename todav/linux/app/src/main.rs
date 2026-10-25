@@ -127,44 +127,24 @@ pub fn sandbox() -> bool {
     std::env::var_os("TODAV_SANDBOX").is_some()
 }
 
-/// The app ID before 1.2.1, which named the keyring schema: passwords saved under it are moved
-/// to the current one when first read.
-const OLD_APP_ID: &str = "io.github.selfref.Todav";
-
 fn schema() -> libsecret::Schema {
-    schema_for(APP_ID)
-}
-
-fn schema_for(app_id: &str) -> libsecret::Schema {
     let attrs = HashMap::from([
         ("url", libsecret::SchemaAttributeType::String),
         ("user", libsecret::SchemaAttributeType::String),
     ]);
     let name = if sandbox() {
-        format!("{app_id}.Sandbox")
+        format!("{APP_ID}.Sandbox")
     } else {
-        app_id.into()
+        APP_ID.into()
     };
     libsecret::Schema::new(&name, libsecret::SchemaFlags::NONE, attrs)
 }
 
 pub fn password_load(url: &str, user: &str) -> Option<String> {
     let attrs = HashMap::from([("url", url), ("user", user)]);
-    let lookup = |schema: &libsecret::Schema| {
-        libsecret::password_lookup_sync(Some(schema), attrs.clone(), gio::Cancellable::NONE)
-            .ok()
-            .flatten()
-            .map(|s| s.to_string())
-    };
-    if let Some(pw) = lookup(&schema()) {
-        return Some(pw);
-    }
-    let old = schema_for(OLD_APP_ID);
-    let pw = lookup(&old)?;
-    if password_store(url, user, &pw).is_ok() {
-        let _ = libsecret::password_clear_sync(Some(&old), attrs, gio::Cancellable::NONE);
-    }
-    Some(pw)
+    libsecret::password_lookup_sync(Some(&schema()), attrs, gio::Cancellable::NONE)
+        .ok()?
+        .map(|s| s.to_string())
 }
 
 pub fn password_store(url: &str, user: &str, password: &str) -> Result<(), glib::Error> {

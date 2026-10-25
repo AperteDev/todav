@@ -228,7 +228,7 @@ impl Client {
 
 A single Rust binary (`todav-linux`) that is both the GUI and a background service: it keeps the ntfy connection open, runs sync, and exposes a small D-Bus interface the GNOME extension uses. There is no separate daemon.
 
-**Stack**: `gtk4-rs`, `libadwaita-rs`, `libsecret`; D-Bus, GNOME Online Accounts and notifications through `gio`. Static views are Blueprint files in `ui/`. No GSettings: settings live in the core (`Client::setting`, synced). The app password in the Secret Service, under a schema named after the app ID (`dev.aperte.Todav`; one saved under the ID before 1.2.1, `io.github.selfref.Todav`, moves over when first read); a GOA account's password stays in GOA. An account remembered without its password (`Client::account` without `Client::connected`) does not sync or listen for pushes: the welcome page shows, and in local mode Preferences say it is not connected. State in `$XDG_DATA_HOME/todav/core.sqlite` via the core.
+**Stack**: `gtk4-rs`, `libadwaita-rs`, `libsecret`; D-Bus, GNOME Online Accounts and notifications through `gio`. Static views are Blueprint files in `ui/`. No GSettings: settings live in the core (`Client::setting`, synced). The app password in the Secret Service, under a schema named after the app ID; a GOA account's password stays in GOA. An account remembered without its password (`Client::account` without `Client::connected`) does not sync or listen for pushes: the welcome page shows, and in local mode Preferences say it is not connected. State in `$XDG_DATA_HOME/todav/core.sqlite` via the core.
 
 **UI**
 
@@ -286,7 +286,7 @@ The interface returns small tuples, not JSON, so the extension needs no parsing 
 
 **Packaging**: Flatpak on `org.gnome.Platform` 51 (`todav/linux/flatpak/`). Permissions: `--share=network`, `--talk-name=org.freedesktop.secrets`, `--talk-name=org.gnome.OnlineAccounts`; autostart through the Background portal. Not on Flathub yet.
 
-**App ID** `dev.aperte.Todav`, extension UUID `todav@aperte.dev`, on the domain of Aperte, the developer (decided 2026-10-25; a domain ID does not depend on where the code is hosted). Todav 1.2 and older were `io.github.selfref.Todav` and `todav@selfref.dev`, with no migration (no other users yet).
+**App ID** `dev.aperte.Todav`, extension UUID `todav@aperte.dev`, on the domain of Aperte, the developer (decided 2026-10-25; a domain ID does not depend on where the code is hosted). Todav 1.2 and older were `io.github.selfref.Todav` and `todav@selfref.dev`, with no migration (no other users yet): the data directory did not depend on it, a password saved in the keyring under the old schema is not found.
 
 ## GNOME Shell extension
 
