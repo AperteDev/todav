@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A task's subtask count ("1/4") counts only its own subtasks; deeper ones count on their
   subtask's row.
 
+### Fixed
+
+- Extension: hovering over the menu no longer highlights all of it with themes that style
+  hovered menu items, such as Blur my Shell's; only the row under the pointer is highlighted.
+
 ## [1.2.1] - 2026-10-25
 
 ### Changed

@@ -51,6 +51,16 @@ function dayKey(date) {
     return GLib.DateTime.new_utc(date.get_year(), date.get_month(), date.get_day_of_month(), 0, 0, 0).to_unix();
 }
 
+/// A menu item that only holds other widgets: reactive, or the shell dims it as insensitive, but
+/// never highlighted itself (`hover: false` alone still tracks hover, and themes such as Blur
+/// my Shell's style any hovered menu item with !important); its own rows take the clicks.
+function holder(child, style_class = null) {
+    const item = new PopupMenu.PopupBaseMenuItem({activate: false, hover: false, can_focus: false, style_class});
+    item.track_hover = false;
+    item.add_child(child);
+    return item;
+}
+
 function entry(hint, done) {
     const e = new St.Entry({hint_text: hint, can_focus: true, x_expand: true, style_class: 'todav-entry'});
     e.clutter_text.connect('activate', () => {
@@ -150,10 +160,7 @@ class TodavIndicator extends PanelMenu.Button {
         });
         text.clutter_text.line_wrap = true;
         box.add_child(text);
-        // Reactive, or the shell dims it as insensitive.
-        const item = new PopupMenu.PopupBaseMenuItem({activate: false, hover: false, can_focus: false});
-        item.add_child(box);
-        this.menu.addMenuItem(item);
+        this.menu.addMenuItem(holder(box));
         const get = new PopupMenu.PopupMenuItem(_('Get Todav'));
         get.connect('activate', () => Gio.AppInfo.launch_default_for_uri(RELEASES, global.create_app_launch_context(0, -1)));
         this.menu.addMenuItem(get);
@@ -203,12 +210,8 @@ class TodavIndicator extends PanelMenu.Button {
             columns.add_child(new St.Widget({style_class: double ? 'todav-vsep' : 'todav-hsep'}));
         if (calendar)
             columns.add_child(calendar);
-        if (tasks || calendar) {
-            // Reactive, or the shell dims it as insensitive; its own rows take the clicks.
-            const item = new PopupMenu.PopupBaseMenuItem({activate: false, hover: false, can_focus: false, style_class: 'todav-item'});
-            item.add_child(columns);
-            this.menu.addMenuItem(item);
-        }
+        if (tasks || calendar)
+            this.menu.addMenuItem(holder(columns, 'todav-item'));
         if (on('open')) {
             if (tasks || calendar)
                 this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
