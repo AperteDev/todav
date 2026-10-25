@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   be reached, or that it is in maintenance mode), when Todav last synced, and whether DAV
   Push works. Without DAV Push on the server, it says what that means and links to the app
   in the Nextcloud App Store; with it but no ntfy server, it asks for one.
+- Extension: a settings button in the Extensions app, opening Todav's Preferences on the
+  Extension page.
 
 ### Changed
 

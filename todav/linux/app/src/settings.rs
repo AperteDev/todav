@@ -234,9 +234,23 @@ fn connect_reminders(b: &gtk::Builder) {
     }
 }
 
-pub fn present(parent: &impl IsA<gtk::Widget>) {
+/// Open Preferences on `page` (a page's `name` in ui/settings.blp: "general", "accounts",
+/// "tasks", "calendar", "extension"; `None` for the first), or turn the open ones to it.
+pub fn present(parent: &adw::ApplicationWindow, page: Option<&str>) {
+    if let Some(open) = parent
+        .visible_dialog()
+        .and_downcast::<adw::PreferencesDialog>()
+    {
+        if let Some(page) = page {
+            open.set_visible_page_name(page);
+        }
+        return;
+    }
     let b = view!("settings");
     let dialog: adw::PreferencesDialog = get(&b, "dialog");
+    if let Some(page) = page {
+        dialog.set_visible_page_name(page);
+    }
     let ntfy: UrlRow = (get(&b, "ntfy_scheme"), get(&b, "ntfy"));
     let conn = connect_account(&b, &dialog);
     let server = conn.server.clone();

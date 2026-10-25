@@ -2,6 +2,8 @@ import Gio from 'gi://Gio';
 
 export const BUS_NAME = 'dev.aperte.Todav';
 export const OBJECT_PATH = '/dev/aperte/Todav';
+/// Where to get the app when it is missing.
+export const RELEASES = 'https://github.com/AperteDev/todav/releases/latest';
 
 // Keep in sync with linux/app/src/dbus.rs.
 const XML = `<node>

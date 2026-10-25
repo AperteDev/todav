@@ -184,6 +184,17 @@ pub fn setup_actions(app: &adw::Application) {
         }
     });
     app.add_action(&day);
+    // From the extension's settings button (Extensions app): Preferences on that page.
+    let prefs = gio::SimpleAction::new("show-preferences", Some(glib::VariantTy::STRING));
+    prefs.connect_activate(|_, page| {
+        if let Some(app) = gio::Application::default().and_downcast::<adw::Application>() {
+            present(&app);
+        }
+        if let Some(ui) = ui().filter(|_| crate::ready()) {
+            crate::settings::present(&ui.window, page.and_then(|p| p.str()));
+        }
+    });
+    app.add_action(&prefs);
     let complete = gio::SimpleAction::new("complete", Some(glib::VariantTy::STRING));
     complete.connect_activate(|_, uid| {
         if let Some(uid) = uid.and_then(|u| u.str())
@@ -824,7 +835,7 @@ fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
     let prefs = gio::SimpleAction::new("preferences", None);
     prefs.connect_activate(move |_, _| {
         if let Some(ui) = weak.upgrade().filter(|_| crate::ready()) {
-            crate::settings::present(&ui.window);
+            crate::settings::present(&ui.window, None);
         }
     });
     ui.window.add_action(&prefs);

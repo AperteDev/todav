@@ -5,6 +5,7 @@ Adw.PreferencesDialog dialog {
   search-enabled: false;
 
   Adw.PreferencesPage {
+    name: "general";
     title: _("General");
     icon-name: "preferences-system-symbolic";
 
@@ -48,6 +49,7 @@ Adw.PreferencesDialog dialog {
   }
 
   Adw.PreferencesPage {
+    name: "accounts";
     title: _("Accounts");
     icon-name: "system-users-symbolic";
 
@@ -178,6 +180,7 @@ Adw.PreferencesDialog dialog {
   }
 
   Adw.PreferencesPage {
+    name: "tasks";
     title: _("Tasks");
     icon-name: "checkbox-checked-symbolic";
 
@@ -304,6 +307,7 @@ Adw.PreferencesDialog dialog {
   }
 
   Adw.PreferencesPage {
+    name: "calendar";
     title: _("Calendar");
     icon-name: "x-office-calendar-symbolic";
 
@@ -341,6 +345,7 @@ Adw.PreferencesDialog dialog {
   // The GNOME Shell extension's panel menu (ids are the settings' names, see settings.rs
   // EXTENSION).
   Adw.PreferencesPage {
+    name: "extension";
     title: _("Extension");
     icon-name: "application-x-addon-symbolic";
 

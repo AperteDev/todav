@@ -15,14 +15,12 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import {Extension, gettext as _, ngettext, pgettext} from 'resource:///org/gnome/shell/extensions/extension.js';
 
-import {BUS_NAME, OBJECT_PATH, TodavProxy} from './dbus.js';
+import {BUS_NAME, OBJECT_PATH, RELEASES, TodavProxy} from './dbus.js';
 
 const MAX_TASKS = 100;
 /// Days the agenda covers, from today.
 const AGENDA_DAYS = 7;
 const DAY = 86400;
-/// Where to get the app when it is missing.
-const RELEASES = 'https://github.com/AperteDev/todav/releases/latest';
 const {HORIZONTAL, VERTICAL} = Clutter.Orientation;
 const CENTER = Clutter.ActorAlign.CENTER;
 /// What St draws dimmed (it has no CSS opacity): done tasks, other months' days, weekdays.

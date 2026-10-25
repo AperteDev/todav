@@ -1,6 +1,6 @@
 UUID = todav@aperte.dev
 DEST = $(HOME)/.local/share/gnome-shell/extensions/$(UUID)
-FILES = metadata.json extension.js dbus.js stylesheet.css icons
+FILES = metadata.json extension.js prefs.js dbus.js stylesheet.css icons
 PO = ../../po
 # The extension as installed: its files and the translations compiled into locale/ (the shell
 # binds the gettext domain there).
