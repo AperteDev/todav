@@ -10,7 +10,7 @@ export GETTEXTDATADIRS="$PWD/po" # po/its: what of the metainfo is translated
 pot=po/todav.pot
 x() {
   xgettext --from-code=UTF-8 --add-comments=Translators: --sort-by-file --package-name=Todav \
-    --msgid-bugs-address=https://github.com/SelfRef/todav/issues --output="$pot" "$@"
+    --msgid-bugs-address=https://github.com/AperteDev/todav/issues --output="$pot" "$@"
 }
 
 x -L Rust -k -kgettext -kngettext:1,2 -kpgettext:1c,2 -kgettext_noop \
@@ -18,8 +18,8 @@ x -L Rust -k -kgettext -kngettext:1,2 -kpgettext:1c,2 -kgettext_noop \
 # Blueprint's _("…") and C_("context", "…") read like C.
 x --join-existing -L C -k -k_ -kC_:1c,2 todav/linux/app/ui/*.blp
 x --join-existing -L JavaScript -k -k_ -kngettext:1,2 -kpgettext:1c,2 todav/gnome-extension/*.js
-x --join-existing todav/linux/data/io.github.selfref.Todav.desktop \
-  todav/linux/data/io.github.selfref.Todav.metainfo.xml
+x --join-existing todav/linux/data/dev.aperte.Todav.desktop \
+  todav/linux/data/dev.aperte.Todav.metainfo.xml
 
 for lang in $(grep -v '^#' po/LINGUAS); do
   if [ -f "po/$lang.po" ]; then

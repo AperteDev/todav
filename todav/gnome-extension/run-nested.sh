@@ -4,7 +4,7 @@
 # `cargo build -p todav-linux` to have been run.
 set -eu
 
-uuid=todav@selfref.dev
+uuid=todav@aperte.dev
 app=$(dirname "$0")/../../target/debug/todav-linux
 display=todav-nested
 
@@ -55,9 +55,9 @@ app_pid=$!
 
 # The extension asks the app for lists right away: enable it once the app's interface is up.
 # Waiting for the name first: introspecting a free name would D-Bus-activate an installed copy.
-gdbus wait --session --timeout 10 io.github.selfref.Todav || true
-until gdbus introspect --session --dest io.github.selfref.Todav \
-  --object-path /io/github/selfref/Todav 2>/dev/null | grep -q Todav1; do
+gdbus wait --session --timeout 10 dev.aperte.Todav || true
+until gdbus introspect --session --dest dev.aperte.Todav \
+  --object-path /dev/aperte/Todav 2>/dev/null | grep -q Todav1; do
   kill -0 $app_pid 2>/dev/null || break
   sleep 0.1
 done
@@ -67,7 +67,7 @@ gnome-extensions enable $uuid || true
 # --unsafe-mode above; only this nested session's own bus can reach it).
 if [ -n "${TODAV_WINDOW:-}" ]; then
   show='const w = global.get_window_actors().map(a => a.meta_window)
-    .find(w => w.get_wm_class()?.startsWith("io.github.selfref.Todav"));
+    .find(w => w.get_wm_class()?.startsWith("dev.aperte.Todav"));
   if (w) {
     Main.overview.hide();
     try { w.maximize(); } catch { w.maximize(imports.gi.Meta.MaximizeFlags.BOTH); }

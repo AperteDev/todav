@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="todav/linux/data/io.github.selfref.Todav.svg" width="128" alt="Todav icon">
+  <img src="todav/linux/data/dev.aperte.Todav.svg" width="128" alt="Todav icon">
 </p>
 
 <h1 align="center">Todav</h1>
@@ -7,7 +7,7 @@
 <p align="center">Tasks and calendar for GNOME, kept in your Nextcloud.</p>
 
 <p align="center">
-  <a href="https://github.com/SelfRef/todav/actions/workflows/ci.yml"><img src="https://github.com/SelfRef/todav/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/AperteDev/todav/actions/workflows/ci.yml"><img src="https://github.com/AperteDev/todav/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 </p>
 
 Todav is a task list and calendar app for the GNOME desktop. Your tasks and events stay in your
@@ -118,12 +118,12 @@ install the prebuilt release instead, and `todav-git` and `gnome-shell-extension
 the latest commit.
 
 **Other distributions:** download a package from the
-[latest release](https://github.com/SelfRef/todav/releases/latest):
+[latest release](https://github.com/AperteDev/todav/releases/latest):
 
 ```sh
 # Flatpak, on any distribution (the GNOME runtime comes from Flathub), plus the extension
-flatpak install --user io.github.selfref.Todav.flatpak
-gnome-extensions install todav@selfref.dev.shell-extension.zip
+flatpak install --user dev.aperte.Todav.flatpak
+gnome-extensions install todav@aperte.dev.shell-extension.zip
 
 # Ubuntu 26.04 and newer: the app with the extension
 sudo apt install ./todav_<version>_amd64.deb
@@ -133,7 +133,7 @@ sudo tar -xzf todav-<version>-x86_64.tar.gz -C /
 ```
 
 Log out and back in, then turn the extension on in Extensions (or
-`gnome-extensions enable todav@selfref.dev`). Or [build and install](#building-and-installing)
+`gnome-extensions enable todav@aperte.dev`). Or [build and install](#building-and-installing)
 Todav from source. Then:
 
 1. Open Todav and sign in to your Nextcloud: pick a GNOME Online Accounts account, sign in in the
@@ -156,7 +156,7 @@ Todav is under active development. Planned:
 - **Windows app**
 
 Ideas, questions and bug reports are welcome: open an
-[issue](https://github.com/SelfRef/todav/issues). See [CONTRIBUTING.md](CONTRIBUTING.md) before
+[issue](https://github.com/AperteDev/todav/issues). See [CONTRIBUTING.md](CONTRIBUTING.md) before
 working on a pull request.
 
 ## Translations
@@ -164,7 +164,7 @@ working on a pull request.
 Todav speaks English, Polish, German, French, Spanish, Italian and Brazilian Portuguese, and
 follows your GNOME language. English and Polish are reviewed; the others are first drafts, so
 corrections from native speakers are very welcome. Missing your language? Ask for it in an
-[issue](https://github.com/SelfRef/todav/issues/new?template=translation.yml), or translate it
+[issue](https://github.com/AperteDev/todav/issues/new?template=translation.yml), or translate it
 yourself (see [CONTRIBUTING.md](CONTRIBUTING.md#translations)).
 
 ## Development

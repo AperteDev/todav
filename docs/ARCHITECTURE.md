@@ -1,6 +1,6 @@
 # Todav — Architecture and Plan
 
-Oct 8, 2026 · @Kris · updated Oct 24, 2026
+Oct 8, 2026 · @Kris · updated Oct 25, 2026
 
 ## Overview
 
@@ -104,7 +104,7 @@ One Cargo workspace at the root, the app's core and front-ends under `todav/`. N
     linux/
       app/                   # GTK4 + libadwaita app (Rust, gtk4-rs); Blueprint views in ui/
       data/                  # .desktop, metainfo, icons, D-Bus service
-      flatpak/               # io.github.selfref.Todav.json
+      flatpak/               # dev.aperte.Todav.json
     gnome-extension/         # GNOME Shell extension (GJS), talks D-Bus to the Linux app
     android/                 # planned: app (Compose), core (UniFFI module), pebble companion
     pebble/                  # planned: Pebble watchapp (C, Pebble SDK)
@@ -254,10 +254,10 @@ A single Rust binary (`todav-linux`) that is both the GUI and a background servi
 - Background thread: `push::listen` loop → on message `sync_topic` → emit `Changed` → UI refreshes on the main thread.
 - Fallback timer: every 60 s while the window is focused, every 30 min otherwise → `sync()`. Reminders are checked every 30 s and shown as notifications.
 
-**D-Bus interface** (session bus, name `io.github.selfref.Todav`, path `/io/github/selfref/Todav`)
+**D-Bus interface** (session bus, name `dev.aperte.Todav`, path `/dev/aperte/Todav`)
 
 ```xml
-<interface name="io.github.selfref.Todav1">
+<interface name="dev.aperte.Todav1">
   <method name="GetLists">   <arg direction="out" type="a(ssus)"/> </method>           <!-- href, name, open_count, colour -->
   <method name="GetTasks">   <arg direction="in" name="list" type="s"/>
                              <arg direction="out" type="a(sssbu)"/> </method>          <!-- uid, summary, category, done, depth -->
@@ -282,6 +282,8 @@ The interface returns small tuples, not JSON, so the extension needs no parsing 
 
 **Packaging**: Flatpak on `org.gnome.Platform` 51 (`todav/linux/flatpak/`). Permissions: `--share=network`, `--talk-name=org.freedesktop.secrets`, `--talk-name=org.gnome.OnlineAccounts`; autostart through the Background portal. Not on Flathub yet.
 
+**App ID** `dev.aperte.Todav`, extension UUID `todav@aperte.dev`, on the domain of Aperte, the developer (decided 2026-10-25; a domain ID does not depend on where the code is hosted). Todav 1.2 and older were `io.github.selfref.Todav` and `todav@selfref.dev`, with no migration (no other users yet).
+
 ## GNOME Shell extension
 
 A panel indicator with a read-only view of a list and a month calendar; clicking anything opens the app there. It holds no state and does no networking: everything goes over D-Bus to the Linux app, which means the extension is a few hundred lines of GJS with zero dependencies.
@@ -303,7 +305,7 @@ A panel indicator with a read-only view of a list and a month calendar; clicking
 - `metadata.json`: `shell-version` 48–51; no GSettings schema.
 - `Gio.DBusProxy.makeProxyWrapper(interfaceXml)` from the XML in the Linux section; copy the XML verbatim into `dbus.js`.
 - The task list scrolls; at most 100 tasks, then "+ n more".
-- Install: `make install` copies to `~/.local/share/gnome-shell/extensions/todav@selfref.dev` (`make link` for development); no extensions.gnome.org submission in v1.
+- Install: `make install` copies to `~/.local/share/gnome-shell/extensions/todav@aperte.dev` (`make link` for development); no extensions.gnome.org submission in v1.
 
 **Non-goals**: ticking or editing tasks (read-only for now), reordering, categories.
 
@@ -377,7 +379,7 @@ Dropped: existing tasks are rewritten by hand into categories.
 
 ## Notav integration (planned)
 
-[Notav](https://github.com/SelfRef/notav) is a sibling app for notes and a journal, with its own repository and architecture (its `docs/ARCHITECTURE.md`). The two apps keep separate configuration and credentials, and neither reads or writes the other's. Some of Notav's code started as copies of Todav's, listed there under "Code from Todav".
+[Notav](https://github.com/AperteDev/notav) is a sibling app for notes and a journal, with its own repository and architecture (its `docs/ARCHITECTURE.md`). The two apps keep separate configuration and credentials, and neither reads or writes the other's. Some of Notav's code started as copies of Todav's, listed there under "Code from Todav".
 
 What Todav provides for it (not started):
 

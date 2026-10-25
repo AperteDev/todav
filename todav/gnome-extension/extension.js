@@ -22,7 +22,7 @@ const MAX_TASKS = 100;
 const AGENDA_DAYS = 7;
 const DAY = 86400;
 /// Where to get the app when it is missing.
-const RELEASES = 'https://github.com/SelfRef/todav/releases/latest';
+const RELEASES = 'https://github.com/AperteDev/todav/releases/latest';
 const {HORIZONTAL, VERTICAL} = Clutter.Orientation;
 const CENTER = Clutter.ActorAlign.CENTER;
 /// What St draws dimmed (it has no CSS opacity): done tasks, other months' days, weekdays.
@@ -72,7 +72,7 @@ class TodavIndicator extends PanelMenu.Button {
 
         const box = new St.BoxLayout({style_class: 'todav-panel'});
         // Its own copy of the app's symbolic icon (linux/data), found whether or not the app is installed.
-        const icon = Gio.icon_new_for_string(`${path}/icons/io.github.selfref.Todav-symbolic.svg`);
+        const icon = Gio.icon_new_for_string(`${path}/icons/dev.aperte.Todav-symbolic.svg`);
         box.add_child(new St.Icon({gicon: icon, style_class: 'system-status-icon'}));
         this._count = new St.Label({text: '', y_align: CENTER, style_class: 'todav-count'});
         box.add_child(this._count);

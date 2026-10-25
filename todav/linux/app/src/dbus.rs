@@ -6,10 +6,10 @@ use gtk::{gio, glib};
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-pub const IFACE: &str = "io.github.selfref.Todav1";
+pub const IFACE: &str = "dev.aperte.Todav1";
 
 const XML: &str = r#"<node>
-<interface name="io.github.selfref.Todav1">
+<interface name="dev.aperte.Todav1">
   <method name="GetLists"><arg direction="out" type="a(ssus)"/></method>
   <method name="GetTasks"><arg direction="in" name="list" type="s"/><arg direction="out" type="a(sssbu)"/></method>
   <method name="AddTask"><arg direction="in" name="list" type="s"/><arg direction="in" name="summary" type="s"/><arg direction="out" type="s"/></method>

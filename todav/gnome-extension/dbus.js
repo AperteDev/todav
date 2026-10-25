@@ -1,11 +1,11 @@
 import Gio from 'gi://Gio';
 
-export const BUS_NAME = 'io.github.selfref.Todav';
-export const OBJECT_PATH = '/io/github/selfref/Todav';
+export const BUS_NAME = 'dev.aperte.Todav';
+export const OBJECT_PATH = '/dev/aperte/Todav';
 
 // Keep in sync with linux/app/src/dbus.rs.
 const XML = `<node>
-<interface name="io.github.selfref.Todav1">
+<interface name="dev.aperte.Todav1">
   <method name="GetLists"><arg direction="out" type="a(ssus)"/></method>
   <method name="GetTasks"><arg direction="in" name="list" type="s"/><arg direction="out" type="a(sssbu)"/></method>
   <method name="AddTask"><arg direction="in" name="list" type="s"/><arg direction="in" name="summary" type="s"/><arg direction="out" type="s"/></method>

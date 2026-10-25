@@ -32,7 +32,7 @@ Recommends: gnome-keyring
 Suggests: gnome-shell
 Section: gnome
 Priority: optional
-Homepage: https://github.com/SelfRef/todav
+Homepage: https://github.com/AperteDev/todav
 Description: Tasks and calendar for GNOME, kept in your Nextcloud
  Todav is a task list and calendar for the GNOME desktop. Tasks and events
  stay in your Nextcloud as plain CalDAV; Todav works from a local copy, syncs

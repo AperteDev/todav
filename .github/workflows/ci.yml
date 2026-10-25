@@ -52,8 +52,8 @@ jobs:
         run: python3 scripts/release.py "$VERSION" > /dev/null
       - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
-          manifest-path: todav/linux/flatpak/io.github.selfref.Todav.json
-          bundle: io.github.selfref.Todav.flatpak
+          manifest-path: todav/linux/flatpak/dev.aperte.Todav.json
+          bundle: dev.aperte.Todav.flatpak
           artifact-name: todav-flatpak
 
   tarball:
@@ -133,5 +133,5 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: todav-extension
-          path: target/todav@selfref.dev.shell-extension.zip
+          path: target/todav@aperte.dev.shell-extension.zip
           if-no-files-found: error

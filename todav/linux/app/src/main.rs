@@ -19,7 +19,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 use todav_core::{ChangeListener, Client};
 
-pub const APP_ID: &str = "io.github.selfref.Todav";
+pub const APP_ID: &str = "dev.aperte.Todav";
 
 static CORE: OnceLock<Arc<Client>> = OnceLock::new();
 static SYNC: OnceLock<Sender<()>> = OnceLock::new();

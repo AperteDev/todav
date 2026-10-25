@@ -5,7 +5,7 @@
 use std::process::Command;
 
 const PO: &str = "../../../po";
-const METAINFO: &str = "../data/io.github.selfref.Todav.metainfo.xml";
+const METAINFO: &str = "../data/dev.aperte.Todav.metainfo.xml";
 
 fn msgfmt(args: &[&str]) {
     let ok = Command::new("msgfmt")
@@ -43,7 +43,7 @@ fn main() {
         "-d",
         PO,
         "-o",
-        &format!("{out}/io.github.selfref.Todav.metainfo.xml"),
+        &format!("{out}/dev.aperte.Todav.metainfo.xml"),
     ]);
 
     println!("cargo::rerun-if-changed=ui");
@@ -63,7 +63,7 @@ fn main() {
     // Fallback icons, the app icon and the translated metainfo (for About, from OUT_DIR),
     // embedded in the binary.
     println!("cargo::rerun-if-changed=icons");
-    println!("cargo::rerun-if-changed=../data/io.github.selfref.Todav.svg");
+    println!("cargo::rerun-if-changed=../data/dev.aperte.Todav.svg");
     println!("cargo::rerun-if-changed={METAINFO}");
     let ok = Command::new("glib-compile-resources")
         .args(["--sourcedir", &out, "--sourcedir", "icons", "--target"])

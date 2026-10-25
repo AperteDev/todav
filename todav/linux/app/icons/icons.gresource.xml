@@ -2,19 +2,19 @@
 <!-- Fallbacks for icons some themes lack; GtkApplication looks in <app id path>/icons, after
      the theme's own. -->
 <gresources>
-  <gresource prefix="/io/github/selfref/Todav/icons/scalable/actions">
+  <gresource prefix="/dev/aperte/Todav/icons/scalable/actions">
     <file>view-column-symbolic.svg</file>
     <file>calendar-go-today-symbolic.svg</file>
     <!-- Adwaita's non-starred without its built-in transparency, dimmed in code as the pin is. -->
     <file>star-outline-symbolic.svg</file>
   </gresource>
   <!-- The app's own icon, for the About dialog when it is not installed (a build run). -->
-  <gresource prefix="/io/github/selfref/Todav/icons/scalable/apps">
-    <file alias="io.github.selfref.Todav.svg">../../data/io.github.selfref.Todav.svg</file>
+  <gresource prefix="/dev/aperte/Todav/icons/scalable/apps">
+    <file alias="dev.aperte.Todav.svg">../../data/dev.aperte.Todav.svg</file>
   </gresource>
   <!-- What the About dialog shows (Adw.AboutDialog.new_from_appdata): the metainfo with its
        translations, as build.rs writes it to OUT_DIR. -->
-  <gresource prefix="/io/github/selfref/Todav">
-    <file alias="metainfo.xml">io.github.selfref.Todav.metainfo.xml</file>
+  <gresource prefix="/dev/aperte/Todav">
+    <file alias="metainfo.xml">dev.aperte.Todav.metainfo.xml</file>
   </gresource>
 </gresources>

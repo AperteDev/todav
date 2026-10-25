@@ -83,7 +83,7 @@ def main() -> None:
         rf'\g<1>"{version}"',
     )
     # The newest release first; one already listed (the first, written by hand) gets today's date.
-    metainfo = "todav/linux/data/io.github.selfref.Todav.metainfo.xml"
+    metainfo = "todav/linux/data/dev.aperte.Todav.metainfo.xml"
     if f'<release version="{version}"' in (ROOT / metainfo).read_text():
         edit(
             metainfo,

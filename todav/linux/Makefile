@@ -5,7 +5,7 @@ DATADIR = $(PREFIX)/share
 AUTOSTART = $(HOME)/.config/autostart
 ICONS = $(DATADIR)/icons/hicolor
 LOCALE = $(DATADIR)/locale
-ID = io.github.selfref.Todav
+ID = dev.aperte.Todav
 # Translations (see scripts/i18n.sh); po/its says what of the metainfo is translated.
 PO = ../../po
 export GETTEXTDATADIRS = $(abspath $(PO))
@@ -42,7 +42,7 @@ stage:
 	cargo build --release --locked -p todav-linux
 	$(MAKE) install-data
 	install -Dm644 data/$(ID)-autostart.desktop $(DESTDIR)/etc/xdg/autostart/$(ID).desktop
-	$(MAKE) -C ../gnome-extension install DEST=$(DESTDIR)$(DATADIR)/gnome-shell/extensions/todav@selfref.dev
+	$(MAKE) -C ../gnome-extension install DEST=$(DESTDIR)$(DATADIR)/gnome-shell/extensions/todav@aperte.dev
 
 # Needs flatpak-builder (or the org.flatpak.Builder Flatpak); the build fetches crates over the
 # network. ponytail: Flathub builds offline, add a generated cargo-sources.json when submitting.
@@ -59,7 +59,7 @@ flatpak:
 # show the existing window. broadwayd stops with the app.
 broadway:
 	cargo build -p todav-linux
-	busctl --user --auto-start=no call $(ID) /io/github/selfref/Todav org.gtk.Actions Activate 'sava{sv}' quit 0 0 2>/dev/null || true
+	busctl --user --auto-start=no call $(ID) /dev/aperte/Todav org.gtk.Actions Activate 'sava{sv}' quit 0 0 2>/dev/null || true
 	for i in $$(seq 50); do busctl --user status $(ID) >/dev/null 2>&1 || break; sleep 0.1; done
 	mkdir -p ../../target/broadway/gtk-4.0
 	printf '[Settings]\ngtk-enable-animations=false\n' > ../../target/broadway/gtk-4.0/settings.ini

@@ -1,4 +1,4 @@
-UUID = todav@selfref.dev
+UUID = todav@aperte.dev
 DEST = $(HOME)/.local/share/gnome-shell/extensions/$(UUID)
 FILES = metadata.json extension.js dbus.js stylesheet.css icons
 PO = ../../po

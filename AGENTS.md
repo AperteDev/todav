@@ -5,7 +5,7 @@
 - `docs/ARCHITECTURE.md` holds the architecture, the design decisions and the plan (progress,
   roadmap, open questions). Read it before working on a feature, and update it in the same
   change when the work changes what it says: a decision made, a step done, a plan dropped.
-- Notav (`SelfRef/notav`, cloned next to this repository) started from copies of some of this
+- Notav (`AperteDev/notav`, cloned next to this repository) started from copies of some of this
   code, listed under "Code from Todav" in its `docs/ARCHITECTURE.md`. A fix to one of those
   probably applies there too: port it or say so. Notav keeps its own configuration and
   credentials; never read or write its files, keyring entries or settings.
@@ -73,7 +73,7 @@
 
 ## Testing the Linux app
 
-- The app is single-instance over D-Bus (`io.github.selfref.Todav`): a new launch only shows the
+- The app is single-instance over D-Bus (`dev.aperte.Todav`): a new launch only shows the
   running window. Quit the running copy first (`pkill -x todav-linux`).
 - `make -C todav/linux sandbox` (Zed task "linux: run in sandbox") runs a separate copy next to the
   normal one (`TODAV_SANDBOX`): own data in `target/sandbox`, own keyring entries, same GNOME

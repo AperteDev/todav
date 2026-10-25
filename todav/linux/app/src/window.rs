@@ -187,7 +187,7 @@ pub fn setup_actions(app: &adw::Application) {
     about.connect_activate(|_, _| {
         let Some(ui) = ui() else { return };
         let d = adw::AboutDialog::from_appdata(
-            "/io/github/selfref/Todav/metainfo.xml",
+            "/dev/aperte/Todav/metainfo.xml",
             Some(env!("CARGO_PKG_VERSION")),
         );
         d.set_copyright("© 2026 SelfRef");
