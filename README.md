@@ -148,7 +148,8 @@ Todav from source. Then:
    without an account.
 2. Your task lists and calendars appear, and new ones can be created from the sidebar.
 3. For instant updates, install the [DAV Push](https://apps.nextcloud.com/apps/dav_push) app on
-   your Nextcloud and enter your ntfy server in Preferences → Accounts → Push.
+   your Nextcloud and enter your ntfy server in Preferences → Accounts → Push. Server Status
+   on the same page shows whether the server has DAV Push and whether it works.
 
 ## Roadmap
 

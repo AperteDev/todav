@@ -15,6 +15,16 @@ pub struct PushRegistration {
     pub expires: i64,
 }
 
+/// How far WebDAV-Push reaches among the account's calendars (lists on this device aside).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct PushStatus {
+    pub calendars: u32,
+    /// Advertise a push topic: the server has the DAV Push app (`dav_push`).
+    pub supported: u32,
+    /// Registered for this device and not expired.
+    pub registered: u32,
+}
+
 /// dav_push clamps expiry to one week.
 const MAX_EXPIRY: i64 = 7 * 86400;
 
@@ -82,6 +92,28 @@ impl Client {
             });
         }
         Ok(out)
+    }
+
+    /// What the last discovery and registrations found; nothing until the first sync.
+    pub fn push_status(&self) -> PushStatus {
+        let db = self.db.lock().unwrap();
+        db.query_row(
+            &format!(
+                "SELECT COUNT(*), COUNT(push_topic),
+                   COUNT(CASE WHEN push_registration_href IS NOT NULL AND push_expires > ?1 THEN 1 END)
+                 FROM lists WHERE href NOT LIKE '{}%'",
+                store::LOCAL
+            ),
+            [crate::now()],
+            |r| {
+                Ok(PushStatus {
+                    calendars: r.get(0)?,
+                    supported: r.get(1)?,
+                    registered: r.get(2)?,
+                })
+            },
+        )
+        .unwrap_or_default()
     }
 
     pub fn push_unregister(&self) -> Result<()> {
@@ -370,6 +402,26 @@ pub fn http_date(t: i64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn push_status_counts_server_calendars() {
+        let dir = std::env::temp_dir().join(format!("todav-test-push-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        assert_eq!(c.push_status(), PushStatus::default());
+        let later = crate::now() + 3600;
+        c.db.lock()
+            .unwrap()
+            .execute_batch(&format!(
+                "INSERT INTO lists (href, display_name, push_topic, push_registration_href, push_expires) VALUES
+                   ('/a/', 'A', 'ta', '/reg/a', {later}), ('/b/', 'B', 'tb', '/reg/b', 1),
+                   ('/c/', 'C', NULL, NULL, NULL), ('{}x/', 'Here', NULL, NULL, NULL);",
+                store::LOCAL
+            ))
+            .unwrap();
+        let s = c.push_status();
+        assert_eq!((s.calendars, s.supported, s.registered), (3, 2, 1));
+    }
 
     #[test]
     fn rfc8291_vector() {

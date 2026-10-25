@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - About has a Support page with where to support Todav's development: Ko-fi, GitHub Sponsors
   and Liberapay.
+- Server Status in Preferences → Accounts: the Nextcloud version (or why the server cannot
+  be reached, or that it is in maintenance mode), when Todav last synced, and whether DAV
+  Push works. Without DAV Push on the server, it says what that means and links to the app
+  in the Nextcloud App Store; with it but no ntfy server, it asks for one.
 
 ## [1.2.1] - 2026-10-25
 

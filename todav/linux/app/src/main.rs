@@ -26,6 +26,8 @@ static SYNC: OnceLock<Sender<()>> = OnceLock::new();
 static SYNC_STATE: Mutex<String> = Mutex::new(String::new());
 /// The ntfy server the push listener was started for.
 static PUSH_URL: Mutex<String> = Mutex::new(String::new());
+/// What the push listener last failed with; cleared by its next success.
+static PUSH_ERROR: Mutex<Option<String>> = Mutex::new(None);
 
 pub fn core() -> &'static Arc<Client> {
     CORE.get().expect("core opened at startup")
@@ -66,6 +68,10 @@ pub fn sync_state() -> String {
     SYNC_STATE.lock().unwrap().clone()
 }
 
+pub fn push_error() -> Option<String> {
+    PUSH_ERROR.lock().unwrap().clone()
+}
+
 /// Events from background threads, handled on the main thread.
 #[derive(Debug, Clone)]
 pub enum Event {
@@ -82,6 +88,9 @@ fn post(ev: Event) {
         }
         window::on_event(&ev);
         dbus::on_event(&ev);
+        if let Event::SyncState(_) = &ev {
+            settings::status_changed();
+        }
     });
 }
 
@@ -307,10 +316,14 @@ pub fn restart_push() {
     core().stop_listening();
     let url = core().setting("ntfy_url".into()).unwrap_or_default();
     *PUSH_URL.lock().unwrap() = url.clone();
+    *PUSH_ERROR.lock().unwrap() = None;
     if let Some(ntfy) = Some(url).filter(|u| !u.is_empty() && core().account().is_some()) {
         std::thread::spawn(move || {
             // Blocks until the next restart_push; reconnects internally.
-            let _ = core().listen(ntfy, &|r| set_state(&r));
+            let _ = core().listen(ntfy, &|r| {
+                *PUSH_ERROR.lock().unwrap() = r.as_ref().err().map(|e| e.to_string());
+                set_state(&r);
+            });
         });
     }
 }

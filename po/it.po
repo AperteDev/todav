@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Todav\n"
 "Report-Msgid-Bugs-To: https://github.com/AperteDev/todav/issues\n"
-"POT-Creation-Date: 2026-10-25 18:40+0100\n"
+"POT-Creation-Date: 2026-10-25 18:58+0100\n"
 "PO-Revision-Date: 2026-10-22 21:00+0200\n"
 "Last-Translator: \n"
 "Language-Team: Italian\n"
@@ -97,7 +97,7 @@ msgstr "Niente in programma questa settimana"
 #: todav/linux/app/src/calendar.rs:210 todav/linux/app/src/lists.rs:311
 #: todav/linux/app/ui/calendar.blp:54 todav/linux/app/ui/calendar.blp:217
 #: todav/linux/app/ui/event-dialog.blp:66 todav/linux/app/ui/settings.blp:45
-#: todav/linux/app/ui/settings.blp:272 todav/linux/app/ui/settings.blp:345
+#: todav/linux/app/ui/settings.blp:307 todav/linux/app/ui/settings.blp:380
 #: todav/linux/app/ui/shortcuts.blp:71
 msgid "Calendar"
 msgstr "Calendario"
@@ -149,7 +149,7 @@ msgstr[1] "+ altri {n}"
 msgid "Starts {date}"
 msgstr "Inizia {date}"
 
-#: todav/linux/app/src/calendar.rs:1447 todav/linux/app/src/main.rs:374
+#: todav/linux/app/src/calendar.rs:1447 todav/linux/app/src/main.rs:387
 #, rust-format
 msgid "Due {date}"
 msgstr "Scade {date}"
@@ -168,8 +168,8 @@ msgstr "Non salvato sul server"
 
 #: todav/linux/app/src/calendar.rs:1581 todav/linux/app/src/lists.rs:299
 #: todav/linux/app/src/window.rs:1527 todav/linux/app/ui/settings.blp:45
-#: todav/linux/app/ui/settings.blp:146 todav/linux/app/ui/settings.blp:150
-#: todav/linux/app/ui/settings.blp:328 todav/linux/app/ui/shortcuts.blp:57
+#: todav/linux/app/ui/settings.blp:181 todav/linux/app/ui/settings.blp:185
+#: todav/linux/app/ui/settings.blp:363 todav/linux/app/ui/shortcuts.blp:57
 #: todav/linux/app/ui/window.blp:167 todav/linux/app/ui/window.blp:257
 msgid "Tasks"
 msgstr "Attività"
@@ -178,8 +178,8 @@ msgstr "Attività"
 msgid "Add a task for this event"
 msgstr "Aggiungi un'attività per questo evento"
 
-#: todav/linux/app/src/calendar.rs:1608 todav/linux/app/ui/settings.blp:190
-#: todav/linux/app/ui/settings.blp:335
+#: todav/linux/app/src/calendar.rs:1608 todav/linux/app/ui/settings.blp:225
+#: todav/linux/app/ui/settings.blp:370
 msgid "Subtasks"
 msgstr "Sottoattività"
 
@@ -231,8 +231,8 @@ msgstr "Per {event}"
 msgid "Subtask of {task}"
 msgstr "Sottoattività di {task}"
 
-#: todav/linux/app/src/calendar.rs:1943 todav/linux/app/ui/settings.blp:280
-#: todav/linux/app/ui/settings.blp:358 todav/linux/app/ui/shortcuts.blp:104
+#: todav/linux/app/src/calendar.rs:1943 todav/linux/app/ui/settings.blp:315
+#: todav/linux/app/ui/settings.blp:393 todav/linux/app/ui/shortcuts.blp:104
 msgid "Agenda"
 msgstr "Agenda"
 
@@ -293,7 +293,7 @@ msgid "The event repeats."
 msgstr "L'evento si ripete."
 
 #: todav/linux/app/src/calendar/dialog.rs:47 todav/linux/app/src/lists.rs:566
-#: todav/linux/app/src/settings.rs:590 todav/linux/app/ui/edit-dialog.blp:23
+#: todav/linux/app/src/settings.rs:742 todav/linux/app/ui/edit-dialog.blp:23
 #: todav/linux/app/ui/event-dialog.blp:25 todav/linux/app/ui/list-dialog.blp:18
 #: todav/linux/app/ui/new-category.blp:18
 #: todav/linux/app/ui/password-login.blp:19 todav/linux/app/ui/settings.blp:69
@@ -394,7 +394,7 @@ msgstr "Scadute"
 msgid "Later"
 msgstr "Più avanti"
 
-#: todav/linux/app/src/lists.rs:199 todav/linux/app/ui/settings.blp:136
+#: todav/linux/app/src/lists.rs:199 todav/linux/app/ui/settings.blp:171
 msgid "On This Device"
 msgstr "Su questo dispositivo"
 
@@ -510,33 +510,33 @@ msgstr ""
 msgid "It can be restored from the trash bin in Nextcloud Calendar."
 msgstr "Può essere ripristinato dal cestino di Nextcloud Calendario."
 
-#: todav/linux/app/src/main.rs:226
+#: todav/linux/app/src/main.rs:235
 #, rust-format
 msgid "Cannot upload pending changes first: {error}"
 msgstr "Impossibile caricare prima le modifiche in sospeso: {error}"
 
-#: todav/linux/app/src/main.rs:242
+#: todav/linux/app/src/main.rs:251
 msgid "Disconnecting failed"
 msgstr "Disconnessione non riuscita"
 
-#: todav/linux/app/src/main.rs:261
+#: todav/linux/app/src/main.rs:270
 msgid "Online Accounts has no password for this account"
 msgstr "Account online non ha una password per questo account"
 
-#: todav/linux/app/src/main.rs:280 todav/linux/app/src/settings.rs:669
+#: todav/linux/app/src/main.rs:289 todav/linux/app/src/settings.rs:821
 #, rust-format
 msgid "Cannot save password: {error}"
 msgstr "Impossibile salvare la password: {error}"
 
-#: todav/linux/app/src/main.rs:293
+#: todav/linux/app/src/main.rs:302
 msgid "Connecting failed"
 msgstr "Connessione non riuscita"
 
-#: todav/linux/app/src/main.rs:380
+#: todav/linux/app/src/main.rs:393
 msgid "Mark as Done"
 msgstr "Segna come fatta"
 
-#: todav/linux/app/src/main.rs:407
+#: todav/linux/app/src/main.rs:420
 msgid "Sync tasks and receive changes in the background"
 msgstr "Sincronizza le attività e ricevi le modifiche in background"
 
@@ -568,83 +568,151 @@ msgctxt "reminder"
 msgid "after"
 msgstr "dopo"
 
-#: todav/linux/app/src/settings.rs:184
+#: todav/linux/app/src/settings.rs:185
 msgid "Set by the sort order"
 msgstr "Stabilito dall'ordinamento"
 
-#: todav/linux/app/src/settings.rs:319
+#: todav/linux/app/src/settings.rs:320
 msgid "Also places the “Add subtask” field"
 msgstr "Posiziona anche il campo «Aggiungi sottoattività»"
 
-#: todav/linux/app/src/settings.rs:385 todav/linux/app/src/settings.rs:424
+#: todav/linux/app/src/settings.rs:411
+#, rust-format
+msgid "Last synced: {time}"
+msgstr "Ultima sincronizzazione: {time}"
+
+#: todav/linux/app/src/settings.rs:416
+msgid "Syncing…"
+msgstr "Sincronizzazione…"
+
+#: todav/linux/app/src/settings.rs:421
+#, rust-format
+msgid "Failed: {error}"
+msgstr "Non riuscita: {error}"
+
+#: todav/linux/app/src/settings.rs:425
+msgid "Not synced yet"
+msgstr "Non ancora sincronizzato"
+
+#: todav/linux/app/src/settings.rs:436
+msgid "Checked at the next sync"
+msgstr "Verificato alla prossima sincronizzazione"
+
+#: todav/linux/app/src/settings.rs:441
+msgid ""
+"Not available on this server, so changes made elsewhere show up at the next "
+"check (every minute while the window is focused). Install the DAV Push app "
+"on Nextcloud and enter an ntfy server below to see them within seconds"
+msgstr ""
+"Non disponibile su questo server, quindi le modifiche fatte altrove "
+"compaiono al controllo successivo (ogni minuto mentre la finestra è attiva). "
+"Installa l'app DAV Push su Nextcloud e inserisci un server ntfy qui sotto "
+"per vederle in pochi secondi"
+
+#: todav/linux/app/src/settings.rs:450
+msgid ""
+"Available on this server. Enter an ntfy server below to see changes made "
+"elsewhere within seconds"
+msgstr ""
+"Disponibile su questo server. Inserisci un server ntfy qui sotto per vedere "
+"in pochi secondi le modifiche fatte altrove"
+
+#: todav/linux/app/src/settings.rs:457
+#, rust-format
+msgid "Not working: {error}"
+msgstr "Non funziona: {error}"
+
+#: todav/linux/app/src/settings.rs:460
+msgid "Registering…"
+msgstr "Registrazione…"
+
+#: todav/linux/app/src/settings.rs:464
+msgid "On: changes made elsewhere show up within seconds"
+msgstr "Attivo: le modifiche fatte altrove compaiono in pochi secondi"
+
+#: todav/linux/app/src/settings.rs:474
+msgid "Checking…"
+msgstr "Verifica in corso…"
+
+#: todav/linux/app/src/settings.rs:486
+#, rust-format
+msgid "{server}, in maintenance mode"
+msgstr "{server}, in modalità manutenzione"
+
+#: todav/linux/app/src/settings.rs:496
+#, rust-format
+msgid "Cannot reach the server: {error}"
+msgstr "Impossibile raggiungere il server: {error}"
+
+#: todav/linux/app/src/settings.rs:533 todav/linux/app/src/settings.rs:576
 #, rust-format
 msgid "Connected as {name}"
 msgstr "Connesso come {name}"
 
-#: todav/linux/app/src/settings.rs:386 todav/linux/app/src/window.rs:905
+#: todav/linux/app/src/settings.rs:534 todav/linux/app/src/window.rs:905
 #: todav/linux/app/ui/window.blp:42
 msgid "GNOME Online Accounts"
 msgstr "Account online di GNOME"
 
-#: todav/linux/app/src/settings.rs:389 todav/linux/app/src/settings.rs:431
-#: todav/linux/app/src/settings.rs:611
+#: todav/linux/app/src/settings.rs:537 todav/linux/app/src/settings.rs:583
+#: todav/linux/app/src/settings.rs:763
 #, rust-format
 msgid "Signed in as {name}"
 msgstr "Accesso effettuato come {name}"
 
-#: todav/linux/app/src/settings.rs:393
+#: todav/linux/app/src/settings.rs:541
 msgid "Not signed in"
 msgstr "Accesso non effettuato"
 
-#: todav/linux/app/src/settings.rs:435
+#: todav/linux/app/src/settings.rs:587
 msgid "Disconnected"
 msgstr "Disconnesso"
 
-#: todav/linux/app/src/settings.rs:489 todav/linux/app/src/window.rs:964
+#: todav/linux/app/src/settings.rs:641 todav/linux/app/src/window.rs:964
 msgid "Waiting for Sign-In…"
 msgstr "In attesa dell'accesso…"
 
-#: todav/linux/app/src/settings.rs:491 todav/linux/app/src/window.rs:966
+#: todav/linux/app/src/settings.rs:643 todav/linux/app/src/window.rs:966
 msgid "Waiting for Browser…"
 msgstr "In attesa del browser…"
 
-#: todav/linux/app/src/settings.rs:584
+#: todav/linux/app/src/settings.rs:736
 msgid "Turn Off Local Lists?"
 msgstr "Disattivare le liste locali?"
 
-#: todav/linux/app/src/settings.rs:586
+#: todav/linux/app/src/settings.rs:738
 msgid "Local lists and calendars will be hidden until you turn them on again."
 msgstr ""
 "Le liste e i calendari locali resteranno nascosti finché non li riattivi."
 
-#: todav/linux/app/src/settings.rs:591
+#: todav/linux/app/src/settings.rs:743
 msgid "Turn Off"
 msgstr "Disattiva"
 
-#: todav/linux/app/src/settings.rs:645
+#: todav/linux/app/src/settings.rs:797
 msgid "Connection works"
 msgstr "La connessione funziona"
 
-#: todav/linux/app/src/settings.rs:646
+#: todav/linux/app/src/settings.rs:798
 #, rust-format
 msgid "Test failed: {error}"
 msgstr "Prova non riuscita: {error}"
 
-#: todav/linux/app/src/settings.rs:647
+#: todav/linux/app/src/settings.rs:799
 msgid "Test failed"
 msgstr "Prova non riuscita"
 
-#: todav/linux/app/src/settings.rs:661
+#: todav/linux/app/src/settings.rs:813
 #, rust-format
 msgid "Server not changed, cannot upload pending changes: {error}"
 msgstr ""
 "Server non cambiato, impossibile caricare le modifiche in sospeso: {error}"
 
-#: todav/linux/app/src/settings.rs:677
+#: todav/linux/app/src/settings.rs:829
 msgid "Nextcloud server changed"
 msgstr "Server Nextcloud cambiato"
 
-#: todav/linux/app/src/settings.rs:682
+#: todav/linux/app/src/settings.rs:834
 msgid "Changing the server failed"
 msgstr "Impossibile cambiare il server"
 
@@ -1202,7 +1270,7 @@ msgstr "Avvio"
 msgid "Open at start"
 msgstr "Apri all'avvio"
 
-#: todav/linux/app/ui/settings.blp:45 todav/linux/app/ui/settings.blp:280
+#: todav/linux/app/ui/settings.blp:45 todav/linux/app/ui/settings.blp:315
 msgid "Last used"
 msgstr "Ultima usata"
 
@@ -1214,7 +1282,7 @@ msgstr "Account"
 msgid "Sign Out"
 msgstr "Esci dall'account"
 
-#: todav/linux/app/ui/settings.blp:79 todav/linux/app/ui/settings.blp:371
+#: todav/linux/app/ui/settings.blp:79 todav/linux/app/ui/settings.blp:406
 msgid "Sign In Again"
 msgstr "Accedi di nuovo"
 
@@ -1222,338 +1290,359 @@ msgstr "Accedi di nuovo"
 msgid "More Sign-In Options"
 msgstr "Altre opzioni di accesso"
 
-#: todav/linux/app/ui/settings.blp:95
-msgid "Push"
-msgstr "Push"
-
 #: todav/linux/app/ui/settings.blp:96
-msgid "Changes are applied when this window closes"
-msgstr "Le modifiche vengono applicate alla chiusura di questa finestra"
+msgid "Server Status"
+msgstr "Stato del server"
 
-#: todav/linux/app/ui/settings.blp:99 todav/linux/app/ui/window.blp:116
-msgid "ntfy server for push (optional)"
-msgstr "Server ntfy per il push (facoltativo)"
+#: todav/linux/app/ui/settings.blp:99
+msgid "Server"
+msgstr "Server"
 
-#: todav/linux/app/ui/settings.blp:110
-msgid "Test"
-msgstr "Prova"
-
-#: todav/linux/app/ui/settings.blp:118 todav/linux/app/ui/shortcuts.blp:21
+#: todav/linux/app/ui/settings.blp:106 todav/linux/app/ui/settings.blp:153
+#: todav/linux/app/ui/shortcuts.blp:21
 msgid "Sync"
 msgstr "Sincronizzazione"
 
+#: todav/linux/app/ui/settings.blp:113
+msgid "DAV Push"
+msgstr "DAV Push"
+
 #: todav/linux/app/ui/settings.blp:121
+msgid "Get DAV Push"
+msgstr "Ottieni DAV Push"
+
+#: todav/linux/app/ui/settings.blp:122
+msgid "Open the DAV Push app in the Nextcloud App Store"
+msgstr "Apri l'app DAV Push nell'App Store di Nextcloud"
+
+#: todav/linux/app/ui/settings.blp:130
+msgid "Push"
+msgstr "Push"
+
+#: todav/linux/app/ui/settings.blp:131
+msgid "Changes are applied when this window closes"
+msgstr "Le modifiche vengono applicate alla chiusura di questa finestra"
+
+#: todav/linux/app/ui/settings.blp:134 todav/linux/app/ui/window.blp:116
+msgid "ntfy server for push (optional)"
+msgstr "Server ntfy per il push (facoltativo)"
+
+#: todav/linux/app/ui/settings.blp:145
+msgid "Test"
+msgstr "Prova"
+
+#: todav/linux/app/ui/settings.blp:156
 msgid "Sync settings with server"
 msgstr "Sincronizza le impostazioni con il server"
 
-#: todav/linux/app/ui/settings.blp:122
+#: todav/linux/app/ui/settings.blp:157
 msgid "The Nextcloud server always stays on this device"
 msgstr "Il server Nextcloud resta sempre su questo dispositivo"
 
-#: todav/linux/app/ui/settings.blp:127
+#: todav/linux/app/ui/settings.blp:162
 msgid "Sync ntfy server"
 msgstr "Sincronizza il server ntfy"
 
-#: todav/linux/app/ui/settings.blp:128
+#: todav/linux/app/ui/settings.blp:163
 msgid "Use the same push server on all devices"
 msgstr "Usa lo stesso server push su tutti i dispositivi"
 
-#: todav/linux/app/ui/settings.blp:139
+#: todav/linux/app/ui/settings.blp:174
 msgid "Local lists and calendars"
 msgstr "Liste e calendari locali"
 
-#: todav/linux/app/ui/settings.blp:140
+#: todav/linux/app/ui/settings.blp:175
 msgid "Kept on this device only, never synced"
 msgstr "Solo su questo dispositivo, mai sincronizzati"
 
-#: todav/linux/app/ui/settings.blp:153 todav/linux/app/ui/settings.blp:193
+#: todav/linux/app/ui/settings.blp:188 todav/linux/app/ui/settings.blp:228
 msgid "Sort"
 msgstr "Ordinamento"
 
-#: todav/linux/app/ui/settings.blp:154 todav/linux/app/ui/settings.blp:194
+#: todav/linux/app/ui/settings.blp:189 todav/linux/app/ui/settings.blp:229
 msgid "Due date, latest first"
 msgstr "Scadenza, più lontane prima"
 
-#: todav/linux/app/ui/settings.blp:154 todav/linux/app/ui/settings.blp:194
+#: todav/linux/app/ui/settings.blp:189 todav/linux/app/ui/settings.blp:229
 msgid "Due date, soonest first"
 msgstr "Scadenza, più vicine prima"
 
-#: todav/linux/app/ui/settings.blp:154 todav/linux/app/ui/settings.blp:194
+#: todav/linux/app/ui/settings.blp:189 todav/linux/app/ui/settings.blp:229
 msgid "Manual"
 msgstr "Manuale"
 
-#: todav/linux/app/ui/settings.blp:154 todav/linux/app/ui/settings.blp:194
+#: todav/linux/app/ui/settings.blp:189 todav/linux/app/ui/settings.blp:229
 msgid "Newest first"
 msgstr "Più recenti prima"
 
-#: todav/linux/app/ui/settings.blp:154 todav/linux/app/ui/settings.blp:194
+#: todav/linux/app/ui/settings.blp:189 todav/linux/app/ui/settings.blp:229
 msgid "Oldest first"
 msgstr "Meno recenti prima"
 
-#: todav/linux/app/ui/settings.blp:154 todav/linux/app/ui/settings.blp:194
+#: todav/linux/app/ui/settings.blp:189 todav/linux/app/ui/settings.blp:229
 msgid "Priority, highest first"
 msgstr "Priorità, la più alta prima"
 
-#: todav/linux/app/ui/settings.blp:158
+#: todav/linux/app/ui/settings.blp:193
 msgid "Add new tasks"
 msgstr "Aggiungi le nuove attività"
 
-#: todav/linux/app/ui/settings.blp:159 todav/linux/app/ui/settings.blp:199
+#: todav/linux/app/ui/settings.blp:194 todav/linux/app/ui/settings.blp:234
 msgid "At the end"
 msgstr "In fondo"
 
-#: todav/linux/app/ui/settings.blp:159 todav/linux/app/ui/settings.blp:199
+#: todav/linux/app/ui/settings.blp:194 todav/linux/app/ui/settings.blp:234
 msgid "At the start"
 msgstr "In cima"
 
-#: todav/linux/app/ui/settings.blp:163
+#: todav/linux/app/ui/settings.blp:198
 msgid "Completed tasks"
 msgstr "Attività completate"
 
-#: todav/linux/app/ui/settings.blp:164
+#: todav/linux/app/ui/settings.blp:199
 msgid "In a separate group"
 msgstr "In un gruppo a parte"
 
-#: todav/linux/app/ui/settings.blp:164
+#: todav/linux/app/ui/settings.blp:199
 msgid "Keep in place"
 msgstr "Lascia al suo posto"
 
-#: todav/linux/app/ui/settings.blp:164 todav/linux/app/ui/settings.blp:204
+#: todav/linux/app/ui/settings.blp:199 todav/linux/app/ui/settings.blp:239
 msgid "Move to the end"
 msgstr "Sposta in fondo"
 
-#: todav/linux/app/ui/settings.blp:169 todav/linux/app/ui/settings.blp:299
+#: todav/linux/app/ui/settings.blp:204 todav/linux/app/ui/settings.blp:334
 msgid "Default duration"
 msgstr "Durata predefinita"
 
-#: todav/linux/app/ui/settings.blp:170
+#: todav/linux/app/ui/settings.blp:205
 msgid "When a task gets a time, or is planned on the calendar"
 msgstr "Quando un'attività riceve un orario o viene pianificata nel calendario"
 
-#: todav/linux/app/ui/settings.blp:171 todav/linux/app/ui/settings.blp:301
+#: todav/linux/app/ui/settings.blp:206 todav/linux/app/ui/settings.blp:336
 msgid "1 hour"
 msgstr "1 ora"
 
-#: todav/linux/app/ui/settings.blp:171 todav/linux/app/ui/settings.blp:301
+#: todav/linux/app/ui/settings.blp:206 todav/linux/app/ui/settings.blp:336
 msgid "1.5 hours"
 msgstr "1,5 ore"
 
-#: todav/linux/app/ui/settings.blp:171 todav/linux/app/ui/settings.blp:301
+#: todav/linux/app/ui/settings.blp:206 todav/linux/app/ui/settings.blp:336
 msgid "15 minutes"
 msgstr "15 minuti"
 
-#: todav/linux/app/ui/settings.blp:171 todav/linux/app/ui/settings.blp:301
+#: todav/linux/app/ui/settings.blp:206 todav/linux/app/ui/settings.blp:336
 msgid "2 hours"
 msgstr "2 ore"
 
-#: todav/linux/app/ui/settings.blp:171 todav/linux/app/ui/settings.blp:301
+#: todav/linux/app/ui/settings.blp:206 todav/linux/app/ui/settings.blp:336
 msgid "3 hours"
 msgstr "3 ore"
 
-#: todav/linux/app/ui/settings.blp:171 todav/linux/app/ui/settings.blp:301
+#: todav/linux/app/ui/settings.blp:206 todav/linux/app/ui/settings.blp:336
 msgid "30 minutes"
 msgstr "30 minuti"
 
-#: todav/linux/app/ui/settings.blp:171 todav/linux/app/ui/settings.blp:301
+#: todav/linux/app/ui/settings.blp:206 todav/linux/app/ui/settings.blp:336
 msgid "45 minutes"
 msgstr "45 minuti"
 
-#: todav/linux/app/ui/settings.blp:176
+#: todav/linux/app/ui/settings.blp:211
 msgid "Stars and Pins"
 msgstr "Stelle e fissaggio"
 
-#: todav/linux/app/ui/settings.blp:179
+#: todav/linux/app/ui/settings.blp:214
 msgid "Stars"
 msgstr "Stelle"
 
-#: todav/linux/app/ui/settings.blp:180
+#: todav/linux/app/ui/settings.blp:215
 msgid "A star with each task’s priority, and the Important page"
 msgstr "Una stella con la priorità di ogni attività e la pagina «Importanti»"
 
-#: todav/linux/app/ui/settings.blp:184
+#: todav/linux/app/ui/settings.blp:219
 msgid "Pins"
 msgstr "Fissaggio"
 
-#: todav/linux/app/ui/settings.blp:185
+#: todav/linux/app/ui/settings.blp:220
 msgid "Pin tasks to the top of their list"
 msgstr "Fissa le attività in cima alla loro lista"
 
-#: todav/linux/app/ui/settings.blp:198
+#: todav/linux/app/ui/settings.blp:233
 msgid "Add new subtasks"
 msgstr "Aggiungi le nuove sottoattività"
 
-#: todav/linux/app/ui/settings.blp:203
+#: todav/linux/app/ui/settings.blp:238
 msgid "Completed subtasks"
 msgstr "Sottoattività completate"
 
-#: todav/linux/app/ui/settings.blp:204 todav/linux/app/ui/settings.blp:257
+#: todav/linux/app/ui/settings.blp:239 todav/linux/app/ui/settings.blp:292
 msgid "Hide"
 msgstr "Nascondi"
 
-#: todav/linux/app/ui/settings.blp:204
+#: todav/linux/app/ui/settings.blp:239
 msgid "Show"
 msgstr "Mostra"
 
-#: todav/linux/app/ui/settings.blp:209
+#: todav/linux/app/ui/settings.blp:244
 msgid "Reminders"
 msgstr "Promemoria"
 
-#: todav/linux/app/ui/settings.blp:212
+#: todav/linux/app/ui/settings.blp:247
 msgid "New reminders"
 msgstr "Nuovi promemoria"
 
-#: todav/linux/app/ui/settings.blp:213
+#: todav/linux/app/ui/settings.blp:248
 msgid "For tasks due at a time"
 msgstr "Per le attività con orario di scadenza"
 
-#: todav/linux/app/ui/settings.blp:218
+#: todav/linux/app/ui/settings.blp:253
 msgid "Time for all-day tasks"
 msgstr "Orario per le attività di tutto il giorno"
 
-#: todav/linux/app/ui/settings.blp:219
+#: todav/linux/app/ui/settings.blp:254
 msgid "When reminders of tasks due on a date go off"
 msgstr "Quando suonano i promemoria delle attività con una data di scadenza"
 
-#: todav/linux/app/ui/settings.blp:253 todav/linux/app/ui/window.blp:231
+#: todav/linux/app/ui/settings.blp:288 todav/linux/app/ui/window.blp:231
 msgid "Categories"
 msgstr "Categorie"
 
-#: todav/linux/app/ui/settings.blp:256
+#: todav/linux/app/ui/settings.blp:291
 msgid "Show categories"
 msgstr "Mostra categorie"
 
-#: todav/linux/app/ui/settings.blp:257
+#: todav/linux/app/ui/settings.blp:292
 msgid "As tags"
 msgstr "Come etichette"
 
-#: todav/linux/app/ui/settings.blp:257
+#: todav/linux/app/ui/settings.blp:292
 msgid "Group by category"
 msgstr "Raggruppa per categoria"
 
-#: todav/linux/app/ui/settings.blp:262
+#: todav/linux/app/ui/settings.blp:297
 msgid "Interaction"
 msgstr "Interazione"
 
-#: todav/linux/app/ui/settings.blp:265
+#: todav/linux/app/ui/settings.blp:300
 msgid "Drag handles"
 msgstr "Maniglie di trascinamento"
 
-#: todav/linux/app/ui/settings.blp:266
+#: todav/linux/app/ui/settings.blp:301
 msgid "Move tasks by a handle instead of the whole row, for touchscreens"
 msgstr ""
 "Sposta le attività con una maniglia invece che con tutta la riga, per "
 "touchscreen"
 
-#: todav/linux/app/ui/settings.blp:276
+#: todav/linux/app/ui/settings.blp:311
 msgid "Views"
 msgstr "Viste"
 
-#: todav/linux/app/ui/settings.blp:279
+#: todav/linux/app/ui/settings.blp:314
 msgid "View at start"
 msgstr "Vista all'avvio"
 
-#: todav/linux/app/ui/settings.blp:280 todav/linux/app/ui/shortcuts.blp:94
+#: todav/linux/app/ui/settings.blp:315 todav/linux/app/ui/shortcuts.blp:94
 msgid "Month"
 msgstr "Mese"
 
-#: todav/linux/app/ui/settings.blp:280 todav/linux/app/ui/shortcuts.blp:99
+#: todav/linux/app/ui/settings.blp:315 todav/linux/app/ui/shortcuts.blp:99
 msgid "Week"
 msgstr "Settimana"
 
-#: todav/linux/app/ui/settings.blp:284
+#: todav/linux/app/ui/settings.blp:319
 msgid "Dots in the sidebar month"
 msgstr "Puntini nel mese della barra laterale"
 
-#: todav/linux/app/ui/settings.blp:285 todav/linux/app/ui/settings.blp:353
+#: todav/linux/app/ui/settings.blp:320 todav/linux/app/ui/settings.blp:388
 msgid "Mark the days that have events or tasks"
 msgstr "Evidenzia i giorni con eventi o attività"
 
-#: todav/linux/app/ui/settings.blp:289
+#: todav/linux/app/ui/settings.blp:324
 msgid "Edit on double click"
 msgstr "Modifica con doppio clic"
 
-#: todav/linux/app/ui/settings.blp:290
+#: todav/linux/app/ui/settings.blp:325
 msgid "Off, a click shows the details at once instead of after a short wait"
 msgstr ""
 "Se disattivato, un clic mostra subito i dettagli invece che dopo una breve "
 "attesa"
 
-#: todav/linux/app/ui/settings.blp:295
+#: todav/linux/app/ui/settings.blp:330
 msgid "Events"
 msgstr "Eventi"
 
-#: todav/linux/app/ui/settings.blp:300
+#: todav/linux/app/ui/settings.blp:335
 msgid "When an event is added at a time, or an all-day one gets a time"
 msgstr ""
 "Quando un evento viene aggiunto a un orario o uno di tutto il giorno riceve "
 "un orario"
 
-#: todav/linux/app/ui/settings.blp:309
+#: todav/linux/app/ui/settings.blp:344
 msgid "Extension"
 msgstr "Estensione"
 
-#: todav/linux/app/ui/settings.blp:313
+#: todav/linux/app/ui/settings.blp:348
 msgid "Panel Menu"
 msgstr "Menu del pannello"
 
-#: todav/linux/app/ui/settings.blp:314
+#: todav/linux/app/ui/settings.blp:349
 msgid "For the Todav GNOME Shell extension"
 msgstr "Per l'estensione di GNOME Shell di Todav"
 
-#: todav/linux/app/ui/settings.blp:317
+#: todav/linux/app/ui/settings.blp:352
 msgid "Layout"
 msgstr "Disposizione"
 
-#: todav/linux/app/ui/settings.blp:318
+#: todav/linux/app/ui/settings.blp:353
 msgid "Two columns: tasks on the left, calendar on the right"
 msgstr "Due colonne: attività a sinistra, calendario a destra"
 
-#: todav/linux/app/ui/settings.blp:319
+#: todav/linux/app/ui/settings.blp:354
 msgid "One column"
 msgstr "Una colonna"
 
-#: todav/linux/app/ui/settings.blp:319
+#: todav/linux/app/ui/settings.blp:354
 msgid "Two columns"
 msgstr "Due colonne"
 
-#: todav/linux/app/ui/settings.blp:323
+#: todav/linux/app/ui/settings.blp:358
 msgid "“Open Todav” button"
 msgstr "Pulsante «Apri Todav»"
 
-#: todav/linux/app/ui/settings.blp:331
+#: todav/linux/app/ui/settings.blp:366
 msgid "Task list"
 msgstr "Lista di attività"
 
-#: todav/linux/app/ui/settings.blp:340
+#: todav/linux/app/ui/settings.blp:375
 msgid "Field for adding a task"
 msgstr "Campo per aggiungere un'attività"
 
-#: todav/linux/app/ui/settings.blp:348
+#: todav/linux/app/ui/settings.blp:383
 msgid "Month calendar"
 msgstr "Calendario del mese"
 
-#: todav/linux/app/ui/settings.blp:352
+#: todav/linux/app/ui/settings.blp:387
 msgid "Dots in the month"
 msgstr "Puntini nel mese"
 
-#: todav/linux/app/ui/settings.blp:359
+#: todav/linux/app/ui/settings.blp:394
 msgid "Events and tasks of the coming week, under the month"
 msgstr "Eventi e attività della settimana successiva, sotto il mese"
 
-#: todav/linux/app/ui/settings.blp:363
+#: todav/linux/app/ui/settings.blp:398
 msgid "Field for adding an event"
 msgstr "Campo per aggiungere un evento"
 
-#: todav/linux/app/ui/settings.blp:364
+#: todav/linux/app/ui/settings.blp:399
 msgid "Opens a new event in Todav with the title typed"
 msgstr "Apre in Todav un nuovo evento con il titolo digitato"
 
-#: todav/linux/app/ui/settings.blp:372 todav/linux/app/ui/settings.blp:377
+#: todav/linux/app/ui/settings.blp:407 todav/linux/app/ui/settings.blp:412
 #: todav/linux/app/ui/window.blp:399
 msgid "Copy Login Link"
 msgstr "Copia collegamento di accesso"
 
-#: todav/linux/app/ui/settings.blp:373 todav/linux/app/ui/settings.blp:378
+#: todav/linux/app/ui/settings.blp:408 todav/linux/app/ui/settings.blp:413
 #: todav/linux/app/ui/window.blp:400
 msgid "Sign In with Password…"
 msgstr "Accedi con password…"

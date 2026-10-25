@@ -91,6 +91,41 @@ Adw.PreferencesDialog dialog {
       }
     }
 
+    // How the server, sync and push are doing (settings.rs `connect_status`); with an account.
+    Adw.PreferencesGroup server_status {
+      title: _("Server Status");
+
+      Adw.ActionRow server_row {
+        title: _("Server");
+
+        [prefix]
+        Gtk.Image server_icon {}
+      }
+
+      Adw.ActionRow sync_row {
+        title: _("Sync");
+
+        [prefix]
+        Gtk.Image sync_icon {}
+      }
+
+      Adw.ActionRow push_row {
+        title: _("DAV Push");
+
+        [prefix]
+        Gtk.Image push_icon {}
+
+        // Without DAV Push on the server: its page in the Nextcloud app store.
+        [suffix]
+        Gtk.Button get_push {
+          label: _("Get DAV Push");
+          tooltip-text: _("Open the DAV Push app in the Nextcloud App Store");
+          valign: center;
+          visible: false;
+        }
+      }
+    }
+
     Adw.PreferencesGroup push {
       title: _("Push");
       description: _("Changes are applied when this window closes");

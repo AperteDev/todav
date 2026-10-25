@@ -166,11 +166,14 @@ impl Client {
     pub fn sync(&self) -> Result<SyncReport>;            // push dirty, then pull every list
     pub fn sync_list(&self, list_href: String) -> Result<SyncReport>;
     pub fn sync_topic(&self, topic: String) -> Result<SyncReport>;  // from a push message
+    pub fn last_sync(&self) -> Option<i64>;              // when a sync last went through
+    pub fn server_info(&self) -> Result<ServerInfo>;     // status.php: product, version, maintenance
 
     // Push
     pub fn push_register(&self, push_resource: String, expires_in_secs: u64) -> Result<Vec<PushRegistration>>;
     pub fn push_unregister(&self) -> Result<()>;
     pub fn push_decode(&self, body: Vec<u8>) -> Result<Vec<String>>;  // returns topics
+    pub fn push_status(&self) -> PushStatus;  // calendars, with a push topic, registered
 
     pub fn subscribe(&self, cb: Box<dyn ChangeListener>);  // Changed { list_href, uids }
 }
@@ -237,7 +240,8 @@ A single Rust binary (`todav-linux`) that is both the GUI and a background servi
 - After an edit, the app asks for a sync only when something waits for the server (`Client::pending`): edits in local lists never start one.
 - Type to search; `Ctrl+Z` undo; Keyboard Shortcuts dialog. Toasts for sync errors; the sync button turns into a spinner while syncing.
 - Calendar page: see [Calendar](#calendar-in-todav).
-- Preferences: General (style, start page), Accounts (account, push, settings sync, local lists), Tasks, Calendar, Extension.
+- Preferences: General (style, start page), Accounts (account, server status, push, settings sync, local lists), Tasks, Calendar, Extension.
+- Server status (Preferences → Accounts, with an account): the server as `status.php` describes it (asked each time the page shows the account; unreachable or in maintenance mode says so), the last sync (`Client::last_sync`, or the current error) and DAV Push (`Client::push_status` plus the ntfy listener's last error). Without a push topic on any calendar the server lacks the DAV Push app: the row says what that costs and links to its page in the Nextcloud App Store; with topics but no ntfy server, it asks for one. The sync and push rows follow sync state changes while the dialog is open.
 
 **Local lists**
 

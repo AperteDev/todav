@@ -50,7 +50,19 @@ impl Client {
         }
         self.sync_config()?;
         self.sync_settings()?;
+        self.mark_synced()?;
         Ok(report)
+    }
+
+    /// When a sync last went through (Unix time), if one did with this account.
+    pub fn last_sync(&self) -> Option<i64> {
+        let db = self.db.lock().unwrap();
+        store::kv_get(&db, "last_sync").ok()??.parse().ok()
+    }
+
+    fn mark_synced(&self) -> Result<()> {
+        let db = self.db.lock().unwrap();
+        store::kv_set(&db, "last_sync", &crate::now().to_string())
     }
 
     /// Something waits for the server: edits in synced lists, or old copies of moved tasks.
@@ -65,6 +77,7 @@ impl Client {
         let _guard = self.sync_lock.lock().unwrap();
         let mut report = self.push_dirty()?;
         self.pull(&list_href, &mut report)?;
+        self.mark_synced()?;
         Ok(report)
     }
 

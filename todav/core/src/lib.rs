@@ -23,7 +23,7 @@ use undo::{Before, Journal};
 pub use config::{CategoryGroup, CategoryMeta, DoneView, Sort};
 pub use event::{Event, EventPatch, EventTime, Repeat, Scope};
 pub use login::{Credentials, LoginFlow, login_flow_poll, login_flow_start, password_login};
-pub use push::{PushRegistration, ntfy_check};
+pub use push::{PushRegistration, PushStatus, ntfy_check};
 pub use settings::DEVICE_ONLY;
 pub use sync::{Refused, SyncReport};
 
@@ -136,6 +136,16 @@ pub struct Due {
 pub struct Account {
     pub url: String,
     pub user: String,
+}
+
+/// What the Nextcloud server says about itself (`status.php`).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ServerInfo {
+    /// "Nextcloud", or the name a themed server gives itself.
+    pub product: String,
+    /// "32.0.1"
+    pub version: String,
+    pub maintenance: bool,
 }
 
 pub trait ChangeListener: Send + Sync {
@@ -399,7 +409,7 @@ impl Client {
             db.execute_batch(&format!(
                 "DELETE FROM tasks WHERE list_href NOT LIKE '{0}%'; DELETE FROM lists WHERE href NOT LIKE '{0}%';
                  DELETE FROM moved;
-                 DELETE FROM kv WHERE key LIKE 'config_%' OR key IN ('push_resource', 'conflict_log');",
+                 DELETE FROM kv WHERE key LIKE 'config_%' OR key IN ('push_resource', 'conflict_log', 'last_sync');",
                 store::LOCAL
             ))?;
         }
@@ -424,11 +434,16 @@ impl Client {
         db.execute_batch(&format!(
             "DELETE FROM tasks WHERE list_href NOT LIKE '{0}%'; DELETE FROM lists WHERE href NOT LIKE '{0}%';
              DELETE FROM moved;
-             DELETE FROM kv WHERE key LIKE 'config_%' OR key LIKE 'account_%' OR key IN ('push_resource', 'conflict_log');",
+             DELETE FROM kv WHERE key LIKE 'config_%' OR key LIKE 'account_%' OR key IN ('push_resource', 'conflict_log', 'last_sync');",
             store::LOCAL
         ))?;
         *self.dav.lock().unwrap() = None;
         Ok(())
+    }
+
+    /// Ask the server what it is (no sign-in needed): reachable, its version, maintenance mode.
+    pub fn server_info(&self) -> Result<ServerInfo> {
+        self.dav()?.server_info()
     }
 
     fn dav(&self) -> Result<Arc<Dav>> {

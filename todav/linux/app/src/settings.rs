@@ -8,6 +8,7 @@ use crate::i18n::{gettext, gettext_noop};
 use crate::window::{get, toast, url_text, view};
 use adw::prelude::*;
 use gtk::{gio, glib};
+use std::cell::RefCell;
 use std::rc::Rc;
 use todav_core::Sort;
 
@@ -355,6 +356,151 @@ pub fn present(parent: &impl IsA<gtk::Widget>) {
     dialog.present(Some(parent));
 }
 
+thread_local! {
+    /// Shows the sync and push state in the open Preferences; set while they are open.
+    static STATUS: RefCell<Option<Rc<dyn Fn()>>> = const { RefCell::new(None) };
+}
+
+/// A sync started or ended, or push failed or works again: the open Preferences show it.
+pub fn status_changed() {
+    if let Some(show) = STATUS.with_borrow(Clone::clone) {
+        show();
+    }
+}
+
+/// The DAV Push app's page in the Nextcloud app store.
+const DAV_PUSH_APP: &str = "https://apps.nextcloud.com/apps/dav_push";
+
+/// One row of "Server Status": its icon (none, "success", "info", "warning" or "error") and
+/// subtitle.
+fn set_status(row: &adw::ActionRow, icon: &gtk::Image, look: Option<&str>, text: &str) {
+    row.set_subtitle(text);
+    icon.set_visible(look.is_some());
+    for class in ["success", "warning", "error", "dimmed"] {
+        icon.remove_css_class(class);
+    }
+    if let Some(look) = look {
+        icon.set_icon_name(Some(match look {
+            "success" => "object-select-symbolic",
+            "error" => "dialog-error-symbolic",
+            "warning" => "dialog-warning-symbolic",
+            _ => "dialog-information-symbolic",
+        }));
+        icon.add_css_class(if look == "info" { "dimmed" } else { look });
+    }
+}
+
+/// The "Server Status" group: the server (asked each time the returned closure runs), the last
+/// sync and DAV Push, the latter two kept up to date while the dialog is open.
+fn connect_status(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<dyn Fn()> {
+    let (server, server_icon): (adw::ActionRow, gtk::Image) =
+        (get(b, "server_row"), get(b, "server_icon"));
+    let (sync, sync_icon): (adw::ActionRow, gtk::Image) = (get(b, "sync_row"), get(b, "sync_icon"));
+    let (push, push_icon): (adw::ActionRow, gtk::Image) = (get(b, "push_row"), get(b, "push_icon"));
+    let get_push: gtk::Button = get(b, "get_push");
+    get_push.connect_clicked(|button| {
+        let window = button.root().and_downcast::<gtk::Window>();
+        gtk::UriLauncher::new(DAV_PUSH_APP).launch(window.as_ref(), gio::Cancellable::NONE, |_| {});
+    });
+
+    let show = Rc::new(move || {
+        // The last sync, as the sidebar dates say it ("Today 14:32").
+        let now = core().local_now();
+        let last = core().last_sync().map(|t| {
+            let local = t + now - todav_core::now();
+            gettext("Last synced: {time}")
+                .replace("{time}", &crate::dates::label(local, false, now))
+        });
+        let state = crate::sync_state();
+        match state.strip_prefix("error:") {
+            _ if state == "syncing" => set_status(&sync, &sync_icon, None, &gettext("Syncing…")),
+            Some(e) => set_status(
+                &sync,
+                &sync_icon,
+                Some("error"),
+                &gettext("Failed: {error}").replace("{error}", e),
+            ),
+            None => match &last {
+                Some(l) => set_status(&sync, &sync_icon, Some("success"), l),
+                None => set_status(&sync, &sync_icon, None, &gettext("Not synced yet")),
+            },
+        }
+
+        let p = core().push_status();
+        let ntfy = !core()
+            .setting("ntfy_url".into())
+            .unwrap_or_default()
+            .is_empty();
+        get_push.set_visible(p.calendars > 0 && p.supported == 0);
+        let (look, text) = if p.calendars == 0 {
+            (None, gettext("Checked at the next sync"))
+        } else if p.supported == 0 {
+            (
+                Some("info"),
+                gettext(
+                    "Not available on this server, so changes made elsewhere show up at the next \
+                     check (every minute while the window is focused). Install the DAV Push app \
+                     on Nextcloud and enter an ntfy server below to see them within seconds",
+                ),
+            )
+        } else if !ntfy {
+            (
+                Some("info"),
+                gettext(
+                    "Available on this server. Enter an ntfy server below to see changes made \
+                     elsewhere within seconds",
+                ),
+            )
+        } else if let Some(e) = crate::push_error() {
+            (
+                Some("error"),
+                gettext("Not working: {error}").replace("{error}", &e),
+            )
+        } else if p.registered == 0 {
+            (None, gettext("Registering…"))
+        } else {
+            (
+                Some("success"),
+                gettext("On: changes made elsewhere show up within seconds"),
+            )
+        };
+        set_status(&push, &push_icon, look, &text);
+    });
+    STATUS.set(Some(show.clone()));
+    dialog.connect_closed(|_| STATUS.set(None));
+
+    Rc::new(move || {
+        show();
+        set_status(&server, &server_icon, None, &gettext("Checking…"));
+        let (server, icon) = (server.downgrade(), server_icon.downgrade());
+        glib::spawn_future_local(async move {
+            let r = gio::spawn_blocking(|| core().server_info()).await;
+            let (Some(server), Some(icon)) = (server.upgrade(), icon.upgrade()) else {
+                return;
+            };
+            match r {
+                Ok(Ok(info)) => {
+                    let name = format!("{} {}", info.product, info.version);
+                    if info.maintenance {
+                        let text =
+                            gettext("{server}, in maintenance mode").replace("{server}", &name);
+                        set_status(&server, &icon, Some("warning"), &text);
+                    } else {
+                        set_status(&server, &icon, Some("success"), &name);
+                    }
+                }
+                Ok(Err(e)) => set_status(
+                    &server,
+                    &icon,
+                    Some("error"),
+                    &gettext("Cannot reach the server: {error}").replace("{error}", &e.to_string()),
+                ),
+                Err(_) => {}
+            }
+        });
+    })
+}
+
 /// The "Account" group: a status row, then the shared GOA / server rows, applied at once.
 /// Turning GOA on (or picking another account) connects through it; turning it off goes back
 /// to the last browser sign-in, or disconnects without one. Signing in with the browser
@@ -369,6 +515,8 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
     let sign_out: adw::SplitButton = get(b, "sign_out");
     // Push and sync are about the account: only with one (local mode runs without).
     let server_groups: [adw::PreferencesGroup; 2] = [get(b, "push"), get(b, "sync")];
+    let server_status: adw::PreferencesGroup = get(b, "server_status");
+    let check_server = connect_status(b, dialog);
     // Everything here shows the actual connection, the switch included.
     let describe = {
         let (conn, sign_in, sign_out) = (conn.clone(), sign_in.clone(), sign_out.clone());
@@ -397,6 +545,10 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
             icon.set_visible(acc.is_some());
             for g in &server_groups {
                 g.set_sensitive(acc.is_some());
+            }
+            server_status.set_visible(acc.is_some());
+            if acc.is_some() {
+                check_server();
             }
             sign_out.set_visible(acc.is_some() && !goa);
             sign_in.set_visible(acc.is_none());
