@@ -124,7 +124,7 @@ One Cargo workspace at the root, the app's core and front-ends under `todav/`. N
 | Need | Crate / library | Why not std |
 | --- | --- | --- |
 | HTTP + TLS | `ureq` (sync, rustls) | No async runtime needed; keeps the core small |
-| SQLite | `rusqlite` (bundled) | Standard choice, single file |
+| SQLite | `rusqlite` (0.38 to 0.40), the system SQLite | Standard choice, single file; not bundled, as distributions (Fedora) require, and 0.38 is what Fedora packages. Android will need its `bundled` feature |
 | XML | `quick-xml` | PROPFIND/REPORT bodies and multistatus responses |
 | FFI | `uniffi` | Kotlin bindings generated from the Rust API |
 | ntfy stream (Linux push) | — (`ureq`) | ntfy's `/<topic>/json` NDJSON stream over plain HTTP; no WebSocket crate needed |
@@ -285,6 +285,10 @@ A single Rust binary (`todav-linux`) that is both the GUI and a background servi
 The interface returns small tuples, not JSON, so the extension needs no parsing library. D-Bus activation (`DBusActivatable=true` + a service file) lets the extension start the app on demand.
 
 **Packaging**: Flatpak on `org.gnome.Platform` 51 (`todav/linux/flatpak/`). Permissions: `--share=network`, `--talk-name=org.freedesktop.secrets`, `--talk-name=org.gnome.OnlineAccounts`; autostart through the Background portal. Not on Flathub yet.
+
+- Flathub: the submission (a manifest building offline from the release tag, with a generated `cargo-sources.json`) lives in its own `flathub/dev.aperte.Todav` repository and is written and opened by hand: Flathub accepts no AI-generated manifests or AI-opened submissions, and AI-assisted code in the app must be disclosed (Claude). Expect questions on the two `--talk-name` permissions (libsecret uses the Secret portal inside Flatpak) and on the project's age. The metainfo already has what Flathub asks for: screenshots from the release tag, release notes, brand colours.
+- Fedora: `todav/linux/rpm/todav.spec` builds on COPR through `.copr/Makefile` (source tarball from the checkout, `cargo vendor` next to it), with the extension as the noarch `gnome-shell-extension-todav`. The official repositories would want Fedora's crates instead of vendored ones: all are packaged at our versions except `libsecret` (not packaged) and `rusqlite` (Fedora has 0.38, which the core accepts). SQLite is the system one (no `bundled` feature), as Fedora requires.
+- extensions.gnome.org reviews reject code with clear signs of AI generation; the extension must be one its author can explain line by line.
 
 **App ID** `dev.aperte.Todav`, extension UUID `todav@aperte.dev`, on the domain of Aperte, the developer (decided 2026-10-25; a domain ID does not depend on where the code is hosted). Todav 1.2 and older were `io.github.selfref.Todav` and `todav@selfref.dev`, with no migration (no other users yet): the data directory did not depend on it, a password saved in the keyring under the old schema is not found.
 
@@ -449,7 +453,8 @@ Deviation: no docker stack (`infra/`) for now — integration runs against the r
 - [x] README and CONTRIBUTING
 - [x] CI and releases (GitHub Actions): every push runs fmt, clippy `-D warnings` and the unit tests on Fedora 45 (GNOME 51), and builds the packages: the Flatpak bundle (Flathub's GNOME 51 builder image), a tarball of the system-wide tree (`make -C todav/linux stage`: app, data, `/etc/xdg/autostart`, the extension under `/usr/share/gnome-shell/extensions`) built on Fedora 43 so its glibc suits newer distributions, a `.deb` for Ubuntu 26.04+ repacked from that tree (`scripts/deb.sh`, dependencies by `dpkg-shlibdeps` plus libadwaita ≥ 1.8) and the extension zip. Lowest supported GNOME: 49 (libadwaita 1.8, `Adw.ShortcutsDialog`). The manual Release workflow builds them with the version set by `scripts/release.py`, then commits `chore(release): X`, tags `vX` and publishes a GitHub release with the changelog section as notes. The AUR has the app and the extension as separate packages, each from the release tag, the release assets (`-bin`) and `master` (`-git`); they are maintained outside this repository. One version for the workspace (`[workspace.package]`), the metainfo and the extension
 - [x] Translations: gettext domain `todav` for the app (Rust `i18n.rs` over glibc, Blueprint `_()`), the extension (`gettext-domain`, catalogs in its `locale/`), the desktop file and the metainfo (`msgfmt --desktop/--xml`, rules in `po/its/`, so no AppStream package is needed to build). `scripts/i18n.sh` refreshes `po/todav.pot` and merges it; build.rs compiles the catalogs for a build run (and the translated metainfo for About), `make install-data` and the extension's `stage` for installs. Languages: Polish (reviewed), German, French, Spanish, Italian, Brazilian Portuguese (drafts). Weeks start on the locale's first weekday (`i18n::first_weekday`, glibc's `_NL_TIME_WEEK_1STDAY` + `_NL_TIME_FIRST_WEEKDAY`, as GTK's calendar)
-- [ ] `docs/`, Flathub (generated `cargo-sources.json`), extensions.gnome.org
+- [ ] `docs/`, Flathub (generated `cargo-sources.json`, see Packaging), extensions.gnome.org
+- [x] COPR spec for Fedora (`todav/linux/rpm/`, `.copr/Makefile`); metainfo ready for Flathub (screenshots, release notes from the changelog, branding); system SQLite
 - [ ] M6 Android (+ UniFFI exports) → M7 Pebble
 
 ## Roadmap

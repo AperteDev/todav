@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 SelfRef -->
 <component type="desktop-application">
   <id>dev.aperte.Todav</id>
   <metadata_license>CC0-1.0</metadata_license>
@@ -15,16 +16,43 @@
       <li>Changes from other devices arrive within seconds through push</li>
       <li>Categories, subtasks, due dates and reminders</li>
       <li>Month, week and agenda views; plan tasks into time slots by drag and drop</li>
-      <li>A GNOME Shell extension with your tasks and calendar in the top bar</li>
+      <li>An optional GNOME Shell extension, installed separately, puts your tasks and calendar in the top bar</li>
       <li>Connects through GNOME Online Accounts or a browser sign-in</li>
     </ul>
   </description>
   <developer id="dev.aperte">
-    <name>Aperte</name>
+    <name translate="no">Aperte</name>
   </developer>
   <launchable type="desktop-id">dev.aperte.Todav.desktop</launchable>
+  <translation type="gettext">todav</translation>
   <url type="homepage">https://github.com/AperteDev/todav</url>
   <url type="bugtracker">https://github.com/AperteDev/todav/issues</url>
+  <url type="vcs-browser">https://github.com/AperteDev/todav</url>
+  <url type="contribute">https://github.com/AperteDev/todav/blob/master/CONTRIBUTING.md</url>
+  <url type="donation">https://github.com/sponsors/SelfRef</url>
+  <!-- From the release tag (scripts/release.py moves them to each new one). -->
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v1.2.1/docs/screenshots/tasks.png</image>
+      <caption>Tasks grouped by category, with subtasks and due dates</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v1.2.1/docs/screenshots/calendar-month.png</image>
+      <caption>The month, with an event's details</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v1.2.1/docs/screenshots/calendar-week.png</image>
+      <caption>Tasks planned into the week next to events</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v1.2.1/docs/screenshots/event-dialog.png</image>
+      <caption>Editing an event</caption>
+    </screenshot>
+  </screenshots>
+  <branding>
+    <color type="primary" scheme_preference="light">#a5e1d0</color>
+    <color type="primary" scheme_preference="dark">#1d4b6b</color>
+  </branding>
   <content_rating type="oars-1.1"/>
   <supports>
     <control>pointing</control>
@@ -32,10 +60,76 @@
     <control>touch</control>
   </supports>
   <releases>
-    <release version="1.2.1" date="2026-10-25"/>
-    <release version="1.2.0" date="2026-10-23"/>
-    <release version="1.1.0" date="2026-10-22"/>
-    <release version="1.0.0" date="2026-10-22"/>
+    <release version="1.2.1" date="2026-10-25">
+      <url type="details">https://github.com/AperteDev/todav/releases/tag/v1.2.1</url>
+      <description translate="no">
+        <p>Changed</p>
+        <ul>
+          <li>The app ID is now <code>dev.aperte.Todav</code> and the extension's UUID <code>todav@aperte.dev</code>. Todav moved to AperteDev on GitHub.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.2.0" date="2026-10-23">
+      <url type="details">https://github.com/AperteDev/todav/releases/tag/v1.2.0</url>
+      <description translate="no">
+        <p>Added</p>
+        <ul>
+          <li>Use Todav without an account: "On This Device Only" on the welcome page keeps your task lists and calendars on this computer, starting with a task list and a calendar.</li>
+          <li>"Local lists and calendars" in Preferences → Accounts: keep lists and calendars on this device only, next to the synced ones. Turning it off hides them; nothing is deleted. New lists and calendars ask where to go.</li>
+          <li>The sidebars and the event dialog's calendar picker group lists and calendars by where they are kept, those on this device last.</li>
+          <li>Move tasks to another list and events to another calendar by dropping them on it in the sidebar; a task takes its subtasks along.</li>
+          <li>A list picker in the task dialog, to move a task to another list.</li>
+          <li>A star on every task, coloured by its priority; its menu sets the priority. As in Nextcloud Tasks, a starred task is one of high priority.</li>
+          <li>An Important page with the high-priority tasks of every list.</li>
+          <li>"Priority, highest first" to sort tasks and subtasks.</li>
+          <li>Pin tasks to the top of their list, in a Pinned group (shared with Nextcloud Tasks' pins).</li>
+          <li>"Stars" and "Pins" in Preferences → Tasks turn either off; pinned tasks stay pinned for other apps.</li>
+          <li>Nested subtasks, any number of levels deep: a subtask's "+" adds subtasks to it, and a task dropped on a "+" moves there with its own subtasks; dropped on an "Add subtask" field, it goes where a new subtask would. The task details on the calendar list a subtask's subtasks too.</li>
+        </ul>
+        <p>Changed</p>
+        <ul>
+          <li>The welcome page asks first how to use Todav (GNOME Online Accounts, a Nextcloud server or this device only), then for the account.</li>
+          <li>The account, push and sync settings moved to a new Accounts page in Preferences.</li>
+          <li>Times on the calendar are dimmer than titles and come after them, at the end of one-line entries, as in GNOME Calendar.</li>
+          <li>Upcoming shows in the sidebar only while some task has a due date, as Important does while some task has high priority.</li>
+        </ul>
+        <p>Fixed</p>
+        <ul>
+          <li>A task dropped on the "Add a task" field no longer types its internal ID into it.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.1.0" date="2026-10-22">
+      <url type="details">https://github.com/AperteDev/todav/releases/tag/v1.1.0</url>
+      <description translate="no">
+        <p>Fixed</p>
+        <ul>
+          <li>The window opens with the size it had when the app quit, and maximized if it was.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.0.0" date="2026-10-22">
+      <url type="details">https://github.com/AperteDev/todav/releases/tag/v1.0.0</url>
+      <description translate="no">
+        <p>Added</p>
+        <ul>
+          <li>Tasks and events in your Nextcloud over CalDAV, kept in a local copy: the app works offline and syncs in the background, and push through WebDAV Push and ntfy brings changes from other devices within seconds.</li>
+          <li>Sign in through GNOME Online Accounts, in the browser (Nextcloud Login Flow), or with a login name and app password; passwords stay in the keyring.</li>
+          <li>Task lists: create, rename, recolour and delete them; categories as groups or tags with a sidebar filter; subtasks; manual order by drag and drop, shared with Nextcloud Tasks; sorting by due date.</li>
+          <li>Tasks: due dates and start times, priority, notes, several reminders each as desktop notifications with "Mark as Done", and an Upcoming page across lists.</li>
+          <li>A calendar with Month, Week and Agenda views: create, edit, move and delete events, repeating ones too (this occurrence, the following or all), with reminders. Weeks start on the day your region's formats say.</li>
+          <li>Time-blocking: drag tasks from "To Plan" onto an hour or a day, move and resize blocks in the week, drop them back to unplan.</li>
+          <li>Click an event or task on the calendar for its details, where an event's tasks and a task's subtasks can be ticked and added; double-click to edit it ("Edit on double click" in Preferences turns this off for instant details).</li>
+          <li>Tasks linked to events, and today's events at the top of Upcoming.</li>
+          <li>Search across tasks and events, undo with Ctrl+Z, keyboard shortcuts.</li>
+          <li>Preferences synced between devices through Nextcloud Files.</li>
+          <li>Runs in the background and starts with the session.</li>
+          <li>Translations into Polish, German, French, Spanish, Italian and Brazilian Portuguese, for the app and the extension. Polish is reviewed; the others are first drafts.</li>
+          <li>Packages for GNOME 49 and newer: a Flatpak bundle, a <code>.deb</code> for Ubuntu 26.04 and newer, a tarball for other distributions (both with the extension), and the extension as a zip.</li>
+          <li>A GNOME Shell extension: the open-task count in the top bar, and a menu with a task list, a month calendar with dots for what each day holds and the coming week's agenda; it adds tasks and events and opens the app where you click. Its options are in the app's Preferences. Without the app installed, its menu says so and links to the download.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-10-14"/>
   </releases>
 </component>

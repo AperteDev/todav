@@ -8,7 +8,8 @@ license.workspace = true
 p256 = { version = "0.14.0", default-features = false, features = ["ecdh", "alloc"] }
 quick-xml = "0.42.0"
 ring = "0.17"
-rusqlite = { version = "0.40.2", features = ["bundled"] }
+# 0.38 is what Fedora packages; the system SQLite, as distributions want.
+rusqlite = ">=0.38, <0.41"
 ureq = "3.4.2"
 
 [features]

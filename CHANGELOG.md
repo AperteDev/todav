@@ -17,9 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in the Nextcloud App Store; with it but no ntfy server, it asks for one.
 - Extension: a settings button in the Extensions app, opening Todav's Preferences on the
   Extension page.
+- An RPM spec for Fedora, with the extension as a separate package, built on COPR from
+  `.copr/Makefile`.
 
 ### Changed
 
+- Todav uses the system's SQLite library instead of a built-in copy; packages now depend on it.
+- The app's store listing has screenshots, release notes and brand colours, and says the GNOME
+  Shell extension is optional and installed separately.
 - A task's subtask count ("1/4") counts only its own subtasks; deeper ones count on their
   subtask's row.
 - Extension: with tasks and calendar side by side, the task list and the agenda take the

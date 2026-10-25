@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Todav\n"
 "Report-Msgid-Bugs-To: https://github.com/AperteDev/todav/issues\n"
-"POT-Creation-Date: 2026-10-25 20:40+0100\n"
+"POT-Creation-Date: 2026-10-25 21:30+0100\n"
 "PO-Revision-Date: 2026-10-22 21:00+0200\n"
 "Last-Translator: \n"
 "Language-Team: Brazilian Portuguese\n"
@@ -1727,12 +1727,12 @@ msgid "Category (Ctrl+K)"
 msgstr "Categoria (Ctrl+K)"
 
 #: todav/linux/data/dev.aperte.Todav.desktop:2
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:6
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:7
 msgid "Todav"
 msgstr "Todav"
 
 #: todav/linux/data/dev.aperte.Todav.desktop:3
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:7
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:8
 msgid "Tasks and calendar kept in your Nextcloud"
 msgstr "Tarefas e agenda guardadas no seu Nextcloud"
 
@@ -1740,7 +1740,7 @@ msgstr "Tarefas e agenda guardadas no seu Nextcloud"
 msgid "todo;tasks;calendar;events;caldav;nextcloud;"
 msgstr "tarefas;agenda;calendário;eventos;todo;caldav;nextcloud;"
 
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:9
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:10
 msgid ""
 "Todav is a task list and calendar kept in your Nextcloud through CalDAV, so "
 "the Nextcloud Tasks and Calendar web apps and other CalDAV clients see the "
@@ -1750,38 +1750,56 @@ msgstr ""
 "CalDAV, então os aplicativos web Tarefas e Agenda do Nextcloud e outros "
 "clientes CalDAV veem as mesmas listas e eventos."
 
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:14
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:15
 msgid "Works offline; changes sync when the server is reachable"
 msgstr ""
 "Funciona off-line; as alterações sincronizam quando o servidor está acessível"
 
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:15
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:16
 msgid "Changes from other devices arrive within seconds through push"
 msgstr "As alterações de outros dispositivos chegam em segundos por push"
 
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:16
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:17
 msgid "Categories, subtasks, due dates and reminders"
 msgstr "Categorias, subtarefas, vencimentos e lembretes"
 
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:17
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:18
 msgid ""
 "Month, week and agenda views; plan tasks into time slots by drag and drop"
 msgstr ""
 "Visões de mês, semana e lista; planeje tarefas em horários arrastando e "
 "soltando"
 
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:18
-msgid "A GNOME Shell extension with your tasks and calendar in the top bar"
-msgstr ""
-"Uma extensão do GNOME Shell com suas tarefas e sua agenda na barra superior"
-
 #: todav/linux/data/dev.aperte.Todav.metainfo.xml:19
+msgid ""
+"An optional GNOME Shell extension, installed separately, puts your tasks and "
+"calendar in the top bar"
+msgstr "Uma extensão opcional do GNOME Shell, instalada separadamente, mostra suas tarefas e seu calendário na barra superior"
+
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:20
 msgid "Connects through GNOME Online Accounts or a browser sign-in"
 msgstr "Conecta-se pelas Contas on-line do GNOME ou por login no navegador"
 
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:23
-msgid "Aperte"
-msgstr ""
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:44
+msgid "Tasks grouped by category, with subtasks and due dates"
+msgstr "Tarefas agrupadas por categoria, com subtarefas e prazos"
+
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:48
+msgid "The month, with an event's details"
+msgstr "O mês, com os detalhes de um evento"
+
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:52
+msgid "Tasks planned into the week next to events"
+msgstr "Tarefas planejadas na semana ao lado dos eventos"
+
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:56
+msgid "Editing an event"
+msgstr "Edição de um evento"
+
+#, fuzzy
+#~| msgid "Priority, highest first"
+#~ msgid "\"Priority, highest first\" to sort tasks and subtasks."
+#~ msgstr "Prioridade, a mais alta primeiro"
 
 #~ msgid "SelfRef"
 #~ msgstr "SelfRef"

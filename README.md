@@ -191,7 +191,7 @@ Todav speaks standard CalDAV, but other servers and desktops are untested for no
 
 ### Building and installing
 
-**Dependencies:** Rust (stable), GTK 4.14+, libadwaita 1.8+, libsecret, `blueprint-compiler`,
+**Dependencies:** Rust (stable), GTK 4.14+, libadwaita 1.8+, libsecret, SQLite, `blueprint-compiler`,
 `glib-compile-resources` (GLib) and gettext's `msgfmt`.
 
 ```sh
@@ -203,6 +203,12 @@ make -C todav/gnome-extension install
 ```
 
 A Flatpak manifest is included too: `make -C todav/linux flatpak` (needs `flatpak-builder`).
+For Fedora, `todav/linux/rpm/todav.spec` builds the app and the extension as RPMs; COPR builds
+it with `.copr/Makefile`, which also works locally:
+
+```sh
+make -f .copr/Makefile srpm outdir=$PWD/target/rpm spec=$PWD/todav/linux/rpm/todav.spec
+```
 
 Every push is checked and packaged by [CI](.github/workflows/ci.yml); releases are made by the
 manual [Release](.github/workflows/release.yml) workflow and listed in the

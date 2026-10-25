@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Todav\n"
 "Report-Msgid-Bugs-To: https://github.com/AperteDev/todav/issues\n"
-"POT-Creation-Date: 2026-10-25 20:40+0100\n"
+"POT-Creation-Date: 2026-10-25 21:30+0100\n"
 "PO-Revision-Date: 2026-10-22 21:00+0200\n"
 "Last-Translator: \n"
 "Language-Team: French\n"
@@ -1733,12 +1733,12 @@ msgid "Category (Ctrl+K)"
 msgstr "Catégorie (Ctrl+K)"
 
 #: todav/linux/data/dev.aperte.Todav.desktop:2
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:6
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:7
 msgid "Todav"
 msgstr "Todav"
 
 #: todav/linux/data/dev.aperte.Todav.desktop:3
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:7
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:8
 msgid "Tasks and calendar kept in your Nextcloud"
 msgstr "Tâches et agenda conservés dans votre Nextcloud"
 
@@ -1746,7 +1746,7 @@ msgstr "Tâches et agenda conservés dans votre Nextcloud"
 msgid "todo;tasks;calendar;events;caldav;nextcloud;"
 msgstr "tâches;agenda;calendrier;événements;todo;caldav;nextcloud;"
 
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:9
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:10
 msgid ""
 "Todav is a task list and calendar kept in your Nextcloud through CalDAV, so "
 "the Nextcloud Tasks and Calendar web apps and other CalDAV clients see the "
@@ -1756,44 +1756,61 @@ msgstr ""
 "via CalDAV, si bien que les applications web Tâches et Agenda de Nextcloud "
 "et les autres clients CalDAV voient les mêmes listes et événements."
 
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:14
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:15
 msgid "Works offline; changes sync when the server is reachable"
 msgstr ""
 "Fonctionne hors ligne ; les modifications se synchronisent dès que le "
 "serveur est joignable"
 
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:15
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:16
 msgid "Changes from other devices arrive within seconds through push"
 msgstr ""
 "Les modifications des autres appareils arrivent en quelques secondes grâce "
 "au push"
 
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:16
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:17
 msgid "Categories, subtasks, due dates and reminders"
 msgstr "Catégories, sous-tâches, échéances et rappels"
 
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:17
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:18
 msgid ""
 "Month, week and agenda views; plan tasks into time slots by drag and drop"
 msgstr ""
 "Vues mois, semaine et liste ; planifiez les tâches dans des créneaux par "
 "glisser-déposer"
 
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:18
-msgid "A GNOME Shell extension with your tasks and calendar in the top bar"
-msgstr ""
-"Une extension GNOME Shell avec vos tâches et votre agenda dans la barre "
-"supérieure"
-
 #: todav/linux/data/dev.aperte.Todav.metainfo.xml:19
+msgid ""
+"An optional GNOME Shell extension, installed separately, puts your tasks and "
+"calendar in the top bar"
+msgstr "Une extension GNOME Shell facultative, installée séparément, affiche vos tâches et votre agenda dans la barre supérieure"
+
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:20
 msgid "Connects through GNOME Online Accounts or a browser sign-in"
 msgstr ""
 "Se connecte via les Comptes en ligne GNOME ou une connexion dans le "
 "navigateur"
 
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:23
-msgid "Aperte"
-msgstr ""
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:44
+msgid "Tasks grouped by category, with subtasks and due dates"
+msgstr "Tâches groupées par catégorie, avec sous-tâches et échéances"
+
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:48
+msgid "The month, with an event's details"
+msgstr "Le mois, avec les détails d’un événement"
+
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:52
+msgid "Tasks planned into the week next to events"
+msgstr "Tâches planifiées dans la semaine à côté des événements"
+
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:56
+msgid "Editing an event"
+msgstr "Modification d’un événement"
+
+#, fuzzy
+#~| msgid "Priority, highest first"
+#~ msgid "\"Priority, highest first\" to sort tasks and subtasks."
+#~ msgstr "Priorité, la plus haute d’abord"
 
 #~ msgid "SelfRef"
 #~ msgstr "SelfRef"
