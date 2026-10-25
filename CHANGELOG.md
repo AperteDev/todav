@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Push works. Without DAV Push on the server, it says what that means and links to the app
   in the Nextcloud App Store; with it but no ntfy server, it asks for one.
 
+### Changed
+
+- A task's subtask count ("1/4") counts only its own subtasks; deeper ones count on their
+  subtask's row.
+
 ## [1.2.1] - 2026-10-25
 
 ### Changed

@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Todav\n"
 "Report-Msgid-Bugs-To: https://github.com/AperteDev/todav/issues\n"
-"POT-Creation-Date: 2026-10-25 18:58+0100\n"
+"POT-Creation-Date: 2026-10-25 19:26+0100\n"
 "PO-Revision-Date: 2026-10-22 21:00+0200\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
@@ -188,7 +188,7 @@ msgid "Add a subtask"
 msgstr "Añadir una subtarea"
 
 #: todav/linux/app/src/calendar.rs:1684 todav/linux/app/src/lists.rs:567
-#: todav/linux/app/src/window.rs:2623
+#: todav/linux/app/src/window.rs:2615
 msgid "Delete"
 msgstr "Eliminar"
 
@@ -202,7 +202,7 @@ msgstr "Se repite"
 
 #: todav/linux/app/src/calendar.rs:1849
 #: todav/linux/app/src/calendar/dialog.rs:345
-#: todav/linux/app/src/window.rs:2632
+#: todav/linux/app/src/window.rs:2624
 #, rust-format
 msgid "“{title}” deleted"
 msgstr "«{title}» eliminado"
@@ -216,7 +216,7 @@ msgstr "¿Eliminar el evento repetido?"
 msgid "Done"
 msgstr "Hecho"
 
-#: todav/linux/app/src/calendar.rs:1898 todav/linux/app/src/window.rs:1803
+#: todav/linux/app/src/calendar.rs:1898 todav/linux/app/src/window.rs:1795
 #, rust-format
 msgid "Not saved on the server: {reason}"
 msgstr "No guardado en el servidor: {reason}"
@@ -766,7 +766,7 @@ msgstr "«{title}» no se guardó en el servidor"
 msgid "“{title}” was not saved on the server: {reason}"
 msgstr "«{title}» no se guardó en el servidor: {reason}"
 
-#: todav/linux/app/src/window.rs:483 todav/linux/app/src/window.rs:1928
+#: todav/linux/app/src/window.rs:483 todav/linux/app/src/window.rs:1920
 msgid "Edit"
 msgstr "Editar"
 
@@ -895,82 +895,82 @@ msgid_plural "{n} open"
 msgstr[0] "{n} pendiente"
 msgstr[1] "{n} pendientes"
 
-#: todav/linux/app/src/window.rs:1782
+#: todav/linux/app/src/window.rs:1774
 #, rust-format
 msgid "{done} of {all} subtask done"
 msgid_plural "{done} of {all} subtasks done"
 msgstr[0] "{done} de {all} subtarea hecha"
 msgstr[1] "{done} de {all} subtareas hechas"
 
-#: todav/linux/app/src/window.rs:1884 todav/linux/app/src/window.rs:1923
+#: todav/linux/app/src/window.rs:1876 todav/linux/app/src/window.rs:1915
 msgid "Add Subtask"
 msgstr "Añadir subtarea"
 
-#: todav/linux/app/src/window.rs:2018
+#: todav/linux/app/src/window.rs:2010
 msgid "Add subtask"
 msgstr "Añadir subtarea"
 
-#: todav/linux/app/src/window.rs:2158
+#: todav/linux/app/src/window.rs:2150
 msgid "Drag to Move"
 msgstr "Arrastrar para mover"
 
-#: todav/linux/app/src/window.rs:2551 todav/linux/app/ui/edit-dialog.blp:95
+#: todav/linux/app/src/window.rs:2543 todav/linux/app/ui/edit-dialog.blp:95
 msgid "Priority"
 msgstr "Prioridad"
 
-#: todav/linux/app/src/window.rs:2561 todav/linux/app/ui/edit-dialog.blp:96
+#: todav/linux/app/src/window.rs:2553 todav/linux/app/ui/edit-dialog.blp:96
 msgctxt "priority"
 msgid "None"
 msgstr "Ninguna"
 
-#: todav/linux/app/src/window.rs:2562 todav/linux/app/ui/edit-dialog.blp:96
+#: todav/linux/app/src/window.rs:2554 todav/linux/app/ui/edit-dialog.blp:96
 msgctxt "priority"
 msgid "Low"
 msgstr "Baja"
 
-#: todav/linux/app/src/window.rs:2563 todav/linux/app/ui/edit-dialog.blp:96
+#: todav/linux/app/src/window.rs:2555 todav/linux/app/ui/edit-dialog.blp:96
 msgctxt "priority"
 msgid "Medium"
 msgstr "Media"
 
-#: todav/linux/app/src/window.rs:2564 todav/linux/app/ui/edit-dialog.blp:96
+#: todav/linux/app/src/window.rs:2556 todav/linux/app/ui/edit-dialog.blp:96
 msgctxt "priority"
 msgid "High"
 msgstr "Alta"
 
-#: todav/linux/app/src/window.rs:2602
+#: todav/linux/app/src/window.rs:2594
 msgid "Unpin"
 msgstr "Desfijar"
 
-#: todav/linux/app/src/window.rs:2604
+#: todav/linux/app/src/window.rs:2596
 msgid "Pin"
 msgstr "Fijar"
 
-#: todav/linux/app/src/window.rs:2641 todav/linux/app/ui/shortcuts.blp:16
+#: todav/linux/app/src/window.rs:2633 todav/linux/app/ui/shortcuts.blp:16
 msgid "Undo"
 msgstr "Deshacer"
 
-#: todav/linux/app/src/window.rs:2833
+#: todav/linux/app/src/window.rs:2825
 msgid "Start and due date need a time on both or on neither"
 msgstr "El inicio y el vencimiento deben tener hora los dos o ninguno"
 
-#: todav/linux/app/src/window.rs:2836
+#: todav/linux/app/src/window.rs:2828
 msgid "The task starts after it is due"
 msgstr "La tarea empieza después de vencer"
 
-#: todav/linux/app/src/window.rs:2977
+#: todav/linux/app/src/window.rs:2969
 msgid "Add a Time"
 msgstr "Añadir una hora"
 
-#: todav/linux/app/src/window.rs:3098
+#: todav/linux/app/src/window.rs:3090
 msgid "Low priority"
 msgstr "Prioridad baja"
 
-#: todav/linux/app/src/window.rs:3099
+#: todav/linux/app/src/window.rs:3091
 msgid "Medium priority"
 msgstr "Prioridad media"
 
-#: todav/linux/app/src/window.rs:3100
+#: todav/linux/app/src/window.rs:3092
 msgid "High priority"
 msgstr "Prioridad alta"
 

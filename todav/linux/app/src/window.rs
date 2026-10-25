@@ -1725,25 +1725,17 @@ fn trees(tasks: &[Task]) -> Vec<(&Task, Vec<(usize, &Task)>)> {
     out
 }
 
-/// (open, done) subtasks below each task, at any depth, hidden ones included.
+/// (open, done) direct subtasks of each task, hidden ones included; theirs count on their own row.
 fn subtask_counts(tasks: &[Task]) -> HashMap<String, (usize, usize)> {
-    let parent: HashMap<&str, &str> = tasks
-        .iter()
-        .filter_map(|t| Some((t.uid.as_str(), t.parent_uid.as_deref()?)))
-        .collect();
     let mut counts: HashMap<String, (usize, usize)> = HashMap::new();
     for t in tasks {
-        let mut up = t.parent_uid.as_deref();
-        // Bounded: RELATED-TO from a server can form a cycle.
-        for _ in 0..tasks.len() {
-            let Some(uid) = up else { break };
-            let c = counts.entry(uid.to_string()).or_default();
+        if let Some(parent) = &t.parent_uid {
+            let c = counts.entry(parent.clone()).or_default();
             if t.done {
                 c.1 += 1;
             } else {
                 c.0 += 1;
             }
-            up = parent.get(uid).copied();
         }
     }
     counts
@@ -3143,7 +3135,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn counts_open_and_done_subtasks_at_any_depth() {
+    fn counts_open_and_done_direct_subtasks() {
         let done = |uid, parent| Task {
             done: true,
             ..task(uid, parent)
@@ -3152,16 +3144,14 @@ pub(crate) mod tests {
             task("a", None),
             task("a1", Some("a")),
             done("a1x", Some("a1")),
+            task("a1y", Some("a1")),
             done("a2", Some("a")),
             task("b", None),
-            done("loop1", Some("loop2")),
-            task("loop2", Some("loop1")),
         ];
         let c = subtask_counts(&tasks);
-        assert_eq!(c.get("a"), Some(&(1, 2)));
-        assert_eq!(c.get("a1"), Some(&(0, 1)));
+        assert_eq!(c.get("a"), Some(&(1, 1)), "a1x and a1y count on a1 only");
+        assert_eq!(c.get("a1"), Some(&(1, 1)));
         assert_eq!(c.get("b"), None);
-        assert!(c.contains_key("loop1")); // a cycle ends
     }
 
     #[test]
