@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Todav\n"
 "Report-Msgid-Bugs-To: https://github.com/AperteDev/todav/issues\n"
-"POT-Creation-Date: 2026-10-25 11:47+0100\n"
+"POT-Creation-Date: 2026-10-25 18:40+0100\n"
 "PO-Revision-Date: 2026-10-22 21:00+0200\n"
 "Last-Translator: \n"
 "Language-Team: German\n"
@@ -103,7 +103,7 @@ msgid "Calendar"
 msgstr "Kalender"
 
 #: todav/linux/app/src/calendar.rs:470 todav/linux/app/src/calendar.rs:2066
-#: todav/linux/app/src/window.rs:1499
+#: todav/linux/app/src/window.rs:1582
 msgid "All day"
 msgstr "Ganztägig"
 
@@ -149,7 +149,7 @@ msgstr[1] "+{n} weitere"
 msgid "Starts {date}"
 msgstr "Beginnt {date}"
 
-#: todav/linux/app/src/calendar.rs:1447 todav/linux/app/src/main.rs:395
+#: todav/linux/app/src/calendar.rs:1447 todav/linux/app/src/main.rs:374
 #, rust-format
 msgid "Due {date}"
 msgstr "Fällig {date}"
@@ -167,7 +167,7 @@ msgid "Not saved on the server"
 msgstr "Nicht auf dem Server gespeichert"
 
 #: todav/linux/app/src/calendar.rs:1581 todav/linux/app/src/lists.rs:299
-#: todav/linux/app/src/window.rs:1444 todav/linux/app/ui/settings.blp:45
+#: todav/linux/app/src/window.rs:1527 todav/linux/app/ui/settings.blp:45
 #: todav/linux/app/ui/settings.blp:146 todav/linux/app/ui/settings.blp:150
 #: todav/linux/app/ui/settings.blp:328 todav/linux/app/ui/shortcuts.blp:57
 #: todav/linux/app/ui/window.blp:167 todav/linux/app/ui/window.blp:257
@@ -188,7 +188,7 @@ msgid "Add a subtask"
 msgstr "Unteraufgabe hinzufügen"
 
 #: todav/linux/app/src/calendar.rs:1684 todav/linux/app/src/lists.rs:567
-#: todav/linux/app/src/window.rs:2540
+#: todav/linux/app/src/window.rs:2623
 msgid "Delete"
 msgstr "Löschen"
 
@@ -202,7 +202,7 @@ msgstr "Wiederholt sich"
 
 #: todav/linux/app/src/calendar.rs:1849
 #: todav/linux/app/src/calendar/dialog.rs:345
-#: todav/linux/app/src/window.rs:2549
+#: todav/linux/app/src/window.rs:2632
 #, rust-format
 msgid "“{title}” deleted"
 msgstr "„{title}“ gelöscht"
@@ -216,7 +216,7 @@ msgstr "Wiederkehrenden Termin löschen?"
 msgid "Done"
 msgstr "Erledigt"
 
-#: todav/linux/app/src/calendar.rs:1898 todav/linux/app/src/window.rs:1720
+#: todav/linux/app/src/calendar.rs:1898 todav/linux/app/src/window.rs:1803
 #, rust-format
 msgid "Not saved on the server: {reason}"
 msgstr "Nicht auf dem Server gespeichert: {reason}"
@@ -240,7 +240,7 @@ msgstr "Agenda"
 msgid "Nothing Planned"
 msgstr "Nichts geplant"
 
-#: todav/linux/app/src/calendar.rs:2026 todav/linux/app/src/window.rs:1592
+#: todav/linux/app/src/calendar.rs:2026 todav/linux/app/src/window.rs:1675
 #: todav/linux/app/ui/shortcuts.blp:11
 msgid "Search"
 msgstr "Suchen"
@@ -252,11 +252,11 @@ msgid_plural "{n} events"
 msgstr[0] "{n} Termin"
 msgstr[1] "{n} Termine"
 
-#: todav/linux/app/src/calendar.rs:2046 todav/linux/app/src/window.rs:1613
+#: todav/linux/app/src/calendar.rs:2046 todav/linux/app/src/window.rs:1696
 msgid "No Results Found"
 msgstr "Keine Ergebnisse gefunden"
 
-#: todav/linux/app/src/calendar.rs:2047 todav/linux/app/src/window.rs:1614
+#: todav/linux/app/src/calendar.rs:2047 todav/linux/app/src/window.rs:1697
 msgid "Try a different search"
 msgstr "Versuchen Sie eine andere Suche"
 
@@ -344,7 +344,7 @@ msgstr "Vorheriger Monat"
 msgid "Next Month"
 msgstr "Nächster Monat"
 
-#: todav/linux/app/src/connection.rs:39 todav/linux/app/src/window.rs:807
+#: todav/linux/app/src/connection.rs:39 todav/linux/app/src/window.rs:890
 msgid "No Nextcloud account in Settings → Online Accounts"
 msgstr "Kein Nextcloud-Konto unter Einstellungen → Online-Konten"
 
@@ -511,33 +511,33 @@ msgstr ""
 msgid "It can be restored from the trash bin in Nextcloud Calendar."
 msgstr "Es kann im Papierkorb von Nextcloud Kalender wiederhergestellt werden."
 
-#: todav/linux/app/src/main.rs:247
+#: todav/linux/app/src/main.rs:226
 #, rust-format
 msgid "Cannot upload pending changes first: {error}"
 msgstr "Ausstehende Änderungen können nicht zuerst hochgeladen werden: {error}"
 
-#: todav/linux/app/src/main.rs:263
+#: todav/linux/app/src/main.rs:242
 msgid "Disconnecting failed"
 msgstr "Trennen fehlgeschlagen"
 
-#: todav/linux/app/src/main.rs:282
+#: todav/linux/app/src/main.rs:261
 msgid "Online Accounts has no password for this account"
 msgstr "Online-Konten hat kein Passwort für dieses Konto"
 
-#: todav/linux/app/src/main.rs:301 todav/linux/app/src/settings.rs:669
+#: todav/linux/app/src/main.rs:280 todav/linux/app/src/settings.rs:669
 #, rust-format
 msgid "Cannot save password: {error}"
 msgstr "Passwort kann nicht gespeichert werden: {error}"
 
-#: todav/linux/app/src/main.rs:314
+#: todav/linux/app/src/main.rs:293
 msgid "Connecting failed"
 msgstr "Verbindung fehlgeschlagen"
 
-#: todav/linux/app/src/main.rs:401
+#: todav/linux/app/src/main.rs:380
 msgid "Mark as Done"
 msgstr "Als erledigt markieren"
 
-#: todav/linux/app/src/main.rs:428
+#: todav/linux/app/src/main.rs:407
 msgid "Sync tasks and receive changes in the background"
 msgstr "Aufgaben im Hintergrund synchronisieren und Änderungen empfangen"
 
@@ -582,7 +582,7 @@ msgstr "Legt auch die Position des Felds „Unteraufgabe hinzufügen“ fest"
 msgid "Connected as {name}"
 msgstr "Verbunden als {name}"
 
-#: todav/linux/app/src/settings.rs:386 todav/linux/app/src/window.rs:822
+#: todav/linux/app/src/settings.rs:386 todav/linux/app/src/window.rs:905
 #: todav/linux/app/ui/window.blp:42
 msgid "GNOME Online Accounts"
 msgstr "GNOME-Online-Konten"
@@ -601,11 +601,11 @@ msgstr "Nicht angemeldet"
 msgid "Disconnected"
 msgstr "Getrennt"
 
-#: todav/linux/app/src/settings.rs:489 todav/linux/app/src/window.rs:881
+#: todav/linux/app/src/settings.rs:489 todav/linux/app/src/window.rs:964
 msgid "Waiting for Sign-In…"
 msgstr "Warten auf Anmeldung …"
 
-#: todav/linux/app/src/settings.rs:491 todav/linux/app/src/window.rs:883
+#: todav/linux/app/src/settings.rs:491 todav/linux/app/src/window.rs:966
 msgid "Waiting for Browser…"
 msgstr "Warten auf Browser …"
 
@@ -651,231 +651,261 @@ msgstr "Nextcloud-Server geändert"
 msgid "Changing the server failed"
 msgstr "Der Server konnte nicht geändert werden"
 
-#: todav/linux/app/src/window.rs:371
+#: todav/linux/app/src/window.rs:73
+msgid "Support on Ko-fi"
+msgstr "Auf Ko-fi unterstützen"
+
+#: todav/linux/app/src/window.rs:77
+msgid "Sponsor on GitHub"
+msgstr "Auf GitHub sponsern"
+
+#: todav/linux/app/src/window.rs:81
+msgid "Donate on Liberapay"
+msgstr "Über Liberapay spenden"
+
+#: todav/linux/app/src/window.rs:236
+msgid ""
+"Todav is developed in my free time. If it keeps your days in order, you can "
+"support its development."
+msgstr ""
+"Todav entsteht in meiner Freizeit. Wenn es deine Tage ordnet, kannst du "
+"seine Entwicklung unterstützen."
+
+#. Translators: the About row that opens the page with the donation links.
+#: todav/linux/app/src/window.rs:266
+msgid "_Support"
+msgstr "_Unterstützen"
+
+#. Translators: title of About's page with the donation links.
+#: todav/linux/app/src/window.rs:268
+msgid "Support"
+msgstr "Unterstützen"
+
+#: todav/linux/app/src/window.rs:454
 #, rust-format
 msgid "Sync failed: {error}"
 msgstr "Synchronisierung fehlgeschlagen: {error}"
 
-#: todav/linux/app/src/window.rs:389
+#: todav/linux/app/src/window.rs:472
 #, rust-format
 msgid "“{title}” could not be deleted on the server"
 msgstr "„{title}“ konnte auf dem Server nicht gelöscht werden"
 
-#: todav/linux/app/src/window.rs:391
+#: todav/linux/app/src/window.rs:474
 #, rust-format
 msgid "“{title}” was not saved on the server"
 msgstr "„{title}“ wurde nicht auf dem Server gespeichert"
 
-#: todav/linux/app/src/window.rs:393
+#: todav/linux/app/src/window.rs:476
 #, rust-format
 msgid "“{title}” was not saved on the server: {reason}"
 msgstr "„{title}“ wurde nicht auf dem Server gespeichert: {reason}"
 
-#: todav/linux/app/src/window.rs:400 todav/linux/app/src/window.rs:1845
+#: todav/linux/app/src/window.rs:483 todav/linux/app/src/window.rs:1928
 msgid "Edit"
 msgstr "Bearbeiten"
 
-#: todav/linux/app/src/window.rs:825
+#: todav/linux/app/src/window.rs:908
 msgid "Connect with a Nextcloud account from GNOME Settings"
 msgstr "Mit einem Nextcloud-Konto aus den GNOME-Einstellungen verbinden"
 
-#: todav/linux/app/src/window.rs:828 todav/linux/app/ui/window.blp:57
+#: todav/linux/app/src/window.rs:911 todav/linux/app/ui/window.blp:57
 msgid "Nextcloud Server"
 msgstr "Nextcloud-Server"
 
-#: todav/linux/app/src/window.rs:831
+#: todav/linux/app/src/window.rs:914
 msgid "Sign in to your Nextcloud; Todav gets an app password of its own"
 msgstr ""
 "Melden Sie sich bei Ihrer Nextcloud an; Todav erhält ein eigenes App-Passwort"
 
-#: todav/linux/app/src/window.rs:854
+#: todav/linux/app/src/window.rs:937
 msgid "Enter the Nextcloud server first"
 msgstr "Geben Sie zuerst den Nextcloud-Server ein"
 
-#: todav/linux/app/src/window.rs:936 todav/linux/app/ui/settings.blp:86
+#: todav/linux/app/src/window.rs:1019 todav/linux/app/ui/settings.blp:86
 #: todav/linux/app/ui/window.blp:138
 msgid "Sign In with Browser"
 msgstr "Im Browser anmelden"
 
-#: todav/linux/app/src/window.rs:950
+#: todav/linux/app/src/window.rs:1033
 msgid "Cannot start login"
 msgstr "Anmeldung kann nicht gestartet werden"
 
-#: todav/linux/app/src/window.rs:951
+#: todav/linux/app/src/window.rs:1034
 #, rust-format
 msgid "Cannot start login: {error}"
 msgstr "Anmeldung kann nicht gestartet werden: {error}"
 
-#: todav/linux/app/src/window.rs:959
+#: todav/linux/app/src/window.rs:1042
 msgid "Login link copied to clipboard"
 msgstr "Anmeldelink in die Zwischenablage kopiert"
 
-#: todav/linux/app/src/window.rs:979
+#: todav/linux/app/src/window.rs:1062
 #, rust-format
 msgid "Login failed: {error}"
 msgstr "Anmeldung fehlgeschlagen: {error}"
 
-#: todav/linux/app/src/window.rs:981
+#: todav/linux/app/src/window.rs:1064
 msgid "Login failed"
 msgstr "Anmeldung fehlgeschlagen"
 
-#: todav/linux/app/src/window.rs:984
+#: todav/linux/app/src/window.rs:1067
 msgid "Login timed out"
 msgstr "Zeitüberschreitung bei der Anmeldung"
 
-#: todav/linux/app/src/window.rs:1033
+#: todav/linux/app/src/window.rs:1116
 msgid "Wrong login name or password"
 msgstr "Falscher Anmeldename oder falsches Passwort"
 
-#: todav/linux/app/src/window.rs:1034
+#: todav/linux/app/src/window.rs:1117
 #, rust-format
 msgid "Sign-in failed: {error}"
 msgstr "Anmeldung fehlgeschlagen: {error}"
 
-#: todav/linux/app/src/window.rs:1035
+#: todav/linux/app/src/window.rs:1118
 msgid "Sign-in failed"
 msgstr "Anmeldung fehlgeschlagen"
 
-#: todav/linux/app/src/window.rs:1066 todav/linux/app/src/window.rs:1489
+#: todav/linux/app/src/window.rs:1149 todav/linux/app/src/window.rs:1572
 msgid "Upcoming"
 msgstr "Anstehend"
 
-#: todav/linux/app/src/window.rs:1068 todav/linux/app/src/window.rs:1552
+#: todav/linux/app/src/window.rs:1151 todav/linux/app/src/window.rs:1635
 msgid "Important"
 msgstr "Wichtig"
 
-#: todav/linux/app/src/window.rs:1299
+#: todav/linux/app/src/window.rs:1382
 msgid "New Category…"
 msgstr "Neue Kategorie …"
 
-#: todav/linux/app/src/window.rs:1299 todav/linux/app/ui/window.blp:351
+#: todav/linux/app/src/window.rs:1382 todav/linux/app/ui/window.blp:351
 msgid "No category"
 msgstr "Keine Kategorie"
 
-#: todav/linux/app/src/window.rs:1432
+#: todav/linux/app/src/window.rs:1515
 msgid "Pinned"
 msgstr "Angeheftet"
 
-#: todav/linux/app/src/window.rs:1459
+#: todav/linux/app/src/window.rs:1542
 #, rust-format
 msgid "Completed ({n})"
 msgstr "Erledigt ({n})"
 
-#: todav/linux/app/src/window.rs:1472
+#: todav/linux/app/src/window.rs:1555
 msgid "All Done"
 msgstr "Alles erledigt"
 
-#: todav/linux/app/src/window.rs:1495
+#: todav/linux/app/src/window.rs:1578
 msgid "Today’s Events"
 msgstr "Heutige Termine"
 
-#: todav/linux/app/src/window.rs:1540
+#: todav/linux/app/src/window.rs:1623
 msgid "Nothing Scheduled"
 msgstr "Nichts terminiert"
 
-#: todav/linux/app/src/window.rs:1541
+#: todav/linux/app/src/window.rs:1624
 msgid "Tasks with a due date show up here"
 msgstr "Aufgaben mit Fälligkeitsdatum erscheinen hier"
 
-#: todav/linux/app/src/window.rs:1570
+#: todav/linux/app/src/window.rs:1653
 msgid "No Important Tasks"
 msgstr "Keine wichtigen Aufgaben"
 
-#: todav/linux/app/src/window.rs:1571
+#: todav/linux/app/src/window.rs:1654
 msgid "Tasks of high priority show up here"
 msgstr "Aufgaben mit hoher Priorität erscheinen hier"
 
-#: todav/linux/app/src/window.rs:1595
+#: todav/linux/app/src/window.rs:1678
 #, rust-format
 msgid "{n} task"
 msgid_plural "{n} tasks"
 msgstr[0] "{n} Aufgabe"
 msgstr[1] "{n} Aufgaben"
 
-#: todav/linux/app/src/window.rs:1623
+#: todav/linux/app/src/window.rs:1706
 #, rust-format
 msgid "{n} open"
 msgid_plural "{n} open"
 msgstr[0] "{n} offen"
 msgstr[1] "{n} offen"
 
-#: todav/linux/app/src/window.rs:1699
+#: todav/linux/app/src/window.rs:1782
 #, rust-format
 msgid "{done} of {all} subtask done"
 msgid_plural "{done} of {all} subtasks done"
 msgstr[0] "{done} von {all} Unteraufgabe erledigt"
 msgstr[1] "{done} von {all} Unteraufgaben erledigt"
 
-#: todav/linux/app/src/window.rs:1801 todav/linux/app/src/window.rs:1840
+#: todav/linux/app/src/window.rs:1884 todav/linux/app/src/window.rs:1923
 msgid "Add Subtask"
 msgstr "Unteraufgabe hinzufügen"
 
-#: todav/linux/app/src/window.rs:1935
+#: todav/linux/app/src/window.rs:2018
 msgid "Add subtask"
 msgstr "Unteraufgabe hinzufügen"
 
-#: todav/linux/app/src/window.rs:2075
+#: todav/linux/app/src/window.rs:2158
 msgid "Drag to Move"
 msgstr "Zum Verschieben ziehen"
 
-#: todav/linux/app/src/window.rs:2468 todav/linux/app/ui/edit-dialog.blp:95
+#: todav/linux/app/src/window.rs:2551 todav/linux/app/ui/edit-dialog.blp:95
 msgid "Priority"
 msgstr "Priorität"
 
-#: todav/linux/app/src/window.rs:2478 todav/linux/app/ui/edit-dialog.blp:96
+#: todav/linux/app/src/window.rs:2561 todav/linux/app/ui/edit-dialog.blp:96
 msgctxt "priority"
 msgid "None"
 msgstr "Keine"
 
-#: todav/linux/app/src/window.rs:2479 todav/linux/app/ui/edit-dialog.blp:96
+#: todav/linux/app/src/window.rs:2562 todav/linux/app/ui/edit-dialog.blp:96
 msgctxt "priority"
 msgid "Low"
 msgstr "Niedrig"
 
-#: todav/linux/app/src/window.rs:2480 todav/linux/app/ui/edit-dialog.blp:96
+#: todav/linux/app/src/window.rs:2563 todav/linux/app/ui/edit-dialog.blp:96
 msgctxt "priority"
 msgid "Medium"
 msgstr "Mittel"
 
-#: todav/linux/app/src/window.rs:2481 todav/linux/app/ui/edit-dialog.blp:96
+#: todav/linux/app/src/window.rs:2564 todav/linux/app/ui/edit-dialog.blp:96
 msgctxt "priority"
 msgid "High"
 msgstr "Hoch"
 
-#: todav/linux/app/src/window.rs:2519
+#: todav/linux/app/src/window.rs:2602
 msgid "Unpin"
 msgstr "Lösen"
 
-#: todav/linux/app/src/window.rs:2521
+#: todav/linux/app/src/window.rs:2604
 msgid "Pin"
 msgstr "Anheften"
 
-#: todav/linux/app/src/window.rs:2558 todav/linux/app/ui/shortcuts.blp:16
+#: todav/linux/app/src/window.rs:2641 todav/linux/app/ui/shortcuts.blp:16
 msgid "Undo"
 msgstr "Rückgängig"
 
-#: todav/linux/app/src/window.rs:2750
+#: todav/linux/app/src/window.rs:2833
 msgid "Start and due date need a time on both or on neither"
 msgstr ""
 "Beginn und Fälligkeit brauchen beide eine Uhrzeit oder keines von beiden"
 
-#: todav/linux/app/src/window.rs:2753
+#: todav/linux/app/src/window.rs:2836
 msgid "The task starts after it is due"
 msgstr "Die Aufgabe beginnt nach ihrer Fälligkeit"
 
-#: todav/linux/app/src/window.rs:2894
+#: todav/linux/app/src/window.rs:2977
 msgid "Add a Time"
 msgstr "Uhrzeit hinzufügen"
 
-#: todav/linux/app/src/window.rs:3015
+#: todav/linux/app/src/window.rs:3098
 msgid "Low priority"
 msgstr "Niedrige Priorität"
 
-#: todav/linux/app/src/window.rs:3016
+#: todav/linux/app/src/window.rs:3099
 msgid "Medium priority"
 msgstr "Mittlere Priorität"
 
-#: todav/linux/app/src/window.rs:3017
+#: todav/linux/app/src/window.rs:3100
 msgid "High priority"
 msgstr "Hohe Priorität"
 

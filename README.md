@@ -16,6 +16,13 @@ and other CalDAV clients keep seeing the same data. Todav adds a fast desktop ap
 works from a local copy, syncs in the background and picks up changes from other devices within
 seconds.
 
+Todav is developed in my free time. If it keeps your days in order, you can support its
+development:
+
+[![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/N5E229GJPZ)
+[![Sponsor on GitHub](https://img.shields.io/badge/Sponsor-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/SelfRef)
+[![Donate using Liberapay](https://liberapay.com/assets/widgets/donate.svg)](https://liberapay.com/SelfRef/donate)
+
 ## Screenshots
 
 | Tasks, grouped by category | The month, an event's details |
