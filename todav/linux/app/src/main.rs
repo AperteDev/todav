@@ -97,9 +97,9 @@ fn state_text(state: &State) -> String {
         .collect();
     let failed: Vec<String> = failed
         .iter()
-        .map(|(id, e)| match id.and_then(|id| names.get(&id)) {
-            Some(name) => format!("{name}: {e}"),
-            None => e.clone(),
+        .map(|f| match f.account.and_then(|id| names.get(&id)) {
+            Some(name) => format!("{name}: {}", f.error),
+            None => f.error.clone(),
         })
         .collect();
     format!("error:{}", failed.join("; "))
@@ -122,13 +122,12 @@ impl ChangeListener for Listener {
         post(Event::Changed(list_href));
     }
 
-    /// Synced settings (e.g. task order) affect every list's view; a synced ntfy server is
-    /// listened to at once.
+    /// Synced settings (e.g. task order) affect every list's view (the service listens to a
+    /// synced ntfy server itself).
     fn settings_changed(&self) {
         for l in core().lists() {
             post(Event::Changed(l.href));
         }
-        service().settings_changed();
     }
 }
 

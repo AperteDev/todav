@@ -6,17 +6,24 @@ use crate::accounts::syncing;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc::{Sender, channel};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock, Weak};
 use std::time::Duration;
-use todav_core::{Client, Event, Refused, SyncReport, Task};
+use todav_core::{ChangeListener, Client, Event, Refused, SyncReport, Task};
 
 /// What syncing is doing.
 #[derive(Debug, Clone, PartialEq)]
 pub enum State {
     Idle,
     Syncing,
-    /// What failed, by account (None: not one account's, e.g. the push listener's).
-    Failed(Vec<(Option<i64>, String)>),
+    Failed(Vec<Failure>),
+}
+
+/// Why a sync failed.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Failure {
+    /// The account it failed for; None: not one account's (e.g. the push listener's).
+    pub account: Option<i64>,
+    pub error: String,
 }
 
 /// The front-end's side: told from the service's threads, so it hands these to its UI thread.
@@ -43,7 +50,7 @@ pub struct Service {
 
 impl Service {
     pub fn new(client: Arc<Client>, shell: Box<dyn Shell>) -> Arc<Service> {
-        Arc::new(Service {
+        let service = Arc::new(Service {
             client,
             shell,
             worker: OnceLock::new(),
@@ -52,7 +59,10 @@ impl Service {
             push_url: Mutex::new(String::new()),
             push_error: Mutex::new(None),
             ticks: AtomicU32::new(0),
-        })
+        });
+        let settings = Settings(Arc::downgrade(&service));
+        service.client.subscribe(Box::new(settings));
+        service
     }
 
     /// `start` ran.
@@ -142,7 +152,13 @@ impl Service {
     fn report(&self, r: todav_core::Result<SyncReport>) {
         let report = match r {
             Ok(r) => r,
-            Err(e) => return self.set_state(State::Failed(vec![(None, e.to_string())])),
+            Err(e) => {
+                let error = e.to_string();
+                return self.set_state(State::Failed(vec![Failure {
+                    account: None,
+                    error,
+                }]));
+            }
         };
         if !report.refused.is_empty() {
             self.shell.refused(report.refused);
@@ -154,7 +170,10 @@ impl Service {
                 report
                     .failed
                     .iter()
-                    .map(|(id, e)| (Some(*id), e.to_string()))
+                    .map(|(id, e)| Failure {
+                        account: Some(*id),
+                        error: e.to_string(),
+                    })
                     .collect(),
             )
         });
@@ -180,7 +199,7 @@ impl Service {
     }
 
     /// Synced settings arrived: a new ntfy server is listened to at once.
-    pub fn settings_changed(self: &Arc<Self>) {
+    fn settings_changed(self: &Arc<Self>) {
         let ntfy = self.client.setting("ntfy_url".into()).unwrap_or_default();
         if self.running() && ntfy != *self.push_url.lock().unwrap() {
             self.restart_push();
@@ -231,5 +250,18 @@ impl Service {
             let _ = c.set_setting("reminded_until".into(), now.to_string());
         }
         due
+    }
+}
+
+/// Tells the service about settings other devices changed.
+struct Settings(Weak<Service>);
+
+impl ChangeListener for Settings {
+    fn changed(&self, _list_href: String, _uids: Vec<String>) {}
+
+    fn settings_changed(&self) {
+        if let Some(s) = self.0.upgrade() {
+            s.settings_changed();
+        }
     }
 }
