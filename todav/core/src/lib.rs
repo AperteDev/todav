@@ -166,6 +166,8 @@ pub struct Client {
     dav: Mutex<HashMap<i64, Arc<Dav>>>,
     listeners: Mutex<Vec<Box<dyn ChangeListener>>>,
     sync_lock: Mutex<()>,
+    /// Held while registering push, so the listener and a sync do not register a calendar twice.
+    push_lock: Mutex<()>,
     /// Bumped by `stop_listening`; a `listen` call returns once it differs from the value it started with.
     listen_gen: AtomicU64,
     /// The system's zone ("Europe/Warsaw"), for writing new event times; see `set_local_zone`.
@@ -214,6 +216,7 @@ impl Client {
             dav: Mutex::new(HashMap::new()),
             listeners: Mutex::new(Vec::new()),
             sync_lock: Mutex::new(()),
+            push_lock: Mutex::new(()),
             listen_gen: AtomicU64::new(0),
             local_zone: Mutex::new(None),
             journal: Mutex::new(Journal::default()),

@@ -351,6 +351,30 @@ fn push_delivers_changes_and_refreshes_registration() {
 }
 
 #[test]
+fn an_account_added_while_listening_registers_at_its_first_sync() {
+    let Some(ntfy) = get("NTFY_URL") else {
+        eprintln!("NTFY_URL not set, skipping");
+        return;
+    };
+    let (url, user, pass) = env();
+    let dir = std::env::temp_dir().join(format!("todav-it-late-push-{}", now()));
+    let c = Client::open(dir.to_string_lossy().to_string()).unwrap();
+    let id = connect(&c, &url, &user, &pass);
+    // The listener registers before the account's calendars are known: nothing to register.
+    let resource = format!(
+        "{}/todav-it-late-{}?up=1",
+        ntfy.trim_end_matches('/'),
+        now()
+    );
+    assert!(c.push_register(resource, 3600).unwrap().is_empty());
+    c.sync().into_result().unwrap();
+    let s = c.push_status(id);
+    assert!(s.supported > 0, "the server has DAV Push");
+    assert!(s.registered > 0, "registered by the sync: {s:?}");
+    c.push_unregister().unwrap();
+}
+
+#[test]
 fn lists_are_created_renamed_and_deleted() {
     let (url, user, pass) = env();
     let dir = std::env::temp_dir().join(format!("todav-it-lists-{}", now()));

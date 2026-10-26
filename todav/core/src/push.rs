@@ -42,13 +42,15 @@ impl Client {
         if old_resource.as_deref().is_some_and(|r| r != push_resource) {
             self.push_unregister()?;
         }
+        // Kept before any calendar takes it: a sync registers the calendars it finds later.
+        store::kv_set(&self.db.lock().unwrap(), "push_resource", &push_resource)?;
         let mut out = Vec::new();
         let mut first_error = None;
         for a in self.accounts() {
             if !a.enabled || !self.connected(a.id) {
                 continue;
             }
-            match self.register(a.id, &push_resource, expires_in_secs) {
+            match self.register(a.id, &push_resource, expires_in_secs, true) {
                 Ok(r) => out.extend(r),
                 Err(e) => first_error = first_error.or(Some(e)),
             }
@@ -59,12 +61,25 @@ impl Client {
         }
     }
 
+    /// After a sync of `account`: register its calendars that have no registration yet (new
+    /// ones, or all of a new account), with the push resource the listener uses, if it runs.
+    pub(crate) fn register_new(&self, account: i64) -> Result<()> {
+        let Some(resource) = store::kv_get(&self.db.lock().unwrap(), "push_resource")? else {
+            return Ok(());
+        };
+        // Read-only calendars that refuse it are left to the hourly try, not one per sync.
+        self.register(account, &resource, MAX_EXPIRY as u64, false)
+            .map(|_| ())
+    }
+
     fn register(
         &self,
         account: i64,
         push_resource: &str,
         expires_in_secs: u64,
+        read_only: bool,
     ) -> Result<Vec<PushRegistration>> {
+        let _guard = self.push_lock.lock().unwrap();
         let dav = self.dav(account)?;
         let lifetime = (expires_in_secs as i64).min(MAX_EXPIRY);
         let (public, auth) = self.push_keys()?;
@@ -72,10 +87,10 @@ impl Client {
             let db = self.db.lock().unwrap();
             let mut st = db.prepare(
                 "SELECT href, push_registration_href, push_expires, writable FROM lists
-                 WHERE push_topic IS NOT NULL AND account = ?",
+                 WHERE push_topic IS NOT NULL AND account = ?1 AND (writable OR ?2)",
             )?;
             let lists: Vec<(String, Option<String>, Option<i64>, bool)> = st
-                .query_map([account], |r| {
+                .query_map(params![account, read_only], |r| {
                     Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))
                 })?
                 .collect::<rusqlite::Result<_>>()?;

@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Signing in again keeps the account: a different user is added as another account, and a GNOME
   Online Accounts account and a sign-in in Todav are separate accounts rather than one switch.
 
+### Fixed
+
+- A calendar new on the server, or every calendar of an account just added, gets DAV Push at
+  the sync that finds it instead of up to an hour later.
+
 ## [1.2.2] - 2026-10-25
 
 ### Added

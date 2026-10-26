@@ -92,6 +92,9 @@ impl Client {
             self.sync_settings(id, &dav)?;
         }
         self.mark_synced(id)?;
+        drop(_guard);
+        // ponytail: a failure waits for the listener's hourly registration, which reports it.
+        let _ = self.register_new(id);
         Ok(report)
     }
 
