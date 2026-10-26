@@ -93,5 +93,50 @@
     "use_new_terminal": false,
     "allow_concurrent_runs": false,
     "reveal": "always"
+  },
+  {
+    "label": "android: run on emulator",
+    // Starts the emulator if needed (sdk.sh), builds for its ABI, installs and opens the app.
+    "command": "make -C todav/android run",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "android: follow app log",
+    "command": "make -C todav/android logs",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "android: build APKs",
+    // Debug APK for every ABI, in todav/android/app/build/outputs/apk/debug/.
+    "command": "make -C todav/android build",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "android: stop emulator",
+    "command": "make -C todav/android stop",
+    "use_new_terminal": false,
+    "reveal": "no_focus",
+    "hide": "on_success"
+  },
+  {
+    "label": "android: wipe emulator data",
+    "command": "make -C todav/android wipe",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "android: set up SDK and emulator",
+    // The shared SDK in ~/Android/Sdk with the versions todav/android/gradle.properties names.
+    "command": "make -C todav/android setup",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
   }
 ]

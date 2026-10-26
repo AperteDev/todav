@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Todav\n"
 "Report-Msgid-Bugs-To: https://github.com/AperteDev/todav/issues\n"
-"POT-Creation-Date: 2026-10-26 13:15+0100\n"
+"POT-Creation-Date: 2026-10-26 15:54+0100\n"
 "PO-Revision-Date: 2026-10-22 21:00+0200\n"
 "Last-Translator: \n"
 "Language-Team: Brazilian Portuguese\n"
@@ -16,6 +16,326 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:106
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:123
+#: todav/linux/app/src/window.rs:1055 todav/linux/app/src/window.rs:1465
+msgid "Upcoming"
+msgstr "Próximas"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:107
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:131
+#: todav/linux/app/src/window.rs:1057 todav/linux/app/src/window.rs:1528
+msgid "Important"
+msgstr "Importante"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:141
+#: todav/gnome-extension/extension.js:301 todav/linux/app/src/window.rs:58
+msgctxt "category"
+msgid "Other"
+msgstr "Outras"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:192
+#: todav/linux/app/src/calendar.rs:1603
+#: todav/linux/app/src/calendar/dialog.rs:351
+#: todav/linux/app/src/window.rs:2308
+#, rust-format
+msgid "“{title}” deleted"
+msgstr "“{title}” excluído"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:205
+#: todav/linux/app/src/calendar.rs:1335 todav/linux/app/src/main.rs:313
+#: todav/linux/app/src/window.rs:1420 todav/linux/app/ui/settings.blp:46
+#: todav/linux/app/ui/settings.blp:114 todav/linux/app/ui/settings.blp:118
+#: todav/linux/app/ui/settings.blp:298 todav/linux/app/ui/shortcuts.blp:57
+#: todav/linux/app/ui/window.blp:26 todav/linux/app/ui/window.blp:116
+msgid "Tasks"
+msgstr "Tarefas"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:206
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:121
+#: todav/linux/app/src/main.rs:314
+msgid "Welcome to Todav"
+msgstr "Boas-vindas ao Todav"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:207
+#: todav/linux/app/src/main.rs:316
+msgid ""
+"Tick tasks off when done; open one to add a due date, reminders or subtasks."
+msgstr ""
+"Marque as tarefas concluídas; abra uma para adicionar um prazo, lembretes ou "
+"subtarefas."
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:208
+#: todav/linux/app/src/calendar.rs:180 todav/linux/app/src/main.rs:318
+#: todav/linux/app/ui/calendar.blp:54 todav/linux/app/ui/calendar.blp:217
+#: todav/linux/app/ui/event-dialog.blp:66 todav/linux/app/ui/settings.blp:46
+#: todav/linux/app/ui/settings.blp:241 todav/linux/app/ui/settings.blp:315
+#: todav/linux/app/ui/shortcuts.blp:71
+msgid "Calendar"
+msgstr "Agenda"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:219
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:253
+#: todav/linux/app/src/window.rs:899
+msgid "Enter the Nextcloud server first"
+msgstr "Informe primeiro o servidor Nextcloud"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:228
+#: todav/linux/app/src/window.rs:935
+#, rust-format
+msgid "Cannot start login: {error}"
+msgstr "Não foi possível iniciar o login: {error}"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:238
+#: todav/linux/app/src/window.rs:963
+#, rust-format
+msgid "Login failed: {error}"
+msgstr "Falha no login: {error}"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:246
+#: todav/linux/app/src/window.rs:968
+msgid "Login timed out"
+msgstr "O tempo para o login esgotou"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:263
+#: todav/linux/app/src/window.rs:1022
+#, rust-format
+msgid "Sign-in failed: {error}"
+msgstr "Falha ao entrar: {error}"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:22
+#: todav/linux/app/src/main.rs:201
+msgid "On This Device"
+msgstr "Neste dispositivo"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:35
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:51
+#: todav/gnome-extension/extension.js:351 todav/linux/app/src/calendar.rs:1736
+#: todav/linux/app/src/dates.rs:56 todav/linux/app/src/dates.rs:74
+#: todav/linux/app/ui/shortcuts.blp:79
+msgid "Today"
+msgstr "Hoje"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:36
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:52
+#: todav/gnome-extension/extension.js:351 todav/linux/app/src/calendar.rs:1737
+#: todav/linux/app/src/dates.rs:57 todav/linux/app/src/dates.rs:75
+msgid "Tomorrow"
+msgstr "Amanhã"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:37
+#: todav/linux/app/src/dates.rs:58
+msgid "Yesterday"
+msgstr "Ontem"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:50
+#: todav/linux/app/src/dates.rs:73
+msgid "Overdue"
+msgstr "Atrasadas"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:54
+#: todav/linux/app/src/dates.rs:77
+msgid "Later"
+msgstr "Depois"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:59
+#: todav/linux/app/src/window.rs:1021
+msgid "Wrong login name or password"
+msgstr "Nome de usuário ou senha incorretos"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:60
+#: todav/linux/app/src/main.rs:257
+msgid "This account is already added"
+msgstr "Esta conta já foi adicionada"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:66
+#: todav/linux/app/src/main.rs:260
+#, rust-format
+msgid "Cannot save password: {error}"
+msgstr "Não foi possível salvar a senha: {error}"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:68
+#: todav/linux/app/src/main.rs:263
+#, rust-format
+msgid "Cannot upload pending changes first: {error}"
+msgstr "Não foi possível enviar antes as alterações pendentes: {error}"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:70
+#: todav/linux/app/src/main.rs:266
+msgid "It has changes not uploaded yet: sign in again to upload them"
+msgstr "Ela tem alterações ainda não enviadas: entre novamente para enviá-las"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:124
+#: todav/linux/app/ui/add-account.blp:21
+msgid "Tasks and calendar synced with your Nextcloud, or kept on this device"
+msgstr ""
+"Tarefas e agenda sincronizadas com o seu Nextcloud ou guardadas neste "
+"dispositivo"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:125
+#: todav/linux/app/src/add_account.rs:108 todav/linux/app/ui/add-account.blp:52
+msgid "Nextcloud Server"
+msgstr "Servidor Nextcloud"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:125
+#: todav/linux/app/src/add_account.rs:111
+msgid "Sign in to your Nextcloud; Todav gets an app password of its own"
+msgstr "Entre no seu Nextcloud; o Todav recebe uma senha de aplicativo própria"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:128
+msgid "Lists and calendars that stay on this device"
+msgstr "Listas e agendas que ficam neste dispositivo"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:128
+#: todav/linux/app/ui/add-account.blp:69
+msgid "On This Device Only"
+msgstr "Somente neste dispositivo"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:161
+#: todav/linux/app/ui/add-account.blp:53
+msgid "Sign in with the browser or an app password"
+msgstr "Entrar pelo navegador ou com uma senha de aplicativo"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:165
+#: todav/linux/app/src/settings.rs:610 todav/linux/app/ui/account.blp:51
+#: todav/linux/app/ui/add-account.blp:126
+msgid "Nextcloud server"
+msgstr "Servidor Nextcloud"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:177
+#: todav/linux/app/src/settings.rs:808
+msgid "Waiting for Sign-In…"
+msgstr "Aguardando o login…"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:178
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:222
+#: todav/linux/app/src/calendar/dialog.rs:47 todav/linux/app/src/lists.rs:506
+#: todav/linux/app/src/settings.rs:900 todav/linux/app/ui/account.blp:34
+#: todav/linux/app/ui/add-account.blp:195 todav/linux/app/ui/edit-dialog.blp:23
+#: todav/linux/app/ui/event-dialog.blp:25 todav/linux/app/ui/list-dialog.blp:18
+#: todav/linux/app/ui/new-category.blp:18
+#: todav/linux/app/ui/password-login.blp:19
+msgid "Cancel"
+msgstr "Cancelar"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:183
+#: todav/linux/app/ui/add-account.blp:177
+msgid "Sign In with Browser"
+msgstr "Entrar pelo navegador"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:186
+#: todav/linux/app/ui/account.blp:111 todav/linux/app/ui/add-account.blp:188
+msgid "Sign In with Password…"
+msgstr "Entrar com senha…"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:202
+#: todav/linux/app/ui/password-login.blp:6
+msgid "Sign In with Password"
+msgstr "Entrar com senha"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:205
+#: todav/linux/app/ui/password-login.blp:38
+msgid "Create an app password in Nextcloud under Settings → Security"
+msgstr "Crie uma senha de aplicativo no Nextcloud em Configurações → Segurança"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:206
+#: todav/linux/app/ui/password-login.blp:45
+msgid "Login name"
+msgstr "Nome de usuário"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:210
+#: todav/linux/app/ui/password-login.blp:50
+msgid "App password"
+msgstr "Senha de aplicativo"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:219
+#: todav/linux/app/ui/add-account.blp:164
+msgid "Connect"
+msgstr "Conectar"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:238
+#: todav/linux/app/src/window.rs:2317 todav/linux/app/ui/shortcuts.blp:16
+msgid "Undo"
+msgstr "Desfazer"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:245
+#: todav/linux/app/src/window.rs:535
+#, rust-format
+msgid "“{title}” was not saved on the server: {reason}"
+msgstr "“{title}” não foi salvo no servidor: {reason}"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:258
+#: todav/linux/app/src/window.rs:513
+#, rust-format
+msgid "Sync failed: {error}"
+msgstr "Falha na sincronização: {error}"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:279
+#: todav/linux/app/src/window.rs:1599
+#, rust-format
+msgid "{n} open"
+msgid_plural "{n} open"
+msgstr[0] "{n} aberta"
+msgstr[1] "{n} abertas"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:286
+#: todav/linux/app/ui/calendar.blp:146
+msgid "Task lists"
+msgstr "Listas de tarefas"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:293
+#: todav/linux/app/ui/account.blp:75 todav/linux/app/ui/settings.blp:97
+#: todav/linux/app/ui/shortcuts.blp:21
+msgid "Sync"
+msgstr "Sincronização"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:366
+#: todav/linux/app/src/window.rs:1435
+#, rust-format
+msgid "Completed ({n})"
+msgstr "Concluídas ({n})"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:383
+#: todav/linux/app/src/window.rs:1516
+msgid "Nothing Scheduled"
+msgstr "Nada agendado"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:383
+#: todav/linux/app/src/window.rs:1517
+msgid "Tasks with a due date show up here"
+msgstr "As tarefas com vencimento aparecem aqui"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:384
+#: todav/linux/app/src/window.rs:1546
+msgid "No Important Tasks"
+msgstr "Nenhuma tarefa importante"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:384
+#: todav/linux/app/src/window.rs:1547
+msgid "Tasks of high priority show up here"
+msgstr "As tarefas de prioridade alta aparecem aqui"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:385
+#: todav/linux/app/src/window.rs:1448
+msgid "All Done"
+msgstr "Tudo concluído"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:422
+#: todav/linux/app/src/calendar.rs:1438 todav/linux/app/src/lists.rs:507
+#: todav/linux/app/src/window.rs:2299
+msgid "Delete"
+msgstr "Excluir"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:482
+#: todav/linux/app/ui/window.blp:204
+msgid "Add a task"
+msgstr "Adicionar uma tarefa"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:489
+#: todav/linux/app/ui/window.blp:211
+msgid "Add Task"
+msgstr "Adicionar tarefa"
 
 #: todav/gnome-extension/extension.js:125
 #: todav/gnome-extension/extension.js:194
@@ -59,11 +379,6 @@ msgstr "%s, escolher outra lista"
 msgid "Add a task…"
 msgstr "Adicionar uma tarefa…"
 
-#: todav/gnome-extension/extension.js:301 todav/linux/app/src/window.rs:58
-msgctxt "category"
-msgid "Other"
-msgstr "Outras"
-
 #: todav/gnome-extension/extension.js:307
 #, javascript-format
 msgid "+ %d more"
@@ -78,17 +393,6 @@ msgstr "Tudo concluído"
 #: todav/gnome-extension/extension.js:334
 msgid "Add an event…"
 msgstr "Adicionar um evento…"
-
-#: todav/gnome-extension/extension.js:351 todav/linux/app/src/calendar.rs:1736
-#: todav/linux/app/src/dates.rs:56 todav/linux/app/src/dates.rs:74
-#: todav/linux/app/ui/shortcuts.blp:79
-msgid "Today"
-msgstr "Hoje"
-
-#: todav/gnome-extension/extension.js:351 todav/linux/app/src/calendar.rs:1737
-#: todav/linux/app/src/dates.rs:57 todav/linux/app/src/dates.rs:75
-msgid "Tomorrow"
-msgstr "Amanhã"
 
 #: todav/gnome-extension/extension.js:358
 msgid "Nothing planned this week"
@@ -131,22 +435,6 @@ msgstr "Contas on-line do GNOME"
 #: todav/linux/app/src/add_account.rs:105
 msgid "Connect with a Nextcloud account from GNOME Settings"
 msgstr "Conectar com uma conta Nextcloud das Configurações do GNOME"
-
-#: todav/linux/app/src/add_account.rs:108 todav/linux/app/ui/add-account.blp:52
-msgid "Nextcloud Server"
-msgstr "Servidor Nextcloud"
-
-#: todav/linux/app/src/add_account.rs:111
-msgid "Sign in to your Nextcloud; Todav gets an app password of its own"
-msgstr "Entre no seu Nextcloud; o Todav recebe uma senha de aplicativo própria"
-
-#: todav/linux/app/src/calendar.rs:180 todav/linux/app/src/main.rs:319
-#: todav/linux/app/ui/calendar.blp:54 todav/linux/app/ui/calendar.blp:217
-#: todav/linux/app/ui/event-dialog.blp:66 todav/linux/app/ui/settings.blp:46
-#: todav/linux/app/ui/settings.blp:241 todav/linux/app/ui/settings.blp:315
-#: todav/linux/app/ui/shortcuts.blp:71
-msgid "Calendar"
-msgstr "Agenda"
 
 #: todav/linux/app/src/calendar.rs:419 todav/linux/app/src/calendar.rs:1799
 #: todav/linux/app/src/window.rs:1475
@@ -195,7 +483,7 @@ msgstr[1] "+{n} outros"
 msgid "Starts {date}"
 msgstr "Começa {date}"
 
-#: todav/linux/app/src/calendar.rs:1201 todav/linux/app/src/main.rs:406
+#: todav/linux/app/src/calendar.rs:1201 todav/linux/app/src/main.rs:405
 #, rust-format
 msgid "Due {date}"
 msgstr "Vence {date}"
@@ -212,14 +500,6 @@ msgstr "Concluídas"
 msgid "Not saved on the server"
 msgstr "Não salvo no servidor"
 
-#: todav/linux/app/src/calendar.rs:1335 todav/linux/app/src/main.rs:314
-#: todav/linux/app/src/window.rs:1420 todav/linux/app/ui/settings.blp:46
-#: todav/linux/app/ui/settings.blp:114 todav/linux/app/ui/settings.blp:118
-#: todav/linux/app/ui/settings.blp:298 todav/linux/app/ui/shortcuts.blp:57
-#: todav/linux/app/ui/window.blp:26 todav/linux/app/ui/window.blp:116
-msgid "Tasks"
-msgstr "Tarefas"
-
 #: todav/linux/app/src/calendar.rs:1336
 msgid "Add a task for this event"
 msgstr "Adicionar uma tarefa para este evento"
@@ -233,11 +513,6 @@ msgstr "Subtarefas"
 msgid "Add a subtask"
 msgstr "Adicionar uma subtarefa"
 
-#: todav/linux/app/src/calendar.rs:1438 todav/linux/app/src/lists.rs:507
-#: todav/linux/app/src/window.rs:2299
-msgid "Delete"
-msgstr "Excluir"
-
 #: todav/linux/app/src/calendar.rs:1442 todav/linux/app/src/lists.rs:135
 msgid "Edit…"
 msgstr "Editar…"
@@ -245,13 +520,6 @@ msgstr "Editar…"
 #: todav/linux/app/src/calendar.rs:1575
 msgid "Repeats"
 msgstr "Repete-se"
-
-#: todav/linux/app/src/calendar.rs:1603
-#: todav/linux/app/src/calendar/dialog.rs:351
-#: todav/linux/app/src/window.rs:2308
-#, rust-format
-msgid "“{title}” deleted"
-msgstr "“{title}” excluído"
 
 #: todav/linux/app/src/calendar.rs:1610
 #: todav/linux/app/src/calendar/dialog.rs:359
@@ -338,15 +606,6 @@ msgstr[1] "anos"
 msgid "The event repeats."
 msgstr "O evento se repete."
 
-#: todav/linux/app/src/calendar/dialog.rs:47 todav/linux/app/src/lists.rs:506
-#: todav/linux/app/src/settings.rs:900 todav/linux/app/ui/account.blp:34
-#: todav/linux/app/ui/add-account.blp:195 todav/linux/app/ui/edit-dialog.blp:23
-#: todav/linux/app/ui/event-dialog.blp:25 todav/linux/app/ui/list-dialog.blp:18
-#: todav/linux/app/ui/new-category.blp:18
-#: todav/linux/app/ui/password-login.blp:19
-msgid "Cancel"
-msgstr "Cancelar"
-
 #: todav/linux/app/src/calendar/dialog.rs:48
 msgid "Only This Event"
 msgstr "Somente este evento"
@@ -423,18 +682,6 @@ msgstr "No dia às {time}"
 #, rust-format
 msgid "The day before at {time}"
 msgstr "Na véspera às {time}"
-
-#: todav/linux/app/src/dates.rs:58
-msgid "Yesterday"
-msgstr "Ontem"
-
-#: todav/linux/app/src/dates.rs:73
-msgid "Overdue"
-msgstr "Atrasadas"
-
-#: todav/linux/app/src/dates.rs:77
-msgid "Later"
-msgstr "Depois"
 
 #: todav/linux/app/src/lists.rs:276
 msgid "Edit Calendar"
@@ -536,57 +783,24 @@ msgstr "Tudo fica somente neste dispositivo e não poderá ser restaurado."
 msgid "It can be restored from the trash bin in Nextcloud Calendar."
 msgstr "Pode ser restaurado da lixeira do Nextcloud Agenda."
 
-#: todav/linux/app/src/main.rs:202
-msgid "On This Device"
-msgstr "Neste dispositivo"
-
-#: todav/linux/app/src/main.rs:258
-msgid "This account is already added"
-msgstr "Esta conta já foi adicionada"
-
-#: todav/linux/app/src/main.rs:259 todav/linux/app/src/main.rs:297
-#: todav/linux/app/src/main.rs:334
+#: todav/linux/app/src/main.rs:258 todav/linux/app/src/main.rs:296
+#: todav/linux/app/src/main.rs:333
 msgid "Connecting failed"
 msgstr "Falha ao conectar"
 
-#: todav/linux/app/src/main.rs:261
-#, rust-format
-msgid "Cannot save password: {error}"
-msgstr "Não foi possível salvar a senha: {error}"
-
-#: todav/linux/app/src/main.rs:264
-#, rust-format
-msgid "Cannot upload pending changes first: {error}"
-msgstr "Não foi possível enviar antes as alterações pendentes: {error}"
-
-#: todav/linux/app/src/main.rs:267
-msgid "It has changes not uploaded yet: sign in again to upload them"
-msgstr "Ela tem alterações ainda não enviadas: entre novamente para enviá-las"
-
-#: todav/linux/app/src/main.rs:287
+#: todav/linux/app/src/main.rs:286
 msgid "Online Accounts has no password for this account"
 msgstr "Contas on-line não tem senha para esta conta"
 
-#: todav/linux/app/src/main.rs:315
-msgid "Welcome to Todav"
-msgstr "Boas-vindas ao Todav"
-
-#: todav/linux/app/src/main.rs:317
-msgid ""
-"Tick tasks off when done; open one to add a due date, reminders or subtasks."
-msgstr ""
-"Marque as tarefas concluídas; abra uma para adicionar um prazo, lembretes ou "
-"subtarefas."
-
-#: todav/linux/app/src/main.rs:356
+#: todav/linux/app/src/main.rs:355
 msgid "Removing the account failed"
 msgstr "Falha ao remover a conta"
 
-#: todav/linux/app/src/main.rs:412
+#: todav/linux/app/src/main.rs:411
 msgid "Mark as Done"
 msgstr "Marcar como concluída"
 
-#: todav/linux/app/src/main.rs:436
+#: todav/linux/app/src/main.rs:435
 msgid "Sync tasks and receive changes in the background"
 msgstr "Sincronizar tarefas e receber alterações em segundo plano"
 
@@ -716,11 +930,6 @@ msgstr "Listas e agendas que ficam neste computador"
 msgid "Not connected"
 msgstr "Não conectada"
 
-#: todav/linux/app/src/settings.rs:610 todav/linux/app/ui/account.blp:51
-#: todav/linux/app/ui/add-account.blp:126
-msgid "Nextcloud server"
-msgstr "Servidor Nextcloud"
-
 #: todav/linux/app/src/settings.rs:634
 msgctxt "settings sync"
 msgid "Off"
@@ -748,10 +957,6 @@ msgstr "Conectado como {name}"
 #, rust-format
 msgid "Signed in as {name}: add that as another account"
 msgstr "Conectado como {name}: adicione-a como outra conta"
-
-#: todav/linux/app/src/settings.rs:808
-msgid "Waiting for Sign-In…"
-msgstr "Aguardando o login…"
 
 #: todav/linux/app/src/settings.rs:810
 msgid "Waiting for Browser…"
@@ -866,11 +1071,6 @@ msgid_plural "{n} accounts are not connected"
 msgstr[0] "{n} conta não está conectada"
 msgstr[1] "{n} contas não estão conectadas"
 
-#: todav/linux/app/src/window.rs:513
-#, rust-format
-msgid "Sync failed: {error}"
-msgstr "Falha na sincronização: {error}"
-
 #: todav/linux/app/src/window.rs:531
 #, rust-format
 msgid "“{title}” could not be deleted on the server"
@@ -881,65 +1081,25 @@ msgstr "Não foi possível excluir “{title}” no servidor"
 msgid "“{title}” was not saved on the server"
 msgstr "“{title}” não foi salvo no servidor"
 
-#: todav/linux/app/src/window.rs:535
-#, rust-format
-msgid "“{title}” was not saved on the server: {reason}"
-msgstr "“{title}” não foi salvo no servidor: {reason}"
-
 #: todav/linux/app/src/window.rs:542 todav/linux/app/src/window.rs:1778
 msgid "Edit"
 msgstr "Editar"
-
-#: todav/linux/app/src/window.rs:899
-msgid "Enter the Nextcloud server first"
-msgstr "Informe primeiro o servidor Nextcloud"
 
 #: todav/linux/app/src/window.rs:934
 msgid "Cannot start login"
 msgstr "Não foi possível iniciar o login"
 
-#: todav/linux/app/src/window.rs:935
-#, rust-format
-msgid "Cannot start login: {error}"
-msgstr "Não foi possível iniciar o login: {error}"
-
 #: todav/linux/app/src/window.rs:943
 msgid "Login link copied to clipboard"
 msgstr "Link de login copiado para a área de transferência"
-
-#: todav/linux/app/src/window.rs:963
-#, rust-format
-msgid "Login failed: {error}"
-msgstr "Falha no login: {error}"
 
 #: todav/linux/app/src/window.rs:965
 msgid "Login failed"
 msgstr "Falha no login"
 
-#: todav/linux/app/src/window.rs:968
-msgid "Login timed out"
-msgstr "O tempo para o login esgotou"
-
-#: todav/linux/app/src/window.rs:1021
-msgid "Wrong login name or password"
-msgstr "Nome de usuário ou senha incorretos"
-
-#: todav/linux/app/src/window.rs:1022
-#, rust-format
-msgid "Sign-in failed: {error}"
-msgstr "Falha ao entrar: {error}"
-
 #: todav/linux/app/src/window.rs:1023
 msgid "Sign-in failed"
 msgstr "Falha ao entrar"
-
-#: todav/linux/app/src/window.rs:1055 todav/linux/app/src/window.rs:1465
-msgid "Upcoming"
-msgstr "Próximas"
-
-#: todav/linux/app/src/window.rs:1057 todav/linux/app/src/window.rs:1528
-msgid "Important"
-msgstr "Importante"
 
 #: todav/linux/app/src/window.rs:1274
 msgid "New Category…"
@@ -953,34 +1113,9 @@ msgstr "Sem categoria"
 msgid "Pinned"
 msgstr "Fixadas"
 
-#: todav/linux/app/src/window.rs:1435
-#, rust-format
-msgid "Completed ({n})"
-msgstr "Concluídas ({n})"
-
-#: todav/linux/app/src/window.rs:1448
-msgid "All Done"
-msgstr "Tudo concluído"
-
 #: todav/linux/app/src/window.rs:1471
 msgid "Today’s Events"
 msgstr "Eventos de hoje"
-
-#: todav/linux/app/src/window.rs:1516
-msgid "Nothing Scheduled"
-msgstr "Nada agendado"
-
-#: todav/linux/app/src/window.rs:1517
-msgid "Tasks with a due date show up here"
-msgstr "As tarefas com vencimento aparecem aqui"
-
-#: todav/linux/app/src/window.rs:1546
-msgid "No Important Tasks"
-msgstr "Nenhuma tarefa importante"
-
-#: todav/linux/app/src/window.rs:1547
-msgid "Tasks of high priority show up here"
-msgstr "As tarefas de prioridade alta aparecem aqui"
 
 #: todav/linux/app/src/window.rs:1571
 #, rust-format
@@ -988,13 +1123,6 @@ msgid "{n} task"
 msgid_plural "{n} tasks"
 msgstr[0] "{n} tarefa"
 msgstr[1] "{n} tarefas"
-
-#: todav/linux/app/src/window.rs:1599
-#, rust-format
-msgid "{n} open"
-msgid_plural "{n} open"
-msgstr[0] "{n} aberta"
-msgstr[1] "{n} abertas"
 
 #: todav/linux/app/src/window.rs:1632
 #, rust-format
@@ -1042,10 +1170,6 @@ msgstr "Desafixar"
 #: todav/linux/app/src/window.rs:2280
 msgid "Pin"
 msgstr "Fixar"
-
-#: todav/linux/app/src/window.rs:2317 todav/linux/app/ui/shortcuts.blp:16
-msgid "Undo"
-msgstr "Desfazer"
 
 #: todav/linux/app/src/window.rs:2510
 msgid "Start and due date need a time on both or on neither"
@@ -1107,11 +1231,6 @@ msgstr "Status do servidor"
 msgid "Server"
 msgstr "Servidor"
 
-#: todav/linux/app/ui/account.blp:75 todav/linux/app/ui/settings.blp:97
-#: todav/linux/app/ui/shortcuts.blp:21
-msgid "Sync"
-msgstr "Sincronização"
-
 #: todav/linux/app/ui/account.blp:82
 msgid "DAV Push"
 msgstr "DAV Push"
@@ -1131,24 +1250,6 @@ msgstr "Remover conta"
 #: todav/linux/app/ui/account.blp:110 todav/linux/app/ui/add-account.blp:182
 msgid "Copy Login Link"
 msgstr "Copiar link de login"
-
-#: todav/linux/app/ui/account.blp:111 todav/linux/app/ui/add-account.blp:188
-msgid "Sign In with Password…"
-msgstr "Entrar com senha…"
-
-#: todav/linux/app/ui/add-account.blp:21
-msgid "Tasks and calendar synced with your Nextcloud, or kept on this device"
-msgstr ""
-"Tarefas e agenda sincronizadas com o seu Nextcloud ou guardadas neste "
-"dispositivo"
-
-#: todav/linux/app/ui/add-account.blp:53
-msgid "Sign in with the browser or an app password"
-msgstr "Entrar pelo navegador ou com uma senha de aplicativo"
-
-#: todav/linux/app/ui/add-account.blp:69
-msgid "On This Device Only"
-msgstr "Somente neste dispositivo"
 
 #: todav/linux/app/ui/add-account.blp:87
 msgid "You can add more accounts later in Preferences"
@@ -1170,21 +1271,9 @@ msgstr "Sincronizar as configurações com esta conta"
 msgid "Use the same settings on all devices"
 msgstr "Usar as mesmas configurações em todos os dispositivos"
 
-#: todav/linux/app/ui/add-account.blp:164
-msgid "Connect"
-msgstr "Conectar"
-
-#: todav/linux/app/ui/add-account.blp:177
-msgid "Sign In with Browser"
-msgstr "Entrar pelo navegador"
-
 #: todav/linux/app/ui/calendar.blp:102
 msgid "Calendars"
 msgstr "Agendas"
-
-#: todav/linux/app/ui/calendar.blp:146
-msgid "Task lists"
-msgstr "Listas de tarefas"
 
 #: todav/linux/app/ui/calendar.blp:180
 msgid "Drag a task onto a day or an hour"
@@ -1379,22 +1468,6 @@ msgstr "Cor"
 #: todav/linux/app/ui/new-category.blp:5
 msgid "New Category"
 msgstr "Nova categoria"
-
-#: todav/linux/app/ui/password-login.blp:6
-msgid "Sign In with Password"
-msgstr "Entrar com senha"
-
-#: todav/linux/app/ui/password-login.blp:38
-msgid "Create an app password in Nextcloud under Settings → Security"
-msgstr "Crie uma senha de aplicativo no Nextcloud em Configurações → Segurança"
-
-#: todav/linux/app/ui/password-login.blp:45
-msgid "Login name"
-msgstr "Nome de usuário"
-
-#: todav/linux/app/ui/password-login.blp:50
-msgid "App password"
-msgstr "Senha de aplicativo"
 
 #: todav/linux/app/ui/reminder.blp:6
 msgid "Remind"
@@ -1812,14 +1885,6 @@ msgstr "Próximo"
 #: todav/linux/app/ui/window.blp:180
 msgid "Search tasks"
 msgstr "Pesquisar tarefas"
-
-#: todav/linux/app/ui/window.blp:204
-msgid "Add a task"
-msgstr "Adicionar uma tarefa"
-
-#: todav/linux/app/ui/window.blp:211
-msgid "Add Task"
-msgstr "Adicionar tarefa"
 
 #: todav/linux/app/ui/window.blp:216
 msgid "Category (Ctrl+K)"

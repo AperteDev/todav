@@ -122,7 +122,7 @@ One Cargo workspace at the root, the app's core and front-ends under `todav/`. N
       data/                  # .desktop, metainfo, icons, D-Bus service
       flatpak/               # dev.aperte.Todav.json
     gnome-extension/         # GNOME Shell extension (GJS), talks D-Bus to the Linux app
-    android/                 # planned: app (Compose), the todav-ffi module, pebble companion
+    android/                 # Gradle: core/ (todav-ffi, bindings, catalogs), app/ (Compose); sdk.sh, Makefile
     pebble/                  # planned: Pebble watchapp (C, Pebble SDK)
     windows/                 # planned: WinUI 3 app (C#)
 ```
@@ -131,7 +131,7 @@ One Cargo workspace at the root, the app's core and front-ends under `todav/`. N
 
 - Rust stable; `cargo clippy -D warnings`, `cargo fmt`, `cargo test` (`--features integration` for the tests against the server).
 - Linux: `make -C todav/linux install` (per-user) or `make -C todav/linux flatpak`; the build needs `blueprint-compiler` and `glib-compile-resources`. Flathub will need a generated `cargo-sources.json` for an offline build.
-- Android (planned): Gradle, Kotlin, `cargo-ndk` to build `.so` for arm64-v8a (and x86\_64 for the emulator); UniFFI bindgen in a Gradle task.
+- Android: `make -C todav/android setup|run|logs|build` (AGP 9, Kotlin, Compose; Gradle wrapper on JDK 21). The SDK is shared in `~/Android/Sdk`, set up by `todav/android/sdk.sh` with the versions in `todav/android/gradle.properties`; the emulator image is the one Noogle uses (see AGENTS.md).
 - Bindings: `scripts/bindings.sh` (see [Platforms](#platforms)); needs Gradle with a JDK 17 and the .NET 8 SDK for the smoke tests.
 - Windows (planned): .NET and the Windows App SDK (WinUI 3), `cargo build --target x86_64-pc-windows-msvc` (and `aarch64`) in `todav/ffi`; `uniffi-bindgen-cs` for the C# bindings. Builds and runs only on Windows: a Windows machine or VM for development, a `windows-latest` runner in CI.
 - Pebble (planned): the open-source Pebble SDK toolchain (`pebble build`), pinned version in `pebble/README.md`.
@@ -389,8 +389,9 @@ Kotlin + Jetpack Compose on top of the core and `todav-app` via UniFFI (`todav-f
 
 **Structure**
 
-- `android/core`: Gradle library module; a `cargo-ndk` task builds `libtodav_ffi.so` for `arm64-v8a` and `x86_64`, then runs `uniffi-bindgen` to generate the Kotlin bindings.
-- `android/app`: `TodavApp` (holds one `Client`), `MainActivity` (Compose), `SyncScheduler`, `PushReceiver`, `pebble/` package.
+- `android/core`: Gradle library module. Its tasks, wired in through the variant API: `cargoNdk` builds `libtodav_ffi.so` for `todav.abis` (`make run` only x86\_64), `uniffiBindings` generates the Kotlin bindings from it (package `dev.aperte.todav.core`), `catalogs` compiles `po/` into `assets/locale/<language>/todav.mo`. JNA comes as an AAR; keep rules for JNA and the bindings go to the app.
+- `android/app` (`dev.aperte.todav`, minSdk 29, target 37): `TodavApp` (the `Todav` object, the service started without the ntfy listener, change and sync-state flows, accounts connected with their saved passwords), `Passwords` (the `Keyring`: AES-GCM with a key in the Android Keystore, ciphertext in preferences; backup off), `I18n` (`tr`/`ntr`/`ptr` over `Translations`, the app's own language when set: `locales_config.xml` lists `po/LINGUAS`), `Main` (the view model), `MainActivity` (sync on resume, `tick` every minute in front), `ui/`. Later: `SyncScheduler`, `PushReceiver`, `pebble/`.
+- Launcher icon: the Linux icon rendered as the adaptive icon's foreground (`app/icons.sh`), the brand's light colour behind it, the symbolic icon as the monochrome layer.
 
 **UI (Compose, Material 3)**
 
@@ -521,7 +522,8 @@ Deviation: no docker stack (`infra/`) for now — integration runs against the r
 - [x] COPR spec for Fedora (`todav/linux/rpm/`, `.copr/Makefile`); metainfo ready for Flathub (screenshots, release notes from the changelog, branding); system SQLite
 - [x] `todav-app`: the Linux app's logic that is not GTK moved into a crate of its own for every front-end (settings with defaults, dates, task trees and drops, calendar items, layout and drops, accounts over a keyring trait, the background service); its unit tests moved with it
 - [x] `todav-ffi`: the core and `todav-app` exported with UniFFI (a workspace of its own, bundled SQLite), Kotlin and C# bindings generated and smoke-tested against the Linux build by `scripts/bindings.sh`, in CI too
-- [ ] M6 Android → M7 Pebble, then Windows
+- [x] Android groundwork: Gradle project building the core with cargo-ndk, bindings and catalogs; the shared SDK and emulator (`sdk.sh`, Makefile, Zed tasks); welcome page (local lists, or Nextcloud by browser or app password), the drawer with Upcoming, Important and the lists by account, tasks by category with subtasks, add, tick, swipe to delete with Undo, sync on resume and every minute in front. Tried on the Android 15 emulator
+- [ ] M6 Android (push, background sync, reminders, edit, widget, settings) → M7 Pebble, then Windows
 
 ## Roadmap
 

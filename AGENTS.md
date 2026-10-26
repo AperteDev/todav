@@ -97,6 +97,30 @@
 - Static views are Blueprint files in `todav/linux/app/ui/`, compiled by `build.rs`; dynamic UI
   (task rows, sidebar rows) stays in Rust code.
 
+## Android
+
+- `todav/android` is a Gradle project: `core` (todav-ffi built by cargo-ndk, its Kotlin bindings,
+  the `.mo` catalogs as assets) and `app` (Compose). Build and run it with
+  `make -C todav/android <target>` (Zed tasks "android: …"): `setup`, `run`, `logs`, `build`,
+  `stop`, `wipe`.
+- One Android SDK for every project on the machine: `~/Android/Sdk` (or `$ANDROID_HOME`), set up
+  only by `todav/android/sdk.sh setup` (Google's command-line tools, then `sdkmanager`), never
+  with AUR or other system SDK packages. It installs exactly the versions in
+  `todav/android/gradle.properties` (`todav.platform`, `todav.buildTools`, `todav.ndk`,
+  `todav.image`), which the build scripts read too. Change a version there only, then remove the
+  old package (`sdkmanager --uninstall …`) so copies don't pile up; the SDK is several GB.
+- The emulator image is the one Noogle's `scripts/setup-avd.sh` uses by default (Android 15 with
+  Play Store), so both share one copy. Noogle roots that image (Magisk) when it sets up its own
+  AVD; the `todav` AVD may then boot with Magisk, which doesn't matter for Todav.
+- System packages it needs (sdk.sh names the missing ones, it installs none): `rustup` (stable;
+  sdk.sh adds the Android targets), `cargo-ndk`, `android-tools` (adb: the SDK's adb is a link to
+  it, as two adb versions drop the emulator), `jdk21-openjdk` (Gradle runs on JDK 21 through
+  `JAVA_HOME`), `gettext`, `unzip`; `/dev/kvm` writable.
+- The emulator is the `todav` AVD on `emulator-5580`, next to Noogle's (5554 and up). Drive it
+  with adb: `adb exec-out screencap -p > shot.png`, `adb shell input tap X Y` (1080×2400 px),
+  `adb shell input text …`, `adb shell input keyevent 66` (Enter); `make logs` for the app's log.
+  Its dialog about the computer's RAM is advisory.
+
 ## Testing the Linux app
 
 - The app is single-instance over D-Bus (`dev.aperte.Todav`): a new launch only shows the
