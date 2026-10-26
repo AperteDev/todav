@@ -53,7 +53,7 @@ pub trait Keyring: Send + Sync {
 
 /// Changes to undo together: see `Todav::together`.
 #[uniffi::export(callback_interface)]
-pub trait Action: Send + Sync {
+pub trait Changes: Send + Sync {
     fn run(&self);
 }
 
@@ -449,9 +449,9 @@ impl Todav {
 
     // --- undo
 
-    /// What `action` changes is undone together, as one step.
-    pub fn together(&self, action: Box<dyn Action>) {
-        self.c().together(|| action.run())
+    /// What `changes` does is undone together, as one step.
+    pub fn together(&self, changes: Box<dyn Changes>) {
+        self.c().together(|| changes.run())
     }
 
     /// The latest change, to undo just that one later (a snackbar's Undo).
@@ -934,9 +934,9 @@ pub fn timed_reminders() -> Vec<i64> {
 
 /// A reminder offset in the largest unit it fits exactly.
 #[uniffi::export]
-pub fn reminder_span(offset: i64) -> Span {
+pub fn reminder_span(offset: i64) -> ReminderSpan {
     let (amount, unit, before) = todav_app::dates::span(offset);
-    Span {
+    ReminderSpan {
         amount,
         unit,
         before,
@@ -944,7 +944,7 @@ pub fn reminder_span(offset: i64) -> Span {
 }
 
 #[uniffi::export]
-pub fn reminder_offset(span: Span) -> i64 {
+pub fn reminder_offset(span: ReminderSpan) -> i64 {
     todav_app::dates::offset(span.amount, span.unit, span.before)
 }
 
@@ -1066,14 +1066,14 @@ pub fn unplan(task: Task) -> Option<TaskPatch> {
 
 /// Columns for the blocks of one day: overlapping ones side by side.
 #[uniffi::export]
-pub fn columns(blocks: Vec<Block>) -> Vec<Column> {
+pub fn columns(blocks: Vec<DayBlock>) -> Vec<BlockColumn> {
     let segs = blocks
         .into_iter()
         .map(|b| (b.index as usize, b.from, b.to))
         .collect();
     todav_app::calendar::columns(segs)
         .into_iter()
-        .map(|(index, column, columns)| Column {
+        .map(|(index, column, columns)| BlockColumn {
             index: index as u32,
             column: column as u32,
             columns: columns as u32,

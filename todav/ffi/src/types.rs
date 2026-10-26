@@ -29,8 +29,11 @@ pub struct TodavList {
     pub account: i64,
 }
 
+/// A task. Not `Task`, which C# code has in scope as System.Threading.Tasks.Task.
+pub type TodavTask = todav_core::Task;
+
 #[uniffi::remote(Record)]
-pub struct Task {
+pub struct TodavTask {
     pub uid: String,
     pub list_href: String,
     pub summary: String,
@@ -222,11 +225,12 @@ pub enum Day {
 pub type Day = todav_app::dates::Day;
 
 #[uniffi::remote(Enum)]
-pub enum Page {
+pub enum SidebarPage {
     Upcoming,
     Important,
 }
-pub type Page = todav_app::tasks::Page;
+/// A page above the lists in the sidebar.
+pub type SidebarPage = todav_app::tasks::Page;
 
 #[uniffi::remote(Record)]
 pub struct Slot {
@@ -437,7 +441,7 @@ pub struct Date {
 
 /// A reminder offset as an amount of `dates::UNITS` (0 minutes, 1 hours, 2 days, 3 weeks).
 #[derive(uniffi::Record)]
-pub struct Span {
+pub struct ReminderSpan {
     pub amount: i64,
     pub unit: u32,
     pub before: bool,
@@ -446,7 +450,7 @@ pub struct Span {
 /// A page above the lists, with its count.
 #[derive(uniffi::Record)]
 pub struct PageCount {
-    pub page: Page,
+    pub page: SidebarPage,
     pub count: u32,
 }
 
@@ -516,12 +520,12 @@ pub struct When {
 pub enum Time {
     /// All of it: an all-day event, or a day inside a longer one.
     AllDay,
-    /// From the day's start until then: the last day of a longer event.
+    /// From the day's start until `end`: the last day of a longer event.
     Until {
-        at: i64,
+        end: i64,
     },
     At {
-        at: i64,
+        time: i64,
     },
     /// A task due that day, without a time.
     Date,
@@ -543,8 +547,8 @@ impl From<cal::Entry> for AgendaEntry {
             day: e.day,
             time: match e.time {
                 cal::Time::AllDay => Time::AllDay,
-                cal::Time::Until(at) => Time::Until { at },
-                cal::Time::At(at) => Time::At { at },
+                cal::Time::Until(end) => Time::Until { end },
+                cal::Time::At(time) => Time::At { time },
                 cal::Time::Date => Time::Date,
             },
             item: e.item.into(),
@@ -588,7 +592,7 @@ pub struct Segment {
 
 /// A block of one day of the week view, to lay out: an index of the caller's, from and to.
 #[derive(uniffi::Record)]
-pub struct Block {
+pub struct DayBlock {
     pub index: u32,
     pub from: i64,
     pub to: i64,
@@ -596,7 +600,7 @@ pub struct Block {
 
 /// A block's column among the ones it overlaps (`columns` of them).
 #[derive(uniffi::Record)]
-pub struct Column {
+pub struct BlockColumn {
     pub index: u32,
     pub column: u32,
     pub columns: u32,

@@ -112,7 +112,10 @@ One Cargo workspace at the root, the app's core and front-ends under `todav/`. N
         lists.rs             # colours, order by account, a new local account's lists
         accounts.rs          # add, reconnect, remove over the platform's keyring (`Keyring`)
         service.rs           # sync worker, ntfy listener, safety-net syncs, due reminders (`Shell`)
-    ffi/                     # planned: todav-ffi, UniFFI exports of core + app (Kotlin, C#, later Swift)
+    ffi/                     # todav-ffi, a workspace of its own: core + app exported with UniFFI
+      src/lib.rs             # the `Todav` object, callback interfaces, plain functions
+      src/types.rs           # records and enums: core and app types mirrored, FFI-only forms
+      tests/                 # smoke tests of the generated bindings (kotlin/, csharp/)
     cli/                     # todav-cli: thin debugging/scripting front-end
     linux/
       app/                   # GTK4 + libadwaita app (Rust, gtk4-rs); Blueprint views in ui/
@@ -129,9 +132,10 @@ One Cargo workspace at the root, the app's core and front-ends under `todav/`. N
 - Rust stable; `cargo clippy -D warnings`, `cargo fmt`, `cargo test` (`--features integration` for the tests against the server).
 - Linux: `make -C todav/linux install` (per-user) or `make -C todav/linux flatpak`; the build needs `blueprint-compiler` and `glib-compile-resources`. Flathub will need a generated `cargo-sources.json` for an offline build.
 - Android (planned): Gradle, Kotlin, `cargo-ndk` to build `.so` for arm64-v8a (and x86\_64 for the emulator); UniFFI bindgen in a Gradle task.
-- Windows (planned): .NET and the Windows App SDK (WinUI 3), `cargo build --target x86_64-pc-windows-msvc` (and `aarch64`); `uniffi-bindgen-cs` for the C# bindings. Builds and runs only on Windows: a Windows machine or VM for development, a `windows-latest` runner in CI.
+- Bindings: `scripts/bindings.sh` (see [Platforms](#platforms)); needs Gradle with a JDK 17 and the .NET 8 SDK for the smoke tests.
+- Windows (planned): .NET and the Windows App SDK (WinUI 3), `cargo build --target x86_64-pc-windows-msvc` (and `aarch64`) in `todav/ffi`; `uniffi-bindgen-cs` for the C# bindings. Builds and runs only on Windows: a Windows machine or VM for development, a `windows-latest` runner in CI.
 - Pebble (planned): the open-source Pebble SDK toolchain (`pebble build`), pinned version in `pebble/README.md`.
-- CI (GitHub Actions, `.github/workflows/`): fmt, clippy, unit tests, the Flatpak bundle and the extension zip on every push; releases by the manual Release workflow (see [Progress](#progress)). Later the Android debug build and Pebble build. No signing in CI.
+- CI (GitHub Actions, `.github/workflows/`): fmt, clippy, unit tests, the bindings (`scripts/bindings.sh`), the Flatpak bundle and the extension zip on every push; releases by the manual Release workflow (see [Progress](#progress)). Later the Android debug build and Pebble build. No signing in CI.
 
 **Dependency policy** (keep it short)
 
@@ -240,7 +244,7 @@ impl Client {
 
 ## Shared front-end layer (`todav-app`)
 
-Code every front-end would otherwise write again, on top of `Client`; the Linux app uses it directly, the others will through `todav-ffi`. It holds no state of its own beyond the service's, has no dependency but the core, and returns no text: what to show comes back as enums, times and ids (`dates::Day`, `dates::Section`, `calendar::Time`, `service::State`, `accounts::Error`), and the front-end words and formats it in its locale.
+Code every front-end would otherwise write again, on top of `Client`; the Linux app uses it directly, the others through `todav-ffi`. It holds no state of its own beyond the service's, has no dependency but the core, and returns no text: what to show comes back as enums, times and ids (`dates::Day`, `dates::Section`, `calendar::Time`, `service::State`, `accounts::Error`), and the front-end words and formats it in its locale.
 
 - `prefs`: the settings the app reads with their defaults (sorts, completed tasks, stars, pins, durations, reminder defaults, hidden calendars), so a missing key means the same everywhere.
 - `dates`, `tasks`, `calendar`, `lists`: pure rules over core data (trees, Upcoming, items by day, lanes and columns of the views, what a drop does). A drop that makes several core calls is one undo step (`Client::together` inside).
@@ -260,7 +264,12 @@ Decided 2026-10-26: a native UI per platform over the shared Rust, not a cross-p
 
 Why: most of each app's own work is the platform's services (Android: UnifiedPush, widgets, the Pebble companion, notification actions; Windows: tray, start with the session, toasts, the credential locker), and with `todav-app` the part written per platform is mostly views. Compose Multiplatform (one Kotlin UI for Android and Windows) was ruled out: Material on Windows and a resident JVM for an app that runs all day for push and reminders. Flutter and Slint likewise give neither platform its own look, and Android's services would still be Kotlin.
 
-**Bindings** (`todav-ffi`, planned): a cdylib exporting the core's and `todav-app`'s API with UniFFI proc-macros, so neither of those crates depends on UniFFI (the Linux and Fedora builds stay as they are). The API stays synchronous with sync callback interfaces (`ChangeListener`, `Shell`, `Keyring`), which every generator handles; the C# one has open bugs with async callbacks. To change before exporting: `Client::together` takes a closure (export the multi-call actions instead, as `todav-app` does), `Client::listen` takes `&dyn Fn` (a callback interface), `Error` needs a flat form. CI generates the Kotlin and C# bindings so an API that cannot be exported fails early.
+**Bindings** (`todav-ffi`): a cdylib (and staticlib) exporting the core's and `todav-app`'s API with UniFFI proc-macros. It is a Cargo workspace of its own (excluded from the root one), so UniFFI and SQLite's `bundled` feature, which Android and Windows need, stay out of the Linux builds and their packaging; the release script sets its version too.
+
+- One object, `Todav`, holds the `Client` and the `Service` (started by `start_service`; without it the service calls do nothing); pure rules are plain functions (Kotlin: top-level, C#: static methods of `TodavCore`). The API is synchronous with sync callback interfaces (`Listener`, `ServiceShell`, `Keyring`, `Changes` for `together`, `EventFilter`), which both generators handle; the C# one has open bugs with async callbacks.
+- Core and app types are mirrored with `uniffi::remote` (the compiler checks the fields), so neither crate depends on UniFFI. The bindings' own types cover what does not cross as it is: patches (`Option<Option<T>>` is a single optional in Kotlin, so a field to clear is `DueValue { due: None }`), tuples, `usize`, enums with unnamed fields, `SyncReport`'s errors. One error type, `TodavError` (Kotlin `TodavException`, C# the same name).
+- Names that would clash on a platform are avoided at the source: `TodavList` and `TodavTask` (Kotlin's `List`, C#'s `Task`), `Changes` (C#'s `Action`), `ReminderSpan` (`Span`), `SidebarPage` and `DayBlock` (WinUI's `Page` and `Block`); a variant's field never has the variant's name (C#). The C# namespace is `Aperte.Todav.Core` (a `Todav.…` namespace would be shadowed by the `Todav` class), the Kotlin package `dev.aperte.todav.core`; C# symbols are `internal`, the bindings file compiled into the app.
+- `scripts/bindings.sh` builds the library for the machine it runs on, generates both bindings (Kotlin with UniFFI's own generator, a binary of the crate; C# with `uniffi-bindgen-cs`, built into `target/tools` at the version matching UniFFI 0.31) and runs the smoke tests in `todav/ffi/tests/` against them: Gradle with JNA, and .NET 8. CI runs it, so an API change that does not export, or breaks the bindings, fails there.
 
 **Translations** (open): the `po/` catalogs stay the one source. Either a small `.mo` reader in Rust exported through `todav-ffi` (one set of messages and Polish plurals everywhere; xgettext reads C#, and Kotlin with the Java parser), or `strings.xml` and `.resw` generated from `po/` (`.resw` has no plurals). Decide before the first Android screen.
 
@@ -511,7 +520,8 @@ Deviation: no docker stack (`infra/`) for now — integration runs against the r
 - [ ] `docs/`, Flathub (generated `cargo-sources.json`, see Packaging), extensions.gnome.org
 - [x] COPR spec for Fedora (`todav/linux/rpm/`, `.copr/Makefile`); metainfo ready for Flathub (screenshots, release notes from the changelog, branding); system SQLite
 - [x] `todav-app`: the Linux app's logic that is not GTK moved into a crate of its own for every front-end (settings with defaults, dates, task trees and drops, calendar items, layout and drops, accounts over a keyring trait, the background service); its unit tests moved with it
-- [ ] `todav-ffi` (UniFFI exports of core + app, bindings generated in CI), then M6 Android → M7 Pebble, then Windows
+- [x] `todav-ffi`: the core and `todav-app` exported with UniFFI (a workspace of its own, bundled SQLite), Kotlin and C# bindings generated and smoke-tested against the Linux build by `scripts/bindings.sh`, in CI too
+- [ ] M6 Android → M7 Pebble, then Windows
 
 ## Roadmap
 

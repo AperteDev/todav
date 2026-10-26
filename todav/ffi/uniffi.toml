@@ -3,5 +3,7 @@ package_name = "dev.aperte.todav.core"
 cdylib_name = "todav_ffi"
 
 [bindings.csharp]
-namespace = "Todav.Core"
+namespace = "Aperte.Todav.Core"
 cdylib_name = "todav_ffi"
+# The plain functions, as static methods of this class.
+global_methods_class_name = "TodavCore"

@@ -15,8 +15,12 @@
 - Logic a front-end needs that is not about widgets goes in `todav/app` (`todav-app`), not in a
   front-end: settings with their defaults, date rules, task and calendar rules, the background
   service. It returns no text (enums, times, ids); each front-end words and formats it.
-  Android and Windows will use it through `todav/ffi` (planned), so keep its API exportable:
-  synchronous, no closures or generics in what front-ends call.
+  Android and Windows use it through `todav/ffi` (`todav-ffi`, a Cargo workspace of its own),
+  so keep its API exportable: synchronous, no closures or generics in what front-ends call.
+- `todav/ffi` exports the core and `todav-app` with UniFFI (Kotlin, C#). Add what a new
+  front-end feature needs there too; after changing it or the types it mirrors, run
+  `scripts/bindings.sh` (it generates both bindings and runs their smoke tests; CI does too),
+  plus `cargo fmt` and clippy in `todav/ffi`, which the root workspace's checks don't cover.
 
 ## Releases
 
@@ -32,7 +36,8 @@
 - Packaging for stores: the metainfo must pass `appstreamcli validate` without warnings (Flathub
   treats them as errors), and links in it must answer automated requests (Ko-fi's does not).
 - CI (`.github/workflows/ci.yml`) runs on every push: `cargo fmt --check`, clippy with
-  warnings as errors and the unit tests on Fedora (GNOME 51), plus the packages: the Flatpak
+  warnings as errors and the unit tests on Fedora (GNOME 51), the bindings
+  (`scripts/bindings.sh`), plus the packages: the Flatpak
   bundle, a tarball of the system-wide tree (`make -C todav/linux stage`, built on the oldest
   supported GNOME, now Fedora 43), the `.deb` made from it on Ubuntu 26.04 (`scripts/deb.sh`)
   and the extension zip. Run the checks before committing.

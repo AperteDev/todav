@@ -39,6 +39,39 @@ jobs:
       # Unit tests; the integration tests need a Nextcloud account.
       - run: cargo test --workspace --locked
 
+  bindings:
+    name: Bindings (Kotlin, C#)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: todav/ffi
+      # uniffi-bindgen-cs, built by the script at the version it names.
+      - uses: actions/cache@v6
+        with:
+          path: target/tools
+          key: uniffi-bindgen-cs-${{ hashFiles('scripts/bindings.sh') }}
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: current
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 8.0.x
+      - run: cargo fmt --check
+        working-directory: todav/ffi
+      - run: cargo clippy --all-targets --locked -- -D warnings
+        working-directory: todav/ffi
+      # The bindings generated and run against the library built for Linux.
+      - run: scripts/bindings.sh
+
   flatpak:
     name: Flatpak
     runs-on: ubuntu-24.04

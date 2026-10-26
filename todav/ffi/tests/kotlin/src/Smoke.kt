@@ -30,7 +30,7 @@ fun main() {
     check(t.task(task.uid)!!.due == null)
 
     // Two changes, one undo step.
-    t.together(object : Action {
+    t.together(object : Changes {
         override fun run() {
             t.setDone(task.uid, true)
             t.updateTask(task.uid, TaskPatch(summary = "Buy oat milk"))

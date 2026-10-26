@@ -1,0 +1,18 @@
+<!-- The C# bindings against the library built for this machine (`cargo build` in todav/ffi, then
+     the bindings generated into target/bindings/cs): `dotnet run`. A check that they compile and
+     work, not the Windows build. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Generated code: its warnings are not ours to fix. -->
+    <NoWarn>$(NoWarn);CS1591;CS8981</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../target/bindings/cs/*.cs" />
+    <None Include="../../target/debug/libtodav_ffi.so" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
