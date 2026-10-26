@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The open subtasks of a completed task stay under it among the open tasks instead of showing
   as top-level tasks.
+- Undoing a change while a sync was uploading it no longer gets the change back from the server:
+  a task reopened that way was completed again a moment later.
 
 ## [1.3.0] - 2026-10-26
 

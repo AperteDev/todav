@@ -347,16 +347,39 @@ impl Client {
                     None => return Err(e),
                 },
             };
+            // No ETag: the server stored something else than it was sent. Its copy gives one, so
+            // a later pull can tell it from edits made elsewhere.
+            let (etag, server) = match etag {
+                Some(e) => (Some(e), None),
+                None => match dav.get(&href)? {
+                    Some((e, ics)) => (e, Calendar::parse(&ics)),
+                    None => (None, None),
+                },
+            };
             let db = self.db.lock().unwrap();
             // Only clear the flag if nobody edited the row while we were uploading.
             let now = store::raw(&db, t.kind, &t.list_href, &t.uid)?;
             let still_same = now.is_some_and(|r| r.raw_ics == t.raw_ics);
-            let dirty = if still_same {
-                store::CLEAN
-            } else {
-                store::MODIFIED
-            };
-            store::set_sync_state(&db, &t, Some(&href), etag.as_deref(), dirty)?;
+            match server.filter(|_| still_same) {
+                Some(cal) => {
+                    store::save(
+                        &db,
+                        &t.list_href,
+                        Some(&href),
+                        etag.as_deref(),
+                        &cal,
+                        store::CLEAN,
+                    )?;
+                }
+                None => {
+                    let dirty = if still_same {
+                        store::CLEAN
+                    } else {
+                        store::MODIFIED
+                    };
+                    store::set_sync_state(&db, &t, Some(&href), etag.as_deref(), dirty)?;
+                }
+            }
             report.pushed += 1;
         }
         Ok(report)
@@ -469,10 +492,7 @@ impl Client {
                 continue;
             }
             let local = store::raw(&tx, kind, list_href, &uid)?;
-            if local
-                .as_ref()
-                .is_some_and(|l| l.etag.as_deref() == Some(&etag) && l.dirty == store::CLEAN)
-            {
+            if unchanged(local.as_ref(), &etag) {
                 continue;
             }
             match local {
@@ -539,6 +559,14 @@ impl Client {
     }
 }
 
+/// The server copy (`etag`) is the one `local` last synced with, often the upload this sync just
+/// made coming back: nothing changed there. An edit made here since (an undo while the upload
+/// was on its way) is newer and goes up with the next push; merged with its own base, the old
+/// copy could win parts of it back (a reopened task completed again).
+fn unchanged(local: Option<&store::RawObject>, etag: &str) -> bool {
+    local.is_some_and(|l| l.etag.as_deref() == Some(etag))
+}
+
 /// Conflict rule: newer LAST-MODIFIED wins the whole VTODO; a completed status always sticks.
 pub fn resolve(local: &Calendar, server: &Calendar) -> Calendar {
     let lm = |c: &Calendar| c.time("LAST-MODIFIED").unwrap_or(0);
@@ -571,6 +599,28 @@ mod tests {
             "BEGIN:VCALENDAR\nBEGIN:VTODO\nUID:u\nSUMMARY:{summary}\nSTATUS:{status}\nLAST-MODIFIED:{lm}\nEND:VTODO\nEND:VCALENDAR\n"
         ))
         .unwrap()
+    }
+
+    #[test]
+    fn a_server_copy_with_the_rows_etag_is_unchanged_even_with_edits_waiting() {
+        let row = |etag: Option<&str>, dirty| store::RawObject {
+            kind: Kind::Task,
+            uid: "u".into(),
+            list_href: "/l/".into(),
+            href: Some("/l/u.ics".into()),
+            etag: etag.map(Into::into),
+            raw_ics: String::new(),
+            dirty,
+        };
+        // Reopened (undo) after this sync uploaded it completed: the upload comes back.
+        assert!(unchanged(Some(&row(Some("e1"), store::MODIFIED)), "e1"));
+        assert!(unchanged(Some(&row(Some("e1"), store::CLEAN)), "e1"));
+        assert!(
+            !unchanged(Some(&row(Some("e0"), store::MODIFIED)), "e1"),
+            "edited there too"
+        );
+        assert!(!unchanged(Some(&row(None, store::MODIFIED)), "e1"));
+        assert!(!unchanged(None, "e1"));
     }
 
     #[test]
