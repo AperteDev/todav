@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["todav/core", "todav/cli", "todav/linux/app"]
+members = ["todav/core", "todav/app", "todav/cli", "todav/linux/app"]
 
 # One version for the whole app, set by the Release workflow (scripts/release.py).
 [workspace.package]

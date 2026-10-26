@@ -57,13 +57,14 @@ fn call(method: &str, params: &glib::Variant) -> Result<Option<glib::Variant>, S
         // (href, name, open tasks, colour as the app shows it)
         "GetLists" => {
             // In the sidebar's order: by account.
-            let lists: Vec<(String, String, u32, String)> = crate::lists::by_place(c.lists())
-                .into_iter()
-                .map(|l| {
-                    let color = crate::lists::color(&l);
-                    (l.href, l.display_name, l.open_count, color)
-                })
-                .collect();
+            let lists: Vec<(String, String, u32, String)> =
+                todav_app::lists::by_place(c, c.lists())
+                    .into_iter()
+                    .map(|l| {
+                        let color = todav_app::lists::color(&l);
+                        (l.href, l.display_name, l.open_count, color)
+                    })
+                    .collect();
             Some((lists,).to_variant())
         }
         // (uid, summary, category, done, depth: 0 for a task, 1 for its subtask, ...), in the
@@ -71,12 +72,12 @@ fn call(method: &str, params: &glib::Variant) -> Result<Option<glib::Variant>, S
         "GetTasks" => {
             let (list,) = params.get::<(String,)>().ok_or_else(bad)?;
             let mut out: Vec<(String, String, String, bool, u32)> = Vec::new();
-            let order = crate::settings::order();
+            let order = todav_app::prefs::order(c);
             for g in c.grouped_by(
                 list,
                 order.tasks,
                 order.subtasks,
-                crate::settings::done_view(),
+                todav_app::prefs::done_view(c),
             ) {
                 let cat = g.name.unwrap_or_default();
                 // Parents come before their subtasks.
@@ -101,7 +102,7 @@ fn call(method: &str, params: &glib::Variant) -> Result<Option<glib::Variant>, S
                     summary,
                     None,
                     None,
-                    crate::settings::order().task_start,
+                    todav_app::prefs::order(c).task_start,
                 )
                 .map_err(|e| e.to_string())?;
             request_sync();
@@ -153,7 +154,7 @@ fn call(method: &str, params: &glib::Variant) -> Result<Option<glib::Variant>, S
         // with something on it: the month's dots.
         "GetDays" => {
             let (from, days) = params.get::<(i64, u32)>().ok_or_else(bad)?;
-            let days = crate::calendar::day_colors(from, i64::from(days.min(42)));
+            let days = todav_app::calendar::day_colors(c, from, i64::from(days.min(42)));
             Some((days,).to_variant())
         }
         // (day as local midnight for ShowDay, time, title, colour, is a task, done) for each

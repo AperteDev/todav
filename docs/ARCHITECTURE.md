@@ -4,7 +4,7 @@ Oct 8, 2026 · @Kris · updated Oct 26, 2026
 
 ## Overview
 
-Todav is a personal, local-first task list synced through Nextcloud CalDAV (VTODO) with near-instant push via WebDAV-Push (`dav_push`) and a self-hosted ntfy server. One Rust core drives the front-ends: a GTK4/libadwaita app on Linux, a GNOME Shell extension for quick preview, an Android app, a Pebble watchapp fed by the Android app, and a Windows app (planned, see [Roadmap](#roadmap)).
+Todav is a personal, local-first task list synced through Nextcloud CalDAV (VTODO) with near-instant push via WebDAV-Push (`dav_push`) and a self-hosted ntfy server. One Rust core drives the front-ends: a GTK4/libadwaita app on Linux, a GNOME Shell extension for quick preview, an Android app, a Pebble watchapp fed by the Android app, and a Windows app (planned, see [Platforms](#platforms)).
 
 Todav is meant to become a tasks + calendar app (VEVENT next to VTODO, same CalDAV calendars). Notes and journal go in a sibling app, Notav, with its own repository (see [Notav integration](#notav-integration-planned)).
 
@@ -19,11 +19,12 @@ Todav is meant to become a tasks + calendar app (VEVENT next to VTODO, same CalD
 
 - Multi-user sharing, assignees, comments.
 - Recurring tasks, attachments.
-- iOS, web front-end.
+- iOS, macOS, web front-end (iOS and macOS later, see [Platforms](#platforms)).
 
 **Principles for the agent**
 
 - The Rust core is the only place with sync, push, parsing and conflict logic. Front-ends are thin: they render state and call commands.
+- What every front-end needs beyond storage and sync (settings with their defaults, date rules, task trees, calendar layout and drops, the background service) lives in `todav-app`, not in a front-end. A front-end keeps its widgets, its wording and formatting, and its platform services (keyring, notifications, timers).
 - Every feature lands in the core with tests against a real Nextcloud (the Test account, see [Progress](#progress)) before any UI uses it.
 - Push is best-effort by spec; polling with `sync-token` stays as the safety net everywhere.
 - When in doubt, do the simpler thing and leave a `TODO(v2)` comment rather than a configuration option.
@@ -84,7 +85,7 @@ One Cargo workspace at the root, the app's core and front-ends under `todav/`. N
 
 ```text
 <repo>/
-  Cargo.toml                 # workspace: todav/core, todav/cli, todav/linux/app
+  Cargo.toml                 # workspace: todav/core, todav/app, todav/cli, todav/linux/app
   todav/
     core/                    # todav-core (library), flat modules in src/
       src/
@@ -102,15 +103,25 @@ One Cargo workspace at the root, the app's core and front-ends under `todav/`. N
         login.rs             # Login Flow v2, app password sign-in
         undo.rs              # undo history of local changes
         json.rs              # minimal JSON (no serde)
+    app/                     # todav-app: what every front-end does over the core, no toolkit, no text
+      src/
+        prefs.rs             # synced settings the app reads, with their defaults
+        dates.rs             # day arithmetic, how a day is named, Upcoming sections, reminder offsets
+        tasks.rs             # subtask trees, sidebar pages, drag and drop of tasks
+        calendar.rs          # items by day, agenda, search, drops on days/hours/lists, week and month layout
+        lists.rs             # colours, order by account, a new local account's lists
+        accounts.rs          # add, reconnect, remove over the platform's keyring (`Keyring`)
+        service.rs           # sync worker, ntfy listener, safety-net syncs, due reminders (`Shell`)
+    ffi/                     # planned: todav-ffi, UniFFI exports of core + app (Kotlin, C#, later Swift)
     cli/                     # todav-cli: thin debugging/scripting front-end
     linux/
       app/                   # GTK4 + libadwaita app (Rust, gtk4-rs); Blueprint views in ui/
       data/                  # .desktop, metainfo, icons, D-Bus service
       flatpak/               # dev.aperte.Todav.json
     gnome-extension/         # GNOME Shell extension (GJS), talks D-Bus to the Linux app
-    android/                 # planned: app (Compose), core (UniFFI module), pebble companion
+    android/                 # planned: app (Compose), the todav-ffi module, pebble companion
     pebble/                  # planned: Pebble watchapp (C, Pebble SDK)
-    windows/                 # planned: WinUI 3 app
+    windows/                 # planned: WinUI 3 app (C#)
 ```
 
 **Tooling**
@@ -118,6 +129,7 @@ One Cargo workspace at the root, the app's core and front-ends under `todav/`. N
 - Rust stable; `cargo clippy -D warnings`, `cargo fmt`, `cargo test` (`--features integration` for the tests against the server).
 - Linux: `make -C todav/linux install` (per-user) or `make -C todav/linux flatpak`; the build needs `blueprint-compiler` and `glib-compile-resources`. Flathub will need a generated `cargo-sources.json` for an offline build.
 - Android (planned): Gradle, Kotlin, `cargo-ndk` to build `.so` for arm64-v8a (and x86\_64 for the emulator); UniFFI bindgen in a Gradle task.
+- Windows (planned): .NET and the Windows App SDK (WinUI 3), `cargo build --target x86_64-pc-windows-msvc` (and `aarch64`); `uniffi-bindgen-cs` for the C# bindings. Builds and runs only on Windows: a Windows machine or VM for development, a `windows-latest` runner in CI.
 - Pebble (planned): the open-source Pebble SDK toolchain (`pebble build`), pinned version in `pebble/README.md`.
 - CI (GitHub Actions, `.github/workflows/`): fmt, clippy, unit tests, the Flatpak bundle and the extension zip on every push; releases by the manual Release workflow (see [Progress](#progress)). Later the Android debug build and Pebble build. No signing in CI.
 
@@ -126,9 +138,9 @@ One Cargo workspace at the root, the app's core and front-ends under `todav/`. N
 | Need | Crate / library | Why not std |
 | --- | --- | --- |
 | HTTP + TLS | `ureq` (sync, rustls) | No async runtime needed; keeps the core small |
-| SQLite | `rusqlite` (0.38 to 0.40), the system SQLite | Standard choice, single file; not bundled, as distributions (Fedora) require, and 0.38 is what Fedora packages. Android will need its `bundled` feature |
+| SQLite | `rusqlite` (0.38 to 0.40), the system SQLite | Standard choice, single file; not bundled, as distributions (Fedora) require, and 0.38 is what Fedora packages. Android and Windows will need its `bundled` feature (behind a feature of the core, off for Linux) |
 | XML | `quick-xml` | PROPFIND/REPORT bodies and multistatus responses |
-| FFI | `uniffi` | Kotlin bindings generated from the Rust API |
+| FFI | `uniffi` (in `todav-ffi` only) + `uniffi-bindgen-cs` (NordSecurity, a build tool) | Kotlin (later Swift) bindings from UniFFI itself, C# from the third-party generator; UniFFI pinned to the version both support (0.31 as of Oct 2026) |
 | ntfy stream (Linux push) | — (`ureq`) | ntfy's `/<topic>/json` NDJSON stream over plain HTTP; no WebSocket crate needed |
 | Web Push decryption | `ring` (HKDF, AES-128-GCM, RNG; already pulled in by rustls) + `p256` (static-key ECDH) | `dav_push` always encrypts (RFC 8291); `ece` drags in OpenSSL, ring can't load a stored ECDH key |
 | iCalendar | hand-written in `todav/core/src/ical.rs` | Full iCal crates are large; VTODO needs \~15 properties, line folding and escaping |
@@ -226,6 +238,36 @@ impl Client {
 
 **CLI** (`todav`): `lists`, `ls`, `add`, `done`, `undo`, `rm`, `sync`, `push-register`, `listen` (ntfy loop → sync); the account comes from `.env`. Used to validate the core before any GUI exists and as a debugging aid later.
 
+## Shared front-end layer (`todav-app`)
+
+Code every front-end would otherwise write again, on top of `Client`; the Linux app uses it directly, the others will through `todav-ffi`. It holds no state of its own beyond the service's, has no dependency but the core, and returns no text: what to show comes back as enums, times and ids (`dates::Day`, `dates::Section`, `calendar::Time`, `service::State`, `accounts::Error`), and the front-end words and formats it in its locale.
+
+- `prefs`: the settings the app reads with their defaults (sorts, completed tasks, stars, pins, durations, reminder defaults, hidden calendars), so a missing key means the same everywhere.
+- `dates`, `tasks`, `calendar`, `lists`: pure rules over core data (trees, Upcoming, items by day, lanes and columns of the views, what a drop does). A drop that makes several core calls is one undo step (`Client::together` inside).
+- `accounts`: add, reconnect and remove, with the platform's keyring behind the `Keyring` trait; a password from elsewhere (GNOME Online Accounts) stays the front-end's (`Account::source`).
+- `service`: one `Service` per app: the sync worker (requests coalesced, 300 ms to let a burst settle), the ntfy listener (`start(listen)`; Android gets pushes from UnifiedPush instead), `tick` once a minute for the safety-net syncs, `due_reminders` since the last call. It reports to the front-end's `Shell` from its own threads.
+
+## Platforms
+
+Decided 2026-10-26: a native UI per platform over the shared Rust, not a cross-platform UI toolkit.
+
+| Platform | UI | Bindings |
+| --- | --- | --- |
+| Linux | GTK4 + libadwaita (Rust) | `todav-core` and `todav-app` directly |
+| Android | Kotlin + Jetpack Compose (Material 3) | UniFFI (Kotlin), from `todav-ffi` |
+| Windows | C# + WinUI 3 (Windows App SDK) | `uniffi-bindgen-cs`, from `todav-ffi` |
+| iOS, macOS (later) | SwiftUI | UniFFI (Swift), from `todav-ffi` |
+
+Why: most of each app's own work is the platform's services (Android: UnifiedPush, widgets, the Pebble companion, notification actions; Windows: tray, start with the session, toasts, the credential locker), and with `todav-app` the part written per platform is mostly views. Compose Multiplatform (one Kotlin UI for Android and Windows) was ruled out: Material on Windows and a resident JVM for an app that runs all day for push and reminders. Flutter and Slint likewise give neither platform its own look, and Android's services would still be Kotlin.
+
+**Bindings** (`todav-ffi`, planned): a cdylib exporting the core's and `todav-app`'s API with UniFFI proc-macros, so neither of those crates depends on UniFFI (the Linux and Fedora builds stay as they are). The API stays synchronous with sync callback interfaces (`ChangeListener`, `Shell`, `Keyring`), which every generator handles; the C# one has open bugs with async callbacks. To change before exporting: `Client::together` takes a closure (export the multi-call actions instead, as `todav-app` does), `Client::listen` takes `&dyn Fn` (a callback interface), `Error` needs a flat form. CI generates the Kotlin and C# bindings so an API that cannot be exported fails early.
+
+**Translations** (open): the `po/` catalogs stay the one source. Either a small `.mo` reader in Rust exported through `todav-ffi` (one set of messages and Polish plurals everywhere; xgettext reads C#, and Kotlin with the Java parser), or `strings.xml` and `.resw` generated from `po/` (`.resw` has no plurals). Decide before the first Android screen.
+
+## Windows app (planned)
+
+What the Linux app does, the Windows way: one resident process (single instance by `AppInstance.FindOrRegisterForKey`) with a tray icon, the window hidden on close; the ntfy listener and the safety-net syncs from `todav-app`'s `Service`; reminders as toasts (`AppNotificationManager`) with "Mark as Done"; start with the session (an MSIX `StartupTask`); app passwords in the credential locker (`PasswordVault`); the system zone for `Client::set_local_zone` from `TimeZoneInfo.TryConvertWindowsIdToIanaId`; data in the app's local folder. A tray flyout with a list and the agenda would be the GNOME extension's counterpart. WinUI 3 has no tray icon of its own: a small library (H.NotifyIcon) or the Win32 calls through CsWin32, to be chosen and added to the dependency table. Distribution through the Microsoft Store (free for individual developers since September 2025; the Store signs the MSIX) and winget; check the Store's rules on AI-assisted code first, as for Flathub.
+
 ## Linux app (GTK4 + libadwaita)
 
 A single Rust binary (`todav-linux`) that is both the GUI and a background service: it keeps the ntfy connection open, runs sync, and exposes a small D-Bus interface the GNOME extension uses. There is no separate daemon.
@@ -261,7 +303,7 @@ A single Rust binary (`todav-linux`) that is both the GUI and a background servi
 - Lists and calendars kept on this device only: the local account's. Their href is `local:<uid>/` (`store::LOCAL`) in the same `lists` table, so tasks and events in them are stored like any other; `List::local` marks them.
 - Never synced: the upload queue (`store::dirty`) skips them, so items in them keep `dirty` set and no href; refreshing an account's calendars and adding or removing another account leave them alone; creating, editing and deleting a local list never calls a server. Moving an event from a local calendar to a server one uploads it (it is new there), and moving one back deletes the server copy.
 - Without a Nextcloud account the app runs on them alone: the background service starts for reminders and D-Bus, sync and push stay off, and the sync buttons are greyed out.
-- Shown by account: both sidebars and the event dialog's calendar picker group lists by account in the accounts' order (`lists::by_place`), with a heading per group only when there is more than one (`lists::headings`; ListBox header functions, and an `Adw.ComboRow` header factory over a `GtkFlattenListModel` of one string list per account). The new list dialog's "Save to" row offers the accounts that can take one (`lists::places`) when there is a choice.
+- Shown by account: both sidebars and the event dialog's calendar picker group lists by account in the accounts' order (`todav_app::lists::by_place`), with a heading per group only when there is more than one (`lists::headings`; ListBox header functions, and an `Adw.ComboRow` header factory over a `GtkFlattenListModel` of one string list per account). The new list dialog's "Save to" row offers the accounts that can take one (`lists::places`) when there is a choice.
 - Not done: moving a whole list between accounts (single events move with the calendar picker, tasks by dropping them on a list).
 
 **Process model**
@@ -332,20 +374,20 @@ A panel indicator with a read-only view of a list and a month calendar; clicking
 
 ## Android app
 
-Kotlin + Jetpack Compose on top of the same core via UniFFI. Push arrives through UnifiedPush with the ntfy app as distributor; no Google services, no own foreground service.
+Kotlin + Jetpack Compose on top of the core and `todav-app` via UniFFI (`todav-ffi`). Push arrives through UnifiedPush with the ntfy app as distributor; no Google services, no own foreground service.
 
 **Dependencies** (AndroidX + Compose + these three): `net.java.dev.jna:jna` (required by UniFFI), `org.unifiedpush.android:connector`, and PebbleKit (vendored AAR, see Pebble section). No Room, Retrofit, OkHttp, Hilt or WorkManager-dependent libraries; the core already has storage and HTTP.
 
 **Structure**
 
-- `android/core`: Gradle library module; a `cargo-ndk` task builds `libtodav_core.so` for `arm64-v8a` and `x86_64`, then runs `uniffi-bindgen` to generate `uniffi/todav/todav.kt`.
+- `android/core`: Gradle library module; a `cargo-ndk` task builds `libtodav_ffi.so` for `arm64-v8a` and `x86_64`, then runs `uniffi-bindgen` to generate the Kotlin bindings.
 - `android/app`: `TodavApp` (holds one `Client`), `MainActivity` (Compose), `SyncScheduler`, `PushReceiver`, `pebble/` package.
 
 **UI (Compose, Material 3)**
 
 - Bottom navigation or a list drawer mirroring the Linux layout; task screen is a `LazyColumn` with sticky category headers; checkbox rows; swipe-to-delete with undo snackbar.
 - Quick-add bar at the bottom with a category chip row (from config.json) above the keyboard.
-- Home-screen widget (`AppWidgetProvider`, `RemoteViews` list) for the pinned list: ticking an item sends a broadcast → `set_done` → `sync()`. This is the Android counterpart of the GNOME extension.
+- Home-screen widget (Jetpack Glance, part of AndroidX) for the pinned list: ticking an item sends a broadcast → `set_done` → `sync()`. This is the Android counterpart of the GNOME extension.
 - State: a `ViewModel` per screen reads the core on `Dispatchers.IO` and re-reads on `ChangeListener` callbacks; no in-memory duplicate of the data.
 
 **Push and sync**
@@ -355,6 +397,7 @@ Kotlin + Jetpack Compose on top of the same core via UniFFI. Push arrives throug
 3. If the connector reports an encrypted Web Push message (UnifiedPush 3 connectors decrypt it before `onMessage`), the bytes are already plaintext; `push_decode` handles both.
 4. Safety net: `WorkManager` (part of AndroidX, acceptable) periodic `SyncWorker` every 30 min with network constraint; plus `sync()` on app foreground.
 5. Registration refresh: a `SyncWorker` run also re-registers push when `push_expires` is within 6 h.
+6. Reminders: no 30-second check as on Linux; an exact alarm (`AlarmManager`) set for the next reminder, which then shows `Service::due_reminders` and sets the next one. Needs a "next reminder at" query in the core.
 
 **Account setup**: Nextcloud Login Flow v2 (`/index.php/login/v2`) in a Custom Tab yields an app password; store it in `EncryptedSharedPreferences` is deprecated, so use the Android Keystore to wrap it and keep the blob in `SharedPreferences`.
 
@@ -467,7 +510,8 @@ Deviation: no docker stack (`infra/`) for now — integration runs against the r
 - [x] Translations: gettext domain `todav` for the app (Rust `i18n.rs` over glibc, Blueprint `_()`), the extension (`gettext-domain`, catalogs in its `locale/`), the desktop file and the metainfo (`msgfmt --desktop/--xml`, rules in `po/its/`, so no AppStream package is needed to build). `scripts/i18n.sh` refreshes `po/todav.pot` and merges it; build.rs compiles the catalogs for a build run (and the translated metainfo for About), `make install-data` and the extension's `stage` for installs. Languages: Polish (reviewed), German, French, Spanish, Italian, Brazilian Portuguese (drafts). Weeks start on the locale's first weekday (`i18n::first_weekday`, glibc's `_NL_TIME_WEEK_1STDAY` + `_NL_TIME_FIRST_WEEKDAY`, as GTK's calendar)
 - [ ] `docs/`, Flathub (generated `cargo-sources.json`, see Packaging), extensions.gnome.org
 - [x] COPR spec for Fedora (`todav/linux/rpm/`, `.copr/Makefile`); metainfo ready for Flathub (screenshots, release notes from the changelog, branding); system SQLite
-- [ ] M6 Android (+ UniFFI exports) → M7 Pebble
+- [x] `todav-app`: the Linux app's logic that is not GTK moved into a crate of its own for every front-end (settings with defaults, dates, task trees and drops, calendar items, layout and drops, accounts over a keyring trait, the background service); its unit tests moved with it
+- [ ] `todav-ffi` (UniFFI exports of core + app, bindings generated in CI), then M6 Android → M7 Pebble, then Windows
 
 ## Roadmap
 
@@ -478,7 +522,7 @@ Public in the README as planned work; order not fixed.
 - [ ] **More services** besides Nextcloud: other CalDAV servers first (Radicale, Baïkal, Fastmail, iCloud…), which mostly means login without Login Flow v2, settings/categories without Nextcloud Files, and polling where there is no WebDAV-Push. Each would be another `AccountKind`.
 - [ ] **Android app**: M6 above.
 - [ ] **Pebble app**: M7 above, fed by the Android app (see [Pebble watchapp + companion](#pebble-watchapp--companion)).
-- [ ] **Windows app**: a native WinUI 3 front-end over the same Rust core (bindings as for Android), with what the Linux app does in the background: push over ntfy, reminder notifications, starting with the session. Details to be specified.
+- [ ] **Windows app**: a native WinUI 3 front-end over the same Rust core, with what the Linux app does in the background: push over ntfy, reminder notifications, starting with the session (see [Windows app](#windows-app-planned)).
 - [x] **Nested subtasks**: any depth, as `RELATED-TO` allows. Rows indent per level inside the top-level task's expander (no expander per level); every subtask has a "+" for adding to it and taking dropped tasks; the calendar's task popover shows a subtask's task and its own subtasks.
 - [ ] **Advanced notifications**: configurable, beyond the reminder notifications the background service shows now; details to be specified.
 - [x] **Starred tasks**: as Nextcloud Tasks does it, starred is high priority (1–4), no property of its own. Each task row has a star coloured by its priority (red high, yellow medium, blue low, outlined without one) whose menu sets the level as the edit dialog does (1, 5, 9 or none); the Important page lists the open high-priority tasks of every list by list (`Client::important`); "Priority, highest first" is a sort for tasks and subtasks. Pinning is Nextcloud's `X-PINNED:true` (`Task::pinned`, a `pinned` column): pinned top-level tasks open the list in a "Pinned" group, in the list's overall order and filtered by the category filter; dropping a task into it pins it, dragging one out unpins it (and sets the category of the group it lands in). Synced "Stars" (`show_stars`) and "Pins" (`show_pins`) in Preferences → Tasks, on by default, hide the stars with the Important page, and the pins with the Pinned group (X-PINNED is left as it is).

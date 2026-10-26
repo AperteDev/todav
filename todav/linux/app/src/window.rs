@@ -8,7 +8,9 @@ use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use todav_core::{AccountKind, CategoryGroup, Due, Sort, Task, TaskPatch};
+use todav_app::prefs;
+use todav_app::tasks::{self, Page, Slot};
+use todav_core::{AccountKind, CategoryGroup, Due, Task, TaskPatch};
 
 /// Libadwaita only styles plain buttons as pills; round the ends of the sign-in split button to match.
 /// The category section header turns its arrow like an expander row, without a "pressed" look.
@@ -822,7 +824,7 @@ fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
                 .then(|| ui.cats.string(ui.cat.selected()).map(|s| s.to_string()))
                 .flatten(),
         };
-        let start = crate::settings::order().task_start;
+        let start = prefs::order(core()).task_start;
         match core().add_task(list, text, cat, None, start) {
             Ok(_) => {
                 entry.set_text("");
@@ -1037,8 +1039,8 @@ fn refresh_lists(ui: &Rc<Ui>) {
         sync.set_enabled(crate::can_sync());
     }
     update_banners();
-    let lists = crate::lists::by_place(core().lists());
-    let pages = pages(&lists);
+    let lists = todav_app::lists::by_place(core(), core().lists());
+    let pages = pages();
     let valid = |h: &str| pages.iter().any(|(p, _)| *p == h) || lists.iter().any(|l| l.href == h);
     if ui.current.borrow().as_deref().is_none_or(|c| !valid(c)) {
         let last = core().setting("last_list".into()).filter(|l| valid(l));
@@ -1140,8 +1142,8 @@ fn list_drop(ui: &Rc<Ui>, row: &gtk::ListBoxRow, href: &str) {
 }
 
 fn refresh_sidebar_counts(ui: &Rc<Ui>) {
-    let lists = crate::lists::by_place(core().lists());
-    let pages = pages(&lists);
+    let lists = todav_app::lists::by_place(core(), core().lists());
+    let pages = pages();
     // A page appearing or going (its first or last task) rebuilds the sidebar too.
     if sidebar_hrefs(&pages, &lists) != *ui.hrefs.borrow() || looks(&lists) != *ui.looks.borrow() {
         return refresh_lists(ui);
@@ -1170,29 +1172,15 @@ fn looks(lists: &[todav_core::List]) -> Vec<(String, Option<String>)> {
         .collect()
 }
 
-/// The pages shown above `lists`, with their sidebar counts: Upcoming while a task has a due
-/// date (counting those due today or earlier), Important while one is of high priority (with
-/// stars on).
-fn pages(lists: &[todav_core::List]) -> Vec<(&'static str, usize)> {
-    if lists.is_empty() {
-        return Vec::new();
-    }
-    let now = core().local_now();
-    let upcoming = core().upcoming();
-    let important = if crate::settings::stars() {
-        core().important().len()
-    } else {
-        0
-    };
-    let pressing = upcoming.iter().filter(|t| dates::pressing(t, now)).count();
-    [
-        (UPCOMING, !upcoming.is_empty(), pressing),
-        (IMPORTANT, important > 0, important),
-    ]
-    .into_iter()
-    .filter(|(_, shown, _)| *shown)
-    .map(|(page, _, n)| (page, n))
-    .collect()
+/// The pages shown above the lists, with their sidebar counts.
+fn pages() -> Vec<(&'static str, usize)> {
+    todav_app::tasks::pages(core())
+        .into_iter()
+        .map(|(page, n)| match page {
+            Page::Upcoming => (UPCOMING, n),
+            Page::Important => (IMPORTANT, n),
+        })
+        .collect()
 }
 
 /// The sidebar rows' hrefs: the pages, then the lists.
@@ -1238,7 +1226,7 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
     } else {
         core().tasks(href.clone(), true)
     };
-    *ui.counts.borrow_mut() = subtask_counts(&all);
+    *ui.counts.borrow_mut() = tasks::subtask_counts(&all);
     // The new-task entry and its category picker.
     let add_box = ui.entry.parent();
     add_box.iter().for_each(|b| b.set_visible(!mixed));
@@ -1263,10 +1251,10 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
             .unwrap_or_default(),
     );
 
-    let order = crate::settings::order();
+    let order = prefs::order(core());
     ui.handles
         .set(core().setting("drag_handles".into()).as_deref() == Some("true"));
-    let done_view = crate::settings::done_view();
+    let done_view = prefs::done_view(core());
     let groups = core().grouped_by(href.clone(), order.tasks, order.subtasks, done_view);
 
     // Category picker: configured categories, then any others in use; keep the selection.
@@ -1321,8 +1309,9 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
                 let Some((d, ds)) = weak.upgrade().and_then(|ui| ui.dragging.take()) else {
                     return false;
                 };
-                if let Err(e) = core().together(|| drop_on_category(&d, &ds, cat.clone())) {
-                    toast(&e.to_string());
+                match tasks::drop_on_category(core(), &d, &ds, cat.clone()) {
+                    Ok(()) => request_sync(),
+                    Err(e) => toast(&e.to_string()),
                 }
                 true
             });
@@ -1372,15 +1361,15 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
     // Pinned top-level tasks first, in a group of their own, in the list's overall order; the
     // sidebar filter goes by each top-level task's category (a group's name in "group").
     // With pins turned off, pinned tasks show among the others.
-    let pins = crate::settings::pins();
+    let pins = prefs::pins(core());
     let all_open = core().ungrouped_by(href.clone(), order.tasks, order.subtasks, done_view);
-    let pinned: Vec<_> = trees(&all_open)
+    let pinned: Vec<_> = tasks::trees(&all_open)
         .into_iter()
         .filter(|(root, _)| pins && root.pinned && shown(root.category.as_ref()))
         .collect();
     let mut sections: Vec<(Option<String>, Vec<_>)> = Vec::new();
     for g in &groups {
-        let rest: Vec<_> = trees(&g.tasks)
+        let rest: Vec<_> = tasks::trees(&g.tasks)
             .into_iter()
             .filter(|(root, _)| !(pins && root.pinned) && shown(root.category.as_ref()))
             .collect();
@@ -1476,7 +1465,7 @@ fn rebuild_upcoming(ui: &Rc<Ui>) {
     ui.title.set_title(&gettext("Upcoming"));
     ui.title.set_subtitle(&open_count(tasks.len() as u64));
     // Today's events first: the day's plan next to what is due.
-    let events = crate::calendar::today_events();
+    let events = todav_app::calendar::today_events(core());
     if !events.is_empty() {
         let group = adw::PreferencesGroup::builder()
             .title(gettext("Today’s Events"))
@@ -1538,7 +1527,7 @@ fn rebuild_important(ui: &Rc<Ui>) {
     let tasks = core().important();
     ui.title.set_title(&gettext("Important"));
     ui.title.set_subtitle(&open_count(tasks.len() as u64));
-    for l in crate::lists::by_place(core().lists()) {
+    for l in todav_app::lists::by_place(core(), core().lists()) {
         let here: Vec<&Task> = tasks.iter().filter(|t| t.list_href == l.href).collect();
         if here.is_empty() {
             continue;
@@ -1608,41 +1597,6 @@ fn rebuild_search(ui: &Rc<Ui>, query: &str, all: Vec<Task>) {
 /// "3 open": the open tasks of a list or of Upcoming, under the title.
 fn open_count(n: u64) -> String {
     ngettext("{n} open", "{n} open", n).replace("{n}", &n.to_string())
-}
-
-/// Split a group's depth-first task list into root tasks, each with its (depth, subtask) list.
-fn trees(tasks: &[Task]) -> Vec<(&Task, Vec<(usize, &Task)>)> {
-    let mut depth = HashMap::new();
-    let mut out: Vec<(&Task, Vec<(usize, &Task)>)> = Vec::new();
-    for t in tasks {
-        match t.parent_uid.as_ref().and_then(|p| depth.get(p).copied()) {
-            Some(d) => {
-                depth.insert(&t.uid, d + 1);
-                out.last_mut().unwrap().1.push((d + 1, t)); // a parent always precedes its subtasks
-            }
-            None => {
-                depth.insert(&t.uid, 0usize);
-                out.push((t, Vec::new()));
-            }
-        }
-    }
-    out
-}
-
-/// (open, done) direct subtasks of each task, hidden ones included; theirs count on their own row.
-fn subtask_counts(tasks: &[Task]) -> HashMap<String, (usize, usize)> {
-    let mut counts: HashMap<String, (usize, usize)> = HashMap::new();
-    for t in tasks {
-        if let Some(parent) = &t.parent_uid {
-            let c = counts.entry(parent.clone()).or_default();
-            if t.done {
-                c.1 += 1;
-            } else {
-                c.0 += 1;
-            }
-        }
-    }
-    counts
 }
 
 /// The event a task is for, as a pill opening the calendar on its (next) day.
@@ -1720,7 +1674,7 @@ fn task_row(ui: &Rc<Ui>, t: &Task, indent: usize, slot: Option<Slot>) -> adw::Ac
     }
     row.add_prefix(&done_check(t));
     // Top-level rows of a list page can be pinned.
-    let pinnable = slot.as_ref().is_some_and(|s| s.root) && crate::settings::pins();
+    let pinnable = slot.as_ref().is_some_and(|s| s.root) && prefs::pins(core());
     if let Some(slot) = slot {
         // ActionRow puts each new prefix to the left of the previous ones (ExpanderRow: right).
         connect_dnd(ui, &row, t, slot, |h| row.add_prefix(h));
@@ -1755,7 +1709,7 @@ fn task_row(ui: &Rc<Ui>, t: &Task, indent: usize, slot: Option<Slot>) -> adw::Ac
     if pinnable {
         row.add_suffix(&pin_button(t));
     }
-    if crate::settings::stars() {
+    if prefs::stars(core()) {
         row.add_suffix(&star_button(t));
     }
     row.add_suffix(&delete_button(t));
@@ -1831,10 +1785,10 @@ fn tree_row(
     row.add_suffix(&edit);
     row.add_suffix(&delete_button(root));
     // ExpanderRow puts each new suffix to the left of the previous ones.
-    if crate::settings::stars() {
+    if prefs::stars(core()) {
         row.add_suffix(&star_button(root));
     }
-    if crate::settings::pins() {
+    if prefs::pins(core()) {
         row.add_suffix(&pin_button(root));
     }
     if let Some(tag) = tag(ui, root) {
@@ -1869,7 +1823,7 @@ fn tree_row(
         row.add_row(&sub_entry(ui, root, 0, start));
     }
     // A subtask given an entry by its "+".
-    let at = (ui.adding.borrow().as_deref()).and_then(|uid| entry_at(subs, uid, start));
+    let at = (ui.adding.borrow().as_deref()).and_then(|uid| tasks::entry_at(subs, uid, start));
     let nested_entry = |p: usize| sub_entry(ui, subs[p].1, subs[p].0, start);
     for (i, (depth, t)) in subs.iter().enumerate() {
         if let Some((_, p)) = at.filter(|a| a.0 == i) {
@@ -1897,15 +1851,6 @@ fn tree_row(
     row
 }
 
-/// Where the "Add subtask" entry of subtask `uid` goes in a tree's depth-first `subs`: (the
-/// row it goes in front of, `subs.len()` for last; `uid`'s index). First among its subtasks
-/// with `start`, otherwise after them.
-fn entry_at(subs: &[(usize, &Task)], uid: &str, start: bool) -> Option<(usize, usize)> {
-    let p = subs.iter().position(|(_, t)| t.uid == uid)?;
-    let below = subs[p + 1..].iter().take_while(|(d, _)| *d > subs[p].0);
-    Some((if start { p + 1 } else { p + 1 + below.count() }, p))
-}
-
 /// "Add subtask" entry under `parent`, a task `depth` levels deep; new subtasks go first with
 /// `start`. Under a subtask, Escape closes it. A task dropped on it goes where a new subtask
 /// would.
@@ -1916,17 +1861,21 @@ fn sub_entry(ui: &Rc<Ui>, parent: &Task, depth: usize, start: bool) -> adw::Entr
     entry.set_margin_start(INDENT * (depth as i32 + 1));
     entry.add_prefix(&gtk::Image::from_icon_name("list-add-symbolic"));
     let p = parent.clone();
-    let drop = task_drop(ui, move |d| can_join(d, &p), start);
+    let drop = task_drop(ui, move |d| tasks::can_join(core(), d, &p), start);
     let (weak, p) = (Rc::downgrade(ui), parent.clone());
     drop.connect_drop(move |dt, _, _, _| {
         let (Some(ui), Some(w)) = (weak.upgrade(), dt.widget()) else {
             return false;
         };
         unmark(&ui, &w);
-        let Some((d, _)) = ui.dragging.take().filter(|(d, _)| can_join(d, &p)) else {
+        let Some((d, _)) = ui
+            .dragging
+            .take()
+            .filter(|(d, _)| tasks::can_join(core(), d, &p))
+        else {
             return false;
         };
-        match core().together(|| adopt(&d, &p)) {
+        match tasks::adopt(core(), &d, &p) {
             Ok(()) => request_sync(),
             Err(e) => ui.toasts.add_toast(note(&e.to_string())),
         }
@@ -1976,20 +1925,6 @@ fn sub_entry(ui: &Rc<Ui>, parent: &Task, depth: usize, start: bool) -> adw::Entr
     entry
 }
 
-/// Where a row sits, for drag and drop.
-#[derive(Clone)]
-struct Slot {
-    /// Category group the row is shown in; None is "Other". In the Pinned group: its own
-    /// category.
-    group: Option<String>,
-    /// In the Pinned group (top-level tasks pinned to the top of the list) or under one there.
-    pinned: bool,
-    /// A top-level row (otherwise a subtask, movable only among its siblings).
-    root: bool,
-    /// The row after it that a drop below lands in front of; None means last.
-    next: Option<String>,
-}
-
 /// Make `row` draggable (by the whole row, or by a handle passed to `add_handle`) and a drop
 /// target for other tasks: above or below it, depending on which half the pointer is over.
 fn connect_dnd(
@@ -2019,7 +1954,9 @@ fn connect_dnd(
         if let Some(ui) = weak.upgrade() {
             *ui.dragging.borrow_mut() = Some((task.clone(), s.clone()));
             for (w, parent, tree) in ui.adopters.borrow().iter() {
-                if can_adopt(&task, parent) && tree.as_ref().is_none_or(|t| !t.is_expanded()) {
+                if tasks::can_adopt(core(), &task, parent)
+                    && tree.as_ref().is_none_or(|t| !t.is_expanded())
+                {
                     w.set_visible(true);
                     w.add_css_class("drop-hint");
                 }
@@ -2066,7 +2003,7 @@ fn connect_dnd(
             let dragging = ui.dragging.borrow();
             dragging
                 .as_ref()
-                .is_some_and(|(d, ds)| can_drop(d, ds, &target, &s))
+                .is_some_and(|(d, ds)| tasks::can_drop(core(), d, ds, &target, &s))
         })
     });
     let (weak, target, s) = (Rc::downgrade(ui), t.clone(), slot.clone());
@@ -2077,7 +2014,7 @@ fn connect_dnd(
                 .dragging
                 .borrow()
                 .as_ref()
-                .is_some_and(|(d, ds)| stays_put(d, ds, &target, &s, above));
+                .is_some_and(|(d, ds)| tasks::stays_put(d, ds, &target, &s, above));
             if stays || over_nested(&s, &w, x, y) {
                 unmark(&ui, &w);
             } else {
@@ -2105,8 +2042,9 @@ fn connect_dnd(
             return false;
         };
         let above = y < w.height() as f64 / 2.0;
-        if let Err(e) = core().together(|| drop_task(&d, &ds, &target, &slot, above)) {
-            ui.toasts.add_toast(note(&e.to_string()));
+        match tasks::drop_task(core(), &d, &ds, &target, &slot, above) {
+            Ok(()) => request_sync(),
+            Err(e) => ui.toasts.add_toast(note(&e.to_string())),
         }
         true
     });
@@ -2207,7 +2145,9 @@ fn adopt_target(
     drop.connect_accept(move |_, _| {
         weak.upgrade().is_some_and(|ui| {
             let dragging = ui.dragging.borrow();
-            dragging.as_ref().is_some_and(|(d, _)| can_adopt(d, &p))
+            dragging
+                .as_ref()
+                .is_some_and(|(d, _)| tasks::can_adopt(core(), d, &p))
         })
     });
     let (weak, p) = (Rc::downgrade(ui), parent.clone());
@@ -2218,7 +2158,7 @@ fn adopt_target(
         let Some((d, _)) = ui.dragging.take() else {
             return false;
         };
-        match core().together(|| adopt(&d, &p)) {
+        match tasks::adopt(core(), &d, &p) {
             Ok(()) => {
                 ui.expanded.borrow_mut().insert(p.uid.clone()); // show where it went
                 request_sync();
@@ -2228,166 +2168,6 @@ fn adopt_target(
         true
     });
     w.add_controller(drop);
-}
-
-/// `d` can become a subtask of `parent`, its own subtasks coming along, unless it already is
-/// one or `parent` is in its tree.
-fn can_adopt(d: &Task, parent: &Task) -> bool {
-    d.parent_uid.as_ref() != Some(&parent.uid) && !core().within(parent.uid.clone(), d.uid.clone())
-}
-
-/// `d` can be dropped on `parent`'s "Add subtask" entry: as `can_adopt`, or to move to the end
-/// of its siblings in manual order.
-fn can_join(d: &Task, parent: &Task) -> bool {
-    let manual = crate::settings::order().subtasks == Sort::Manual;
-    (manual || d.parent_uid.as_ref() != Some(&parent.uid))
-        && !core().within(parent.uid.clone(), d.uid.clone())
-}
-
-/// Make `d` a subtask of `parent` (if it is not one yet), first or last among its subtasks as
-/// new subtasks would be.
-fn adopt(d: &Task, parent: &Task) -> todav_core::Result<()> {
-    if d.parent_uid.as_ref() != Some(&parent.uid) {
-        core().set_parent(d.uid.clone(), parent.uid.clone())?;
-        if d.category.is_some() {
-            set_category(&d.uid, None)?; // the top-level task's category decides
-        }
-    }
-    let order = crate::settings::order();
-    if order.subtasks == Sort::Manual {
-        let first = core()
-            .tasks(parent.list_href.clone(), true)
-            .into_iter()
-            .find(|t| t.parent_uid.as_ref() == Some(&parent.uid) && t.uid != d.uid);
-        match first {
-            Some(f) if order.sub_start => core().reorder(d.uid.clone(), Some(f.uid))?,
-            Some(_) => core().reorder(d.uid.clone(), None)?,
-            None => {} // the only subtask
-        }
-    }
-    Ok(())
-}
-
-/// Would dropping `d` above or below `t` leave it where it is? Then no line is drawn there.
-fn stays_put(d: &Task, ds: &Slot, t: &Task, ts: &Slot, above: bool) -> bool {
-    let before = if above {
-        Some(&t.uid)
-    } else {
-        ts.next.as_ref()
-    };
-    ds.root == ts.root
-        && ds.group == ts.group
-        && ds.pinned == ts.pinned
-        && d.parent_uid == t.parent_uid
-        && (before == Some(&d.uid) || before == ds.next.as_ref())
-}
-
-/// Top-level tasks move within and between groups (changing category; into Pinned and out of it,
-/// pinning and unpinning); a subtask dropped among them is promoted. A task dropped among
-/// subtasks joins them under their parent, with its own subtasks, unless that is inside its
-/// tree. Reordering only means something in manual order.
-fn can_drop(d: &Task, ds: &Slot, t: &Task, ts: &Slot) -> bool {
-    let order = crate::settings::order();
-    if d.uid == t.uid {
-        return false;
-    }
-    if ts.root {
-        let elsewhere = ds.group != ts.group || ds.pinned != ts.pinned;
-        return !ds.root || elsewhere || order.tasks == Sort::Manual;
-    }
-    if d.parent_uid == t.parent_uid {
-        return order.subtasks == Sort::Manual;
-    }
-    !core().within(t.uid.clone(), d.uid.clone())
-}
-
-/// Move dragged task `d` above or below target `t`.
-fn drop_task(d: &Task, ds: &Slot, t: &Task, ts: &Slot, above: bool) -> todav_core::Result<()> {
-    let order = crate::settings::order();
-    let promote = !ds.root && ts.root;
-    if promote {
-        core().promote(d.uid.clone())?;
-    }
-    if ts.root && d.pinned != ts.pinned {
-        let patch = TaskPatch {
-            pinned: Some(ts.pinned),
-            ..Default::default()
-        };
-        core().update_task(d.uid.clone(), patch)?;
-    }
-    // Pinned tasks keep their category.
-    if ts.root && !ts.pinned && (promote || ds.group != ts.group) {
-        set_category(&d.uid, ts.group.clone())?;
-    }
-    if !ts.root && d.parent_uid != t.parent_uid {
-        let parent = t.parent_uid.clone().unwrap_or_default();
-        core().set_parent(d.uid.clone(), parent)?;
-        if d.category.is_some() {
-            set_category(&d.uid, None)?; // the new top-level task's category decides
-        }
-    }
-    let sort = if ts.root { order.tasks } else { order.subtasks };
-    let mut before = if above {
-        Some(t.uid.clone())
-    } else {
-        ts.next.clone()
-    };
-    // Completed tasks shown last sit anywhere in the stored order: an open task dropped in front
-    // of them goes last, a completed one dropped among open tasks keeps its place.
-    let view = crate::settings::done_view();
-    let mut keep = false;
-    if if ts.root {
-        view.tasks_last
-    } else {
-        view.subtasks_last
-    } {
-        let done = before
-            .clone()
-            .and_then(|b| core().task(b))
-            .is_some_and(|b| b.done);
-        if done && !d.done {
-            before = None;
-        }
-        keep = d.done && !done && before.is_some();
-    }
-    // Dropping right below the task above it leaves `d` where it is.
-    if sort == Sort::Manual && !keep && before.as_ref() != Some(&d.uid) {
-        core().reorder(d.uid.clone(), before)?;
-    }
-    request_sync();
-    Ok(())
-}
-
-fn set_category(uid: &str, category: Option<String>) -> todav_core::Result<()> {
-    let patch = TaskPatch {
-        category: Some(category.unwrap_or_default()),
-        ..Default::default()
-    };
-    core().update_task(uid.into(), patch)
-}
-
-/// A task dropped on a sidebar category: into that category (a subtask becomes top-level),
-/// first or last in it as new tasks would be.
-fn drop_on_category(d: &Task, ds: &Slot, category: Option<String>) -> todav_core::Result<()> {
-    if !ds.root {
-        core().promote(d.uid.clone())?;
-    }
-    set_category(&d.uid, category)?;
-    let order = crate::settings::order();
-    if order.tasks == Sort::Manual {
-        // Before every task of the list puts it first in its category too.
-        let first = core()
-            .tasks(d.list_href.clone(), true)
-            .first()
-            .map(|t| t.uid.clone());
-        match first {
-            _ if !order.task_start => core().reorder(d.uid.clone(), None)?,
-            Some(f) if f != d.uid => core().reorder(d.uid.clone(), Some(f))?,
-            _ => {} // already first
-        }
-    }
-    request_sync();
-    Ok(())
 }
 
 /// Category pill for the "Show as tags" view.
@@ -2679,7 +2459,7 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
         due_time.connect_active_notify(move |s| {
             if s.is_active() && start_row.enables_expansion() {
                 let from = spins[0].value() as i64 * 3600 + spins[1].value() as i64 * 60;
-                let to = (from + crate::settings::duration("task_duration")).min(86400 - 60);
+                let to = (from + prefs::task_duration(core())).min(86400 - 60);
                 spins[2].set_value((to / 3600) as f64);
                 spins[3].set_value((to / 60 % 60) as f64);
             }
@@ -2691,7 +2471,8 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
 
     // The list it is in, among those it can move to, grouped by where they are kept.
     let list_row: adw::ComboRow = get(&b, "list");
-    let lists = crate::lists::by_place(
+    let lists = todav_app::lists::by_place(
+        core(),
         core()
             .lists()
             .into_iter()
@@ -3036,78 +2817,5 @@ pub(crate) mod tests {
             sync_error: None,
             pinned: false,
         }
-    }
-
-    #[test]
-    fn counts_open_and_done_direct_subtasks() {
-        let done = |uid, parent| Task {
-            done: true,
-            ..task(uid, parent)
-        };
-        let tasks = [
-            task("a", None),
-            task("a1", Some("a")),
-            done("a1x", Some("a1")),
-            task("a1y", Some("a1")),
-            done("a2", Some("a")),
-            task("b", None),
-        ];
-        let c = subtask_counts(&tasks);
-        assert_eq!(c.get("a"), Some(&(1, 1)), "a1x and a1y count on a1 only");
-        assert_eq!(c.get("a1"), Some(&(1, 1)));
-        assert_eq!(c.get("b"), None);
-    }
-
-    #[test]
-    fn trees_nest_depth_first_lists() {
-        let tasks = [
-            task("a", None),
-            task("a1", Some("a")),
-            task("a1x", Some("a1")),
-            task("a2", Some("a")),
-            task("b", None),
-            task("c", Some("gone")), // parent closed or deleted: shown as a root
-        ];
-        let got: Vec<(&str, Vec<(usize, &str)>)> = trees(&tasks)
-            .into_iter()
-            .map(|(r, s)| {
-                (
-                    r.uid.as_str(),
-                    s.iter().map(|(d, t)| (*d, t.uid.as_str())).collect(),
-                )
-            })
-            .collect();
-        assert_eq!(
-            got,
-            [
-                ("a", vec![(1, "a1"), (2, "a1x"), (1, "a2")]),
-                ("b", vec![]),
-                ("c", vec![]),
-            ]
-        );
-    }
-
-    #[test]
-    fn a_subtasks_entry_goes_first_among_its_subtasks_or_after_them() {
-        let (a1, a1x, a1xy, a2) = (
-            task("a1", Some("a")),
-            task("a1x", Some("a1")),
-            task("a1xy", Some("a1x")),
-            task("a2", Some("a")),
-        );
-        let subs = [(1, &a1), (2, &a1x), (3, &a1xy), (1, &a2)];
-        assert_eq!(entry_at(&subs, "a1", true), Some((1, 0)));
-        assert_eq!(
-            entry_at(&subs, "a1", false),
-            Some((3, 0)),
-            "after a1x and a1xy"
-        );
-        assert_eq!(
-            entry_at(&subs, "a1xy", false),
-            Some((3, 2)),
-            "no subtasks yet"
-        );
-        assert_eq!(entry_at(&subs, "a2", false), Some((4, 3)), "last");
-        assert_eq!(entry_at(&subs, "b", false), None, "another tree");
     }
 }

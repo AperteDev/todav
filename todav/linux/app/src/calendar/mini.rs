@@ -88,7 +88,7 @@ fn render(c: &Rc<Cal>) {
             m.grid.attach(&band, 0, row as i32 + 1, 7, 1);
         }
     }
-    let all = if crate::settings::mini_dots() {
+    let all = if prefs::mini_dots(core()) {
         items(start, start + 42 * DAY)
     } else {
         Vec::new()

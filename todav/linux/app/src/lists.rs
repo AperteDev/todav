@@ -8,13 +8,8 @@ use adw::prelude::*;
 use gtk::{gdk, gio, glib};
 use std::cell::RefCell;
 use std::rc::Rc;
-use todav_core::{AccountKind, List};
-
-/// Nextcloud's colour presets (its colour picker's palette), in its order.
-const PRESETS: [&str; 12] = [
-    "#B6469D", "#BF678B", "#C98879", "#D3A967", "#DDCB55", "#A5B872", "#6EA68F", "#3794AC",
-    "#0082C9", "#2D73BE", "#5B64B3", "#8855A8",
-];
+use todav_app::lists::{PRESETS, color};
+use todav_core::List;
 
 /// Swatches per row in the dialog.
 const COLUMNS: i32 = 7;
@@ -34,17 +29,6 @@ const CSS: &str = "
 thread_local! {
     /// The colour classes, and the CSS they were last loaded from.
     static COLORS: RefCell<Option<(gtk::CssProvider, String)>> = const { RefCell::new(None) };
-}
-
-/// A list's colour from the server, if it is one (it goes into CSS).
-pub fn color(l: &List) -> String {
-    l.color
-        .as_deref()
-        .filter(|c| {
-            c.len() <= 9 && c.starts_with('#') && c[1..].chars().all(|x| x.is_ascii_hexdigit())
-        })
-        .unwrap_or("#3584e4")
-        .to_string()
 }
 
 /// The CSS class showing list `href` in its colour (see `paint`).
@@ -197,40 +181,20 @@ pub fn place(account: i64) -> String {
         .unwrap_or_default()
 }
 
-/// Where new lists can go, as (heading, account): the switched-on accounts that can take one
-/// now (a Nextcloud account connected), in the order they were added.
+/// Where new lists can go, as (heading, account), in the user's order of the accounts.
 pub fn places() -> Vec<(String, i64)> {
-    core()
-        .accounts()
+    todav_app::lists::places(core())
         .into_iter()
-        .filter(|a| a.enabled && (a.kind == AccountKind::Local || core().connected(a.id)))
-        .map(|a| (crate::account_name(&a), a.id))
+        .map(|id| (place(id), id))
         .collect()
 }
 
-/// Where account `id` comes among the accounts (the user's order), for sorting.
-pub fn rank() -> impl Fn(i64) -> usize {
-    let ids: Vec<i64> = core().accounts().iter().map(|a| a.id).collect();
-    move |id| ids.iter().position(|i| *i == id).unwrap_or(usize::MAX)
-}
-
-/// Lists grouped by account, in the order the accounts were added, each group in the order
-/// given.
-pub fn by_place(mut lists: Vec<List>) -> Vec<List> {
-    let rank = rank();
-    lists.sort_by_key(|l| rank(l.account));
-    lists
-}
-
-/// The heading over each of `lists` (as `by_place` orders them): its account on the first of a
-/// group, when they are from more than one.
+/// The heading over each of `lists` (as `todav_app::lists::by_place` orders them): its
+/// account on the first of a group, when they are from more than one.
 pub fn headings(lists: &[List]) -> Vec<Option<String>> {
-    let mixed = lists.iter().any(|l| l.account != lists[0].account);
-    (0..lists.len())
-        .map(|i| {
-            let first = i == 0 || lists[i - 1].account != lists[i].account;
-            (mixed && first).then(|| place(lists[i].account))
-        })
+    todav_app::lists::headings(lists)
+        .into_iter()
+        .map(|h| h.map(place))
         .collect()
 }
 
@@ -293,23 +257,6 @@ pub fn picker(row: &adw::ComboRow, lists: &[List]) {
         }
     });
     row.set_header_factory(Some(&factory));
-}
-
-/// A new local account's lists: a task list with a task to start from and an empty calendar.
-pub fn start_local(account: i64) -> todav_core::Result<()> {
-    let list = core().create_list(account, gettext("Tasks"), PRESETS[8].into(), false)?;
-    let uid = core()
-        .add_task(list, gettext("Welcome to Todav"), None, None, false)?
-        .uid;
-    let note =
-        gettext("Tick tasks off when done; open one to add a due date, reminders or subtasks.");
-    let patch = todav_core::TaskPatch {
-        description: Some(note),
-        ..Default::default()
-    };
-    core().update_task(uid, patch)?;
-    core().create_list(account, gettext("Calendar"), PRESETS[0].into(), true)?;
-    Ok(())
 }
 
 /// "#rrggbb" (or with alpha) as "#RRGGBB", to compare with the presets and to save.

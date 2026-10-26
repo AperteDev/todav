@@ -1,0 +1,235 @@
+//! The background service every front-end runs: a sync worker taking requests from any
+//! thread, the ntfy push listener (where the platform has no push service of its own), when to
+//! sync without being asked, and which reminders went off.
+
+use crate::accounts::syncing;
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::mpsc::{Sender, channel};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::Duration;
+use todav_core::{Client, Event, Refused, SyncReport, Task};
+
+/// What syncing is doing.
+#[derive(Debug, Clone, PartialEq)]
+pub enum State {
+    Idle,
+    Syncing,
+    /// What failed, by account (None: not one account's, e.g. the push listener's).
+    Failed(Vec<(Option<i64>, String)>),
+}
+
+/// The front-end's side: told from the service's threads, so it hands these to its UI thread.
+pub trait Shell: Send + Sync {
+    fn state(&self, state: State);
+    /// Items the server refused in a sync that otherwise went through.
+    fn refused(&self, items: Vec<Refused>);
+}
+
+pub struct Service {
+    client: Arc<Client>,
+    shell: Box<dyn Shell>,
+    worker: OnceLock<Sender<()>>,
+    state: Mutex<State>,
+    /// Why each account's last sync failed, by id; gone once one goes through.
+    errors: Mutex<Option<HashMap<i64, String>>>,
+    /// The ntfy server the push listener was started for.
+    push_url: Mutex<String>,
+    /// What the push listener last failed with; cleared by its next success.
+    push_error: Mutex<Option<String>>,
+    /// Minutes `tick` has counted.
+    ticks: AtomicU32,
+}
+
+impl Service {
+    pub fn new(client: Arc<Client>, shell: Box<dyn Shell>) -> Arc<Service> {
+        Arc::new(Service {
+            client,
+            shell,
+            worker: OnceLock::new(),
+            state: Mutex::new(State::Idle),
+            errors: Mutex::new(None),
+            push_url: Mutex::new(String::new()),
+            push_error: Mutex::new(None),
+            ticks: AtomicU32::new(0),
+        })
+    }
+
+    /// `start` ran.
+    pub fn running(&self) -> bool {
+        self.worker.get().is_some()
+    }
+
+    /// Start the sync worker and (`listen`) the push listener, and sync; true the first time.
+    /// Later calls just sync. Without `listen`, pushes come through the platform
+    /// (`Client::push_decode`, `Client::sync_topic`).
+    pub fn start(self: &Arc<Self>, listen: bool) -> bool {
+        if self.running() {
+            self.sync_now();
+            return false;
+        }
+        let (tx, rx) = channel::<()>();
+        let _ = self.worker.set(tx);
+        let me = self.clone();
+        std::thread::spawn(move || {
+            while rx.recv().is_ok() {
+                std::thread::sleep(Duration::from_millis(300)); // let a burst of edits settle
+                while rx.try_recv().is_ok() {}
+                if !me.can_sync() {
+                    continue; // no account, or no password for one: nothing to sync until one connects
+                }
+                me.set_state(State::Syncing);
+                let report = me.client.sync();
+                *me.errors.lock().unwrap() = Some(
+                    report
+                        .failed
+                        .iter()
+                        .map(|(id, e)| (*id, e.to_string()))
+                        .collect(),
+                );
+                me.report(Ok(report));
+            }
+        });
+        self.sync_now();
+        if listen {
+            self.restart_push();
+        }
+        true
+    }
+
+    /// Ask the worker for a full sync; requests arriving while one runs are coalesced.
+    pub fn sync_now(&self) {
+        if let Some(tx) = self.worker.get() {
+            let _ = tx.send(());
+        }
+    }
+
+    /// After an edit: sync if it left something for the server (edits in lists on this device
+    /// leave nothing, so no sync runs for them).
+    pub fn request_sync(&self) {
+        if self.client.pending(None) {
+            self.sync_now();
+        }
+    }
+
+    /// Some account syncs: the sync buttons work.
+    pub fn can_sync(&self) -> bool {
+        self.client
+            .accounts()
+            .iter()
+            .any(|a| syncing(&self.client, a))
+    }
+
+    pub fn state(&self) -> State {
+        self.state.lock().unwrap().clone()
+    }
+
+    /// Why account `id`'s last sync failed.
+    pub fn sync_error(&self, id: i64) -> Option<String> {
+        self.errors.lock().unwrap().as_ref()?.get(&id).cloned()
+    }
+
+    pub fn push_error(&self) -> Option<String> {
+        self.push_error.lock().unwrap().clone()
+    }
+
+    fn set_state(&self, s: State) {
+        *self.state.lock().unwrap() = s.clone();
+        self.shell.state(s);
+    }
+
+    /// What a sync or a push did: items the server refused, and the state.
+    fn report(&self, r: todav_core::Result<SyncReport>) {
+        let report = match r {
+            Ok(r) => r,
+            Err(e) => return self.set_state(State::Failed(vec![(None, e.to_string())])),
+        };
+        if !report.refused.is_empty() {
+            self.shell.refused(report.refused);
+        }
+        self.set_state(if report.failed.is_empty() {
+            State::Idle
+        } else {
+            State::Failed(
+                report
+                    .failed
+                    .iter()
+                    .map(|(id, e)| (Some(*id), e.to_string()))
+                    .collect(),
+            )
+        });
+    }
+
+    /// Stop the push listener and start a new one if an ntfy server is set (`ntfy_url`).
+    pub fn restart_push(self: &Arc<Self>) {
+        self.client.stop_listening();
+        let url = self.client.setting("ntfy_url".into()).unwrap_or_default();
+        *self.push_url.lock().unwrap() = url.clone();
+        *self.push_error.lock().unwrap() = None;
+        if url.is_empty() || !self.can_sync() {
+            return;
+        }
+        let me = self.clone();
+        std::thread::spawn(move || {
+            // Blocks until the next restart_push; reconnects internally.
+            let _ = me.client.listen(url, &|r| {
+                *me.push_error.lock().unwrap() = r.as_ref().err().map(|e| e.to_string());
+                me.report(r);
+            });
+        });
+    }
+
+    /// Synced settings arrived: a new ntfy server is listened to at once.
+    pub fn settings_changed(self: &Arc<Self>) {
+        let ntfy = self.client.setting("ntfy_url".into()).unwrap_or_default();
+        if self.running() && ntfy != *self.push_url.lock().unwrap() {
+            self.restart_push();
+        }
+    }
+
+    /// An account came or got its password: sync it, and register push for its lists now
+    /// rather than within the hour.
+    pub fn account_added(self: &Arc<Self>, listen: bool) {
+        if !self.start(listen) && listen {
+            self.restart_push();
+        }
+    }
+
+    /// Account `id` is gone: its errors with it; sync the rest.
+    pub fn account_removed(&self, id: i64) {
+        if let Some(errors) = self.errors.lock().unwrap().as_mut() {
+            errors.remove(&id);
+        }
+        if !self.can_sync() {
+            self.set_state(State::Idle); // no sync left to fail
+        } else {
+            self.sync_now();
+        }
+    }
+
+    /// Call once a minute: the safety net for lost pushes syncs every minute while the app is
+    /// in front (`active`), every 30 minutes otherwise.
+    pub fn tick(&self, active: bool) {
+        let ticks = self.ticks.fetch_add(1, Ordering::Relaxed) + 1;
+        if active || ticks.is_multiple_of(30) {
+            self.sync_now();
+        }
+    }
+
+    /// Reminders of tasks and events that went off since the last call: at most a day back, so
+    /// a device that was off does not replay old ones.
+    pub fn due_reminders(&self) -> (Vec<Task>, Vec<Event>) {
+        let c = &self.client;
+        let now = c.local_now();
+        let from = c
+            .setting("reminded_until".into())
+            .and_then(|v| v.parse::<i64>().ok())
+            .unwrap_or(now)
+            .max(now - 86400);
+        let due = (c.reminders(from, now), c.event_reminders(from, now));
+        if from != now {
+            let _ = c.set_setting("reminded_until".into(), now.to_string());
+        }
+        due
+    }
+}

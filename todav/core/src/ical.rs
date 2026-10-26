@@ -599,7 +599,9 @@ pub fn fmt_utc(t: i64) -> String {
 }
 
 // Howard Hinnant's civil date algorithms.
-pub(crate) fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
+
+/// Days since 1970-01-01 of a date (month and day from 1).
+pub fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
     let y = if m <= 2 { y - 1 } else { y };
     let era = y.div_euclid(400);
     let yoe = y - era * 400;
@@ -608,7 +610,8 @@ pub(crate) fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
     era * 146097 + doe - 719468
 }
 
-pub(crate) fn civil_from_days(z: i64) -> (i64, i64, i64) {
+/// The date (year, month, day) of a day number, as `days_from_civil` counts them.
+pub fn civil_from_days(z: i64) -> (i64, i64, i64) {
     let z = z + 719468;
     let era = z.div_euclid(146097);
     let doe = z - era * 146097;

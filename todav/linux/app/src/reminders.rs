@@ -125,7 +125,10 @@ impl Reminders {
             // The default, else the first preset not in use yet, so it is not a duplicate.
             if let Some(r) = weak.upgrade() {
                 let all_day = r.all_day.get();
-                let (used, first) = (r.offsets(), dates::default_reminder(all_day));
+                let (used, first) = (
+                    r.offsets(),
+                    todav_app::prefs::default_reminder(crate::core(), all_day),
+                );
                 let presets = dates::reminders(all_day).into_iter().map(|(_, o)| o);
                 let free = std::iter::once(first)
                     .chain(presets)
@@ -186,7 +189,7 @@ impl Reminders {
                 if custom || fits {
                     o
                 } else {
-                    dates::default_reminder(all_day)
+                    todav_app::prefs::default_reminder(crate::core(), all_day)
                 },
                 custom,
             );

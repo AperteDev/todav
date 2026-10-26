@@ -10,44 +10,10 @@ use adw::prelude::*;
 use gtk::{gio, glib};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
-use todav_core::{Account, AccountKind, Sort};
+use todav_app::prefs::{self, DURATIONS};
+use todav_core::{Account, AccountKind};
 
 type UrlRow = (gtk::DropDown, adw::EntryRow);
-
-/// Setting values for the "Sort" rows, in row order.
-const SORTS: [(&str, Sort); 6] = [
-    ("manual", Sort::Manual),
-    ("newest", Sort::Newest),
-    ("oldest", Sort::Oldest),
-    ("due_soonest", Sort::DueSoonest),
-    ("due_latest", Sort::DueLatest),
-    ("priority", Sort::Priority),
-];
-
-fn sort_index(key: &str) -> u32 {
-    let v = core().setting(key.into()).unwrap_or_default();
-    SORTS.iter().position(|(s, _)| *s == v).unwrap_or(0) as u32
-}
-
-/// Where tasks show up and where new ones go; date sorting decides the latter.
-pub struct Order {
-    pub tasks: Sort,
-    pub subtasks: Sort,
-    pub task_start: bool,
-    pub sub_start: bool,
-}
-
-/// How completed tasks are shown, from the "Completed tasks" / "Completed subtasks" rows.
-pub fn done_view() -> todav_core::DoneView {
-    let tasks = core().setting("done_tasks".into()).unwrap_or_default();
-    let subtasks = core().setting("done_subtasks".into()).unwrap_or_default();
-    todav_core::DoneView {
-        in_place: tasks == "in_place" || tasks == "last",
-        tasks_last: tasks == "last",
-        hide_subtasks: subtasks == "hide",
-        subtasks_last: subtasks == "last",
-    }
-}
 
 /// Light or dark as the device-only `color_scheme` says: "light", "dark", else the system's.
 pub fn apply_color_scheme() {
@@ -57,29 +23,6 @@ pub fn apply_color_scheme() {
         _ => adw::ColorScheme::Default,
     };
     adw::StyleManager::default().set_color_scheme(scheme);
-}
-
-/// Stars on tasks for their priority, and the Important page (`show_stars`; on unless turned
-/// off).
-pub fn stars() -> bool {
-    core().setting("show_stars".into()).as_deref() != Some("false")
-}
-
-/// Pins on tasks and the Pinned group (`show_pins`; on unless turned off). Off, pinned tasks
-/// stay pinned (X-PINNED) and show among the others.
-pub fn pins() -> bool {
-    core().setting("show_pins".into()).as_deref() != Some("false")
-}
-
-/// Whether the sidebar month marks days with dots (`mini_dots`; on unless turned off).
-pub fn mini_dots() -> bool {
-    core().setting("mini_dots".into()).as_deref() != Some("false")
-}
-
-/// Whether a double click on a calendar item edits it (`double_click_edit`; on unless turned
-/// off). Off, a click shows its details at once, not after the double-click time.
-pub fn double_click_edit() -> bool {
-    core().setting("double_click_edit".into()).as_deref() != Some("false")
 }
 
 /// The GNOME extension's options (Preferences → Extension, synced like the rest) with their
@@ -108,23 +51,12 @@ pub fn extension() -> Vec<(String, String)> {
         .collect()
 }
 
-/// Lengths offered for `duration`, in minutes, as the rows list them.
-const DURATIONS: [i64; 7] = [15, 30, 45, 60, 90, 120, 180];
-
-/// How long, in seconds, a task's or event's time lasts when one is added ("task_duration" or
-/// "event_duration", minutes; an hour by default).
-pub fn duration(key: &str) -> i64 {
-    core()
-        .setting(key.into())
-        .and_then(|v| v.parse::<i64>().ok())
-        .filter(|m| *m > 0)
-        .unwrap_or(60)
-        * 60
-}
-
 fn connect_duration(b: &gtk::Builder, key: &'static str) {
     let row: adw::ComboRow = get(b, key);
-    let current = duration(key) / 60;
+    let current = core()
+        .setting(key.into())
+        .and_then(|v| v.parse::<i64>().ok());
+    let current = current.filter(|m| *m > 0).unwrap_or(60);
     let hour = DURATIONS.iter().position(|m| *m == 60).unwrap_or(0);
     row.set_selected(DURATIONS.iter().position(|m| *m == current).unwrap_or(hour) as u32);
     row.connect_selected_notify(move |r| {
@@ -142,23 +74,6 @@ fn connect_choice(b: &gtk::Builder, key: &'static str, values: &'static [&'stati
         let _ = core().set_setting(key.into(), values[r.selected() as usize].into());
         crate::window::refresh();
     });
-}
-
-pub fn order() -> Order {
-    let sort = |key| SORTS[sort_index(key) as usize].1;
-    let start = |sort, key: &str| match sort {
-        Sort::Newest => true,
-        Sort::Oldest => false,
-        // New tasks have no due date: they go among the undated ones, as in manual order.
-        _ => core().setting(key.into()).as_deref() == Some("start"),
-    };
-    let (tasks, subtasks) = (sort("task_sort"), sort("sub_sort"));
-    Order {
-        tasks,
-        subtasks,
-        task_start: start(tasks, "task_new"),
-        sub_start: start(subtasks, "sub_new"),
-    }
 }
 
 /// Tie a "Sort" row to its "Add new …" row: sorting by creation date shows (and locks) where
@@ -186,10 +101,13 @@ fn connect_order(b: &gtk::Builder, which: &'static str, hint: Option<&'static st
             });
         }
     };
-    sort.set_selected(sort_index(&sort_key));
+    sort.set_selected(prefs::sort_index(core(), &sort_key) as u32);
     show();
     sort.connect_selected_notify(move |s| {
-        let _ = core().set_setting(sort_key.clone(), SORTS[s.selected() as usize].0.into());
+        let _ = core().set_setting(
+            sort_key.clone(),
+            prefs::SORTS[s.selected() as usize].0.into(),
+        );
         show();
         crate::window::refresh();
     });
@@ -207,20 +125,20 @@ fn connect_order(b: &gtk::Builder, which: &'static str, hint: Option<&'static st
 fn connect_reminders(b: &gtk::Builder) {
     let default: adw::ComboRow = get(b, "reminder_default");
     let model: gtk::StringList = get(b, "reminder_defaults");
-    for (label, _) in crate::dates::TIMED {
+    for label in crate::dates::TIMED {
         model.append(&gettext(label));
     }
-    let current = crate::dates::default_reminder(false);
-    let pos = crate::dates::TIMED.iter().position(|(_, o)| *o == current);
+    let current = prefs::default_reminder(core(), false);
+    let pos = todav_app::dates::TIMED.iter().position(|o| *o == current);
     default.set_selected(pos.unwrap_or(0) as u32);
     default.connect_selected_notify(|r| {
-        let offset = crate::dates::TIMED[r.selected() as usize].1;
+        let offset = todav_app::dates::TIMED[r.selected() as usize];
         let _ = core().set_setting("reminder_default".into(), offset.to_string());
     });
 
     let (hour, minute): (gtk::SpinButton, gtk::SpinButton) =
         (get(b, "reminder_hour"), get(b, "reminder_minute"));
-    let t = crate::dates::all_day_time();
+    let t = prefs::all_day_time(core());
     hour.set_value((t / 3600) as f64);
     minute.set_value((t / 60 % 60) as f64);
     for spin in [&hour, &minute] {
@@ -284,13 +202,13 @@ pub fn present(parent: &adw::ApplicationWindow, page: Option<&str>) -> adw::Pref
     connect_duration(&b, "task_duration");
     connect_duration(&b, "event_duration");
     let dots: adw::SwitchRow = get(&b, "mini_dots");
-    dots.set_active(mini_dots());
+    dots.set_active(prefs::mini_dots(core()));
     dots.connect_active_notify(|d| {
         let _ = core().set_setting("mini_dots".into(), d.is_active().to_string());
         crate::calendar::refresh();
     });
     let double: adw::SwitchRow = get(&b, "double_click_edit");
-    double.set_active(double_click_edit());
+    double.set_active(prefs::double_click_edit(core()));
     double.connect_active_notify(|d| {
         let _ = core().set_setting("double_click_edit".into(), d.is_active().to_string());
     });
@@ -421,7 +339,7 @@ fn connect_status(b: &gtk::Builder, id: i64) -> Rc<dyn Fn()> {
                 .replace("{time}", &crate::dates::label(local, false, now))
         });
         let state = crate::sync_state();
-        match crate::sync_error(id) {
+        match crate::service().sync_error(id) {
             _ if state == "syncing" => set_status(&sync, &sync_icon, None, &gettext("Syncing…")),
             Some(e) => set_status(
                 &sync,
@@ -460,7 +378,7 @@ fn connect_status(b: &gtk::Builder, id: i64) -> Rc<dyn Fn()> {
                      elsewhere within seconds",
                 ),
             )
-        } else if let Some(e) = crate::push_error() {
+        } else if let Some(e) = crate::service().push_error() {
             (
                 Some("error"),
                 gettext("Not working: {error}").replace("{error}", &e),

@@ -14,64 +14,50 @@ mod window;
 use adw::prelude::*;
 use gtk::{gio, glib};
 use std::collections::HashMap;
-use std::sync::mpsc::{Sender, channel};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::Duration;
+use todav_app::accounts::Keyring;
+use todav_app::service::{Service, Shell, State};
 use todav_core::{Account, AccountKind, ChangeListener, Client};
 
 pub const APP_ID: &str = "dev.aperte.Todav";
 
 static CORE: OnceLock<Arc<Client>> = OnceLock::new();
-static SYNC: OnceLock<Sender<()>> = OnceLock::new();
+static SERVICE: OnceLock<Arc<Service>> = OnceLock::new();
+/// `State` as D-Bus tells it (see `state_text`).
 static SYNC_STATE: Mutex<String> = Mutex::new(String::new());
-/// Why each account's last sync failed, by id; gone once one goes through.
-static SYNC_ERRORS: Mutex<Option<HashMap<i64, String>>> = Mutex::new(None);
-/// The ntfy server the push listener was started for.
-static PUSH_URL: Mutex<String> = Mutex::new(String::new());
-/// What the push listener last failed with; cleared by its next success.
-static PUSH_ERROR: Mutex<Option<String>> = Mutex::new(None);
 
 pub fn core() -> &'static Arc<Client> {
     CORE.get().expect("core opened at startup")
 }
 
-/// After an edit: sync if it left something for the server (edits in lists on this device
-/// leave nothing, so no sync runs for them).
-pub fn request_sync() {
-    if core().pending(None) {
-        sync_now();
-    }
+/// The background service: sync worker, push listener, reminders.
+pub fn service() -> &'static Arc<Service> {
+    SERVICE.get().expect("service made at startup")
 }
 
-/// Ask the worker for a full sync; requests arriving while one runs are coalesced.
+/// After an edit: sync if it left something for the server.
+pub fn request_sync() {
+    service().request_sync();
+}
+
+/// Ask the worker for a full sync.
 pub fn sync_now() {
-    if let Some(tx) = SYNC.get() {
-        let _ = tx.send(());
-    }
+    service().sync_now();
 }
 
 /// The main window has something to show: an account (one not connected too: its lists are
 /// here, a banner offers to sign in again).
 pub fn ready() -> bool {
-    SYNC.get().is_some() && !core().accounts().is_empty()
+    service().running() && !core().accounts().is_empty()
 }
 
 /// Some account syncs: the sync buttons work.
 pub fn can_sync() -> bool {
-    core().accounts().iter().any(syncing)
-}
-
-/// Why account `id`'s last sync failed.
-pub fn sync_error(id: i64) -> Option<String> {
-    SYNC_ERRORS.lock().unwrap().as_ref()?.get(&id).cloned()
+    service().can_sync()
 }
 
 pub fn sync_state() -> String {
     SYNC_STATE.lock().unwrap().clone()
-}
-
-pub fn push_error() -> Option<String> {
-    PUSH_ERROR.lock().unwrap().clone()
 }
 
 /// Events from background threads, handled on the main thread.
@@ -96,44 +82,38 @@ fn post(ev: Event) {
     });
 }
 
-/// What a sync or a push did: items the server refused, the state the extension and the
-/// window show (naming the accounts that failed).
-fn set_state(r: Result<todav_core::SyncReport, todav_core::Error>) {
-    let report = match r {
-        Ok(r) => r,
-        Err(e) => return post(Event::SyncState(format!("error:{e}"))),
+/// `State` as the D-Bus `SyncState` property and the window take it: "idle", "syncing" or
+/// "error:" with what failed, naming the accounts.
+fn state_text(state: &State) -> String {
+    let failed = match state {
+        State::Idle => return "idle".into(),
+        State::Syncing => return "syncing".into(),
+        State::Failed(failed) => failed,
     };
-    if !report.refused.is_empty() {
-        post(Event::Refused(report.refused));
-    }
     let names: HashMap<i64, String> = core()
         .accounts()
         .iter()
         .map(|a| (a.id, account_name(a)))
         .collect();
-    let failed: Vec<String> = report
-        .failed
+    let failed: Vec<String> = failed
         .iter()
-        .map(|(id, e)| match names.get(id) {
+        .map(|(id, e)| match id.and_then(|id| names.get(&id)) {
             Some(name) => format!("{name}: {e}"),
-            None => e.to_string(),
+            None => e.clone(),
         })
         .collect();
-    post(Event::SyncState(if failed.is_empty() {
-        "idle".into()
-    } else {
-        format!("error:{}", failed.join("; "))
-    }));
+    format!("error:{}", failed.join("; "))
 }
 
-/// A full sync tried every account that syncs: their errors replace the last ones.
-fn set_errors(report: &todav_core::SyncReport) {
-    let errors = report
-        .failed
-        .iter()
-        .map(|(id, e)| (*id, e.to_string()))
-        .collect();
-    *SYNC_ERRORS.lock().unwrap() = Some(errors);
+struct Ui;
+impl Shell for Ui {
+    fn state(&self, state: State) {
+        post(Event::SyncState(state_text(&state)));
+    }
+
+    fn refused(&self, items: Vec<todav_core::Refused>) {
+        post(Event::Refused(items));
+    }
 }
 
 struct Listener;
@@ -148,10 +128,7 @@ impl ChangeListener for Listener {
         for l in core().lists() {
             post(Event::Changed(l.href));
         }
-        let ntfy = core().setting("ntfy_url".into()).unwrap_or_default();
-        if ntfy != *PUSH_URL.lock().unwrap() {
-            restart_push();
-        }
+        service().settings_changed();
     }
 }
 
@@ -202,6 +179,18 @@ pub fn password_clear(url: &str, user: &str) {
     let _ = libsecret::password_clear_sync(Some(&schema()), attrs, gio::Cancellable::NONE);
 }
 
+/// The Secret Service, for the accounts the core adds and removes.
+struct Secrets;
+impl Keyring for Secrets {
+    fn store(&self, url: &str, user: &str, password: &str) -> Result<(), String> {
+        password_store(url, user, password).map_err(|e| e.to_string())
+    }
+
+    fn clear(&self, url: &str, user: &str) {
+        password_clear(url, user);
+    }
+}
+
 // --- accounts ----------------------------------------------------------------
 
 /// What an account is called: the name given to it, else "user@host", or "On This Device".
@@ -211,10 +200,7 @@ pub fn account_name(a: &Account) -> String {
     }
     match a.kind {
         AccountKind::Local => i18n::gettext("On This Device"),
-        AccountKind::Nextcloud => {
-            let host = a.url.split_once("://").map_or(a.url.as_str(), |(_, h)| h);
-            format!("{}@{}", a.user, host.trim_end_matches('/'))
-        }
+        AccountKind::Nextcloud => format!("{}@{}", a.user, todav_app::accounts::host(a)),
     }
 }
 
@@ -265,14 +251,23 @@ fn forget_old_sign_in() {
     }
 }
 
-/// Switched on and connected: an account that syncs.
-fn syncing(a: &Account) -> bool {
-    a.enabled && core().connected(a.id)
-}
-
-/// Why an account cannot go yet: edits not on the server would be lost with the local copy.
-fn pending_error(e: &todav_core::Error) -> String {
-    i18n::gettext("Cannot upload pending changes first: {error}").replace("{error}", &e.to_string())
+/// Why an account could not be added, reconnected or removed, in words.
+fn account_error(e: todav_app::accounts::Error) -> String {
+    use todav_app::accounts::Error;
+    match e {
+        Error::Exists => i18n::gettext("This account is already added"),
+        Error::Gone => i18n::gettext("Connecting failed"),
+        Error::SavePassword(e) => {
+            i18n::gettext("Cannot save password: {error}").replace("{error}", &e)
+        }
+        // Edits not on the server would be lost with the local copy.
+        Error::Upload(e) => i18n::gettext("Cannot upload pending changes first: {error}")
+            .replace("{error}", &e.to_string()),
+        Error::NotUploaded => {
+            i18n::gettext("It has changes not uploaded yet: sign in again to upload them")
+        }
+        Error::Core(e) => e.to_string(),
+    }
 }
 
 /// A Nextcloud account to add.
@@ -295,27 +290,8 @@ pub async fn add_account(target: Target, settings: bool) -> Result<i64, String> 
             }
             Target::Manual(c) => (c.server, c.login_name, c.app_password, String::new()),
         };
-        let url = url.trim_end_matches('/').to_string();
-        let kind = AccountKind::Nextcloud;
-        let id = core()
-            .add_account(kind, url.clone(), user.clone(), source.clone())
-            .map_err(|e| match e {
-                todav_core::Error::Exists => i18n::gettext("This account is already added"),
-                e => e.to_string(),
-            })?;
-        if source.is_empty()
-            && let Err(e) = password_store(&url, &user, &pw)
-        {
-            let _ = core().remove_account(id);
-            return Err(
-                i18n::gettext("Cannot save password: {error}").replace("{error}", &e.to_string())
-            );
-        }
-        core().connect(id, pw).map_err(|e| e.to_string())?;
-        if settings {
-            let _ = core().set_settings_account(Some(id));
-        }
-        Ok(id)
+        todav_app::accounts::add(core(), &Secrets, &url, &user, pw, source, settings)
+            .map_err(account_error)
     })
     .await
     .map_err(|_| i18n::gettext("Connecting failed"))??;
@@ -334,7 +310,15 @@ pub fn add_local() -> Result<i64, String> {
             String::new(),
         )
         .map_err(|e| e.to_string())?;
-    lists::start_local(id).map_err(|e| e.to_string())?;
+    let starter = todav_app::lists::Starter {
+        tasks: i18n::gettext("Tasks"),
+        task: i18n::gettext("Welcome to Todav"),
+        note: i18n::gettext(
+            "Tick tasks off when done; open one to add a due date, reminders or subtasks.",
+        ),
+        calendar: i18n::gettext("Calendar"),
+    };
+    todav_app::lists::start_local(core(), id, starter).map_err(|e| e.to_string())?;
     start_background();
     Ok(id)
 }
@@ -343,25 +327,8 @@ pub fn add_local() -> Result<i64, String> {
 /// user on a moved server (then its lists come again from there, after the edits waiting for
 /// the old one went up).
 pub async fn reconnect(id: i64, url: String, password: String) -> Result<(), String> {
-    gio::spawn_blocking(move || -> Result<(), String> {
-        let a = core()
-            .account(id)
-            .ok_or_else(|| i18n::gettext("Connecting failed"))?;
-        let url = url.trim_end_matches('/').to_string();
-        password_store(&url, &a.user, &password).map_err(|e| {
-            i18n::gettext("Cannot save password: {error}").replace("{error}", &e.to_string())
-        })?;
-        if url == a.url {
-            return core().connect(id, password).map_err(|e| e.to_string());
-        }
-        if core().connected(id) || core().pending(Some(id)) {
-            core().sync_account(id).map_err(|e| pending_error(&e))?;
-        }
-        core()
-            .move_account(id, url, password)
-            .map_err(|e| e.to_string())?;
-        password_clear(&a.url, &a.user);
-        Ok(())
+    gio::spawn_blocking(move || {
+        todav_app::accounts::reconnect(core(), &Secrets, id, &url, password).map_err(account_error)
     })
     .await
     .map_err(|_| i18n::gettext("Connecting failed"))??;
@@ -382,34 +349,12 @@ pub async fn enable_account(id: i64, on: bool) {
 /// Remove account `id` from this device, with its saved password; edits waiting for its server
 /// go up first, unless `force` (then they are lost).
 pub async fn remove_account(id: i64, force: bool) -> Result<(), String> {
-    gio::spawn_blocking(move || -> Result<(), String> {
-        let Some(a) = core().account(id) else {
-            return Ok(());
-        };
-        if a.kind == AccountKind::Nextcloud && !force {
-            if core().connected(id) {
-                core().sync_account(id).map_err(|e| pending_error(&e))?;
-            } else if core().pending(Some(id)) {
-                return Err(i18n::gettext(
-                    "It has changes not uploaded yet: sign in again to upload them",
-                ));
-            }
-        }
-        if a.kind == AccountKind::Nextcloud && a.source.is_empty() {
-            password_clear(&a.url, &a.user);
-        }
-        core().remove_account(id).map_err(|e| e.to_string())
+    gio::spawn_blocking(move || {
+        todav_app::accounts::remove(core(), &Secrets, id, force).map_err(account_error)
     })
     .await
     .map_err(|_| i18n::gettext("Removing the account failed"))??;
-    if let Some(errors) = SYNC_ERRORS.lock().unwrap().as_mut() {
-        errors.remove(&id);
-    }
-    if !can_sync() {
-        post(Event::SyncState("idle".into())); // no sync left to fail
-    } else {
-        sync_now();
-    }
+    service().account_removed(id);
     if core().accounts().is_empty() {
         window::show_welcome();
     } else {
@@ -421,87 +366,40 @@ pub async fn remove_account(id: i64, force: bool) -> Result<(), String> {
 
 /// An account came, connected or was switched on: sync it, listen for its pushes.
 fn started() {
-    let running = SYNC.get().is_some();
-    start_background();
-    if running {
-        restart_push(); // registers push for the account's lists now, not within the hour
-    }
+    service().account_added(true);
 }
 
 // --- background --------------------------------------------------------------
 
 /// Stop the push listener and start a new one if an ntfy server is configured.
 pub fn restart_push() {
-    core().stop_listening();
-    let url = core().setting("ntfy_url".into()).unwrap_or_default();
-    *PUSH_URL.lock().unwrap() = url.clone();
-    *PUSH_ERROR.lock().unwrap() = None;
-    if let Some(ntfy) = Some(url).filter(|u| !u.is_empty() && can_sync()) {
-        std::thread::spawn(move || {
-            // Blocks until the next restart_push; reconnects internally.
-            let _ = core().listen(ntfy, &|r| {
-                *PUSH_ERROR.lock().unwrap() = r.as_ref().err().map(|e| e.to_string());
-                set_state(r);
-            });
-        });
-    }
+    service().restart_push();
 }
 
-/// Start the sync worker and, if an ntfy server is configured, the push listener. Idempotent.
+/// Start the sync worker, the push listener and the timers for reminders and syncs. Idempotent.
 pub fn start_background() {
-    if SYNC.get().is_some() {
-        sync_now();
+    if !service().start(true) {
         return;
     }
-    let (tx, rx) = channel::<()>();
-    let _ = SYNC.set(tx);
-    std::thread::spawn(move || {
-        while rx.recv().is_ok() {
-            std::thread::sleep(Duration::from_millis(300)); // let a burst of edits settle
-            while rx.try_recv().is_ok() {}
-            if !can_sync() {
-                continue; // no account, or no password for one: nothing to sync until one connects
-            }
-            post(Event::SyncState("syncing".into()));
-            let report = core().sync();
-            set_errors(&report);
-            set_state(Ok(report));
-        }
-    });
-    sync_now();
-
-    restart_push();
-
     notify_reminders();
     glib::timeout_add_seconds_local(30, || {
         notify_reminders();
         glib::ControlFlow::Continue
     });
-
-    // Safety net for lost pushes: every minute while the window is focused, every 30 min otherwise.
-    let mut ticks = 0u32;
-    glib::timeout_add_seconds_local(60, move || {
-        ticks += 1;
-        if window::is_active() || ticks.is_multiple_of(30) {
-            sync_now();
-        }
+    glib::timeout_add_seconds_local(60, || {
+        service().tick(window::is_active());
         glib::ControlFlow::Continue
     });
 }
 
-/// Notify about reminders that went off since the last check: at most a day back, so a device
-/// that was off does not replay old ones.
+/// Notify about reminders that went off since the last check.
 fn notify_reminders() {
     let Some(app) = gio::Application::default() else {
         return;
     };
     let now = core().local_now();
-    let from = core()
-        .setting("reminded_until".into())
-        .and_then(|v| v.parse::<i64>().ok())
-        .unwrap_or(now)
-        .max(now - 86400);
-    for t in core().reminders(from, now) {
+    let (tasks, events) = service().due_reminders();
+    for t in tasks {
         let n = gio::Notification::new(&t.summary);
         if let Some(d) = t.due {
             n.set_body(Some(
@@ -517,7 +415,7 @@ fn notify_reminders() {
         );
         app.send_notification(Some(&format!("reminder-{}", t.uid)), &n);
     }
-    for e in core().event_reminders(from, now) {
+    for e in events {
         let n = gio::Notification::new(&e.summary);
         let when = dates::label(e.start, e.all_day, now);
         n.set_body(Some(&match &e.location {
@@ -526,9 +424,6 @@ fn notify_reminders() {
         }));
         n.set_default_action_and_target_value("app.show-day", Some(&e.start.to_variant()));
         app.send_notification(Some(&format!("event-{}-{}", e.uid, e.start)), &n);
-    }
-    if from != now {
-        let _ = core().set_setting("reminded_until".into(), now.to_string());
     }
 }
 
@@ -567,7 +462,9 @@ fn main() -> glib::ExitCode {
     let data = glib::user_data_dir().join("todav");
     let client = Client::open(data.to_string_lossy().into()).expect("open local database");
     client.subscribe(Box::new(Listener));
-    let _ = CORE.set(Arc::new(client));
+    let client = Arc::new(client);
+    let _ = SERVICE.set(Service::new(client.clone(), Box::new(Ui)));
+    let _ = CORE.set(client);
 
     let app: App = glib::Object::builder()
         .property("application-id", APP_ID)

@@ -8,76 +8,6 @@ use super::*;
 /// ponytail: fixed; measure a chip if a large text scale makes them taller.
 const LANE: i32 = 24;
 
-/// One piece of an item on the row: its lane and the days (columns 0–6) it covers.
-#[derive(Debug, PartialEq)]
-struct Piece {
-    item: usize,
-    lane: usize,
-    from: usize,
-    to: usize,
-}
-
-/// Lanes for items covering the days `days[i]` (ascending, contiguous): the earliest first,
-/// then the longest, each in the lowest lane free on all its days. At most `max` lanes show: a
-/// day with an item past them keeps its last lane for "+N more", listing what it hides there.
-fn layout(days: &[Vec<usize>], max: usize) -> (Vec<Piece>, [Vec<usize>; 7]) {
-    let mut order: Vec<usize> = (0..days.len()).filter(|&i| !days[i].is_empty()).collect();
-    order.sort_by_key(|&i| (days[i][0], std::cmp::Reverse(days[i].len()), i));
-    let mut taken: Vec<[bool; 7]> = Vec::new();
-    let mut lane = vec![0; days.len()];
-    for &i in &order {
-        let free = |t: &[bool; 7]| days[i].iter().all(|&d| !t[d]);
-        let l = taken.iter().position(free).unwrap_or(taken.len());
-        if l == taken.len() {
-            taken.push([false; 7]);
-        }
-        for &d in &days[i] {
-            taken[l][d] = true;
-        }
-        lane[i] = l;
-    }
-    let limit: Vec<usize> = (0..7)
-        .map(|d| {
-            let over = order
-                .iter()
-                .any(|&i| days[i].contains(&d) && lane[i] >= max);
-            if over { max - 1 } else { max }
-        })
-        .collect();
-    let mut pieces = Vec::new();
-    let mut more: [Vec<usize>; 7] = Default::default();
-    for &i in &order {
-        let mut run: Option<(usize, usize)> = None;
-        for &d in &days[i] {
-            if lane[i] < limit[d] {
-                run = Some(run.map_or((d, d), |(from, _)| (from, d)));
-            } else {
-                more[d].push(i);
-                if let Some((from, to)) = run.take() {
-                    pieces.push(Piece {
-                        item: i,
-                        lane: lane[i],
-                        from,
-                        to,
-                    });
-                }
-            }
-        }
-        if let Some((from, to)) = run {
-            pieces.push(Piece {
-                item: i,
-                lane: lane[i],
-                from,
-                to,
-            });
-        }
-    }
-    for m in &mut more {
-        m.sort(); // in the items' order
-    }
-    (pieces, more)
-}
-
 /// The week from `start`: a `cell` per day (its background: number, clicks, drops) and `items`
 /// on top, in at most `max` lanes. Dropped on an item, something goes to that item's day, as
 /// `day_drop` with `all_day`.
@@ -97,7 +27,7 @@ pub(super) fn row(
                 .collect()
         })
         .collect();
-    let (pieces, more) = layout(&days, max);
+    let (pieces, more) = calendar::lanes(&days, max);
     let lanes = pieces
         .iter()
         .map(|p| p.lane + 1)
@@ -178,48 +108,4 @@ pub(super) fn cells(row: &gtk::Widget) -> Vec<gtk::Widget> {
         out.push(w);
     }
     out
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn piece(item: usize, lane: usize, from: usize, to: usize) -> Piece {
-        Piece {
-            item,
-            lane,
-            from,
-            to,
-        }
-    }
-
-    #[test]
-    fn multi_day_items_keep_a_lane_and_overflow_goes_to_more() {
-        // 0: Mon–Wed, 1: Tue, 2: Tue–Sun, 3: Wed, 4: Wed
-        let days = vec![
-            vec![0, 1, 2],
-            vec![1],
-            vec![1, 2, 3, 4, 5, 6],
-            vec![2],
-            vec![2],
-        ];
-        let (pieces, more) = layout(&days, 3);
-        assert_eq!(
-            pieces,
-            vec![
-                piece(0, 0, 0, 2),
-                // The longer one first on Tuesday, under the bar from Monday.
-                piece(2, 1, 1, 6),
-                piece(1, 2, 1, 1),
-            ]
-        );
-        // Wednesday has four: its third lane shows "+2 more" for the two singles.
-        assert_eq!(more[2], vec![3, 4]);
-        assert!(more.iter().enumerate().all(|(d, m)| d == 2 || m.is_empty()));
-
-        // Without a limit everything gets a lane.
-        let (pieces, more) = layout(&days, usize::MAX);
-        assert_eq!(pieces.len(), 5);
-        assert!(more.iter().all(Vec::is_empty));
-    }
 }

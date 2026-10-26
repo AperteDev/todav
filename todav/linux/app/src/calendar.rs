@@ -9,14 +9,16 @@ mod week;
 
 use crate::i18n::{gettext, ngettext, pgettext};
 use crate::lists::class;
-use crate::settings::duration;
 use crate::window::{get, view};
 use crate::{core, dates, request_sync};
 use adw::prelude::*;
 use gtk::{gdk, gio, glib};
 use std::cell::{Cell, RefCell};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::rc::Rc;
+use todav_app::calendar::{self, Change, Item, Time, day_lists, on_day, planned, when};
+use todav_app::dates::month_first;
+use todav_app::prefs;
 use todav_core::{Due, Event, EventPatch, EventTime, List, Scope, Task, TaskPatch};
 
 const DAY: i64 = 86400;
@@ -85,38 +87,6 @@ button.block.task { padding-left: 4px; }
 .drag-card { margin: 8px; padding: 8px 14px; border-radius: 10px; background: @card_bg_color; color: @card_fg_color; box-shadow: 0 2px 8px alpha(black, 0.25); }
 ";
 
-/// Something on the calendar.
-#[derive(Clone)]
-enum Item {
-    Event(Event),
-    Task(Task),
-}
-
-impl Item {
-    fn list(&self) -> &str {
-        match self {
-            Item::Event(e) => &e.list_href,
-            Item::Task(t) => &t.list_href,
-        }
-    }
-
-    /// When it is, for sorting within a day: all-day things first.
-    fn key(&self) -> (bool, i64) {
-        match self {
-            Item::Event(e) => (!e.all_day, e.start),
-            Item::Task(t) => (!when(t).1, when(t).0),
-        }
-    }
-}
-
-/// A task's place on the calendar: its start, else its due date; and whether that is a date.
-fn when(t: &Task) -> (i64, bool) {
-    match t.start {
-        Some(s) => (s, t.start_all_day),
-        None => (t.due.unwrap_or(0), t.due_all_day),
-    }
-}
-
 struct Cal {
     /// The window's Tasks / Calendar stack.
     stack: adw::ViewStack,
@@ -175,8 +145,7 @@ fn cal() -> Option<Rc<Cal>> {
 }
 
 fn today() -> i64 {
-    let now = core().local_now();
-    now - now.rem_euclid(DAY)
+    todav_app::dates::midnight(core().local_now())
 }
 
 /// Add the Calendar page to the window's view stack.
@@ -274,7 +243,7 @@ pub fn build(views: &adw::ViewStack) {
             let Some(c) = cal() else { return };
             // Rows are in the section's order.
             if let Some(href) = section(&c, events).get(row.index() as usize) {
-                set_hidden([href.as_str()], !hidden().contains(href));
+                prefs::set_hidden(core(), [href.as_str()], !hidden().contains(href));
                 glib::idle_add_local_once(refresh);
             }
         });
@@ -434,80 +403,38 @@ fn new_event() -> Option<adw::EntryRow> {
     };
     let time = EventTime {
         start,
-        end: start + duration("event_duration"),
+        end: start + prefs::event_duration(core()),
         all_day: false,
     };
     Some(dialog::open(&c, None, time))
 }
 
-/// For the extension's month: the colours of `day_lists` for each of `days` days from `from`.
-pub fn day_colors(from: i64, days: i64) -> Vec<Vec<String>> {
-    let colors = colors();
-    let all = items(from, from + days * DAY);
-    (0..days)
-        .map(|n| {
-            day_lists(&all, from + n * DAY)
-                .into_iter()
-                .map(|l| colors.get(l).cloned().unwrap_or_default())
-                .collect()
-        })
-        .collect()
-}
-
 /// For the extension's agenda: what is on each of `days` days from today, as the Agenda view
 /// lists it: (day, time, title, colour, is a task, done).
 pub fn agenda(days: i64) -> Vec<(i64, String, String, String, bool, bool)> {
-    let colors = colors();
-    let from = today();
-    let all = items(from, from + days * DAY);
-    let mut out = Vec::new();
-    for day in (0..days).map(|n| from + n * DAY) {
-        for i in all.iter().filter(|i| on_day(i, day)) {
-            let color = colors.get(i.list()).cloned().unwrap_or_default();
-            out.push(match i {
-                Item::Event(e) => {
-                    // A day inside a longer event: all of it, or until it ends.
-                    let time = if e.all_day || (e.start < day && e.end >= day + DAY) {
-                        gettext("All day")
-                    } else if e.start < day {
-                        gettext("Until {time}").replace("{time}", &fmt(e.end, "%H:%M"))
-                    } else {
-                        fmt(e.start, "%H:%M")
-                    };
-                    (day, time, e.summary.clone(), color, false, false)
-                }
-                Item::Task(t) => {
-                    let (at, all_day) = when(t);
-                    let time = if all_day {
-                        String::new()
-                    } else {
-                        fmt(at, "%H:%M")
-                    };
-                    (day, time, t.summary.clone(), color, true, t.done)
-                }
-            });
-        }
-    }
-    out
-}
-
-/// Every collection's colour as the app shows it, by href.
-fn colors() -> HashMap<String, String> {
-    core()
-        .calendars()
+    calendar::agenda(core(), today(), days)
         .into_iter()
-        .chain(core().lists())
-        .map(|l| (l.href.clone(), crate::lists::color(&l)))
+        .map(|e| {
+            let time = match e.time {
+                Time::AllDay => gettext("All day"),
+                Time::Until(t) => gettext("Until {time}").replace("{time}", &fmt(t, "%H:%M")),
+                Time::At(t) => fmt(t, "%H:%M"),
+                Time::Date => String::new(),
+            };
+            let (task, done) = match &e.item {
+                Item::Task(t) => (true, t.done),
+                Item::Event(_) => (false, false),
+            };
+            (
+                e.day,
+                time,
+                e.item.summary().to_string(),
+                e.color,
+                task,
+                done,
+            )
+        })
         .collect()
-}
-
-/// Today's events in the calendars shown, for the Tasks page's Upcoming.
-pub fn today_events() -> Vec<Event> {
-    let hidden = hidden();
-    let mut all = core().events(today(), today() + DAY);
-    all.retain(|e| !hidden.contains(&e.list_href) && !e.cancelled);
-    all.sort_by_key(|e| (!e.all_day, e.start));
-    all
 }
 
 /// Switch to the calendar on the day holding `t` (local time), the day pulsing once.
@@ -741,39 +668,15 @@ fn day_drop(w: &impl IsA<gtk::Widget>, day: i64, all_day: bool) {
 }
 
 fn drop_on_day(i: &Item, day: i64, all_day: bool) {
-    match i {
-        // Out of the hours: due that day, no time (its due time was the slot's end).
-        Item::Task(t) if all_day && t.start.is_some() && !t.start_all_day => save(
-            &t.uid,
-            TaskPatch {
-                start: Some(None),
-                due: Some(Some(Due {
-                    at: day,
-                    all_day: true,
-                })),
-                ..Default::default()
-            },
-        ),
-        Item::Task(t) => move_to_day(t, day),
-        Item::Event(e) if all_day && !e.all_day => move_event(
-            e,
-            EventTime {
-                start: day,
-                end: day + DAY,
-                all_day: true,
-            },
-        ),
-        Item::Event(e) => {
-            let start = day + e.start.rem_euclid(DAY);
-            move_event(
-                e,
-                EventTime {
-                    start,
-                    end: start + e.end - e.start,
-                    all_day: e.all_day,
-                },
-            )
-        }
+    apply(i, calendar::day_drop(i, day, all_day));
+}
+
+/// Make the change a drop of `i` asks for.
+fn apply(i: &Item, change: Change) {
+    match (i, change) {
+        (Item::Task(t), Change::Task(patch)) => save(&t.uid, patch),
+        (Item::Event(e), Change::Event(time)) => move_event(e, time),
+        _ => {}
     }
 }
 
@@ -814,100 +717,11 @@ fn save(uid: &str, patch: TaskPatch) {
     }
 }
 
-/// Move a task to the day starting at `day`, keeping its times of day (and its length when
-/// it is planned into a slot); a task without a time is due that day.
-fn move_to_day(t: &Task, day: i64) {
-    let at = |t: i64, all_day| {
-        Some(Due {
-            at: day + t.rem_euclid(DAY),
-            all_day,
-        })
-    };
-    let patch = match (t.start, t.due) {
-        (Some(s), due) if !t.start_all_day => TaskPatch {
-            start: Some(at(s, false)),
-            due: due.map(|d| {
-                Some(Due {
-                    at: d - s + day + s.rem_euclid(DAY),
-                    all_day: t.due_all_day,
-                })
-            }),
-            ..Default::default()
-        },
-        (_, Some(d)) if !t.due_all_day => TaskPatch {
-            start: t.start.map(|_| None),
-            due: Some(at(d, false)),
-            ..Default::default()
-        },
-        _ => TaskPatch {
-            start: t.start.map(|_| None),
-            due: Some(Some(Due {
-                at: day,
-                all_day: true,
-            })),
-            ..Default::default()
-        },
-    };
-    save(&t.uid, patch);
-}
-
-/// Plan a task into the slot starting at `at`: as long as it was planned before, else the
-/// default length.
-fn plan_at(t: &Task, at: i64) {
-    let len = match (t.start, slot_end(t)) {
-        (Some(s), Some(e)) => e - s,
-        _ => duration("task_duration"),
-    };
-    let time = |t| {
-        Some(Some(Due {
-            at: t,
-            all_day: false,
-        }))
-    };
-    save(
-        &t.uid,
-        TaskPatch {
-            start: time(at),
-            due: time(at + len),
-            ..Default::default()
-        },
-    );
-}
-
-/// Where a planned task's slot ends: its due time, when that is later the same day. A deadline
-/// further off is not the end of a slot.
-fn slot_end(t: &Task) -> Option<i64> {
-    let s = t.start.filter(|_| !t.start_all_day)?;
-    t.due
-        .filter(|&d| !t.due_all_day && d > s && d <= s - s.rem_euclid(DAY) + DAY)
-}
-
-/// Whether `t` has a time slot: a start, or a due time rather than a date. Without one it is in
-/// "To Plan" already.
-fn planned(t: &Task) -> bool {
-    t.start.is_some() || (t.due.is_some() && !t.due_all_day)
-}
-
 /// Back to "To Plan": no slot, due on the day it was planned for.
 fn unplan(t: &Task) {
-    if !planned(t) {
-        return;
+    if let Some(patch) = calendar::unplan(t) {
+        save(&t.uid, patch);
     }
-    let (at, _) = when(t);
-    let due = t.due.map(|_| {
-        Some(Due {
-            at: at - at.rem_euclid(DAY),
-            all_day: true,
-        })
-    });
-    save(
-        &t.uid,
-        TaskPatch {
-            start: Some(None),
-            due,
-            ..Default::default()
-        },
-    );
 }
 
 fn plan_drop(c: &Rc<Cal>) {
@@ -927,38 +741,8 @@ pub fn set_syncing(on: bool) {
     }
 }
 
-/// Collections the user hid (synced `hidden_calendars` setting, one href per line).
 fn hidden() -> HashSet<String> {
-    let stored: Vec<String> = core()
-        .setting("hidden_calendars".into())
-        .unwrap_or_default()
-        .lines()
-        .map(String::from)
-        .collect();
-    let mut all: HashSet<String> = stored.iter().cloned().collect();
-    // Todav 1.2 kept server paths: the lists at those paths.
-    if stored.iter().any(|s| s.starts_with('/')) {
-        for l in core().lists().into_iter().chain(core().calendars()) {
-            if stored.iter().any(|s| todav_core::same_list(s, &l.href)) {
-                all.insert(l.href);
-            }
-        }
-    }
-    all
-}
-
-fn set_hidden<'a>(hrefs: impl IntoIterator<Item = &'a str>, hide: bool) {
-    let mut h = hidden();
-    for href in hrefs {
-        if hide {
-            h.insert(href.to_string());
-        } else {
-            h.retain(|s| !todav_core::same_list(s, href));
-        }
-    }
-    let mut v: Vec<String> = h.into_iter().collect();
-    v.sort();
-    let _ = core().set_setting("hidden_calendars".into(), v.join("\n"));
+    prefs::hidden(core())
 }
 
 /// Every collection's colour class, and a sidebar row each to show or hide it.
@@ -971,7 +755,7 @@ fn refresh_calendars(c: &Rc<Cal>) {
         }
     }
     // Calendars, then task lists, each grouped by account.
-    let rank = crate::lists::rank();
+    let rank = todav_app::lists::rank(core());
     all.sort_by_key(|l| {
         (
             !l.holds_events,
@@ -1049,16 +833,7 @@ fn list_drop(row: &gtk::ListBoxRow, l: &List) {
     let href = l.href.clone();
     drop.connect_drop(move |_, _, _, _| {
         let Some(i) = dragging() else { return false };
-        let moved = match &i {
-            Item::Task(t) => core().together(|| {
-                if t.parent_uid.is_some() {
-                    core().promote(t.uid.clone())?;
-                }
-                core().move_task(t.uid.clone(), href.clone())
-            }),
-            Item::Event(e) => core().move_event(e.list_href.clone(), e.uid.clone(), href.clone()),
-        };
-        match moved {
+        match calendar::move_to_list(core(), &i, href.clone()) {
             Ok(()) => request_sync(),
             Err(e) => crate::window::toast(&e.to_string()),
         }
@@ -1088,35 +863,7 @@ fn list_name(c: &Cal, list: &str) -> String {
 
 /// Visible events and dated tasks in `[from, to)`.
 fn items(from: i64, to: i64) -> Vec<Item> {
-    let hidden = hidden();
-    let events = core().events(from, to).into_iter().map(Item::Event);
-    let tasks = core().scheduled(from, to).into_iter().map(Item::Task);
-    let mut out: Vec<Item> = events
-        .chain(tasks)
-        .filter(|i| !hidden.contains(i.list()))
-        .collect();
-    out.sort_by_key(Item::key);
-    out
-}
-
-/// Whether `i` is on the day starting at `day`.
-fn on_day(i: &Item, day: i64) -> bool {
-    match i {
-        // Zero-length events still show on their day.
-        Item::Event(e) => e.start < day + DAY && (e.end > day || e.start >= day),
-        Item::Task(t) => (day..day + DAY).contains(&when(t).0),
-    }
-}
-
-/// The collections with something on `day` among `all`, three at most: a month day's dots.
-fn day_lists(all: &[Item], day: i64) -> Vec<&str> {
-    let mut lists: Vec<&str> = Vec::new();
-    for i in all.iter().filter(|i| on_day(i, day)) {
-        if lists.len() < 3 && !lists.contains(&i.list()) {
-            lists.push(i.list());
-        }
-    }
-    lists
+    calendar::items(core(), from, to)
 }
 
 fn fmt(t: i64, f: &str) -> String {
@@ -1135,13 +882,7 @@ fn capitalized(s: &str) -> String {
 
 /// Midnight of the first day of the week holding `day`, the locale's first weekday.
 fn week_start(day: i64) -> i64 {
-    week_start_on(day, crate::i18n::first_weekday())
-}
-
-/// The same with weeks starting on `first` (0 = Sunday).
-fn week_start_on(day: i64, first: i64) -> i64 {
-    // 1970-01-01, day 0, was a Thursday (4).
-    day - (day.div_euclid(DAY) + 4 - first).rem_euclid(7) * DAY
+    todav_app::dates::week_start(day, crate::i18n::first_weekday())
 }
 
 fn clear(w: &impl IsA<gtk::Widget>) {
@@ -1218,11 +959,6 @@ fn render_month(c: &Rc<Cal>) -> i64 {
         c.month.attach(&row, 0, w as i32, 1, 1);
     }
     end
-}
-
-/// Midnight of the first day of the month holding `day`.
-fn month_first(day: i64) -> i64 {
-    day - (dates::fields(day).day_of_month() as i64 - 1) * DAY
 }
 
 /// Select a day of the month grid. In the month shown only the highlight moves: a rebuilt
@@ -1580,7 +1316,7 @@ fn event_tasks(e: &Event) -> gtk::Box {
             .or(lists.first())?
             .href
             .clone();
-        let start = crate::settings::order().task_start;
+        let start = prefs::order(core()).task_start;
         let patch = TaskPatch {
             event: Some(Some(ev.uid.clone())),
             due: Some(Some(Due {
@@ -1617,7 +1353,7 @@ fn subtasks(t: &Task) -> gtk::Box {
         }
     };
     let add = move |text: String| {
-        let start = crate::settings::order().sub_start;
+        let start = prefs::order(core()).sub_start;
         core()
             .add_task(list.clone(), text, None, Some(uid.clone()), start)
             .ok()
@@ -1748,7 +1484,7 @@ fn on_clicks(
             .widget()
             .and_then(|w| w.pick(x, y, gtk::PickFlags::DEFAULT))
             .is_some_and(|t| t.ancestor(gtk::CheckButton::static_type()).is_some());
-        if n != 2 || on_check || !crate::settings::double_click_edit() {
+        if n != 2 || on_check || !prefs::double_click_edit(core()) {
             s.set(false);
             return;
         }
@@ -1766,7 +1502,7 @@ fn on_clicks(
             return;
         }
         // Without editing on a double click there is nothing to wait for.
-        if !crate::settings::double_click_edit() {
+        if !prefs::double_click_edit(core()) {
             if let (Some(w), Some(pop)) = (w.upgrade(), details()) {
                 pop_up(pop, &w);
             }
@@ -2008,7 +1744,6 @@ fn day_title(day: i64, format: &str) -> String {
 /// coming ones first.
 fn render_search(c: &Rc<Cal>) {
     let query = c.query.borrow().clone();
-    let (now, hidden) = (core().local_now(), hidden());
     let hit = |e: &Event| {
         [
             Some(&e.summary),
@@ -2019,27 +1754,7 @@ fn render_search(c: &Rc<Cal>) {
         .flatten()
         .any(|s| crate::window::folded(s).contains(&query))
     };
-    let ahead = |e: &Event| e.end > now;
-    let mut best: HashMap<(String, String), Event> = HashMap::new();
-    let all = core().events(today() - 366 * DAY, today() + 366 * DAY);
-    for e in all
-        .into_iter()
-        .filter(|e| !hidden.contains(&e.list_href) && hit(e))
-    {
-        let key = (e.list_href.clone(), e.uid.clone());
-        let better = best
-            .get(&key)
-            .is_none_or(|old| match (ahead(&e), ahead(old)) {
-                (true, true) => e.start < old.start,
-                (false, false) => e.start > old.start,
-                (a, _) => a,
-            });
-        if better {
-            best.insert(key, e);
-        }
-    }
-    let mut found: Vec<Event> = best.into_values().collect();
-    found.sort_by_key(|e| (!ahead(e), if ahead(e) { e.start } else { -e.start }));
+    let found = calendar::search(core(), core().local_now(), hit);
 
     c.title.set_title(&gettext("Search"));
     let n = found.len() as u64;
@@ -2130,22 +1845,4 @@ fn agenda_row(i: &Item) -> adw::ActionRow {
         }
     }
     row
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn weeks_start_on_the_locales_day() {
-        let at = |s| todav_core::ical::parse_time(s).unwrap();
-        // Monday first.
-        assert_eq!(week_start_on(at("20261021"), 1), at("20261019")); // a Wednesday
-        assert_eq!(week_start_on(at("20261019"), 1), at("20261019"));
-        assert_eq!(week_start_on(at("20261025"), 1), at("20261019")); // Sunday
-        // Sunday first.
-        assert_eq!(week_start_on(at("20261021"), 0), at("20261018"));
-        assert_eq!(week_start_on(at("20261025"), 0), at("20261025"));
-        assert_eq!(week_start_on(at("20261024"), 0), at("20261018")); // Saturday
-    }
 }

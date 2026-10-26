@@ -107,7 +107,8 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
 
     // Calendars we may write to, grouped by where they are kept; the event's own, or the one
     // used last.
-    let writable = crate::lists::by_place(
+    let writable = todav_app::lists::by_place(
+        core(),
         c.lists
             .borrow()
             .iter()
@@ -145,7 +146,7 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
     // An all-day event's times, should it get some: 9:00 for the default length.
     let (from, to) = if time.all_day {
         let at = 9 * 3600;
-        (at, at + duration("event_duration"))
+        (at, at + prefs::event_duration(core()))
     } else {
         (time.start, time.end)
     };
@@ -237,7 +238,12 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
             let end = if end > start {
                 end
             } else {
-                start + if all { DAY } else { duration("event_duration") }
+                start
+                    + if all {
+                        DAY
+                    } else {
+                        prefs::event_duration(core())
+                    }
             };
             EventTime {
                 start,

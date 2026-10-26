@@ -77,17 +77,7 @@ pub(super) fn setup(c: &Rc<Cal>) {
             let Some(c) = cal() else { return };
             if let Some((day, minute)) = c.hover.take() {
                 let at = week_start(c.anchor.get()) + day * DAY + minute * 60;
-                match i {
-                    Item::Task(t) => plan_at(t, at),
-                    Item::Event(e) => move_event(
-                        e,
-                        EventTime {
-                            start: at,
-                            end: at + drop_length(i) * 60,
-                            all_day: false,
-                        },
-                    ),
-                }
+                apply(i, calendar::slot_drop(core(), i, at));
             }
             show_preview(&c, None);
         },
@@ -98,7 +88,7 @@ pub(super) fn setup(c: &Rc<Cal>) {
         let at = week_start(c.anchor.get()) + day * DAY + minute / 30 * 30 * 60;
         Some(EventTime {
             start: at,
-            end: at + duration("event_duration"),
+            end: at + prefs::event_duration(core()),
             all_day: false,
         })
     });
@@ -114,7 +104,7 @@ pub(super) fn setup(c: &Rc<Cal>) {
         c.hover.set(hover);
         show_preview(
             &c,
-            hover.map(|(day, m)| (&i, (day, m, m + drop_length(&i)))),
+            hover.map(|(day, m)| (&i, (day, m, m + calendar::drop_length(core(), &i)))),
         );
         gdk::DragAction::MOVE
     });
@@ -226,32 +216,7 @@ fn resizing(c: &Rc<Cal>) {
         };
         let day = week_start(c.anchor.get()) + day * DAY;
         let (from, to) = (day + from * 60, day + to * 60);
-        match &i {
-            Item::Event(e) => move_event(
-                e,
-                EventTime {
-                    start: if top { from } else { e.start },
-                    end: if top { e.end } else { to },
-                    all_day: false,
-                },
-            ),
-            // The top is when it starts, the bottom when it is due.
-            Item::Task(t) => {
-                let at = |at| Some(Some(Due { at, all_day: false }));
-                let patch = if top {
-                    TaskPatch {
-                        start: at(from),
-                        ..Default::default()
-                    }
-                } else {
-                    TaskPatch {
-                        due: at(to),
-                        ..Default::default()
-                    }
-                };
-                save(&t.uid, patch);
-            }
-        }
+        apply(&i, calendar::resize(&i, from, to, top));
     });
     c.week_grid.add_controller(drag);
     let motion = gtk::EventControllerMotion::new();
@@ -285,7 +250,7 @@ fn edge_at(c: &Cal, x: f64, y: f64) -> Option<(Item, Geo, bool)> {
         } else {
             return None;
         };
-        let (from, to) = span(i)?;
+        let (from, to) = calendar::span(core(), i)?;
         let day = week + g.day * DAY;
         let real = if top {
             from == day + g.from * 60
@@ -312,19 +277,6 @@ fn rect(width: i32, g: &Geo) -> (f64, f64, f64, f64) {
         (colw / g.cols as f64 - 2.0).max(4.0),
         h - 2.0,
     )
-}
-
-/// Length in minutes of what a dropped item becomes (for the drop preview): its own, else the
-/// default.
-fn drop_length(i: &Item) -> i64 {
-    match i {
-        Item::Task(t) => match (t.start, slot_end(t)) {
-            (Some(s), Some(e)) => (e - s) / 60,
-            _ => duration("task_duration") / 60,
-        },
-        Item::Event(e) if !e.all_day && e.end > e.start => (e.end - e.start) / 60,
-        Item::Event(_) => duration("event_duration") / 60,
-    }
 }
 
 fn draw(c: &Cal, area: &gtk::DrawingArea, cr: &gtk::cairo::Context, w: i32, h: i32) {
@@ -374,60 +326,6 @@ fn draw(c: &Cal, area: &gtk::DrawingArea, cr: &gtk::cairo::Context, w: i32, h: i
     }
 }
 
-/// When an item takes hours, from and to; None for what goes above them.
-fn span(i: &Item) -> Option<(i64, i64)> {
-    match i {
-        Item::Event(e) if !e.all_day => Some((e.start, e.end.max(e.start + 15 * 60))),
-        // Only tasks planned into a slot (a start time) take hours; one just due at a time goes
-        // above with the day's other items, its chip showing the time.
-        Item::Task(t) => match t.start {
-            Some(s) if !t.start_all_day => {
-                Some((s, slot_end(t).unwrap_or(s + duration("task_duration"))))
-            }
-            _ => None,
-        },
-        _ => None,
-    }
-}
-
-/// A timed item's part within one day: (day of the week, from, to in minutes into the day).
-fn segments(i: &Item, start: i64) -> Vec<(i64, i64, i64)> {
-    let Some((from, to)) = span(i) else {
-        return Vec::new();
-    };
-    (0..7)
-        .filter_map(|d| {
-            let day = start + d * DAY;
-            let (a, b) = (from.max(day), to.min(day + DAY));
-            (a < b).then(|| (d, (a - day) / 60, (b - day) / 60))
-        })
-        .collect()
-}
-
-/// Columns for the blocks of one day: overlapping ones side by side.
-fn columns(mut segs: Vec<(usize, i64, i64)>) -> Vec<(usize, usize, usize)> {
-    segs.sort_by_key(|&(_, a, b)| (a, -b));
-    let mut out = Vec::new();
-    let mut cluster: Vec<(usize, i64, usize)> = Vec::new(); // (index, end, column)
-    let mut cluster_end = i64::MIN;
-    let flush = |cluster: &mut Vec<(usize, i64, usize)>, out: &mut Vec<(usize, usize, usize)>| {
-        let cols = cluster.iter().map(|c| c.2 + 1).max().unwrap_or(1);
-        out.extend(cluster.drain(..).map(|(i, _, col)| (i, col, cols)));
-    };
-    for (i, a, b) in segs {
-        if a >= cluster_end {
-            flush(&mut cluster, &mut out);
-        }
-        let col = (0..)
-            .find(|col| !cluster.iter().any(|&(_, end, c)| c == *col && end > a))
-            .unwrap_or(0);
-        cluster.push((i, b, col));
-        cluster_end = cluster_end.max(b);
-    }
-    flush(&mut cluster, &mut out);
-    out
-}
-
 /// Draws the week holding the anchor; returns its end.
 pub(super) fn render(c: &Rc<Cal>) -> i64 {
     let start = week_start(c.anchor.get());
@@ -462,7 +360,7 @@ pub(super) fn render(c: &Rc<Cal>) -> i64 {
     // What has no hours: all-day items, a bar across their days.
     let all_day: Vec<&Item> = items
         .iter()
-        .filter(|i| segments(i, start).is_empty())
+        .filter(|i| calendar::segments(core(), i, start).is_empty())
         .collect();
     let row = days::row(c, start, &all_day, usize::MAX, true, |day| {
         let cell = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -484,13 +382,13 @@ pub(super) fn render(c: &Rc<Cal>) -> i64 {
             .iter()
             .enumerate()
             .flat_map(|(n, i)| {
-                segments(i, start)
+                calendar::segments(core(), i, start)
                     .into_iter()
                     .filter(move |s| s.0 == d)
                     .map(move |(_, a, b)| (n, a, b, d))
             })
             .collect();
-        let laid = columns(
+        let laid = calendar::columns(
             segs.iter()
                 .enumerate()
                 .map(|(k, s)| (k, s.1, s.2))
@@ -575,26 +473,5 @@ fn block(c: &Rc<Cal>, i: &Item, geo: Geo) -> gtk::Widget {
             b.add_css_class("block");
             b.upcast()
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn overlapping_blocks_share_the_width() {
-        // a 9-10, b 9:30-11, c 10-10:30 (beside b), d 12-13 alone.
-        let laid = columns(vec![
-            (0, 540, 600),
-            (1, 570, 660),
-            (2, 600, 630),
-            (3, 720, 780),
-        ]);
-        let at = |i| *laid.iter().find(|l| l.0 == i).unwrap();
-        assert_eq!(at(0), (0, 0, 2));
-        assert_eq!(at(1), (1, 1, 2));
-        assert_eq!(at(2), (2, 0, 2), "c takes a's freed column");
-        assert_eq!(at(3), (3, 0, 1));
     }
 }

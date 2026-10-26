@@ -10,6 +10,14 @@
   probably applies there too: port it or say so. Notav keeps its own configuration and
   credentials; never read or write its files, keyring entries or settings.
 
+## Shared code
+
+- Logic a front-end needs that is not about widgets goes in `todav/app` (`todav-app`), not in a
+  front-end: settings with their defaults, date rules, task and calendar rules, the background
+  service. It returns no text (enums, times, ids); each front-end words and formats it.
+  Android and Windows will use it through `todav/ffi` (planned), so keep its API exportable:
+  synchronous, no closures or generics in what front-ends call.
+
 ## Releases
 
 - Add user-visible changes to `docs/CHANGELOG.md` under `## [Unreleased]`, in the same commit as the
