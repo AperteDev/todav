@@ -1,0 +1,7 @@
+[bindings.kotlin]
+package_name = "dev.aperte.todav.core"
+cdylib_name = "todav_ffi"
+
+[bindings.csharp]
+namespace = "Todav.Core"
+cdylib_name = "todav_ffi"

@@ -1,0 +1,32 @@
+# The bindings for Android and Windows (and later iOS and macOS): the core and todav-app
+# exported with UniFFI. A workspace of its own, so UniFFI and the bundled SQLite stay out of the
+# Linux builds and their packaging. The version is set by scripts/release.py.
+[package]
+name = "todav-ffi"
+version = "1.2.2"
+edition = "2024"
+license = "GPL-3.0-or-later"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "staticlib", "lib"]
+name = "todav_ffi"
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+required-features = ["bindgen"]
+
+[dependencies]
+# The SQLite inside: Android and Windows have none to link to.
+rusqlite = { version = ">=0.38, <0.41", features = ["bundled"] }
+todav-app = { path = "../app" }
+todav-core = { path = "../core" }
+# 0.31: the version uniffi-bindgen-cs (C#) supports as of its v0.11.1.
+uniffi = "0.31"
+
+[features]
+# The Kotlin and Swift generator, as a binary of this crate (`cargo run --features bindgen`).
+bindgen = ["uniffi/cli"]
+
+[workspace]
