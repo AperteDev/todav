@@ -1,6 +1,6 @@
 #!/bin/sh
 # Build todav-ffi for this machine, generate its Kotlin and C# bindings into
-# todav/ffi/target/bindings and run the smoke tests against them (they need Gradle with a JDK 17,
+# todav/ffi/target/bindings and run the smoke tests against them (they need Gradle with a JDK 21,
 # the .NET 8 SDK and msgfmt). The C# generator, uniffi-bindgen-cs, is built into target/tools the
 # first time, at the version matching the UniFFI in todav/ffi/Cargo.toml.
 #

@@ -13,7 +13,7 @@ dependencies { implementation("net.java.dev.jna:jna:5.17.0") }
 val ffi = projectDir.resolve("../..").normalize()
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(21)
     sourceSets["main"].kotlin.srcDirs("src", ffi.resolve("target/bindings/kotlin"))
 }
 
