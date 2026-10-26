@@ -406,7 +406,7 @@ Kotlin + Jetpack Compose on top of the core and `todav-app` via UniFFI (`todav-f
 3. If the connector reports an encrypted Web Push message (UnifiedPush 3 connectors decrypt it before `onMessage`), the bytes are already plaintext; `push_decode` handles both.
 4. Safety net: `WorkManager` (part of AndroidX, acceptable) periodic `SyncWorker` every 30 min with network constraint; plus `sync()` on app foreground.
 5. Registration refresh: a `SyncWorker` run also re-registers push when `push_expires` is within 6 h.
-6. Reminders: no 30-second check as on Linux; an exact alarm (`AlarmManager`) set for the next reminder, which then shows `Service::due_reminders` and sets the next one. Needs a "next reminder at" query in the core.
+6. Reminders: no 30-second check as on Linux; an exact alarm (`AlarmManager`) set for `Todav::next_reminder` (`todav_app::service::next_reminder`, within a week), which then shows `due_reminders` and sets the next one; set again after each sync and change.
 
 **Account setup**: Nextcloud Login Flow v2 (`/index.php/login/v2`) in a Custom Tab yields an app password; store it in `EncryptedSharedPreferences` is deprecated, so use the Android Keystore to wrap it and keep the blob in `SharedPreferences`.
 

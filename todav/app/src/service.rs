@@ -253,6 +253,21 @@ impl Service {
     }
 }
 
+/// How far ahead `next_reminder` looks. A platform that sets an alarm for it sets it again after
+/// a sync or a change, and at least this often.
+pub const LOOKAHEAD: i64 = 7 * 86400;
+
+/// When the next reminder of a task or event goes off after `now` (local time), within
+/// `LOOKAHEAD`: for a platform that wakes up for it (an exact alarm on Android) instead of
+/// checking every 30 seconds. Then `Service::due_reminders` says which went off.
+pub fn next_reminder(c: &Client, now: i64) -> Option<i64> {
+    let to = now + LOOKAHEAD;
+    let tasks = c.reminders(now, to).into_iter().flat_map(|t| t.reminders);
+    let events = c.event_reminders(now, to).into_iter();
+    let events = events.flat_map(|e| e.reminders);
+    tasks.chain(events).filter(|&r| r > now && r <= to).min()
+}
+
 /// Tells the service about settings other devices changed.
 struct Settings(Weak<Service>);
 
@@ -263,5 +278,56 @@ impl ChangeListener for Settings {
         if let Some(s) = self.0.upgrade() {
             s.settings_changed();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use todav_core::{AccountKind, Due, EventTime, TaskPatch};
+
+    #[test]
+    fn the_next_reminder_is_the_soonest_of_tasks_and_events() {
+        let dir = std::env::temp_dir().join(format!("todav-app-{}", std::process::id()));
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let account = c
+            .add_account(
+                AccountKind::Local,
+                String::new(),
+                String::new(),
+                String::new(),
+            )
+            .unwrap();
+        let list = c.create_list(account, "Tasks".into(), "#0082C9".into(), false);
+        let cal = c.create_list(account, "Calendar".into(), "#B6469D".into(), true);
+        let now = c.local_now();
+        assert_eq!(next_reminder(&c, now), None);
+
+        // A task due in two hours, reminded an hour before.
+        let task = c.add_task(list.unwrap(), "Call".into(), None, None, false);
+        let patch = TaskPatch {
+            due: Some(Some(Due {
+                at: now + 7200,
+                all_day: false,
+            })),
+            reminders: Some(vec![-3600]),
+            ..Default::default()
+        };
+        c.update_task(task.unwrap().uid, patch).unwrap();
+        assert_eq!(next_reminder(&c, now), Some(now + 3600));
+
+        // An event in 40 minutes, reminded 15 minutes before: sooner.
+        let time = EventTime {
+            start: now + 2400,
+            end: now + 6000,
+            all_day: false,
+        };
+        c.add_event(cal.unwrap(), "Meet".into(), time, vec![-900])
+            .unwrap();
+        assert_eq!(next_reminder(&c, now), Some(now + 1500));
+        // Past it, the task's comes next; past both, none within the week.
+        assert_eq!(next_reminder(&c, now + 1500), Some(now + 3600));
+        assert_eq!(next_reminder(&c, now + 3600), None);
+        let _ = std::fs::remove_dir_all(dir);
     }
 }

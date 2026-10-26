@@ -77,6 +77,7 @@ catch (TodavException.Exists)
 t.StartService(new Shell(), false);
 Check(!t.CanSync() && t.SyncState() is SyncState.Idle, "service");
 t.DueReminders();
+t.NextReminder();
 
 Check(listener.Changes > 0, "change events");
 Console.WriteLine($"C# bindings: ok ({listener.Changes} change events)");

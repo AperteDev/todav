@@ -789,6 +789,13 @@ impl Todav {
         }
     }
 
+    /// When the next reminder goes off (local time), within a week: set an alarm for it, and
+    /// again after a sync or a change. Works without the service.
+    pub fn next_reminder(&self) -> Option<i64> {
+        let now = self.c().local_now();
+        todav_app::service::next_reminder(self.c(), now)
+    }
+
     /// Reminders that went off since the last call.
     pub fn due_reminders(&self) -> DueReminders {
         match self.service() {

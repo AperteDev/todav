@@ -77,6 +77,7 @@ fun main() {
     }, false)
     check(!t.canSync() && t.syncState() == SyncState.Idle)
     t.dueReminders()
+    t.nextReminder()
 
     check(changes > 0) { "no change events" }
     println("Kotlin bindings: ok ($changes change events)")
