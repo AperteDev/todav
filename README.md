@@ -166,7 +166,7 @@ Todav is under active development. Planned:
 - **Windows app**
 
 Ideas, questions and bug reports are welcome: open an
-[issue](https://github.com/AperteDev/todav/issues). See [CONTRIBUTING.md](CONTRIBUTING.md) before
+[issue](https://github.com/AperteDev/todav/issues). See [CONTRIBUTING.md](docs/CONTRIBUTING.md) before
 working on a pull request.
 
 ## Translations
@@ -175,7 +175,7 @@ Todav speaks English, Polish, German, French, Spanish, Italian and Brazilian Por
 follows your GNOME language. English and Polish are reviewed; the others are first drafts, so
 corrections from native speakers are very welcome. Missing your language? Ask for it in an
 [issue](https://github.com/AperteDev/todav/issues/new?template=translation.yml), or translate it
-yourself (see [CONTRIBUTING.md](CONTRIBUTING.md#translations)).
+yourself (see [CONTRIBUTING.md](docs/CONTRIBUTING.md#translations)).
 
 ## Development
 
@@ -214,7 +214,7 @@ make -f .copr/Makefile srpm outdir=$PWD/target/rpm spec=$PWD/todav/linux/rpm/tod
 
 Every push is checked and packaged by [CI](.github/workflows/ci.yml); releases are made by the
 manual [Release](.github/workflows/release.yml) workflow and listed in the
-[changelog](CHANGELOG.md).
+[changelog](docs/CHANGELOG.md).
 
 ## License
 

@@ -83,7 +83,7 @@ appstreamcli validate --no-net %{buildroot}%{_metainfodir}/dev.aperte.Todav.meta
 
 %files -f %{name}.lang
 %license LICENSE LICENSE.dependencies cargo-vendor.txt
-%doc README.md CHANGELOG.md
+%doc README.md docs/CHANGELOG.md
 %{_bindir}/todav-linux
 %{_datadir}/applications/dev.aperte.Todav.desktop
 %{_metainfodir}/dev.aperte.Todav.metainfo.xml

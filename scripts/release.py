@@ -96,7 +96,7 @@ def main() -> None:
     date = datetime.date.today().isoformat()
 
     # Keep a Changelog: `## [Unreleased]` and `## [x.y.z] - date` sections, links at the end.
-    changelog = ROOT / "CHANGELOG.md"
+    changelog = ROOT / "docs" / "CHANGELOG.md"
     text = changelog.read_text()
     if f"\n## [{version}]" in text:
         fail(f"CHANGELOG.md already has a {version} section")

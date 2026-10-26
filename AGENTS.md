@@ -12,7 +12,7 @@
 
 ## Releases
 
-- Add user-visible changes to `CHANGELOG.md` under `## [Unreleased]`, in the same commit as the
+- Add user-visible changes to `docs/CHANGELOG.md` under `## [Unreleased]`, in the same commit as the
   change. It follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/): `Added`,
   `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`; version links at the end.
 - Releases are cut by the manual Release workflow (`.github/workflows/release.yml`): with the

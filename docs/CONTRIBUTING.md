@@ -25,7 +25,7 @@ When one has been agreed:
 
 ## Translations
 
-Translations live in [`po/`](po), one gettext catalog per language, shared by the app, its
+Translations live in [`po/`](../po), one gettext catalog per language, shared by the app, its
 UI files, the GNOME Shell extension, the desktop file and the metainfo. Corrections to an
 existing language and new languages are welcome; as for code, open a
 [translation issue](https://github.com/AperteDev/todav/issues/new?template=translation.yml) first,
@@ -40,4 +40,4 @@ so two people don't translate the same thing.
   your language, e.g. `LANGUAGE=pl target/debug/todav-linux`.
 
 By contributing, you agree that your contribution is licensed under the
-[GPL-3.0-or-later](LICENSE).
+[GPL-3.0-or-later](../LICENSE).
