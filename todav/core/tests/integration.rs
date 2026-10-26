@@ -4,7 +4,7 @@
 
 use std::time::Duration;
 use todav_core::caldav::{Dav, SyncResult};
-use todav_core::{Client, now};
+use todav_core::{AccountKind, Client, now};
 
 fn get(k: &str) -> Option<String> {
     let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../.env"))
@@ -21,6 +21,15 @@ fn env() -> (String, String, String) {
         get("TODAV_USER").expect("TODAV_USER"),
         get("TODAV_PASS").expect("TODAV_PASS"),
     )
+}
+
+/// The test account, added to `c` and connected; its id.
+fn connect(c: &Client, url: &str, user: &str, pass: &str) -> i64 {
+    let id = c
+        .add_account(AccountKind::Nextcloud, url.into(), user.into(), "".into())
+        .unwrap();
+    c.connect(id, pass.into()).unwrap();
+    id
 }
 
 fn sql(db: &str, sql: &str) {
@@ -58,7 +67,8 @@ impl Fixture {
     fn with(name: &str, comps: &[&str]) -> Fixture {
         let (url, user, pass) = env();
         let dav = Dav::new(&url, &user, &pass);
-        let href = format!("/remote.php/dav/calendars/{user}/it-{name}/");
+        // As the client keys lists: the full URL.
+        let href = dav.absolute(&format!("/remote.php/dav/calendars/{user}/it-{name}/"));
         let comps: String = comps
             .iter()
             .map(|c| format!(r#"<c:comp name="{c}"/>"#))
@@ -81,9 +91,8 @@ impl Fixture {
             let dir = std::env::temp_dir().join(format!("todav-it-{name}-{dev}-{}", now()));
             let dir = dir.to_string_lossy().to_string();
             let c = Client::open(dir.clone()).unwrap();
-            c.set_account(url.clone(), user.clone(), pass.clone())
-                .unwrap();
-            c.sync().unwrap();
+            connect(&c, &url, &user, &pass);
+            c.sync().into_result().unwrap();
             (c, format!("{dir}/core.sqlite"))
         };
         let ((a, a_db), (b, _)) = (client("a"), client("b"));
@@ -109,7 +118,7 @@ fn add_on_a_shows_on_b_and_external_edits_arrive() {
             false,
         )
         .unwrap();
-    f.a.sync().unwrap();
+    f.a.sync().into_result().unwrap();
     f.b.sync_list(f.href.clone()).unwrap();
     let on_b = f.b.task(t.uid.clone()).expect("task synced to b");
     assert_eq!(
@@ -132,7 +141,7 @@ fn add_on_a_shows_on_b_and_external_edits_arrive() {
 
     // Tick on a: the foreign property survives the round trip.
     f.a.set_done(t.uid.clone(), true).unwrap();
-    f.a.sync().unwrap();
+    f.a.sync().into_result().unwrap();
     let (_, ics) = f.dav.get(&href).unwrap().unwrap();
     assert!(
         ics.contains("X-OTHER:keep")
@@ -142,10 +151,10 @@ fn add_on_a_shows_on_b_and_external_edits_arrive() {
     );
 
     // Delete on b reaches a.
-    f.b.sync().unwrap();
+    f.b.sync().into_result().unwrap();
     f.b.delete_task(t.uid.clone()).unwrap();
-    f.b.sync().unwrap();
-    f.a.sync().unwrap();
+    f.b.sync().into_result().unwrap();
+    f.a.sync().into_result().unwrap();
     assert!(f.a.task(t.uid).is_none());
 }
 
@@ -174,28 +183,28 @@ fn a_refused_task_waits_for_an_edit_and_the_rest_syncs() {
     };
     f.a.update_task(bad.clone(), dates(true)).unwrap();
 
-    let report = f.a.sync().unwrap();
+    let report = f.a.sync().into_result().unwrap();
     let refused: Vec<_> = report.refused.iter().map(|r| r.summary.as_str()).collect();
     assert_eq!(refused, ["Bad dates"]);
     assert!(report.refused[0].error.contains("DTSTART"), "{report:?}");
     assert!(f.a.task(bad.clone()).unwrap().sync_error.is_some());
-    f.b.sync().unwrap();
+    f.b.sync().into_result().unwrap();
     assert!(f.b.task(good.clone()).is_some(), "the rest synced");
     assert!(f.b.task(bad.clone()).is_none());
 
     // Not sent again as it is; an edit the server takes goes up and clears the error.
-    assert!(f.a.sync().unwrap().refused.is_empty());
+    assert!(f.a.sync().into_result().unwrap().refused.is_empty());
     f.a.update_task(bad.clone(), dates(false)).unwrap();
-    assert!(f.a.sync().unwrap().refused.is_empty());
+    assert!(f.a.sync().into_result().unwrap().refused.is_empty());
     assert_eq!(f.a.task(bad.clone()).unwrap().sync_error, None);
-    f.b.sync().unwrap();
+    f.b.sync().into_result().unwrap();
     assert!(f.b.task(bad.clone()).is_some());
 
     // Gone again: dated today, they would show in the account's calendars.
     for uid in [bad, good] {
         f.a.delete_task(uid).unwrap();
     }
-    f.a.sync().unwrap();
+    f.a.sync().into_result().unwrap();
 }
 
 #[test]
@@ -204,8 +213,8 @@ fn offline_tick_vs_edit_resolves_to_done() {
     let t =
         f.a.add_task(f.href.clone(), "Buy bread".into(), None, None, false)
             .unwrap();
-    f.a.sync().unwrap();
-    f.b.sync().unwrap();
+    f.a.sync().into_result().unwrap();
+    f.b.sync().into_result().unwrap();
 
     // a ticks, b renames later (newer LAST-MODIFIED) — both offline, then both sync.
     f.a.set_done(t.uid.clone(), true).unwrap();
@@ -218,10 +227,10 @@ fn offline_tick_vs_edit_resolves_to_done() {
         },
     )
     .unwrap();
-    f.a.sync().unwrap();
-    let r = f.b.sync().unwrap();
+    f.a.sync().into_result().unwrap();
+    let r = f.b.sync().into_result().unwrap();
     assert_eq!(r.conflicts, 1);
-    f.a.sync().unwrap();
+    f.a.sync().into_result().unwrap();
     for c in [&f.a, &f.b] {
         let t = c.task(t.uid.clone()).unwrap();
         assert_eq!((t.summary.as_str(), t.done), ("Buy rye bread", true));
@@ -234,11 +243,11 @@ fn removed_remotely_disappears() {
     let t =
         f.a.add_task(f.href.clone(), "Gone soon".into(), None, None, false)
             .unwrap();
-    f.a.sync().unwrap();
+    f.a.sync().into_result().unwrap();
     f.dav
         .delete(&format!("{}{}.ics", f.href, t.uid), None, None)
         .unwrap();
-    f.a.sync().unwrap();
+    f.a.sync().into_result().unwrap();
     assert!(f.a.task(t.uid).is_none());
 }
 
@@ -250,7 +259,7 @@ fn invalid_sync_token_falls_back_to_full_resync() {
         let t =
             f.a.add_task(f.href.clone(), "Stale".into(), None, None, false)
                 .unwrap();
-        f.a.sync().unwrap();
+        f.a.sync().into_result().unwrap();
         f.dav
             .delete(&format!("{}{}.ics", f.href, t.uid), None, None)
             .unwrap();
@@ -258,7 +267,7 @@ fn invalid_sync_token_falls_back_to_full_resync() {
         put_remote(&f.dav, &f.href, &fresh, "Fresh");
 
         sql(&f.a_db, &format!("UPDATE lists SET sync_token = '{bad}'"));
-        f.a.sync().unwrap();
+        f.a.sync().into_result().unwrap();
         assert!(f.a.task(t.uid).is_none(), "{bad}: deleted task survived");
         assert_eq!(f.a.task(fresh).unwrap().summary, "Fresh", "{bad}");
     }
@@ -346,9 +355,9 @@ fn lists_are_created_renamed_and_deleted() {
     let (url, user, pass) = env();
     let dir = std::env::temp_dir().join(format!("todav-it-lists-{}", now()));
     let c = Client::open(dir.to_string_lossy().to_string()).unwrap();
-    c.set_account(url, user, pass).unwrap();
+    let id = connect(&c, &url, &user, &pass);
     let href = c
-        .create_list("it-new & <list>".into(), "#B6469D".into(), false)
+        .create_list(id, "it-new & <list>".into(), "#B6469D".into(), false)
         .unwrap();
     let find = || c.lists().into_iter().find(|l| l.href == href);
     let l = find().expect("the new list is here at once");
@@ -360,7 +369,7 @@ fn lists_are_created_renamed_and_deleted() {
 
     c.edit_list(href.clone(), "it-renamed".into(), "#0082C9".into())
         .unwrap();
-    c.sync().unwrap();
+    c.sync().into_result().unwrap();
     let l = find().unwrap();
     assert_eq!(
         (l.display_name.as_str(), l.color.as_deref()),
@@ -373,7 +382,7 @@ fn lists_are_created_renamed_and_deleted() {
     c.delete_list(href.clone()).unwrap();
     assert!(find().is_none());
     assert!(!c.undo(None).unwrap(), "nothing left to undo in it");
-    c.sync().unwrap();
+    c.sync().into_result().unwrap();
     assert!(find().is_none(), "gone on the server");
 }
 
@@ -383,18 +392,18 @@ fn a_setting_reaches_a_new_device() {
     let device = |name: &str| {
         let dir = std::env::temp_dir().join(format!("todav-it-settings-{name}-{}", now()));
         let c = Client::open(dir.to_string_lossy().to_string()).unwrap();
-        c.set_account(url.clone(), user.clone(), pass.clone())
-            .unwrap();
+        let id = connect(&c, &url, &user, &pass);
+        c.set_settings_account(Some(id)).unwrap();
         c
     };
     // A key of its own: a real setting would reach the account's real devices.
     let value = now().to_string();
     let a = device("a");
-    a.sync().unwrap();
+    a.sync().into_result().unwrap();
     a.set_setting("it_probe".into(), value.clone()).unwrap();
-    a.sync().unwrap();
+    a.sync().into_result().unwrap();
     let b = device("b");
-    b.sync().unwrap();
+    b.sync().into_result().unwrap();
     assert_eq!(b.setting("it_probe".into()), Some(value));
 }
 
@@ -474,13 +483,13 @@ fn events_sync_with_their_zone_and_recurrence() {
         only,
     )
     .unwrap();
-    f.a.sync().unwrap();
+    f.a.sync().into_result().unwrap();
     let (_, server) = f.dav.get(&href).unwrap().unwrap();
     assert!(
         server.contains("SUMMARY:Only this one") && server.matches("RECURRENCE-ID").count() == 2,
         "{server}"
     );
-    f.b.sync().unwrap();
+    f.b.sync().into_result().unwrap();
     let on_b = f.b.events(rid, rid + 1);
     assert_eq!(
         on_b.iter().map(|e| e.summary.as_str()).collect::<Vec<_>>(),
@@ -497,7 +506,7 @@ fn events_sync_with_their_zone_and_recurrence() {
     let uid =
         f.a.add_event(f.href.clone(), "Lunch".into(), time, vec![-600])
             .unwrap();
-    f.a.sync().unwrap();
+    f.a.sync().into_result().unwrap();
     let (_, lunch) = f.dav.get(&format!("{}{uid}.ics", f.href)).unwrap().unwrap();
     assert!(
         lunch.contains("DTSTART;TZID=America/New_York:20261020T120000")
@@ -507,7 +516,7 @@ fn events_sync_with_their_zone_and_recurrence() {
     );
     f.a.delete_event(f.href.clone(), uid.clone(), None, todav_core::Scope::All)
         .unwrap();
-    f.a.sync().unwrap();
+    f.a.sync().into_result().unwrap();
     assert!(
         f.dav
             .get(&format!("{}{uid}.ics", f.href))

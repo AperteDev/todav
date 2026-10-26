@@ -8,7 +8,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use todav_core::{CategoryGroup, Due, Sort, Task, TaskPatch};
+use todav_core::{AccountKind, CategoryGroup, Due, Sort, Task, TaskPatch};
 
 /// Libadwaita only styles plain buttons as pills; round the ends of the sign-in split button to match.
 /// The category section header turns its arrow like an expander row, without a "pressed" look.
@@ -135,13 +135,9 @@ struct Ui {
     /// Task whose row pulses (opened from the extension), until when: rebuilds in between, as
     /// after the sync that showing the window starts, pulse the new row.
     flash: RefCell<Option<(String, std::time::Instant)>>,
-    /// Welcome page: how to use Todav, then GNOME Online Accounts or a server to sign in to.
-    welcome: adw::NavigationView,
-    conn: Rc<crate::connection::Connection>,
-    ntfy: (gtk::DropDown, adw::EntryRow),
-    connect_goa: gtk::Button,
-    login: adw::SplitButton,
-    cancel_login: gtk::Button,
+    /// Welcome page: adding the first account (`add_account`), made anew each time it shows.
+    welcome: adw::Bin,
+    add_account: RefCell<Option<Rc<crate::add_account::AddAccount>>>,
     last_error: RefCell<String>,
 }
 
@@ -310,37 +306,87 @@ pub fn present(app: &adw::Application) {
         UI.with(|u| *u.borrow_mut() = Some(ui.clone()));
         ui
     });
-    let ready = crate::ready();
-    ui.stack
-        .set_visible_child_name(if ready { "main" } else { "login" });
-    if ready {
+    if crate::ready() {
+        ui.stack.set_visible_child_name("main");
         refresh_lists(&ui);
+    } else if ui.add_account.borrow().is_none() {
+        welcome(&ui);
     }
     ui.window.present();
 }
 
-/// Disconnected: back to the welcome page, at its first step; in local mode, to the lists
-/// on this device instead.
+/// The welcome page, made anew (GNOME Online Accounts may have changed); the window shows the
+/// first account's lists once it is added.
+fn welcome(ui: &Rc<Ui>) {
+    let add = crate::add_account::new(true, |_| account_changed());
+    ui.welcome.set_child(Some(&add.root));
+    ui.add_account.replace(Some(add));
+    ui.current.take();
+    ui.stack.set_visible_child_name("login");
+    refresh_lists(ui); // empties the sidebar
+}
+
+/// No account left: back to the welcome page.
 pub fn show_welcome() {
-    if crate::local_mode() {
-        return account_changed();
-    }
     if let Some(ui) = ui() {
-        ui.current.take();
-        ui.welcome.pop_to_tag("choose");
-        ui.stack.set_visible_child_name("login");
-        refresh_lists(&ui); // empties the sidebar
+        welcome(&ui);
     }
 }
 
-/// The account was replaced (or one connected after a disconnect): show its lists once they
-/// arrive.
+/// An account came, went, or was switched on or off: show the lists there are now.
 pub fn account_changed() {
     if let Some(ui) = ui() {
         ui.current.take();
+        ui.add_account.take();
         ui.stack.set_visible_child_name("main");
         refresh_lists(&ui);
     }
+}
+
+/// The lists' grouping or order changed (accounts reordered or renamed): the sidebar anew, on
+/// the same list.
+pub fn lists_changed() {
+    if let Some(ui) = ui() {
+        refresh_lists(&ui);
+    }
+}
+
+thread_local! {
+    /// The banners on the Tasks and Calendar pages saying which accounts are not connected.
+    static BANNERS: RefCell<Vec<adw::Banner>> = const { RefCell::new(Vec::new()) };
+}
+
+pub fn add_banner(banner: adw::Banner) {
+    BANNERS.with_borrow_mut(|b| b.push(banner));
+    update_banners();
+}
+
+/// Switched-on Nextcloud accounts without a connection (no password in the keyring, the GNOME
+/// Online Accounts account gone): their lists are here, nothing syncs.
+pub fn disconnected() -> Vec<todav_core::Account> {
+    let mut v = core().accounts();
+    v.retain(|a| a.enabled && a.kind == AccountKind::Nextcloud && !core().connected(a.id));
+    v
+}
+
+pub fn update_banners() {
+    let off = disconnected();
+    let title = match off.as_slice() {
+        [] => String::new(),
+        [a] => gettext("{name} is not connected").replace("{name}", &crate::account_name(a)),
+        _ => ngettext(
+            "{n} account is not connected",
+            "{n} accounts are not connected",
+            off.len() as u64,
+        )
+        .replace("{n}", &off.len().to_string()),
+    };
+    BANNERS.with_borrow(|banners| {
+        for b in banners {
+            b.set_title(&title);
+            b.set_revealed(!off.is_empty());
+        }
+    });
 }
 
 /// A sync button's icon, or its spinner while syncing.
@@ -603,14 +649,10 @@ fn build(app: &adw::Application) -> Rc<Ui> {
         focus_sub: RefCell::new(None),
         flash: RefCell::new(None),
         welcome: get(&b, "welcome"),
-        conn: crate::connection::Connection::new(true, None),
-        ntfy: (get(&b, "ntfy_scheme"), get(&b, "ntfy")),
-        connect_goa: get(&b, "connect_goa"),
-        login: get(&b, "login"),
-        cancel_login: get(&b, "cancel_login"),
+        add_account: RefCell::new(None),
         last_error: RefCell::new(String::new()),
     });
-    ui.conn.attach(&get(&b, "login_group"));
+    add_banner(get(&b, "banner"));
     connect(&ui, &b);
     let views = get(&b, "views");
     connect_search(&ui, &get(&b, "task_search"), &get(&b, "task_query"), &views);
@@ -790,46 +832,16 @@ fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
         }
     });
 
+    // The banner's "Sign In": the first account not connected, in Preferences.
     let weak = Rc::downgrade(ui);
-    ui.login.connect_clicked(move |_| {
-        if let Some(ui) = weak.upgrade() {
-            start_login(&ui, false);
-        }
-    });
-    let weak = Rc::downgrade(ui);
-    ui.connect_goa.connect_clicked(move |_| {
-        if let Some(ui) = weak.upgrade() {
-            connect_goa(&ui);
-        }
-    });
-    connect_welcome(ui, b);
-    let weak = Rc::downgrade(ui);
-    let copy = gio::SimpleAction::new("copy-login", None);
-    copy.connect_activate(move |_, _| {
-        if let Some(ui) = weak.upgrade() {
-            start_login(&ui, true);
-        }
-    });
-    ui.window.add_action(&copy);
-
-    let weak = Rc::downgrade(ui);
-    let password = gio::SimpleAction::new("password-login", None);
-    password.connect_activate(move |_, _| {
+    let fix = gio::SimpleAction::new("fix-account", None);
+    fix.connect_activate(move |_, _| {
         let Some(ui) = weak.upgrade() else { return };
-        let server = url_text(&ui.conn.server);
-        if server.is_empty() {
-            toast(&no_server());
-            return;
+        if let Some(a) = disconnected().first() {
+            crate::settings::present_account(&ui.window, a.id);
         }
-        let u = ui.clone();
-        password_login(&ui.window, server, move |c| {
-            let ui = u.clone();
-            glib::spawn_future_local(async move {
-                connect_with(&ui, crate::Target::Manual(c)).await;
-            });
-        });
     });
-    ui.window.add_action(&password);
+    ui.window.add_action(&fix);
 
     let weak = Rc::downgrade(ui);
     let prefs = gio::SimpleAction::new("preferences", None);
@@ -878,69 +890,6 @@ fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
         })),
     ));
     ui.split.add_controller(keys);
-
-    let weak = Rc::downgrade(ui);
-    ui.cancel_login.connect_clicked(move |_| {
-        cancel_login(); // the running sign-in sees it is stale and stops
-        if let Some(ui) = weak.upgrade() {
-            reset_login(&ui);
-        }
-    });
-}
-
-/// The welcome page's first step: GNOME Online Accounts or a server lead to the second, where
-/// the account is picked or signed in to; "On this device only" starts local mode at once.
-fn connect_welcome(ui: &Rc<Ui>, b: &gtk::Builder) {
-    let page: adw::NavigationPage = get(b, "connect_page");
-    let status: adw::StatusPage = get(b, "connect_status");
-    let use_goa: adw::ActionRow = get(b, "use_goa");
-    // The switch is the choice made on the first step.
-    ui.conn.goa.set_visible(false);
-    match ui.conn.account_names().as_slice() {
-        [] => use_goa.set_subtitle(&gettext(
-            "No Nextcloud account in Settings → Online Accounts",
-        )),
-        names => use_goa.set_subtitle(&names.join(", ")),
-    }
-    use_goa.set_sensitive(ui.conn.has_accounts());
-
-    let open = {
-        let ui = ui.clone();
-        move |goa: bool| {
-            ui.conn.goa.set_active(goa);
-            // Shown even for one account, as what Connect connects to.
-            ui.conn.account.set_visible(goa);
-            ui.connect_goa.set_visible(goa);
-            ui.login.set_visible(!goa);
-            if goa {
-                page.set_title(&gettext("GNOME Online Accounts"));
-                status.set_icon_name(Some("goa-panel-symbolic"));
-                status.set_description(Some(&gettext(
-                    "Connect with a Nextcloud account from GNOME Settings",
-                )));
-            } else {
-                page.set_title(&gettext("Nextcloud Server"));
-                status.set_icon_name(Some("network-server-symbolic"));
-                status.set_description(Some(&gettext(
-                    "Sign in to your Nextcloud; Todav gets an app password of its own",
-                )));
-            }
-            ui.welcome.push_by_tag("connect");
-        }
-    };
-    let o = open.clone();
-    use_goa.connect_activated(move |_| o(true));
-    get::<adw::ActionRow>(b, "use_server").connect_activated(move |_| open(false));
-    get::<adw::ActionRow>(b, "use_local").connect_activated(|_| crate::lists::start_local());
-
-    // Back to the first step: a sign-in waiting for the browser stops.
-    let weak = Rc::downgrade(ui);
-    ui.welcome.connect_popped(move |_, _| {
-        cancel_login();
-        if let Some(ui) = weak.upgrade() {
-            reset_login(&ui);
-        }
-    });
 }
 
 /// What every way of signing in says when the server field is empty.
@@ -962,73 +911,12 @@ pub fn url_text((scheme, row): &(gtk::DropDown, adw::EntryRow)) -> String {
     format!("{scheme}://{host}")
 }
 
-/// Sign in from the welcome page with the browser (Login Flow v2); `copy` puts the login link on
-/// the clipboard instead of opening the browser.
-fn start_login(ui: &Rc<Ui>, copy: bool) {
-    let server = url_text(&ui.conn.server);
-    if server.is_empty() {
-        toast(&no_server());
-        return;
-    }
-    ui.login.set_sensitive(false);
-    ui.login.set_label(&if copy {
-        gettext("Waiting for Sign-In…")
-    } else {
-        gettext("Waiting for Browser…")
-    });
-    ui.cancel_login.set_visible(true);
-    let ui = ui.clone();
-    glib::spawn_future_local(async move {
-        match browser_login(server, copy).await {
-            Ok(Some(c)) => connect_with(&ui, crate::Target::Manual(c)).await,
-            // Cancelled: Cancel already reset the page, which may be waiting for a new sign-in.
-            Ok(None) => return,
-            Err(e) => ui.toasts.add_toast(note(&e)),
-        }
-        reset_login(&ui);
-    });
-}
-
-/// Connect from the welcome page with the chosen GNOME Online Accounts account.
-fn connect_goa(ui: &Rc<Ui>) {
-    let Some(account) = ui.conn.chosen() else {
-        return;
-    };
-    ui.connect_goa.set_sensitive(false);
-    let ui = ui.clone();
-    glib::spawn_future_local(async move {
-        connect_with(&ui, crate::Target::Goa(account)).await;
-        ui.connect_goa.set_sensitive(true);
-    });
-}
-
-async fn connect_with(ui: &Rc<Ui>, target: crate::Target) {
-    // Left empty: a synced ntfy server, if any, comes with the first sync.
-    let ntfy = url_text(&ui.ntfy);
-    if !ntfy.is_empty() {
-        let _ = core().set_setting("ntfy_url".into(), ntfy);
-    }
-    match crate::switch_account(target).await {
-        Ok(()) => {
-            ui.stack.set_visible_child_name("main");
-            refresh_lists(ui);
-        }
-        Err(e) => ui.toasts.add_toast(note(&e)),
-    }
-}
-
 /// Bumped on every sign-in and on cancel; a sign-in only goes on while its number is current.
 static LOGIN_ATTEMPT: AtomicU64 = AtomicU64::new(0);
 
 /// Stop a running `browser_login`; it then returns `Ok(None)`.
 pub fn cancel_login() {
     LOGIN_ATTEMPT.fetch_add(1, Ordering::SeqCst);
-}
-
-fn reset_login(ui: &Ui) {
-    ui.login.set_sensitive(true);
-    ui.login.set_label(&gettext("Sign In with Browser"));
-    ui.cancel_login.set_visible(false);
 }
 
 /// Login Flow v2: open the browser (or copy the link) and wait until the user approves.
@@ -1083,17 +971,21 @@ pub async fn browser_login(
 pub fn password_login(
     parent: &impl IsA<gtk::Widget>,
     server: String,
+    login_name: Option<String>,
     done: impl Fn(todav_core::Credentials) + 'static,
 ) {
     let b = view!("password-login");
+    let known = login_name;
     let dialog: adw::Dialog = get(&b, "dialog");
     let user: adw::EntryRow = get(&b, "user");
     let password: adw::PasswordEntryRow = get(&b, "password");
     let sign_in: gtk::Button = get(&b, "sign_in");
     let error: adw::Banner = get(&b, "error");
-    // Signing in again usually keeps the login name.
-    if let Some(a) = core().account().filter(|a| a.url == server) {
-        user.set_text(&a.user);
+    // Signing in again keeps the login name.
+    if let Some(name) = &known {
+        user.set_text(name);
+        user.set_sensitive(false);
+        dialog.set_property("focus-widget", &password);
     }
     let filled = {
         let (user, password, sign_in) = (user.clone(), password.clone(), sign_in.clone());
@@ -1137,13 +1029,14 @@ pub fn password_login(
 }
 
 fn refresh_lists(ui: &Rc<Ui>) {
-    // Nothing to sync without an account (local mode): the sync buttons are greyed out.
+    // Nothing to sync without a connected account: the sync buttons are greyed out.
     if let Some(sync) = gio::Application::default()
         .and_then(|a| a.lookup_action("sync"))
         .and_downcast::<gio::SimpleAction>()
     {
-        sync.set_enabled(core().connected());
+        sync.set_enabled(crate::can_sync());
     }
+    update_banners();
     let lists = crate::lists::by_place(core().lists());
     let pages = pages(&lists);
     let valid = |h: &str| pages.iter().any(|(p, _)| *p == h) || lists.iter().any(|l| l.href == h);

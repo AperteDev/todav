@@ -1,3 +1,4 @@
+mod account;
 pub mod caldav;
 mod config;
 mod event;
@@ -15,11 +16,13 @@ mod undo;
 use caldav::Dav;
 use ical::Calendar;
 use rusqlite::Connection;
+use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
 use store::{Kind, RawObject};
 use undo::{Before, Journal};
 
+pub use account::{Account, AccountKind};
 pub use config::{CategoryGroup, CategoryMeta, DoneView, Sort};
 pub use event::{Event, EventPatch, EventTime, Repeat, Scope};
 pub use login::{Credentials, LoginFlow, login_flow_poll, login_flow_start, password_login};
@@ -38,8 +41,10 @@ pub struct List {
     pub holds_events: bool,
     /// We may change it (shared read-only calendars and Birthdays may not).
     pub writable: bool,
-    /// Kept on this device only, never synced (`store::LOCAL`).
+    /// Kept on this device only, never synced (`store::LOCAL`): the local account's.
     pub local: bool,
+    /// The account it belongs to (`Account::id`).
+    pub account: i64,
 }
 
 /// Something in a list; hidden with it (see `shown`).
@@ -65,14 +70,21 @@ impl InList for Event {
     }
 }
 
-/// Local lists and what is in them are hidden while local mode (the `local_mode` setting) is
-/// off; nothing is deleted, turning it on shows them again.
+/// The lists of a switched-off account and what is in them are hidden; nothing is deleted,
+/// switching it on shows them again.
 fn shown<T: InList>(db: &Connection, mut v: Vec<T>) -> Vec<T> {
-    let on = store::kv_get(db, "setting_local_mode").ok().flatten();
-    if on.as_deref() != Some("true") {
-        v.retain(|x| !x.list_href().starts_with(store::LOCAL));
+    let hidden = store::hidden(db).unwrap_or_default();
+    if !hidden.is_empty() {
+        v.retain(|x| !hidden.contains(x.list_href()));
     }
     v
+}
+
+/// Whether `stored`, a list's href kept in a setting, is list `href`. Todav 1.2 kept the
+/// server's path, without the origin it has now (`Dav::absolute`); one synced from a device
+/// still running it matches the list at that path.
+pub fn same_list(stored: &str, href: &str) -> bool {
+    stored == href || (stored.starts_with('/') && href.ends_with(stored))
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -132,12 +144,6 @@ pub struct Due {
     pub all_day: bool,
 }
 
-#[derive(Debug, Clone)]
-pub struct Account {
-    pub url: String,
-    pub user: String,
-}
-
 /// What the Nextcloud server says about itself (`status.php`).
 #[derive(Debug, Clone, PartialEq)]
 pub struct ServerInfo {
@@ -156,7 +162,8 @@ pub trait ChangeListener: Send + Sync {
 
 pub struct Client {
     db: Mutex<Connection>,
-    dav: Mutex<Option<Arc<Dav>>>,
+    /// Connected accounts by id (`connect`).
+    dav: Mutex<HashMap<i64, Arc<Dav>>>,
     listeners: Mutex<Vec<Box<dyn ChangeListener>>>,
     sync_lock: Mutex<()>,
     /// Bumped by `stop_listening`; a `listen` call returns once it differs from the value it started with.
@@ -204,7 +211,7 @@ impl Client {
         let db = store::open(&format!("{data_dir}/core.sqlite"))?;
         Ok(Client {
             db: Mutex::new(db),
-            dav: Mutex::new(None),
+            dav: Mutex::new(HashMap::new()),
             listeners: Mutex::new(Vec::new()),
             sync_lock: Mutex::new(()),
             listen_gen: AtomicU64::new(0),
@@ -397,63 +404,6 @@ impl Client {
         self.emit(&from, vec![uid.clone()]);
         self.emit(&to, vec![uid]);
         Ok(())
-    }
-
-    /// The password is kept in memory only; front-ends keep it in the platform keyring.
-    pub fn set_account(&self, url: String, user: String, app_password: String) -> Result<()> {
-        let db = self.db.lock().unwrap();
-        if store::kv_get(&db, "account_url")?.as_deref() != Some(&url)
-            || store::kv_get(&db, "account_user")?.as_deref() != Some(&user)
-        {
-            // Different account: its copy belongs to the old one (lists on this device stay).
-            db.execute_batch(&format!(
-                "DELETE FROM tasks WHERE list_href NOT LIKE '{0}%'; DELETE FROM lists WHERE href NOT LIKE '{0}%';
-                 DELETE FROM moved;
-                 DELETE FROM kv WHERE key LIKE 'config_%' OR key IN ('push_resource', 'conflict_log', 'last_sync');",
-                store::LOCAL
-            ))?;
-        }
-        store::kv_set(&db, "account_url", &url)?;
-        store::kv_set(&db, "account_user", &user)?;
-        *self.dav.lock().unwrap() = Some(Arc::new(Dav::new(&url, &user, &app_password)));
-        Ok(())
-    }
-
-    pub fn account(&self) -> Option<Account> {
-        let db = self.db.lock().unwrap();
-        Some(Account {
-            url: store::kv_get(&db, "account_url").ok()??,
-            user: store::kv_get(&db, "account_user").ok()??,
-        })
-    }
-
-    /// Connected for this run: `set_account` gave the password. The account alone (`account`)
-    /// stays remembered without one, e.g. when the keyring no longer has it.
-    pub fn connected(&self) -> bool {
-        self.dav.lock().unwrap().is_some()
-    }
-
-    /// Forget the account and its local copy (keeps device keys and the local lists).
-    pub fn logout(&self) -> Result<()> {
-        let _ = self.push_unregister();
-        let db = self.db.lock().unwrap();
-        db.execute_batch(&format!(
-            "DELETE FROM tasks WHERE list_href NOT LIKE '{0}%'; DELETE FROM lists WHERE href NOT LIKE '{0}%';
-             DELETE FROM moved;
-             DELETE FROM kv WHERE key LIKE 'config_%' OR key LIKE 'account_%' OR key IN ('push_resource', 'conflict_log', 'last_sync');",
-            store::LOCAL
-        ))?;
-        *self.dav.lock().unwrap() = None;
-        Ok(())
-    }
-
-    /// Ask the server what it is (no sign-in needed): reachable, its version, maintenance mode.
-    pub fn server_info(&self) -> Result<ServerInfo> {
-        self.dav()?.server_info()
-    }
-
-    fn dav(&self) -> Result<Arc<Dav>> {
-        self.dav.lock().unwrap().clone().ok_or(Error::NoAccount)
     }
 
     /// Task lists.
@@ -889,6 +839,8 @@ fn set_done(cal: &mut Calendar, done: bool, t: i64) {
 #[derive(Debug)]
 pub enum Error {
     Auth,
+    /// The account is here already.
+    Exists,
     Conflict,
     NoAccount,
     NotFound(String),
@@ -902,6 +854,7 @@ impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Error::Auth => write!(f, "authentication failed"),
+            Error::Exists => write!(f, "account already added"),
             Error::Conflict => write!(f, "precondition failed (changed on server)"),
             Error::NoAccount => write!(f, "no account configured"),
             Error::NotFound(s) => write!(f, "not found: {s}"),
@@ -1303,23 +1256,31 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("todav-test-local-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let c = Client::open(dir.to_string_lossy().into()).unwrap();
-        let list = c
-            .create_list("L".into(), "#fff".into(), false, true)
+        let here = c
+            .add_account(AccountKind::Local, "".into(), "".into(), "".into())
             .unwrap();
-        assert!(c.lists().is_empty(), "hidden while local mode is off");
-        c.set_setting("local_mode".into(), "true".into()).unwrap();
-        assert!(c.lists()[0].local);
+        let list = c
+            .create_list(here, "L".into(), "#fff".into(), false)
+            .unwrap();
+        assert!(c.lists()[0].local && c.lists()[0].account == here);
         let uid = c
             .add_task(list.clone(), "a".into(), None, None, false)
             .unwrap()
             .uid;
-        let queue = || store::dirty(&c.db.lock().unwrap()).unwrap();
-        assert!(queue().is_empty() && !c.pending(), "never uploaded");
+        let queue = || store::dirty(&c.db.lock().unwrap(), None).unwrap();
+        assert!(queue().is_empty() && !c.pending(None), "never uploaded");
 
-        // Signing in and out drops the server copy only.
-        c.set_account("https://x".into(), "u".into(), "p".into())
+        // Adding and removing an account leaves them alone.
+        let nc = c
+            .add_account(
+                AccountKind::Nextcloud,
+                "https://x".into(),
+                "u".into(),
+                "".into(),
+            )
             .unwrap();
-        c.logout().unwrap();
+        c.connect(nc, "p".into()).unwrap();
+        c.remove_account(nc).unwrap();
         assert_eq!(c.tasks(list.clone(), true).len(), 1);
 
         // Deleted outright, nothing waits for the server.
@@ -1332,7 +1293,7 @@ mod tests {
 
         // An event moved to a server calendar is uploaded, and one moved back is deleted there.
         let cal = c
-            .create_list("C".into(), "#fff".into(), true, true)
+            .create_list(here, "C".into(), "#fff".into(), true)
             .unwrap();
         c.db.lock()
             .unwrap()
@@ -1404,7 +1365,7 @@ mod tests {
                 .collect()
         };
         assert_eq!(moved(), ["/a/p.ics"]);
-        assert!(c.pending());
+        assert!(c.pending(None));
 
         // Back where it was, with its server copy, which is no longer deleted.
         c.undo(None).unwrap();

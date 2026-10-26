@@ -1,6 +1,7 @@
 //! Front-end settings, kept locally and synced through `.config/todav/settings.json` in
 //! Nextcloud Files: every key carries its last change time and the newer value wins.
 
+use crate::caldav::Dav;
 use crate::json::Json;
 use crate::{Client, Error, Result, store};
 use std::collections::BTreeMap;
@@ -10,12 +11,14 @@ use std::collections::BTreeMap;
 /// them when `sync_ntfy` is "false".
 pub const DEVICE_ONLY: &[&str] = &[
     "last_list",
-    "sync_settings",
+    // Which account (by its id here) settings sync through; none: they stay here.
+    "settings_account",
     "sync_ntfy",
     "drag_handles",
     // Light, dark or the system's: each device follows its own desktop.
     "color_scheme",
-    "goa_account",
+    // Todav 1.2's browser sign-in, remembered while GNOME Online Accounts was used; the Linux
+    // app clears it.
     "manual_url",
     "manual_user",
     "reminded_until",
@@ -24,8 +27,6 @@ pub const DEVICE_ONLY: &[&str] = &[
     "calendar_mode",
     "window_size",
     "window_maximized",
-    // Local lists are on this device only, so is showing them.
-    "local_mode",
 ];
 
 /// key → (value, unix time of the last change)
@@ -47,18 +48,15 @@ impl Client {
         store::kv_set(&db, &format!("settime_{key}"), &crate::now().to_string())
     }
 
-    /// Merge local and server settings (newer wins), uploading if this device has newer ones.
-    /// Off when the `sync_settings` setting is "false".
-    pub(crate) fn sync_settings(&self) -> Result<()> {
-        if self.setting("sync_settings".into()).as_deref() == Some("false") {
-            return Ok(());
-        }
+    /// Merge local and server settings (newer wins), uploading if this device has newer ones;
+    /// through the account `settings_account` names.
+    pub(crate) fn sync_settings(&self, account: i64, dav: &Dav) -> Result<()> {
+        let k = |name: &str| crate::account::key(account, name);
         let mut local_only = DEVICE_ONLY.to_vec();
         if self.setting("sync_ntfy".into()).as_deref() == Some("false") {
             local_only.push("ntfy_url");
         }
-        let dav = self.dav()?;
-        let cached = store::kv_get(&self.db.lock().unwrap(), "config_settings_href")?;
+        let cached = store::kv_get(&self.db.lock().unwrap(), &k("config_settings_href"))?;
         let href = match cached {
             Some(h) => h,
             None => {
@@ -69,7 +67,7 @@ impl Client {
                     .next()
                     .unwrap_or_default();
                 let h = format!("/remote.php/dav/files/{user}/.config/todav/settings.json");
-                store::kv_set(&self.db.lock().unwrap(), "config_settings_href", &h)?;
+                store::kv_set(&self.db.lock().unwrap(), &k("config_settings_href"), &h)?;
                 h
             }
         };
@@ -78,8 +76,8 @@ impl Client {
             let (etag, cached) = {
                 let db = self.db.lock().unwrap();
                 (
-                    store::kv_get(&db, "config_settings_etag")?,
-                    store::kv_get(&db, "config_settings_json")?,
+                    store::kv_get(&db, &k("config_settings_etag"))?,
+                    store::kv_get(&db, &k("config_settings_json"))?,
                 )
             };
             let headers: Vec<(&str, &str)> = etag
@@ -102,12 +100,9 @@ impl Client {
                     store::kv_set(&db, &format!("setting_{k}"), v)?;
                     store::kv_set(&db, &format!("settime_{k}"), &t.to_string())?;
                 }
-                store::kv_set(&db, "config_settings_json", &body)?;
-                store::kv_set(
-                    &db,
-                    "config_settings_etag",
-                    etag.as_deref().unwrap_or_default(),
-                )?;
+                store::kv_set(&db, &k("config_settings_json"), &body)?;
+                let etag = etag.as_deref().unwrap_or_default();
+                store::kv_set(&db, &k("config_settings_etag"), etag)?;
             }
             if !apply.is_empty() {
                 for l in self.listeners.lock().unwrap().iter() {
@@ -136,13 +131,10 @@ impl Client {
             match r.status {
                 200..=299 => {
                     let db = self.db.lock().unwrap();
-                    store::kv_set(&db, "config_settings_json", &new_body)?;
+                    store::kv_set(&db, &k("config_settings_json"), &new_body)?;
                     // Without an ETag the next GET simply returns the file again.
-                    store::kv_set(
-                        &db,
-                        "config_settings_etag",
-                        r.etag.as_deref().unwrap_or_default(),
-                    )?;
+                    let etag = r.etag.as_deref().unwrap_or_default();
+                    store::kv_set(&db, &k("config_settings_etag"), etag)?;
                     return Ok(());
                 }
                 412 => continue,

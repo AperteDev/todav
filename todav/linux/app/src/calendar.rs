@@ -182,6 +182,7 @@ fn today() -> i64 {
 /// Add the Calendar page to the window's view stack.
 pub fn build(views: &adw::ViewStack) {
     let b = view!("calendar");
+    crate::window::add_banner(get(&b, "banner"));
     let split: adw::NavigationSplitView = get(&b, "split");
     // Its own breakpoints, the narrowest last (the last matching one wins): tight, the view
     // switcher moves to a bar at the bottom and the sync button goes (F5 still syncs); narrow,
@@ -928,12 +929,22 @@ pub fn set_syncing(on: bool) {
 
 /// Collections the user hid (synced `hidden_calendars` setting, one href per line).
 fn hidden() -> HashSet<String> {
-    core()
+    let stored: Vec<String> = core()
         .setting("hidden_calendars".into())
         .unwrap_or_default()
         .lines()
         .map(String::from)
-        .collect()
+        .collect();
+    let mut all: HashSet<String> = stored.iter().cloned().collect();
+    // Todav 1.2 kept server paths: the lists at those paths.
+    if stored.iter().any(|s| s.starts_with('/')) {
+        for l in core().lists().into_iter().chain(core().calendars()) {
+            if stored.iter().any(|s| todav_core::same_list(s, &l.href)) {
+                all.insert(l.href);
+            }
+        }
+    }
+    all
 }
 
 fn set_hidden<'a>(hrefs: impl IntoIterator<Item = &'a str>, hide: bool) {
@@ -942,7 +953,7 @@ fn set_hidden<'a>(hrefs: impl IntoIterator<Item = &'a str>, hide: bool) {
         if hide {
             h.insert(href.to_string());
         } else {
-            h.remove(href);
+            h.retain(|s| !todav_core::same_list(s, href));
         }
     }
     let mut v: Vec<String> = h.into_iter().collect();
@@ -959,8 +970,15 @@ fn refresh_calendars(c: &Rc<Cal>) {
             all.push(l);
         }
     }
-    // Calendars, then task lists, each grouped by where they are kept (this device last).
-    all.sort_by_key(|l| (!l.holds_events, l.local, l.display_name.to_lowercase()));
+    // Calendars, then task lists, each grouped by account.
+    let rank = crate::lists::rank();
+    all.sort_by_key(|l| {
+        (
+            !l.holds_events,
+            rank(l.account),
+            l.display_name.to_lowercase(),
+        )
+    });
     let hidden = hidden();
     if *c.lists.borrow() == all && *c.hidden.borrow() == hidden {
         return;

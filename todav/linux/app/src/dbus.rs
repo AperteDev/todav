@@ -127,7 +127,18 @@ fn call(method: &str, params: &glib::Variant) -> Result<Option<glib::Variant>, S
         }
         // The extension's options, see settings::EXTENSION; it may only change those.
         "GetSettings" => {
-            let map: HashMap<String, String> = crate::settings::extension().into_iter().collect();
+            let mut map: HashMap<String, String> =
+                crate::settings::extension().into_iter().collect();
+            // Todav 1.2 kept the server's path: the list at that path.
+            if let Some(list) = map.get_mut("ext_list").filter(|l| l.starts_with('/')) {
+                let found = c
+                    .lists()
+                    .into_iter()
+                    .find(|l| todav_core::same_list(list, &l.href));
+                if let Some(l) = found {
+                    *list = l.href;
+                }
+            }
             Some((map,).to_variant())
         }
         "SetSetting" => {

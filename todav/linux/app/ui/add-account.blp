@@ -1,0 +1,195 @@
+using Gtk 4.0;
+using Adw 1;
+
+// Adding an account: first its kind, then the account to connect (src/add_account.rs). The
+// welcome page shows it for the first account, Preferences → Accounts in a dialog for more.
+Adw.ToastOverlay root {
+  Adw.NavigationView view {
+    Adw.NavigationPage choose_page {
+      tag: "choose";
+      title: "Todav";
+
+      child: Adw.ToolbarView {
+        [top]
+        Adw.HeaderBar choose_header {
+          show-title: false;
+        }
+
+        content: Adw.StatusPage intro {
+          icon-name: "dev.aperte.Todav";
+          title: "Todav";
+          description: _("Tasks and calendar synced with your Nextcloud, or kept on this device");
+          // A smaller icon and margins: the choices fit the default window size.
+          styles ["compact"]
+
+          Adw.Clamp {
+            maximum-size: 420;
+
+            Gtk.Box {
+              orientation: vertical;
+              spacing: 18;
+
+              Gtk.ListBox {
+                selection-mode: none;
+                styles ["boxed-list"]
+
+                Adw.ActionRow use_goa {
+                  title: _("GNOME Online Accounts");
+                  activatable: true;
+
+                  [prefix]
+                  Gtk.Image {
+                    icon-name: "goa-panel-symbolic";
+                  }
+
+                  [suffix]
+                  Gtk.Image {
+                    icon-name: "go-next-symbolic";
+                  }
+                }
+
+                Adw.ActionRow use_server {
+                  title: _("Nextcloud Server");
+                  subtitle: _("Sign in with the browser or an app password");
+                  activatable: true;
+
+                  [prefix]
+                  Gtk.Image {
+                    icon-name: "network-server-symbolic";
+                  }
+
+                  [suffix]
+                  Gtk.Image {
+                    icon-name: "go-next-symbolic";
+                  }
+                }
+
+                // One local account at most: hidden when there is one.
+                Adw.ActionRow use_local {
+                  title: _("On This Device Only");
+                  subtitle: _("Lists and calendars that stay on this computer");
+                  activatable: true;
+
+                  [prefix]
+                  Gtk.Image {
+                    icon-name: "computer-symbolic";
+                  }
+
+                  [suffix]
+                  Gtk.Image {
+                    icon-name: "go-next-symbolic";
+                  }
+                }
+              }
+
+              // The welcome page's.
+              Gtk.Label later {
+                label: _("You can add more accounts later in Preferences");
+                wrap: true;
+                justify: center;
+                visible: false;
+                styles ["dimmed"]
+              }
+            }
+          }
+        };
+      };
+    }
+
+    // The GOA account or the server, as chosen; its title is set in code.
+    Adw.NavigationPage connect_page {
+      tag: "connect";
+
+      child: Adw.ToolbarView {
+        [top]
+        Adw.HeaderBar {}
+
+        content: Adw.StatusPage connect_status {
+          styles ["compact"]
+
+          Adw.Clamp {
+            maximum-size: 420;
+
+            Gtk.Box {
+              orientation: vertical;
+              spacing: 24;
+
+              Adw.PreferencesGroup {
+                // GNOME Online Accounts: which one (shown even for one, as what Connect
+                // connects to).
+                Adw.ComboRow goa_account {
+                  title: _("Account");
+                  model: Gtk.StringList goa_names {};
+                }
+
+                Adw.EntryRow server {
+                  title: _("Nextcloud server");
+
+                  [prefix]
+                  Gtk.DropDown server_scheme {
+                    valign: center;
+                    model: Gtk.StringList { strings ["https", "http"] };
+                    styles ["flat"]
+                  }
+                }
+              }
+
+              // The welcome page's: for this device, not the account.
+              Adw.PreferencesGroup welcome_options {
+                visible: false;
+
+                Adw.EntryRow ntfy {
+                  title: _("ntfy server for push (optional)");
+
+                  [prefix]
+                  Gtk.DropDown ntfy_scheme {
+                    valign: center;
+                    model: Gtk.StringList { strings ["https", "http"] };
+                    styles ["flat"]
+                  }
+                }
+
+                Adw.SwitchRow sync_settings {
+                  title: _("Sync settings with this account");
+                  subtitle: _("Use the same settings on all devices");
+                  active: true;
+                }
+              }
+
+              Gtk.Box {
+                orientation: vertical;
+                spacing: 6;
+
+                Gtk.Button connect_goa {
+                  label: _("Connect");
+                  halign: center;
+                  styles ["suggested-action", "pill"]
+                }
+
+                Adw.SplitButton login {
+                  label: _("Sign In with Browser");
+                  menu-model: login_menu;
+                  dropdown-tooltip: _("More Sign-In Options");
+                  halign: center;
+                  styles ["suggested-action", "pill"]
+                }
+
+                Gtk.Button cancel_login {
+                  label: _("Cancel");
+                  halign: center;
+                  visible: false;
+                  styles ["flat"]
+                }
+              }
+            }
+          }
+        };
+      };
+    }
+  }
+}
+
+menu login_menu {
+  item (_("Copy Login Link"), "add.copy-login")
+  item (_("Sign In with Password…"), "add.password-login")
+}

@@ -81,6 +81,9 @@ development:
 
 - Sign in through **GNOME Online Accounts**, in the browser (Nextcloud Login Flow) or with a login
   name and app password. Passwords stay in the system keyring.
+- **Several accounts** side by side: Nextcloud accounts on one server or more, and lists kept on
+  this device. Each can be switched off (its lists are hidden, nothing is deleted) and the
+  sidebar groups lists by account.
 - Runs in the background: closing the window hides it, and reminders and sync keep working.
   Starts with your session.
 - A **GNOME Shell extension** with the open-task count in the top bar and a menu showing a task
@@ -97,17 +100,16 @@ development:
   Todav checks every minute while its window is focused and every 30 minutes otherwise.
 - Conflicts resolve per task, and a task ticked done on any device stays done.
 - Properties Todav does not understand are kept as they are, so other clients' data survives.
-- Your preferences sync between devices through `.config/todav/settings.json` in your Nextcloud
-  Files (can be turned off; server addresses stay on each device). The order of each list's
-  categories is kept next to it, in `todav/config.json`.
+- Your preferences sync between devices through `.config/todav/settings.json` in the Nextcloud
+  Files of the account you pick (or none; accounts and server addresses stay on each device).
+  The order of each list's categories is kept next to it, in each account's `todav/config.json`.
 
 **On this device only**
 
-- Use Todav without an account: choose "On This Device Only" when it starts, and your task lists
+- Use Todav without a server: choose "On This Device Only" when it starts, and your task lists
   and calendars stay on this computer.
-- With an account too, turn on "Local lists and calendars" (Preferences → Accounts) to keep some
-  lists and calendars off the server, next to the synced ones. Turning it off hides them without
-  deleting anything.
+- With a Nextcloud account too, add "On This Device" in Preferences → Accounts to keep some
+  lists and calendars off the server, next to the synced ones.
 
 ## Getting started
 
@@ -145,17 +147,17 @@ Todav from source. Then:
 
 1. Open Todav and sign in to your Nextcloud: pick a GNOME Online Accounts account, sign in in the
    browser, or use a login name and app password. Or choose "On This Device Only" to start
-   without an account.
-2. Your task lists and calendars appear, and new ones can be created from the sidebar.
+   without a server.
+2. Your task lists and calendars appear, and new ones can be created from the sidebar. More
+   accounts can be added in Preferences → Accounts.
 3. For instant updates, install the [DAV Push](https://apps.nextcloud.com/apps/dav_push) app on
-   your Nextcloud and enter your ntfy server in Preferences → Accounts → Push. Server Status
-   on the same page shows whether the server has DAV Push and whether it works.
+   your Nextcloud and enter your ntfy server in Preferences → Accounts → Push. Each account's
+   page there shows whether its server has DAV Push and whether it works.
 
 ## Roadmap
 
 Todav is under active development. Planned:
 
-- **Multiple accounts**
 - **Advanced notifications**, configurable
 - **Advanced search, filtering and sorting**
 - **More services** besides Nextcloud

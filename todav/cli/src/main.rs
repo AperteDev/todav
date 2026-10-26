@@ -2,7 +2,7 @@
 //! Account comes from TODAV_URL / TODAV_USER / TODAV_PASS (or a .env file in the cwd).
 
 use std::process::exit;
-use todav_core::{Client, List};
+use todav_core::{AccountKind, Client, List};
 
 const USAGE: &str = "usage: todav <command>
   lists                         show lists
@@ -32,7 +32,16 @@ fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     });
     let client = Client::open(data)?;
     let env = |k: &str| std::env::var(k).map_err(|_| format!("{k} not set"));
-    client.set_account(env("TODAV_URL")?, env("TODAV_USER")?, env("TODAV_PASS")?)?;
+    let (url, user) = (env("TODAV_URL")?, env("TODAV_USER")?);
+    let known = client
+        .accounts()
+        .into_iter()
+        .find(|a| a.url == url.trim_end_matches('/') && a.user == user);
+    let id = match known {
+        Some(a) => a.id,
+        None => client.add_account(AccountKind::Nextcloud, url, user, String::new())?,
+    };
+    client.connect(id, env("TODAV_PASS")?)?;
 
     let arg = |i: usize| args.get(i).cloned().ok_or(USAGE);
     match args.first().map(String::as_str) {
@@ -69,19 +78,19 @@ fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
                 .cloned();
             let t = client.add_task(list.href, arg(2)?, cat, None, false)?;
             println!("{}", t.uid);
-            println!("{:?}", client.sync()?);
+            println!("{:?}", client.sync().into_result()?);
         }
         Some(c @ ("done" | "undo")) => {
             client.set_done(arg(1)?, c == "done")?;
-            println!("{:?}", client.sync()?);
+            println!("{:?}", client.sync().into_result()?);
         }
         Some("rm") => {
             client.delete_task(arg(1)?)?;
-            println!("{:?}", client.sync()?);
+            println!("{:?}", client.sync().into_result()?);
         }
-        Some("sync") => println!("{:?}", client.sync()?),
+        Some("sync") => println!("{:?}", client.sync().into_result()?),
         Some("push-register") => {
-            client.sync()?;
+            client.sync().into_result()?;
             for r in client.push_register(arg(1)?, 7 * 86400)? {
                 println!(
                     "{} → {} (expires {})",
@@ -90,7 +99,7 @@ fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         Some("listen") => {
-            println!("{:?}", client.sync()?);
+            println!("{:?}", client.sync().into_result()?);
             client.listen(env("NTFY_URL")?, &|r| match r {
                 Ok(r) => println!("{r:?}"),
                 Err(e) => eprintln!("error: {e}"),

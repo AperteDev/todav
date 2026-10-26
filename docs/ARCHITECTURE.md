@@ -1,6 +1,6 @@
 # Todav — Architecture and Plan
 
-Oct 8, 2026 · @Kris · updated Oct 25, 2026
+Oct 8, 2026 · @Kris · updated Oct 26, 2026
 
 ## Overview
 
@@ -46,18 +46,19 @@ Storage is plain CalDAV: one calendar per list, one VTODO per task. Categories a
 
 | Concept | Where it lives | Notes |
 | --- | --- | --- |
+| Account | `accounts` table, this device only | A Nextcloud account or the local one (see [Accounts](#accounts)); every list belongs to one |
 | List (Shopping, Personal, Work) | CalDAV calendar collection | Only calendars that advertise `VTODO` in supported-component-set are shown |
 | Task | `VTODO` resource (`<uid>.ics`) | `UID`, `SUMMARY`, `STATUS`, `COMPLETED`, `PRIORITY`, `DUE`, `DESCRIPTION` |
 | Category (Groceries, Home, Electronics, Mountains, Car) | `CATEGORIES` on the VTODO | Exactly one category per task in v1; multiple are read but the first is used for grouping |
 | Subtask | `RELATED-TO;RELTYPE=PARENT:<parent uid>` | Any depth |
 | Manual order | `X-APPLE-SORT-ORDER` (integer), shared with Nextcloud Tasks | Fallback: `CREATED` timestamp; the old `X-TODAV-ORDER` is read and dropped on the next reorder |
 | Event | `VEVENT` resource in a calendar that supports it | See [Calendar](#calendar-in-todav) |
-| Category metadata (order, icon) | `todav/config.json` in Nextcloud Files via WebDAV | One file, fetched with `If-None-Match` on sync |
-| Client settings | `.config/todav/settings.json` in Nextcloud Files | Merged per key on every sync, newer wins; device-only keys stay local |
+| Category metadata (order, icon) | `todav/config.json` in each account's Nextcloud Files via WebDAV | One file per account for its lists, fetched with `If-None-Match` on sync |
+| Client settings | `.config/todav/settings.json` in the Nextcloud Files of the account chosen for it | Merged per key on every sync, newer wins; device-only keys stay local |
 | Server change cursor | `sync-token` per calendar | Stored locally; `sync-collection` REPORT (RFC 6578) on every sync |
 | Push identity | `DAV:Push` `topic` per calendar | Maps incoming push to a calendar |
 
-**Local schema**: SQLite in the core (`todav/core/src/store.rs`, migrations by `PRAGMA user_version`): `lists`, `tasks`, `events` (raw iCalendar plus derived columns, a dirty flag for the push queue), `alarms` (reminders in local time), `moved` (server copies of tasks moved to another list, deleted on the next push) and `kv` (config/settings cache, push keys, setting change times).
+**Local schema**: SQLite in the core (`todav/core/src/store.rs`, migrations by `PRAGMA user_version`): `accounts`, `lists` (each with its account), `tasks`, `events` (raw iCalendar plus derived columns, a dirty flag for the push queue), `alarms` (reminders in local time), `moved` (server copies of tasks moved to another list, deleted on the next push) and `kv` (config/settings cache, per account as `a<id>_…`; push keys, setting change times).
 
 `raw_ics` keeps the full original VTODO so properties the app does not understand survive a round trip. On write, the core patches the known properties in `raw_ics` and bumps `DTSTAMP`/`LAST-MODIFIED`/`SEQUENCE`.
 
@@ -88,6 +89,7 @@ One Cargo workspace at the root, the app's core and front-ends under `todav/`. N
     core/                    # todav-core (library), flat modules in src/
       src/
         lib.rs               # public API (Client), change events
+        account.rs           # accounts: add, connect, switch off, remove
         caldav.rs            # PROPFIND/REPORT/PUT/DELETE, MKCALENDAR, XML tree + multistatus
         ical.rs              # VTODO/VEVENT reader/writer, unknown properties kept
         rrule.rs, tz.rs      # recurrence expansion, VTIMEZONE offsets
@@ -140,7 +142,7 @@ Anything beyond this table needs a one-line justification in the PR.
 
 The core owns all state and all network I/O. Front-ends get a `Client` handle, call commands, and subscribe to change events. The API is synchronous and blocking; callers run it on a background thread (GTK: `gio::spawn_blocking`, Android: coroutine on `Dispatchers.IO`).
 
-**Public API (UniFFI surface)**: the first sketch below; the real API in `todav/core/src/lib.rs` has grown since (events, lists and calendars, settings, login, undo).
+**Public API (UniFFI surface)**: the first sketch below; the real API in `todav/core/src/lib.rs` has grown since (accounts, events, lists and calendars, settings, login, undo). `set_account`/`account` became `add_account`, `connect`, `accounts` and the rest of [Accounts](#accounts).
 
 ```rust
 pub struct Client { /* SQLite conn, http agent, account */ }
@@ -228,11 +230,11 @@ impl Client {
 
 A single Rust binary (`todav-linux`) that is both the GUI and a background service: it keeps the ntfy connection open, runs sync, and exposes a small D-Bus interface the GNOME extension uses. There is no separate daemon.
 
-**Stack**: `gtk4-rs`, `libadwaita-rs`, `libsecret`; D-Bus, GNOME Online Accounts and notifications through `gio`. Static views are Blueprint files in `ui/`. No GSettings: settings live in the core (`Client::setting`, synced). The app password in the Secret Service, under a schema named after the app ID; a GOA account's password stays in GOA. An account remembered without its password (`Client::account` without `Client::connected`) does not sync or listen for pushes: the welcome page shows, and in local mode Preferences say it is not connected. State in `$XDG_DATA_HOME/todav/core.sqlite` via the core.
+**Stack**: `gtk4-rs`, `libadwaita-rs`, `libsecret`; D-Bus, GNOME Online Accounts and notifications through `gio`. Static views are Blueprint files in `ui/`. No GSettings: settings live in the core (`Client::setting`, synced). App passwords in the Secret Service, under a schema named after the app ID, one entry per server and user; a GOA account's password stays in GOA (`Account::source` is its GOA id). An account without its password (keyring cleared, GOA account gone: not `Client::connected`) does not sync or listen for pushes; its lists stay usable and a banner over the tasks and the calendar names it, with Sign In (its page in Preferences). State in `$XDG_DATA_HOME/todav/core.sqlite` via the core.
 
 **UI**
 
-- Welcome page in two steps (`AdwNavigationView`): first how to use Todav (GNOME Online Accounts, a Nextcloud server, or "On This Device Only"), then the account to connect: the GOA account, or the server to sign in to with the browser (Login Flow v2) or a login name + app password; optional ntfy server. "On This Device Only" turns local mode on and, the first time, creates a task list with a sample task and an empty calendar (see [Local lists](#local-lists)).
+- Welcome page (no account yet) in two steps (`AdwNavigationView`, `ui/add-account.blp` and `add_account.rs`, shared with Preferences' Add Account dialog): first the kind of account (GNOME Online Accounts, a Nextcloud server, or "On This Device Only"; more can be added later in Preferences, it says), then the account to connect: the GOA account (those not added yet), or the server to sign in to with the browser (Login Flow v2) or a login name + app password. On the welcome page only: the ntfy server and "Sync settings with this account" (on). "On This Device Only" adds the local account with a task list holding a sample task and an empty calendar (see [Local lists](#local-lists)).
 - Tasks | Calendar switcher in the header. Tasks page: `AdwNavigationSplitView` with Upcoming and Important (each only while it has tasks), the lists (colour, open count) and categories in the sidebar; tasks grouped by category (or tags, or ungrouped), subtasks in expander rows (one per top-level task, deeper levels indented inside it; a subtask's "+" gives it an "Add subtask" entry until Escape), completed ones in a "Completed" expander or at the end.
 - Entry at the top of the list: type, Enter → `add_task`; `Ctrl+K` category picker. Edit dialog for dates, reminders, priority, category, event link and notes.
 - Drag and drop reorders, moves between categories, makes and promotes subtasks at any depth (a task takes its own subtasks along; `Client::within` refuses a drop inside its own tree; dropped on an "Add subtask" entry, it goes where a new subtask would, which also ends a level after a deeper subtree), and moves a task to another list when dropped on it in the sidebar (also the edit dialog's list picker, `lists::picker`). On the Calendar page, an event dropped on a sidebar calendar moves there (`move_event`, the whole series), a task on a list likewise.
@@ -240,17 +242,26 @@ A single Rust binary (`todav-linux`) that is both the GUI and a background servi
 - After an edit, the app asks for a sync only when something waits for the server (`Client::pending`): edits in local lists never start one.
 - Type to search; `Ctrl+Z` undo; Keyboard Shortcuts dialog. Toasts for sync errors; the sync button turns into a spinner while syncing.
 - Calendar page: see [Calendar](#calendar-in-todav).
-- Preferences: General (style, start page), Accounts (account, server status, push, settings sync, local lists), Tasks, Calendar, Extension.
-- Server status (Preferences → Accounts, with an account): the server as `status.php` describes it (asked each time the page shows the account; unreachable or in maintenance mode says so), the last sync (`Client::last_sync`, or the current error) and DAV Push (`Client::push_status` plus the ntfy listener's last error). Without a push topic on any calendar the server lacks the DAV Push app: the row says what that costs and links to its page in the Nextcloud App Store; with topics but no ntfy server, it asks for one. The sync and push rows follow sync state changes while the dialog is open.
+- Preferences: General (style, start page), Accounts (a row per account, Add, the ntfy server, "Sync settings with"), Tasks, Calendar, Extension. Each account's page (`ui/account.blp`, a subpage): "Use This Account" (switched off: hidden and not synced), its name (empty gives back "user@host" or "On This Device"), for a Nextcloud account the connection (signed in in Todav: Sign In Again with the browser, a link or a password, for the same user; another server address moves the account there) and Server Status; Remove (asks; uploads waiting edits first, or asks again to lose them).
+- Server status (an account's page, while connected): the server as `status.php` describes it (asked each time the page shows; unreachable or in maintenance mode says so), the last sync (`Client::last_sync`, or that account's last error) and DAV Push (`Client::push_status` plus the ntfy listener's last error). Without a push topic on any calendar the server lacks the DAV Push app: the row says what that costs and links to its page in the Nextcloud App Store; with topics but no ntfy server, it asks for one. The sync and push rows follow sync state changes while the dialog is open.
+
+**Accounts**
+
+- Several accounts side by side (decided 2026-10-26): Nextcloud accounts (`AccountKind::Nextcloud`, through GOA or signed in in Todav; refused when the same server and user is there) and the local account (`AccountKind::Local`, one at most), with room for other kinds of service later. The `accounts` table in the core; each list has its account, `Client::connect(id, password)` gives a Nextcloud account its connection for the run.
+- Lists are keyed by their full URL (`Dav::absolute`: origin + the server's path), so two servers' lists with the same path stay apart; item hrefs stay server paths. Todav 1.2 kept paths: a synced setting holding one (`hidden_calendars`, `ext_list`) from a device still on it matches the list at that path (`todav_core::same_list`).
+- Tasks are keyed by UID: a task in a calendar two added accounts share shows once, in the account that had it first (`store::task_elsewhere`); TODO(v2): key them by list and UID, as events are.
+- `sync` goes through every switched-on, connected account; one failing does not stop the others (`SyncReport::failed`, by account; the sync state names them). One ntfy topic and one set of push keys for the device; each account registers its own calendars with it.
+- Switched off (`set_account_enabled`): its lists and what is in them are hidden from every query (`shown`), not synced, its server's pushes stopped; nothing is deleted. Removed (`remove_account`): its lists and their contents leave this device (a local account's are gone for good), with its saved password.
+- Settings sync through the account in the device-only `settings_account` (none: they stay here). Added on the welcome page with "Sync settings with this account" on, an account becomes it; added from Preferences, nothing changes. Each account keeps its own category file.
+- Migrated from Todav 1.2 (one account in `kv`, local lists behind the `local_mode` setting): the account and, with local lists or local mode, the local account (switched off when local mode was off); `sync_settings` off became no settings account. 1.2's remembered browser sign-in (kept while GOA was used) is cleared at start, with its password unless an account uses it.
 
 **Local lists**
 
-- Lists and calendars kept on this device only, for use without an account or next to the server's. Their href is `local:<uid>/` (`store::LOCAL`) in the same `lists` table, so tasks and events in them are stored like any other; `List::local` marks them.
-- Never synced: the upload queue (`store::dirty`) skips them, so items in them keep `dirty` set and no href; refreshing the server's calendars, signing in and signing out leave them alone; creating, editing and deleting a local list never calls the server. Moving an event from a local calendar to a server one uploads it (it is new there), and moving one back deletes the server copy.
-- Shown only in local mode (the device-only `local_mode` setting, Preferences → Accounts, off by default). The core filters them out of every query while it is off (`shown` in `lib.rs`), so the app, the extension and reminders all ignore them; nothing is deleted. Turning it off warns that they will be hidden when there are some, or when there is no account; with no account it then goes back to the welcome page.
-- Without an account the app runs on them alone: the background service starts for reminders and D-Bus, sync and push stay off, and the sync buttons are greyed out.
-- Shown by place: both sidebars and the event dialog's calendar picker group lists by where they are kept (`lists::by_place`, the account's first, the device's last), with a heading per group only when there is more than one (`lists::headings`; ListBox header functions, and an `Adw.ComboRow` header factory over a `GtkFlattenListModel` of one string list per place). The new list dialog's "Save to" row offers the places (`lists::places`) when there is a choice; a place per account is where multiple accounts would plug in.
-- Not done: moving a whole list between the account and the device (single events move with the calendar picker).
+- Lists and calendars kept on this device only: the local account's. Their href is `local:<uid>/` (`store::LOCAL`) in the same `lists` table, so tasks and events in them are stored like any other; `List::local` marks them.
+- Never synced: the upload queue (`store::dirty`) skips them, so items in them keep `dirty` set and no href; refreshing an account's calendars and adding or removing another account leave them alone; creating, editing and deleting a local list never calls a server. Moving an event from a local calendar to a server one uploads it (it is new there), and moving one back deletes the server copy.
+- Without a Nextcloud account the app runs on them alone: the background service starts for reminders and D-Bus, sync and push stay off, and the sync buttons are greyed out.
+- Shown by account: both sidebars and the event dialog's calendar picker group lists by account in the order the accounts were added (`lists::by_place`), with a heading per group only when there is more than one (`lists::headings`; ListBox header functions, and an `Adw.ComboRow` header factory over a `GtkFlattenListModel` of one string list per account). The new list dialog's "Save to" row offers the accounts that can take one (`lists::places`) when there is a choice.
+- Not done: moving a whole list between accounts (single events move with the calendar picker, tasks by dropping them on a list).
 
 **Process model**
 
@@ -278,7 +289,7 @@ A single Rust binary (`todav-linux`) that is both the GUI and a background servi
   <method name="SetSetting"> <arg direction="in" type="s"/> <arg direction="in" type="s"/> </method> <!-- ext_* keys only -->
   <method name="Sync"/>
   <signal name="Changed">    <arg name="list" type="s"/> </signal>
-  <property name="SyncState" type="s" access="read"/>                                 <!-- idle | syncing | error:<msg> -->
+  <property name="SyncState" type="s" access="read"/>                                 <!-- idle | syncing | error:<msg>, naming the accounts that failed -->
 </interface>
 ```
 
@@ -461,9 +472,9 @@ Deviation: no docker stack (`infra/`) for now — integration runs against the r
 
 Public in the README as planned work; order not fixed.
 
-- [ ] **Multiple accounts**: several servers or users side by side; the core holds one account today (`Client::account`), and lists, push registrations and settings would need an account key.
-- [x] **Offline mode**: use Todav without a server, or keep some lists on the device next to the account's ("Local lists and calendars", see [Local lists](#local-lists)). Not done: moving a whole list between the device and an account.
-- [ ] **More services** besides Nextcloud: other CalDAV servers first (Radicale, Baïkal, Fastmail, iCloud…), which mostly means login without Login Flow v2, settings/categories without Nextcloud Files, and polling where there is no WebDAV-Push.
+- [x] **Multiple accounts**: several servers or users side by side, the lists on this device an account of its own; each can be switched off, settings sync through the one chosen (see [Accounts](#accounts)). Not done: moving a whole list between accounts.
+- [x] **Offline mode**: use Todav without a server, or keep some lists on the device next to an account's (the local account, see [Local lists](#local-lists)).
+- [ ] **More services** besides Nextcloud: other CalDAV servers first (Radicale, Baïkal, Fastmail, iCloud…), which mostly means login without Login Flow v2, settings/categories without Nextcloud Files, and polling where there is no WebDAV-Push. Each would be another `AccountKind`.
 - [ ] **Android app**: M6 above.
 - [ ] **Pebble app**: M7 above, fed by the Android app (see [Pebble watchapp + companion](#pebble-watchapp--companion)).
 - [ ] **Windows app**: a native WinUI 3 front-end over the same Rust core (bindings as for Android), with what the Linux app does in the background: push over ntfy, reminder notifications, starting with the session. Details to be specified.

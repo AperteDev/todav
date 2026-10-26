@@ -238,6 +238,12 @@ pub enum SyncResult {
     InvalidToken,
 }
 
+/// "https://host:8443" of "https://host:8443/nc/remote.php/dav/".
+pub fn origin(url: &str) -> String {
+    let url = url.trim_end_matches('/');
+    url.splitn(4, '/').take(3).collect::<Vec<_>>().join("/")
+}
+
 impl Dav {
     /// `url` is the Nextcloud base (https://cloud.example) or a full DAV root.
     pub fn new(url: &str, user: &str, password: &str) -> Dav {
@@ -247,7 +253,7 @@ impl Dav {
         } else {
             format!("{url}/remote.php/dav/")
         };
-        let origin = url.splitn(4, '/').take(3).collect::<Vec<_>>().join("/");
+        let origin = origin(url);
         let agent = ureq::Agent::config_builder()
             .allow_non_standard_methods(true)
             .user_agent("Todav")
@@ -268,11 +274,26 @@ impl Dav {
     }
 
     pub fn url(&self, href: &str) -> String {
-        if href.starts_with("http") {
-            href.to_string()
+        let path = self.path(href);
+        if path.starts_with("http") {
+            path.to_string()
         } else {
-            format!("{}{}", self.origin, percent_encode_path(href))
+            format!("{}{}", self.origin, percent_encode_path(path))
         }
+    }
+
+    /// `href` as a path on this server: a list's key (its full URL, see `store::lists`) loses
+    /// the origin; a path stays as it is.
+    pub fn path<'a>(&self, href: &'a str) -> &'a str {
+        href.strip_prefix(self.origin.as_str())
+            .filter(|p| p.starts_with('/'))
+            .unwrap_or(href)
+    }
+
+    /// The full URL of a path on this server: how lists are keyed, so two servers' lists
+    /// with the same path stay apart.
+    pub fn absolute(&self, path: &str) -> String {
+        format!("{}{}", self.origin, self.path(path))
     }
 
     pub fn request(
@@ -443,7 +464,7 @@ impl Dav {
         let mut changed = Vec::new();
         let mut removed = Vec::new();
         for resp in resps {
-            if resp.href.trim_end_matches('/') == href.trim_end_matches('/') {
+            if resp.href.trim_end_matches('/') == self.path(href).trim_end_matches('/') {
                 continue;
             }
             if resp.status == 404 {

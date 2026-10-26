@@ -90,7 +90,23 @@ CREATE TABLE moved (
     r#"
 ALTER TABLE tasks ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;
 "#,
+    // Several accounts, each with its lists (the data moves in `one_account_to_many`).
+    r#"
+CREATE TABLE accounts (
+  id INTEGER PRIMARY KEY,
+  kind TEXT NOT NULL,                   -- 'nextcloud' or 'local'
+  name TEXT NOT NULL DEFAULT '',        -- empty: the front-end names it
+  url TEXT NOT NULL DEFAULT '',
+  user TEXT NOT NULL DEFAULT '',
+  source TEXT NOT NULL DEFAULT '',      -- the front-end's, see `Account::source`
+  enabled INTEGER NOT NULL DEFAULT 1
+);
+ALTER TABLE lists ADD COLUMN account INTEGER REFERENCES accounts(id) ON DELETE CASCADE;
+"#,
 ];
+
+/// `user_version` after the migration that adds accounts.
+const ACCOUNTS: usize = 10;
 
 /// RELTYPE of the RELATED-TO linking a task to the event it is for (a custom type: PARENT would
 /// make the event a parent task to other clients, SIBLING means something else).
@@ -144,6 +160,9 @@ pub fn open(path: &str) -> Result<Connection> {
     for (i, m) in MIGRATIONS.iter().enumerate().skip(version as usize) {
         let tx = db.unchecked_transaction()?;
         tx.execute_batch(m)?;
+        if i + 1 == ACCOUNTS {
+            one_account_to_many(&tx)?;
+        }
         tx.pragma_update(None, "user_version", i as i64 + 1)?;
         tx.commit()?;
     }
@@ -153,6 +172,82 @@ pub fn open(path: &str) -> Result<Connection> {
         rederive(&db)?;
     }
     Ok(db)
+}
+
+/// Todav 1.2 kept one account in `kv` (`account_url`, `account_user`, its GNOME Online Accounts
+/// id in the `goa_account` setting) and the lists on this device behind the `local_mode`
+/// setting. Each becomes an account; server lists are keyed by their full URL from now on, so
+/// two servers' lists with the same path stay apart.
+fn one_account_to_many(tx: &Connection) -> Result<()> {
+    tx.execute_batch("PRAGMA defer_foreign_keys = ON")?;
+    let setting = |k: &str| kv_get(tx, &format!("setting_{k}"));
+    let account = (kv_get(tx, "account_url")?, kv_get(tx, "account_user")?);
+    if let (Some(url), Some(user)) = account {
+        let goa = setting("goa_account")?.unwrap_or_default();
+        tx.execute(
+            "INSERT INTO accounts (kind, url, user, source) VALUES ('nextcloud', ?1, ?2, ?3)",
+            params![url, user, goa],
+        )?;
+        let id = tx.last_insert_rowid();
+        let origin = crate::caldav::origin(&url);
+        let not_local = format!("NOT LIKE '{LOCAL}%'");
+        tx.execute(
+            &format!("UPDATE lists SET account = ?1, href = ?2 || href WHERE href {not_local}"),
+            params![id, origin],
+        )?;
+        for table in ["tasks", "events", "moved"] {
+            tx.execute(
+                &format!(
+                    "UPDATE {table} SET list_href = ?1 || list_href WHERE list_href {not_local}"
+                ),
+                [&origin],
+            )?;
+        }
+        if let Some(last) = setting("last_list")?.filter(|l| l.starts_with('/')) {
+            kv_set(tx, "setting_last_list", &format!("{origin}{last}"))?;
+        }
+        // Per account now: the category file, the settings file's cache, the last sync.
+        tx.execute(
+            "UPDATE kv SET key = 'a' || ?1 || '_' || key
+             WHERE key LIKE 'config\\_%' ESCAPE '\\' OR key = 'last_sync'",
+            [id],
+        )?;
+        let synced = setting("sync_settings")?.as_deref() != Some("false");
+        let to = if synced {
+            id.to_string()
+        } else {
+            String::new()
+        };
+        kv_set(tx, "setting_settings_account", &to)?;
+    }
+    let local_mode = setting("local_mode")?.as_deref() == Some("true");
+    let local_lists: bool = tx.query_row(
+        &format!("SELECT EXISTS (SELECT 1 FROM lists WHERE href LIKE '{LOCAL}%')"),
+        [],
+        |r| r.get(0),
+    )?;
+    // Hidden lists stay hidden: the account is there, switched off.
+    if local_mode || local_lists {
+        tx.execute(
+            "INSERT INTO accounts (kind, enabled) VALUES ('local', ?1)",
+            [local_mode],
+        )?;
+        tx.execute(
+            &format!("UPDATE lists SET account = ?1 WHERE href LIKE '{LOCAL}%'"),
+            [tx.last_insert_rowid()],
+        )?;
+    }
+    for k in ["goa_account", "local_mode", "sync_settings"] {
+        tx.execute(
+            "DELETE FROM kv WHERE key IN ('setting_' || ?1, 'settime_' || ?1)",
+            [k],
+        )?;
+    }
+    tx.execute(
+        "DELETE FROM kv WHERE key IN ('account_url', 'account_user')",
+        [],
+    )?;
+    Ok(())
 }
 
 /// Recompute every object's derived columns from its calendar data.
@@ -256,12 +351,13 @@ pub fn kv_set(db: &Connection, key: &str, value: &str) -> Result<()> {
     Ok(())
 }
 
+/// Every list and calendar; each server one keyed by its full URL (`Dav::absolute`).
 pub fn lists(db: &Connection) -> Result<Vec<List>> {
     let mut st = db.prepare(
         "SELECT l.href, l.display_name, l.color,
            (SELECT COUNT(*) FROM tasks t WHERE t.list_href = l.href AND t.dirty != 2
               AND t.status NOT IN ('COMPLETED', 'CANCELLED')),
-           l.has_tasks, l.has_events, l.writable
+           l.has_tasks, l.has_events, l.writable, COALESCE(l.account, 0)
          FROM lists l ORDER BY l.display_name COLLATE NOCASE",
     )?;
     let rows = st.query_map([], |r| {
@@ -275,8 +371,43 @@ pub fn lists(db: &Connection) -> Result<Vec<List>> {
             holds_tasks: r.get(4)?,
             holds_events: r.get(5)?,
             writable: r.get(6)?,
+            account: r.get(7)?,
         })
     })?;
+    Ok(rows.collect::<rusqlite::Result<_>>()?)
+}
+
+/// The account list `href` belongs to (0: none, as in tests).
+pub fn list_account(db: &Connection, href: &str) -> Result<i64> {
+    Ok(db
+        .query_row(
+            "SELECT COALESCE(account, 0) FROM lists WHERE href = ?",
+            [href],
+            |r| r.get(0),
+        )
+        .optional()?
+        .unwrap_or(0))
+}
+
+/// Tasks are keyed by UID: one in a calendar two accounts share shows once, in the account
+/// that had it first. Whether task `uid` is in another account's list than `list_href`.
+/// TODO(v2): key tasks by list and UID, as events are.
+pub fn task_elsewhere(db: &Connection, uid: &str, list_href: &str) -> Result<bool> {
+    Ok(db.query_row(
+        "SELECT EXISTS (SELECT 1 FROM tasks t JOIN lists l ON l.href = t.list_href
+           WHERE t.uid = ?1 AND t.list_href != ?2
+             AND l.account IS NOT (SELECT account FROM lists WHERE href = ?2))",
+        [uid, list_href],
+        |r| r.get(0),
+    )?)
+}
+
+/// Lists of switched-off accounts: hidden, not synced.
+pub fn hidden(db: &Connection) -> Result<std::collections::HashSet<String>> {
+    let mut st = db.prepare(
+        "SELECT l.href FROM lists l JOIN accounts a ON a.id = l.account WHERE NOT a.enabled",
+    )?;
+    let rows = st.query_map([], |r| r.get(0))?;
     Ok(rows.collect::<rusqlite::Result<_>>()?)
 }
 
@@ -444,11 +575,16 @@ pub fn raw(db: &Connection, kind: Kind, list_href: &str, uid: &str) -> Result<Op
         .optional()?)
 }
 
-pub fn raw_by_href(db: &Connection, href: &str) -> Result<Option<RawObject>> {
+/// The object at `href` (a server path) in list `list_href`: another account's server may
+/// have one at the same path.
+pub fn raw_by_href(db: &Connection, list_href: &str, href: &str) -> Result<Option<RawObject>> {
     for kind in [Kind::Task, Kind::Event] {
-        let sql = format!("SELECT {RAW_COLS} FROM {} WHERE href = ?", kind.table());
+        let sql = format!(
+            "SELECT {RAW_COLS} FROM {} WHERE list_href = ?1 AND href = ?2",
+            kind.table()
+        );
         if let Some(o) = db
-            .query_row(&sql, [href], |r| raw_row(r, kind))
+            .query_row(&sql, [list_href, href], |r| raw_row(r, kind))
             .optional()?
         {
             return Ok(Some(o));
@@ -474,18 +610,21 @@ pub fn synced(db: &Connection, list_href: &str) -> Result<Vec<RawObject>> {
     Ok(out)
 }
 
-pub fn dirty(db: &Connection) -> Result<Vec<RawObject>> {
+/// What waits for the server in the lists of `account` (None: of every switched-on account).
+pub fn dirty(db: &Connection, account: Option<i64>) -> Result<Vec<RawObject>> {
     let mut out = Vec::new();
     for kind in [Kind::Task, Kind::Event] {
         // Not a version the server refused: it would refuse it again.
         let sql = format!(
             "SELECT {RAW_COLS} FROM {} WHERE dirty != 0 AND refused_ics IS NOT raw_ics
-               AND list_href NOT LIKE '{LOCAL}%'",
+               AND list_href NOT LIKE '{LOCAL}%'
+               AND list_href IN (SELECT l.href FROM lists l LEFT JOIN accounts a ON a.id = l.account
+                 WHERE COALESCE(a.enabled, 1) AND (?1 IS NULL OR l.account = ?1))",
             kind.table()
         );
         let rows = db
             .prepare(&sql)?
-            .query_map([], |r| raw_row(r, kind))?
+            .query_map([account], |r| raw_row(r, kind))?
             .collect::<rusqlite::Result<Vec<_>>>()?;
         out.extend(rows);
     }
@@ -691,6 +830,86 @@ pub fn delete(db: &Connection, o: &RawObject) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn one_account_and_local_lists_become_accounts() {
+        let path = std::env::temp_dir().join(format!("todav-test-migrate-{}", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        let path = path.to_string_lossy().to_string();
+        {
+            // As Todav 1.2 left it.
+            let db = Connection::open(&path).unwrap();
+            for m in &MIGRATIONS[..ACCOUNTS - 1] {
+                db.execute_batch(m).unwrap();
+            }
+            db.pragma_update(None, "user_version", ACCOUNTS as i64 - 1)
+                .unwrap();
+            db.execute_batch(
+                "INSERT INTO kv (key, value) VALUES ('account_url', 'https://cloud.example/nc'),
+                   ('account_user', 'kris'), ('setting_goa_account', 'account_1'),
+                   ('setting_local_mode', 'false'), ('setting_last_list', '/dav/l/'),
+                   ('config_json', '{}'), ('last_sync', '5'), ('push_private', 'k');
+                 INSERT INTO lists (href, display_name) VALUES ('/dav/l/', 'L'), ('local:x/', 'X');
+                 INSERT INTO tasks (uid, list_href, raw_ics, summary, status)
+                   VALUES ('u', '/dav/l/', 'BEGIN:VCALENDAR
+BEGIN:VTODO
+UID:u
+SUMMARY:s
+END:VTODO
+END:VCALENDAR
+', 's', 'NEEDS-ACTION');",
+            )
+            .unwrap();
+        }
+        let db = open(&path).unwrap();
+        let accounts: Vec<(i64, String, String, String, bool)> = db
+            .prepare("SELECT id, kind, url, source, enabled FROM accounts ORDER BY id")
+            .unwrap()
+            .query_map([], |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
+            })
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+        assert_eq!(
+            accounts,
+            [
+                (
+                    1,
+                    "nextcloud".into(),
+                    "https://cloud.example/nc".into(),
+                    "account_1".into(),
+                    true
+                ),
+                (2, "local".into(), "".into(), "".into(), false),
+            ],
+            "local lists that were hidden stay hidden"
+        );
+        let lists = lists(&db).unwrap();
+        let keys: Vec<(&str, i64)> = lists.iter().map(|l| (l.href.as_str(), l.account)).collect();
+        assert_eq!(keys, [("https://cloud.example/dav/l/", 1), ("local:x/", 2)]);
+        assert_eq!(
+            task(&db, "u").unwrap().unwrap().list_href,
+            "https://cloud.example/dav/l/"
+        );
+        let kv = |k: &str| kv_get(&db, k).unwrap();
+        assert_eq!(
+            kv("setting_last_list").as_deref(),
+            Some("https://cloud.example/dav/l/")
+        );
+        assert_eq!(kv("setting_settings_account").as_deref(), Some("1"));
+        assert_eq!(kv("a1_config_json").as_deref(), Some("{}"));
+        assert_eq!(kv("a1_last_sync").as_deref(), Some("5"));
+        assert_eq!(kv("push_private").as_deref(), Some("k"), "device keys stay");
+        for gone in [
+            "account_url",
+            "setting_goa_account",
+            "setting_local_mode",
+            "config_json",
+        ] {
+            assert_eq!(kv(gone), None, "{gone}");
+        }
+    }
 
     #[test]
     fn zoned_due_times_go_through_their_vtimezone() {

@@ -1,0 +1,112 @@
+using Gtk 4.0;
+using Adw 1;
+
+// An account's page in Preferences → Accounts (src/settings.rs `account_page`).
+Adw.NavigationPage page {
+  child: Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {}
+
+    content: Adw.PreferencesPage {
+      Adw.PreferencesGroup {
+        Adw.SwitchRow enabled {
+          title: _("Use This Account");
+          subtitle: _("Off hides its lists and calendars and stops syncing them; nothing is deleted");
+        }
+
+        Adw.EntryRow name {
+          title: _("Name");
+          show-apply-button: true;
+        }
+      }
+
+      // Nextcloud accounts: how it is connected. Signed in here: "Sign In Again" (a new app
+      // password) and the server's address. A GOA account is managed in GNOME Settings.
+      Adw.PreferencesGroup connection {
+        title: _("Connection");
+
+        Adw.ActionRow status {
+          [prefix]
+          Gtk.Image status_icon {}
+
+          [suffix]
+          Gtk.Button cancel_sign_in {
+            label: _("Cancel");
+            valign: center;
+            visible: false;
+            styles ["flat"]
+          }
+
+          [suffix]
+          Adw.SplitButton sign_in {
+            label: _("Sign In Again");
+            menu-model: sign_in_menu;
+            dropdown-tooltip: _("More Sign-In Options");
+            valign: center;
+          }
+        }
+
+        // Another address moves the account there (same user and app password).
+        Adw.EntryRow server {
+          title: _("Nextcloud server");
+          show-apply-button: true;
+
+          [prefix]
+          Gtk.DropDown server_scheme {
+            valign: center;
+            model: Gtk.StringList { strings ["https", "http"] };
+            styles ["flat"]
+          }
+        }
+      }
+
+      // How the server, sync and push are doing (src/settings.rs `connect_status`).
+      Adw.PreferencesGroup server_status {
+        title: _("Server Status");
+
+        Adw.ActionRow server_row {
+          title: _("Server");
+
+          [prefix]
+          Gtk.Image server_icon {}
+        }
+
+        Adw.ActionRow sync_row {
+          title: _("Sync");
+
+          [prefix]
+          Gtk.Image sync_icon {}
+        }
+
+        Adw.ActionRow push_row {
+          title: _("DAV Push");
+
+          [prefix]
+          Gtk.Image push_icon {}
+
+          // Without DAV Push on the server: its page in the Nextcloud app store.
+          [suffix]
+          Gtk.Button get_push {
+            label: _("Get DAV Push");
+            tooltip-text: _("Open the DAV Push app in the Nextcloud App Store");
+            valign: center;
+            visible: false;
+          }
+        }
+      }
+
+      Adw.PreferencesGroup {
+        Gtk.Button remove {
+          label: _("Remove Account");
+          halign: center;
+          styles ["destructive-action", "pill"]
+        }
+      }
+    };
+  };
+}
+
+menu sign_in_menu {
+  item (_("Copy Login Link"), "account.sign-in-copy")
+  item (_("Sign In with Password…"), "account.sign-in-password")
+}

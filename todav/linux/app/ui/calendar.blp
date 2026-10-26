@@ -313,6 +313,13 @@ Adw.NavigationSplitView split {
         }
       }
 
+      // As the Tasks page's (src/window.rs `update_banners`).
+      [top]
+      Adw.Banner banner {
+        button-label: _("Sign In");
+        action-name: "win.fix-account";
+      }
+
       // Typing on the page opens it too (its key capture widget is set in code). Results show
       // in the agenda's place.
       [top]

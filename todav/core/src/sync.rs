@@ -1,13 +1,13 @@
 //! Sync engine: push the dirty queue, then pull each list with sync-collection.
 
-use crate::caldav::{RemoteList, SyncResult};
+use crate::caldav::{Dav, RemoteList, SyncResult};
 use crate::ical::Calendar;
 use crate::store::Kind;
 use crate::{Client, Error, Result, store};
 use rusqlite::params;
 use std::collections::HashSet;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default)]
 pub struct SyncReport {
     pub pushed: u32,
     pub pulled: u32,
@@ -15,6 +15,27 @@ pub struct SyncReport {
     pub conflicts: u32,
     /// What the server refused this time (not again until edited); the rest synced.
     pub refused: Vec<Refused>,
+    /// Accounts that did not sync (`sync`), by id; the others did.
+    pub failed: Vec<(i64, Error)>,
+}
+
+impl SyncReport {
+    fn add(&mut self, other: SyncReport) {
+        self.pushed += other.pushed;
+        self.pulled += other.pulled;
+        self.deleted += other.deleted;
+        self.conflicts += other.conflicts;
+        self.refused.extend(other.refused);
+        self.failed.extend(other.failed);
+    }
+
+    /// The first account's error, if one failed.
+    pub fn into_result(mut self) -> Result<SyncReport> {
+        match self.failed.is_empty() {
+            true => Ok(self),
+            false => Err(self.failed.remove(0).1),
+        }
+    }
 }
 
 /// A task or event the server would not take.
@@ -39,45 +60,78 @@ fn refusal(e: &Error) -> Option<String> {
 }
 
 impl Client {
-    /// Push dirty tasks, refresh the list of calendars, then pull every list.
-    pub fn sync(&self) -> Result<SyncReport> {
-        let _guard = self.sync_lock.lock().unwrap();
-        let mut report = self.push_dirty()?;
-        let remote = self.dav()?.discover()?;
-        self.save_lists(&remote)?;
-        for l in &remote {
-            self.pull(&l.href, &mut report)?;
+    /// Sync every switched-on account that is connected. One failing (`SyncReport::failed`)
+    /// does not stop the others.
+    pub fn sync(&self) -> SyncReport {
+        let mut report = SyncReport::default();
+        for a in self.accounts() {
+            if !a.enabled || !self.connected(a.id) {
+                continue;
+            }
+            match self.sync_account(a.id) {
+                Ok(r) => report.add(r),
+                Err(e) => report.failed.push((a.id, e)),
+            }
         }
-        self.sync_config()?;
-        self.sync_settings()?;
-        self.mark_synced()?;
+        report
+    }
+
+    /// Push the account's dirty tasks, refresh its calendars, then pull each of them; and the
+    /// categories, and the settings when they sync through it.
+    pub fn sync_account(&self, id: i64) -> Result<SyncReport> {
+        let _guard = self.sync_lock.lock().unwrap();
+        let dav = self.dav(id)?;
+        let mut report = self.push_dirty(id, &dav)?;
+        let remote = dav.discover()?;
+        self.save_lists(id, &dav, &remote)?;
+        for l in &remote {
+            self.pull(&dav, &dav.absolute(&l.href), &mut report)?;
+        }
+        self.sync_config(id, &dav)?;
+        if self.settings_account() == Some(id) {
+            self.sync_settings(id, &dav)?;
+        }
+        self.mark_synced(id)?;
         Ok(report)
     }
 
-    /// When a sync last went through (Unix time), if one did with this account.
-    pub fn last_sync(&self) -> Option<i64> {
+    /// When a sync of account `id` last went through (Unix time).
+    pub fn last_sync(&self, id: i64) -> Option<i64> {
         let db = self.db.lock().unwrap();
-        store::kv_get(&db, "last_sync").ok()??.parse().ok()
+        let t = store::kv_get(&db, &crate::account::key(id, "last_sync"));
+        t.ok()??.parse().ok()
     }
 
-    fn mark_synced(&self) -> Result<()> {
+    fn mark_synced(&self, id: i64) -> Result<()> {
         let db = self.db.lock().unwrap();
-        store::kv_set(&db, "last_sync", &crate::now().to_string())
+        let k = crate::account::key(id, "last_sync");
+        store::kv_set(&db, &k, &crate::now().to_string())
     }
 
-    /// Something waits for the server: edits in synced lists, or old copies of moved tasks.
-    /// Edits in lists on this device never do.
-    pub fn pending(&self) -> bool {
+    /// Something waits for the server: edits in synced lists, or old copies of moved tasks
+    /// (of account `id`, or of any). Edits in lists on this device never do.
+    pub fn pending(&self, id: Option<i64>) -> bool {
         let db = self.db.lock().unwrap();
-        let moved = db.query_row("SELECT EXISTS (SELECT 1 FROM moved)", [], |r| r.get(0));
-        moved.unwrap_or(false) || store::dirty(&db).is_ok_and(|d| !d.is_empty())
+        let moved = db.query_row(
+            "SELECT EXISTS (SELECT 1 FROM moved m JOIN lists l ON l.href = m.list_href
+               LEFT JOIN accounts a ON a.id = l.account
+               WHERE COALESCE(a.enabled, 1) AND (?1 IS NULL OR l.account = ?1))",
+            [id],
+            |r| r.get(0),
+        );
+        moved.unwrap_or(false) || store::dirty(&db, id).is_ok_and(|d| !d.is_empty())
     }
 
     pub fn sync_list(&self, list_href: String) -> Result<SyncReport> {
         let _guard = self.sync_lock.lock().unwrap();
-        let mut report = self.push_dirty()?;
-        self.pull(&list_href, &mut report)?;
-        self.mark_synced()?;
+        let id = store::list_account(&self.db.lock().unwrap(), &list_href)?;
+        if self.account(id).is_some_and(|a| !a.enabled) {
+            return Ok(SyncReport::default()); // a late push for a switched-off account
+        }
+        let dav = self.dav(id)?;
+        let mut report = self.push_dirty(id, &dav)?;
+        self.pull(&dav, &list_href, &mut report)?;
+        self.mark_synced(id)?;
         Ok(report)
     }
 
@@ -94,38 +148,40 @@ impl Client {
         };
         match href {
             Some(h) => self.sync_list(h),
-            None => self.sync(),
+            None => self.sync().into_result(),
         }
     }
 
-    /// A new task list, or calendar of events (`events`), on the server or on this device only
-    /// (`local`); returns its href.
+    /// A new task list, or calendar of events (`events`), in `account`: on its server, or on
+    /// this device only for the local account; returns its href.
     pub fn create_list(
         &self,
+        account: i64,
         name: String,
         color: String,
         events: bool,
-        local: bool,
     ) -> Result<String> {
-        if local {
+        let kind = self.account(account).ok_or(Error::NoAccount)?.kind;
+        if kind == crate::AccountKind::Local {
             let href = format!("{}{}/", store::LOCAL, crate::new_uid());
             self.db.lock().unwrap().execute(
-                "INSERT INTO lists (href, display_name, color, has_tasks, has_events)
-                 VALUES (?1, ?2, ?3, ?4, ?5)",
-                params![href, name, color, !events, events],
+                "INSERT INTO lists (href, display_name, color, has_tasks, has_events, account)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![href, name, color, !events, events, account],
             )?;
             self.emit(&href, Vec::new());
             return Ok(href);
         }
         let _guard = self.sync_lock.lock().unwrap();
-        let dav = self.dav()?;
-        let href = format!(
+        let dav = self.dav(account)?;
+        let path = format!(
             "{}/{}/",
             dav.home()?.trim_end_matches('/'),
             crate::new_uid()
         );
-        dav.mkcalendar(&href, &name, &color, events)?;
-        self.save_lists(&dav.discover()?)?;
+        dav.mkcalendar(&path, &name, &color, events)?;
+        self.save_lists(account, &dav, &dav.discover()?)?;
+        let href = dav.absolute(&path);
         self.emit(&href, Vec::new());
         Ok(href)
     }
@@ -134,7 +190,7 @@ impl Client {
     pub fn edit_list(&self, href: String, name: String, color: String) -> Result<()> {
         let _guard = self.sync_lock.lock().unwrap();
         if !href.starts_with(store::LOCAL) {
-            self.dav()?.proppatch(&href, &name, &color)?;
+            self.list_dav(&href)?.proppatch(&href, &name, &color)?;
         }
         self.db.lock().unwrap().execute(
             "UPDATE lists SET display_name = ?2, color = ?3 WHERE href = ?1",
@@ -149,61 +205,65 @@ impl Client {
     pub fn delete_list(&self, href: String) -> Result<()> {
         let _guard = self.sync_lock.lock().unwrap();
         if !href.starts_with(store::LOCAL) {
-            self.dav()?.delete(&href, None, None)?;
+            self.list_dav(&href)?.delete(&href, None, None)?;
         }
-        self.db
-            .lock()
-            .unwrap()
-            .execute("DELETE FROM lists WHERE href = ?", [&href])?;
+        {
+            let db = self.db.lock().unwrap();
+            db.execute("DELETE FROM moved WHERE list_href = ?", [&href])?;
+            db.execute("DELETE FROM lists WHERE href = ?", [&href])?;
+        }
         self.journal.lock().unwrap().forget_list(&href);
         self.emit(&href, Vec::new());
         Ok(())
     }
 
-    fn save_lists(&self, remote: &[RemoteList]) -> Result<()> {
+    /// The account's lists as the server has them now; ones it no longer has go.
+    pub(crate) fn save_lists(&self, account: i64, dav: &Dav, remote: &[RemoteList]) -> Result<()> {
         let db = self.db.lock().unwrap();
         let tx = db.unchecked_transaction()?;
+        let keep: HashSet<String> = remote.iter().map(|l| dav.absolute(&l.href)).collect();
         for l in remote {
             tx.execute(
-                "INSERT INTO lists (href, display_name, color, ctag, push_topic, has_tasks, has_events, writable)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                "INSERT INTO lists (href, display_name, color, ctag, push_topic, has_tasks, has_events, writable, account)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
                  ON CONFLICT(href) DO UPDATE SET display_name = ?2, color = ?3, ctag = ?4, push_topic = ?5,
-                   has_tasks = ?6, has_events = ?7, writable = ?8",
+                   has_tasks = ?6, has_events = ?7, writable = ?8, account = ?9",
                 params![
-                    l.href,
+                    dav.absolute(&l.href),
                     l.display_name,
                     l.color,
                     l.ctag,
                     l.push_topic,
                     l.tasks,
                     l.events,
-                    l.writable
+                    l.writable,
+                    account
                 ],
             )?;
         }
-        let keep: HashSet<&str> = remote.iter().map(|l| l.href.as_str()).collect();
-        let local: Vec<String> = tx
-            .prepare("SELECT href FROM lists")?
-            .query_map([], |r| r.get(0))?
+        let here: Vec<String> = tx
+            .prepare("SELECT href FROM lists WHERE account = ?")?
+            .query_map([account], |r| r.get(0))?
             .collect::<rusqlite::Result<_>>()?;
-        let gone = |h: &&String| !keep.contains(h.as_str()) && !h.starts_with(store::LOCAL);
-        for h in local.iter().filter(gone) {
+        for h in here.iter().filter(|h| !keep.contains(*h)) {
             tx.execute("DELETE FROM lists WHERE href = ?", [h])?;
         }
         tx.commit()?;
         Ok(())
     }
 
-    fn push_dirty(&self) -> Result<SyncReport> {
-        let dav = self.dav()?;
+    fn push_dirty(&self, account: i64, dav: &Dav) -> Result<SyncReport> {
         let mut report = SyncReport::default();
         // Copies of moved tasks go first, so the new one can take the same UID elsewhere.
         let moved: Vec<(String, String)> = self
             .db
             .lock()
             .unwrap()
-            .prepare("SELECT href, list_href FROM moved")?
-            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .prepare(
+                "SELECT href, list_href FROM moved
+                 WHERE list_href IN (SELECT href FROM lists WHERE account = ?)",
+            )?
+            .query_map([account], |r| Ok((r.get(0)?, r.get(1)?)))?
             .collect::<rusqlite::Result<_>>()?;
         for (href, list) in moved {
             let reg = self.registration(&list);
@@ -217,7 +277,7 @@ impl Client {
             let db = self.db.lock().unwrap();
             db.execute("DELETE FROM moved WHERE href = ?", [&href])?;
         }
-        let dirty = store::dirty(&self.db.lock().unwrap())?;
+        let dirty = store::dirty(&self.db.lock().unwrap(), Some(account))?;
         for t in dirty {
             let reg = self.registration(&t.list_href);
             if t.dirty == store::DELETED {
@@ -259,12 +319,12 @@ impl Client {
             let href = t
                 .href
                 .clone()
-                .unwrap_or_else(|| format!("{}{}.ics", t.list_href, t.uid));
+                .unwrap_or_else(|| format!("{}{}.ics", dav.path(&t.list_href), t.uid));
             let etag = match dav.put(&href, &t.raw_ics, t.etag.as_deref(), reg.as_deref()) {
                 Ok(etag) => etag,
                 Err(Error::Conflict) => {
                     report.conflicts += 1;
-                    self.resolve_conflict(&t, &href, reg.as_deref())?;
+                    self.resolve_conflict(dav, &t, &href, reg.as_deref())?;
                     continue;
                 }
                 // Kept here as edited, waiting for a version the server takes.
@@ -312,11 +372,11 @@ impl Client {
     /// 412 on PUT: fetch the server copy, merge by the conflict rule, upload the result once.
     fn resolve_conflict(
         &self,
+        dav: &Dav,
         local: &store::RawObject,
         href: &str,
         reg: Option<&str>,
     ) -> Result<()> {
-        let dav = self.dav()?;
         let l = Calendar::parse(&local.raw_ics).ok_or_else(|| Error::Parse(href.into()))?;
         let (merged, etag) = match dav.get(href)? {
             None => (l.clone(), dav.put(href, &local.raw_ics, None, reg)?), // gone on the server: re-create
@@ -359,8 +419,7 @@ impl Client {
         store::kv_set(&db, "conflict_log", &log)
     }
 
-    fn pull(&self, list_href: &str, report: &mut SyncReport) -> Result<()> {
-        let dav = self.dav()?;
+    fn pull(&self, dav: &Dav, list_href: &str, report: &mut SyncReport) -> Result<()> {
         let token: String = {
             let db = self.db.lock().unwrap();
             db.query_row(
@@ -402,7 +461,11 @@ impl Client {
             };
             let uid = server.text("UID").unwrap_or_default();
             seen.insert(uid.clone());
-            let local = store::raw(&tx, Kind::of(&server), list_href, &uid)?;
+            let kind = Kind::of(&server);
+            if kind == Kind::Task && store::task_elsewhere(&tx, &uid, list_href)? {
+                continue;
+            }
+            let local = store::raw(&tx, kind, list_href, &uid)?;
             if local
                 .as_ref()
                 .is_some_and(|l| l.etag.as_deref() == Some(&etag) && l.dirty == store::CLEAN)
@@ -443,7 +506,7 @@ impl Client {
         }
         let mut gone: Vec<store::RawObject> = Vec::new();
         for href in removed {
-            gone.extend(store::raw_by_href(&tx, &href)?);
+            gone.extend(store::raw_by_href(&tx, list_href, &href)?);
         }
         if full {
             // Full resync: anything the server had that we did not see no longer exists.

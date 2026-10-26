@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Several accounts side by side: more Nextcloud accounts (through GNOME Online Accounts or
+  signed in in Todav, on the same server or others) and the lists kept on this device, each an
+  account in Preferences → Accounts. Add one with Add; each has its own page with its name, its
+  connection, Server Status and Remove. The sidebars and list pickers group lists by account.
+- An account can be switched off: its lists and calendars are hidden and stop syncing, nothing
+  is deleted.
+- "Sync settings with" in Preferences → Accounts picks the account settings sync through, or
+  none. The welcome page asks whether to sync settings with the account added there.
+- A banner over the tasks and the calendar names an account that is not connected (its password
+  is gone from the keyring, or its GNOME Online Accounts account), with Sign In.
+
+### Changed
+
+- The lists on this device are an account of their own ("On This Device"), replacing the
+  "Local lists and calendars" switch; hidden local lists stay hidden, as a switched-off account.
+- An account without its password no longer shows the welcome page: its lists stay usable and
+  the banner offers to sign in again.
+- Signing in again keeps the account: a different user is added as another account, and a GNOME
+  Online Accounts account and a sign-in in Todav are separate accounts rather than one switch.
+
 ## [1.2.2] - 2026-10-25
 
 ### Added

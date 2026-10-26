@@ -12,149 +12,8 @@ Adw.ApplicationWindow window {
       Gtk.StackPage {
         name: "login";
 
-        // First how to use Todav, then the account to connect (src/window.rs `connect_welcome`).
-        child: Adw.NavigationView welcome {
-          Adw.NavigationPage {
-            tag: "choose";
-            title: "Todav";
-
-            child: Adw.ToolbarView {
-              [top]
-              Adw.HeaderBar {
-                show-title: false;
-              }
-
-              content: Adw.StatusPage {
-                icon-name: "dev.aperte.Todav";
-                title: "Todav";
-                description: _("Tasks and calendar synced with your Nextcloud, or kept on this device");
-                // A smaller icon and margins: the choices fit the default window size.
-                styles ["compact"]
-
-                Adw.Clamp {
-                  maximum-size: 420;
-
-                  Gtk.ListBox {
-                    selection-mode: none;
-                    styles ["boxed-list"]
-
-                    Adw.ActionRow use_goa {
-                      title: _("GNOME Online Accounts");
-                      activatable: true;
-
-                      [prefix]
-                      Gtk.Image {
-                        icon-name: "goa-panel-symbolic";
-                      }
-
-                      [suffix]
-                      Gtk.Image {
-                        icon-name: "go-next-symbolic";
-                      }
-                    }
-
-                    Adw.ActionRow use_server {
-                      title: _("Nextcloud Server");
-                      subtitle: _("Sign in with the browser or an app password");
-                      activatable: true;
-
-                      [prefix]
-                      Gtk.Image {
-                        icon-name: "network-server-symbolic";
-                      }
-
-                      [suffix]
-                      Gtk.Image {
-                        icon-name: "go-next-symbolic";
-                      }
-                    }
-
-                    Adw.ActionRow use_local {
-                      title: _("On This Device Only");
-                      subtitle: _("No account: lists and calendars stay on this computer");
-                      activatable: true;
-
-                      [prefix]
-                      Gtk.Image {
-                        icon-name: "computer-symbolic";
-                      }
-
-                      [suffix]
-                      Gtk.Image {
-                        icon-name: "go-next-symbolic";
-                      }
-                    }
-                  }
-                }
-              };
-            };
-          }
-
-          // The GOA account or the server, as chosen; its title is set in code.
-          Adw.NavigationPage connect_page {
-            tag: "connect";
-
-            child: Adw.ToolbarView {
-              [top]
-              Adw.HeaderBar {}
-
-              content: Adw.StatusPage connect_status {
-                styles ["compact"]
-
-                Adw.Clamp {
-                  maximum-size: 420;
-
-                  Gtk.Box {
-                    orientation: vertical;
-                    spacing: 24;
-
-                    // Filled with the shared connection rows (ui/connection.blp).
-                    Adw.PreferencesGroup login_group {}
-
-                    Adw.PreferencesGroup {
-                      Adw.EntryRow ntfy {
-                        title: _("ntfy server for push (optional)");
-
-                        [prefix]
-                        Gtk.DropDown ntfy_scheme {
-                          valign: center;
-                          model: Gtk.StringList { strings ["https", "http"] };
-                          styles ["flat"]
-                        }
-                      }
-                    }
-
-                    Gtk.Box {
-                      orientation: vertical;
-                      spacing: 6;
-
-                      Gtk.Button connect_goa {
-                        label: _("Connect");
-                        halign: center;
-                        styles ["suggested-action", "pill"]
-                      }
-
-                      Adw.SplitButton login {
-                        label: _("Sign In with Browser");
-                        menu-model: login_menu;
-                        dropdown-tooltip: _("More Sign-In Options");
-                        halign: center;
-                        styles ["suggested-action", "pill"]
-                      }
-
-                      Gtk.Button cancel_login {
-                        label: _("Cancel");
-                        halign: center;
-                        visible: false;
-                        styles ["flat"]
-                      }
-                    }
-                  }
-                }
-              };
-            };
-          }
-        };
+        // The first account to add (ui/add-account.blp, set in src/window.rs `show_welcome`).
+        child: Adw.Bin welcome {};
       }
 
       Gtk.StackPage {
@@ -301,6 +160,13 @@ Adw.ApplicationWindow window {
                     }
                   }
 
+                  // Accounts that are not connected (src/window.rs `update_banners`).
+                  [top]
+                  Adw.Banner banner {
+                    button-label: _("Sign In");
+                    action-name: "win.fix-account";
+                  }
+
                   // Typing on the page opens it too (its key capture widget is set in code).
                   [top]
                   Gtk.SearchBar task_search {
@@ -393,9 +259,4 @@ menu main_menu {
   item (_("Keyboard Shortcuts"), "app.shortcuts")
   item (_("About Todav"), "app.about")
   item (_("Quit"), "app.quit")
-}
-
-menu login_menu {
-  item (_("Copy Login Link"), "win.copy-login")
-  item (_("Sign In with Password…"), "win.password-login")
 }

@@ -8,7 +8,7 @@ use adw::prelude::*;
 use gtk::{gdk, gio, glib};
 use std::cell::RefCell;
 use std::rc::Rc;
-use todav_core::List;
+use todav_core::{AccountKind, List};
 
 /// Nextcloud's colour presets (its colour picker's palette), in its order.
 const PRESETS: [&str; 12] = [
@@ -189,40 +189,47 @@ pub fn context_menu(
     rows.add_controller(hold);
 }
 
-/// Where a list is kept, as its group is headed: the account ("user@host"), or this device.
-pub fn place(local: bool) -> String {
-    match core().account().filter(|_| !local) {
-        Some(a) => {
-            let host = a.url.split_once("://").map_or(a.url.as_str(), |(_, h)| h);
-            format!("{}@{}", a.user, host.trim_end_matches('/'))
-        }
-        None => gettext("On This Device"),
-    }
+/// Where a list is kept, as its group is headed: its account's name.
+pub fn place(account: i64) -> String {
+    core()
+        .account(account)
+        .map(|a| crate::account_name(&a))
+        .unwrap_or_default()
 }
 
-/// Where new lists can go, as (heading, local): the account, then this device in local mode.
-/// ponytail: one account; several would give a place each.
-pub fn places() -> Vec<(String, bool)> {
-    let account = core().account().map(|_| (place(false), false));
-    let device = crate::local_mode().then(|| (place(true), true));
-    account.into_iter().chain(device).collect()
+/// Where new lists can go, as (heading, account): the switched-on accounts that can take one
+/// now (a Nextcloud account connected), in the order they were added.
+pub fn places() -> Vec<(String, i64)> {
+    core()
+        .accounts()
+        .into_iter()
+        .filter(|a| a.enabled && (a.kind == AccountKind::Local || core().connected(a.id)))
+        .map(|a| (crate::account_name(&a), a.id))
+        .collect()
 }
 
-/// Lists grouped by where they are kept: the account's, then this device's, each group in
-/// the order given.
+/// Where account `id` comes among the accounts (the order they were added), for sorting.
+pub fn rank() -> impl Fn(i64) -> usize {
+    let ids: Vec<i64> = core().accounts().iter().map(|a| a.id).collect();
+    move |id| ids.iter().position(|i| *i == id).unwrap_or(usize::MAX)
+}
+
+/// Lists grouped by account, in the order the accounts were added, each group in the order
+/// given.
 pub fn by_place(mut lists: Vec<List>) -> Vec<List> {
-    lists.sort_by_key(|l| l.local);
+    let rank = rank();
+    lists.sort_by_key(|l| rank(l.account));
     lists
 }
 
-/// The heading over each of `lists` (as `by_place` orders them): its place on the first of a
-/// group, when they are in more than one place.
+/// The heading over each of `lists` (as `by_place` orders them): its account on the first of a
+/// group, when they are from more than one.
 pub fn headings(lists: &[List]) -> Vec<Option<String>> {
-    let mixed = lists.iter().any(|l| l.local) && lists.iter().any(|l| !l.local);
+    let mixed = lists.iter().any(|l| l.account != lists[0].account);
     (0..lists.len())
         .map(|i| {
-            let first = i == 0 || lists[i - 1].local != lists[i].local;
-            (mixed && first).then(|| place(lists[i].local))
+            let first = i == 0 || lists[i - 1].account != lists[i].account;
+            (mixed && first).then(|| place(lists[i].account))
         })
         .collect()
 }
@@ -288,35 +295,21 @@ pub fn picker(row: &adw::ComboRow, lists: &[List]) {
     row.set_header_factory(Some(&factory));
 }
 
-/// "On this device only" on the welcome page: local mode on, and the first time a task list
-/// with a task to start from and an empty calendar; lists kept from before just show again.
-pub fn start_local() {
-    let _ = core().set_setting("local_mode".into(), "true".into());
-    let mut all = core().lists();
-    all.extend(core().calendars());
-    if !all.iter().any(|l| l.local) {
-        let start = || -> todav_core::Result<()> {
-            let list = core().create_list(gettext("Tasks"), PRESETS[8].into(), false, true)?;
-            let uid = core()
-                .add_task(list, gettext("Welcome to Todav"), None, None, false)?
-                .uid;
-            let note = gettext(
-                "Tick tasks off when done; open one to add a due date, reminders or subtasks.",
-            );
-            let patch = todav_core::TaskPatch {
-                description: Some(note),
-                ..Default::default()
-            };
-            core().update_task(uid, patch)?;
-            core().create_list(gettext("Calendar"), PRESETS[0].into(), true, true)?;
-            Ok(())
-        };
-        if let Err(e) = start() {
-            crate::window::toast(&e.to_string());
-        }
-    }
-    crate::start_background();
-    crate::window::account_changed();
+/// A new local account's lists: a task list with a task to start from and an empty calendar.
+pub fn start_local(account: i64) -> todav_core::Result<()> {
+    let list = core().create_list(account, gettext("Tasks"), PRESETS[8].into(), false)?;
+    let uid = core()
+        .add_task(list, gettext("Welcome to Todav"), None, None, false)?
+        .uid;
+    let note =
+        gettext("Tick tasks off when done; open one to add a due date, reminders or subtasks.");
+    let patch = todav_core::TaskPatch {
+        description: Some(note),
+        ..Default::default()
+    };
+    core().update_task(uid, patch)?;
+    core().create_list(account, gettext("Calendar"), PRESETS[0].into(), true)?;
+    Ok(())
 }
 
 /// "#rrggbb" (or with alpha) as "#RRGGBB", to compare with the presets and to save.
@@ -464,7 +457,7 @@ pub fn open(parent: &gtk::Widget, list: Option<List>, events: bool) {
         });
     }
 
-    // A new one: on the account or this device, picked when both are there.
+    // A new one: in which account, picked when there is a choice.
     let places = places();
     let place: adw::ComboRow = get(&b, "place");
     let names: gtk::StringList = get(&b, "places");
@@ -513,15 +506,15 @@ pub fn open(parent: &gtk::Widget, list: Option<List>, events: bool) {
             return;
         }
         let (c, href) = (chosen.borrow().clone(), href.clone());
-        let local = places
+        let account = places
             .get(place.selected() as usize)
-            .is_some_and(|(_, local)| *local);
+            .map_or(0, |(_, id)| *id);
         busy2(true);
         let (d, fail) = (d.clone(), fail2.clone());
         glib::spawn_future_local(async move {
             let r = gio::spawn_blocking(move || match href {
                 Some(h) => core().edit_list(h, n, c).map(|_| None),
-                None => core().create_list(n, c, events, local).map(Some),
+                None => core().create_list(account, n, c, events).map(Some),
             })
             .await;
             match r {

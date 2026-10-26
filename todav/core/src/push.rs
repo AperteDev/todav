@@ -29,30 +29,58 @@ pub struct PushStatus {
 const MAX_EXPIRY: i64 = 7 * 86400;
 
 impl Client {
-    /// Register (or refresh) a web-push subscription for every list that advertises a push topic.
-    /// Lists whose registration for this resource still has >25% of its lifetime left are skipped.
+    /// Register (or refresh) a web-push subscription for every list of the switched-on,
+    /// connected accounts that advertises a push topic; one push resource (ntfy topic) for all.
+    /// Lists whose registration for this resource still has >25% of its lifetime left are
+    /// skipped. An account that fails does not stop the others; the first error is returned.
     pub fn push_register(
         &self,
         push_resource: String,
         expires_in_secs: u64,
     ) -> Result<Vec<PushRegistration>> {
-        let dav = self.dav()?;
-        let lifetime = (expires_in_secs as i64).min(MAX_EXPIRY);
-        let (public, auth) = self.push_keys()?;
-        let (lists, old_resource) = {
-            let db = self.db.lock().unwrap();
-            let mut st = db.prepare(
-                "SELECT href, push_registration_href, push_expires, writable FROM lists WHERE push_topic IS NOT NULL",
-            )?;
-            let lists: Vec<(String, Option<String>, Option<i64>, bool)> = st
-                .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?
-                .collect::<rusqlite::Result<_>>()?;
-            (lists, store::kv_get(&db, "push_resource")?)
-        };
+        let old_resource = store::kv_get(&self.db.lock().unwrap(), "push_resource")?;
         if old_resource.as_deref().is_some_and(|r| r != push_resource) {
             self.push_unregister()?;
-            return self.push_register(push_resource, expires_in_secs);
         }
+        let mut out = Vec::new();
+        let mut first_error = None;
+        for a in self.accounts() {
+            if !a.enabled || !self.connected(a.id) {
+                continue;
+            }
+            match self.register(a.id, &push_resource, expires_in_secs) {
+                Ok(r) => out.extend(r),
+                Err(e) => first_error = first_error.or(Some(e)),
+            }
+        }
+        match first_error {
+            Some(e) => Err(e),
+            None => Ok(out),
+        }
+    }
+
+    fn register(
+        &self,
+        account: i64,
+        push_resource: &str,
+        expires_in_secs: u64,
+    ) -> Result<Vec<PushRegistration>> {
+        let dav = self.dav(account)?;
+        let lifetime = (expires_in_secs as i64).min(MAX_EXPIRY);
+        let (public, auth) = self.push_keys()?;
+        let lists = {
+            let db = self.db.lock().unwrap();
+            let mut st = db.prepare(
+                "SELECT href, push_registration_href, push_expires, writable FROM lists
+                 WHERE push_topic IS NOT NULL AND account = ?",
+            )?;
+            let lists: Vec<(String, Option<String>, Option<i64>, bool)> = st
+                .query_map([account], |r| {
+                    Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))
+                })?
+                .collect::<rusqlite::Result<_>>()?;
+            lists
+        };
         let now = crate::now();
         let mut out = Vec::new();
         for (href, reg, expires, writable) in lists {
@@ -69,7 +97,7 @@ impl Client {
             let expires = now + lifetime;
             let body = format!(
                 r#"<?xml version="1.0" encoding="utf-8"?><push-register xmlns="{PUSH}"><subscription><web-push-subscription><push-resource>{}</push-resource><subscription-public-key type="p256dh">{public}</subscription-public-key><auth-secret>{auth}</auth-secret></web-push-subscription></subscription><expires>{}</expires></push-register>"#,
-                xml_escape(&push_resource),
+                xml_escape(push_resource),
                 http_date(expires)
             );
             let r = dav.request("POST", &href, &[], &body)?;
@@ -84,7 +112,7 @@ impl Client {
                 "UPDATE lists SET push_registration_href = ?2, push_expires = ?3 WHERE href = ?1",
                 params![href, location, expires],
             )?;
-            store::kv_set(&db, "push_resource", &push_resource)?;
+            store::kv_set(&db, "push_resource", push_resource)?;
             out.push(PushRegistration {
                 list_href: href,
                 registration_href: location,
@@ -94,17 +122,18 @@ impl Client {
         Ok(out)
     }
 
-    /// What the last discovery and registrations found; nothing until the first sync.
-    pub fn push_status(&self) -> PushStatus {
+    /// What the last discovery and registrations found for an account; nothing until its
+    /// first sync.
+    pub fn push_status(&self, account: i64) -> PushStatus {
         let db = self.db.lock().unwrap();
         db.query_row(
             &format!(
                 "SELECT COUNT(*), COUNT(push_topic),
                    COUNT(CASE WHEN push_registration_href IS NOT NULL AND push_expires > ?1 THEN 1 END)
-                 FROM lists WHERE href NOT LIKE '{}%'",
+                 FROM lists WHERE href NOT LIKE '{}%' AND account = ?2",
                 store::LOCAL
             ),
-            [crate::now()],
+            [crate::now(), account],
             |r| {
                 Ok(PushStatus {
                     calendars: r.get(0)?,
@@ -116,14 +145,34 @@ impl Client {
         .unwrap_or_default()
     }
 
+    /// Stop the servers of every connected account pushing to this device.
     pub fn push_unregister(&self) -> Result<()> {
-        let dav = self.dav()?;
+        let mut first_error = None;
+        for a in self.accounts() {
+            if self.connected(a.id)
+                && let Err(e) = self.unregister(a.id)
+            {
+                first_error = first_error.or(Some(e));
+            }
+        }
+        if let Some(e) = first_error {
+            return Err(e);
+        }
+        let db = self.db.lock().unwrap();
+        db.execute("DELETE FROM kv WHERE key = 'push_resource'", [])?;
+        Ok(())
+    }
+
+    /// Stop the server of `account` pushing to this device.
+    pub(crate) fn unregister(&self, account: i64) -> Result<()> {
+        let dav = self.dav(account)?;
         let regs: Vec<String> = {
             let db = self.db.lock().unwrap();
             let mut st = db.prepare(
-                "SELECT push_registration_href FROM lists WHERE push_registration_href IS NOT NULL",
+                "SELECT push_registration_href FROM lists
+                 WHERE push_registration_href IS NOT NULL AND account = ?",
             )?;
-            st.query_map([], |r| r.get(0))?
+            st.query_map([account], |r| r.get(0))?
                 .collect::<rusqlite::Result<_>>()?
         };
         for reg in regs {
@@ -134,10 +183,9 @@ impl Client {
         }
         let db = self.db.lock().unwrap();
         db.execute(
-            "UPDATE lists SET push_registration_href = NULL, push_expires = NULL",
-            [],
+            "UPDATE lists SET push_registration_href = NULL, push_expires = NULL WHERE account = ?",
+            [account],
         )?;
-        db.execute("DELETE FROM kv WHERE key = 'push_resource'", [])?;
         Ok(())
     }
 
@@ -408,18 +456,20 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("todav-test-push-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let c = Client::open(dir.to_string_lossy().into()).unwrap();
-        assert_eq!(c.push_status(), PushStatus::default());
+        assert_eq!(c.push_status(1), PushStatus::default());
         let later = crate::now() + 3600;
         c.db.lock()
             .unwrap()
             .execute_batch(&format!(
-                "INSERT INTO lists (href, display_name, push_topic, push_registration_href, push_expires) VALUES
-                   ('/a/', 'A', 'ta', '/reg/a', {later}), ('/b/', 'B', 'tb', '/reg/b', 1),
-                   ('/c/', 'C', NULL, NULL, NULL), ('{}x/', 'Here', NULL, NULL, NULL);",
+                "INSERT INTO accounts (id, kind) VALUES (1, 'nextcloud'), (2, 'nextcloud'), (3, 'local');
+                 INSERT INTO lists (href, display_name, push_topic, push_registration_href, push_expires, account) VALUES
+                   ('/a/', 'A', 'ta', '/reg/a', {later}, 1), ('/b/', 'B', 'tb', '/reg/b', 1, 1),
+                   ('/c/', 'C', NULL, NULL, NULL, 1), ('/d/', 'D', 'td', '/reg/d', {later}, 2),
+                   ('{}x/', 'Here', NULL, NULL, NULL, 3);",
                 store::LOCAL
             ))
             .unwrap();
-        let s = c.push_status();
+        let s = c.push_status(1);
         assert_eq!((s.calendars, s.supported, s.registered), (3, 2, 1));
     }
 

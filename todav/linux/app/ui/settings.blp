@@ -53,79 +53,21 @@ Adw.PreferencesDialog dialog {
     title: _("Accounts");
     icon-name: "system-users-symbolic";
 
-    // The status row, then the shared connection rows (ui/connection.blp).
-    Adw.PreferencesGroup account {
-      title: _("Account");
+    // A row per account (src/settings.rs `connect_accounts`), each opening its page
+    // (ui/account.blp).
+    Adw.PreferencesGroup accounts {
+      title: _("Accounts");
 
-      // How Todav is connected now. Signed in here: "Sign Out", with signing in again in its
-      // menu. Not connected: "Sign In with Browser". A GOA account is managed in GNOME Settings.
-      Adw.ActionRow status {
-        [prefix]
-        Gtk.Image status_icon {
-          icon-name: "object-select-symbolic";
-          styles ["success"]
+      header-suffix: Gtk.Button add_account {
+        valign: center;
+        tooltip-text: _("Add Account");
+        styles ["flat"]
+
+        Adw.ButtonContent {
+          icon-name: "list-add-symbolic";
+          label: _("Add");
         }
-
-        [suffix]
-        Gtk.Button cancel_sign_in {
-          label: _("Cancel");
-          valign: center;
-          visible: false;
-          styles ["flat"]
-        }
-
-        [suffix]
-        Adw.SplitButton sign_out {
-          label: _("Sign Out");
-          menu-model: sign_out_menu;
-          dropdown-tooltip: _("Sign In Again");
-          valign: center;
-          styles ["destructive-action"]
-        }
-
-        [suffix]
-        Adw.SplitButton sign_in {
-          label: _("Sign In with Browser");
-          menu-model: sign_in_menu;
-          dropdown-tooltip: _("More Sign-In Options");
-          valign: center;
-        }
-      }
-    }
-
-    // How the server, sync and push are doing (settings.rs `connect_status`); with an account.
-    Adw.PreferencesGroup server_status {
-      title: _("Server Status");
-
-      Adw.ActionRow server_row {
-        title: _("Server");
-
-        [prefix]
-        Gtk.Image server_icon {}
-      }
-
-      Adw.ActionRow sync_row {
-        title: _("Sync");
-
-        [prefix]
-        Gtk.Image sync_icon {}
-      }
-
-      Adw.ActionRow push_row {
-        title: _("DAV Push");
-
-        [prefix]
-        Gtk.Image push_icon {}
-
-        // Without DAV Push on the server: its page in the Nextcloud app store.
-        [suffix]
-        Gtk.Button get_push {
-          label: _("Get DAV Push");
-          tooltip-text: _("Open the DAV Push app in the Nextcloud App Store");
-          valign: center;
-          visible: false;
-        }
-      }
+      };
     }
 
     Adw.PreferencesGroup push {
@@ -154,32 +96,20 @@ Adw.PreferencesDialog dialog {
     Adw.PreferencesGroup sync {
       title: _("Sync");
 
-      Adw.SwitchRow sync_settings {
-        title: _("Sync settings with server");
-        subtitle: _("The Nextcloud server always stays on this device");
-        active: true;
+      // Off, or one of the Nextcloud accounts (src/settings.rs `connect_settings_sync`).
+      Adw.ComboRow settings_account {
+        title: _("Sync settings with");
+        subtitle: _("Accounts and servers always stay on this device");
+        model: Gtk.StringList settings_accounts {};
       }
 
       Adw.SwitchRow sync_ntfy {
         title: _("Sync ntfy server");
         subtitle: _("Use the same push server on all devices");
         active: true;
-        sensitive: bind sync_settings.active;
       }
     }
-
-    // Kept on this device only (setting `local_mode`); off hides those lists, nothing is deleted.
-    Adw.PreferencesGroup {
-      title: _("On This Device");
-
-      Adw.SwitchRow local_mode {
-        title: _("Local lists and calendars");
-        subtitle: _("Kept on this device only, never synced");
-      }
-    }
-  }
-
-  Adw.PreferencesPage {
+  }  Adw.PreferencesPage {
     name: "tasks";
     title: _("Tasks");
     icon-name: "checkbox-checked-symbolic";
@@ -405,15 +335,4 @@ Adw.PreferencesDialog dialog {
       }
     }
   }
-}
-
-menu sign_out_menu {
-  item (_("Sign In Again"), "account.sign-in")
-  item (_("Copy Login Link"), "account.sign-in-copy")
-  item (_("Sign In with Password…"), "account.sign-in-password")
-}
-
-menu sign_in_menu {
-  item (_("Copy Login Link"), "account.sign-in-copy")
-  item (_("Sign In with Password…"), "account.sign-in-password")
 }

@@ -1,16 +1,16 @@
-//! Preferences dialog: General (style, what opens at start), Accounts (account, server
-//! addresses with connection tests, applied on close; sync; local lists), Tasks (order and
-//! display, applied at once), Calendar and Extension.
+//! Preferences dialog: General (style, what opens at start), Accounts (a page per account:
+//! switched on, name, connection, server status; the ntfy server with a connection test,
+//! applied on close; settings sync), Tasks (order and display, applied at once), Calendar and
+//! Extension.
 
-use crate::connection::Connection;
 use crate::core;
-use crate::i18n::{gettext, gettext_noop};
-use crate::window::{get, toast, url_text, view};
+use crate::i18n::{gettext, gettext_noop, pgettext};
+use crate::window::{get, note, url_text, view};
 use adw::prelude::*;
 use gtk::{gio, glib};
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
-use todav_core::Sort;
+use todav_core::{Account, AccountKind, Sort};
 
 type UrlRow = (gtk::DropDown, adw::EntryRow);
 
@@ -236,7 +236,7 @@ fn connect_reminders(b: &gtk::Builder) {
 
 /// Open Preferences on `page` (a page's `name` in ui/settings.blp: "general", "accounts",
 /// "tasks", "calendar", "extension"; `None` for the first), or turn the open ones to it.
-pub fn present(parent: &adw::ApplicationWindow, page: Option<&str>) {
+pub fn present(parent: &adw::ApplicationWindow, page: Option<&str>) -> adw::PreferencesDialog {
     if let Some(open) = parent
         .visible_dialog()
         .and_downcast::<adw::PreferencesDialog>()
@@ -244,7 +244,7 @@ pub fn present(parent: &adw::ApplicationWindow, page: Option<&str>) {
         if let Some(page) = page {
             open.set_visible_page_name(page);
         }
-        return;
+        return open;
     }
     let b = view!("settings");
     let dialog: adw::PreferencesDialog = get(&b, "dialog");
@@ -252,23 +252,14 @@ pub fn present(parent: &adw::ApplicationWindow, page: Option<&str>) {
         dialog.set_visible_page_name(page);
     }
     let ntfy: UrlRow = (get(&b, "ntfy_scheme"), get(&b, "ntfy"));
-    let conn = connect_account(&b, &dialog);
-    let server = conn.server.clone();
-
-    let acc = core().account();
-    let old_server = acc.as_ref().map(|a| a.url.clone()).unwrap_or_default();
-    let user = acc.map(|a| a.user).unwrap_or_default();
-    let manual = crate::goa_id().is_none();
-    let password = crate::password_load(&old_server, &user).unwrap_or_default();
+    connect_accounts(&b, &dialog);
     let old_ntfy = core().setting("ntfy_url".into()).unwrap_or_default();
-    for key in ["sync_settings", "sync_ntfy"] {
-        let sync: adw::SwitchRow = get(&b, key);
-        sync.set_active(core().setting(key.into()).as_deref() != Some("false"));
-        sync.connect_active_notify(move |s| {
-            let _ = core().set_setting(key.into(), s.is_active().to_string());
-            crate::sync_now(); // turning it on pulls the server's settings right away
-        });
-    }
+    let sync_ntfy: adw::SwitchRow = get(&b, "sync_ntfy");
+    sync_ntfy.set_active(core().setting("sync_ntfy".into()).as_deref() != Some("false"));
+    sync_ntfy.connect_active_notify(move |s| {
+        let _ = core().set_setting("sync_ntfy".into(), s.is_active().to_string());
+        crate::sync_now(); // turning it on pulls the server's ntfy server right away
+    });
     let style: adw::ToggleGroup = get(&b, "color_scheme");
     let current = core().setting("color_scheme".into());
     style.set_active_name(Some(match current.as_deref() {
@@ -334,8 +325,6 @@ pub fn present(parent: &adw::ApplicationWindow, page: Option<&str>) {
         Some(gettext_noop("Also places the “Add subtask” field")),
     );
     connect_reminders(&b);
-    connect_local(&b, &dialog);
-    set_url(&server, &old_server);
     set_url(&ntfy, &old_ntfy);
 
     connect_test(
@@ -355,24 +344,30 @@ pub fn present(parent: &adw::ApplicationWindow, page: Option<&str>) {
             }
             crate::restart_push();
         }
-        // Still signed in here and the address edited: same account, moved server.
-        let new_server = url_text(&server);
-        let still_manual = manual && crate::goa_id().is_none() && !conn.goa.is_active();
-        if still_manual && !new_server.is_empty() && new_server != old_server {
-            move_account(
-                old_server.clone(),
-                user.clone(),
-                password.clone(),
-                new_server,
-            );
-        }
     });
     dialog.present(Some(parent));
+    dialog
+}
+
+/// Preferences on account `id`'s page.
+pub fn present_account(parent: &adw::ApplicationWindow, id: i64) {
+    let dialog = present(parent, Some("accounts"));
+    dialog.pop_subpage();
+    dialog.push_subpage(&account_page(&dialog, id));
 }
 
 thread_local! {
-    /// Shows the sync and push state in the open Preferences; set while they are open.
+    /// Shows the sync and push state on the open account page; set while Preferences are open.
     static STATUS: RefCell<Option<Rc<dyn Fn()>>> = const { RefCell::new(None) };
+    /// Shows the accounts in the open Preferences anew.
+    static ACCOUNTS: RefCell<Option<Rc<dyn Fn()>>> = const { RefCell::new(None) };
+}
+
+/// Accounts came, went or changed: the open Preferences show them.
+pub fn accounts_changed() {
+    if let Some(show) = ACCOUNTS.with_borrow(Clone::clone) {
+        show();
+    }
 }
 
 /// A sync started or ended, or push failed or works again: the open Preferences show it.
@@ -404,9 +399,9 @@ fn set_status(row: &adw::ActionRow, icon: &gtk::Image, look: Option<&str>, text:
     }
 }
 
-/// The "Server Status" group: the server (asked each time the returned closure runs), the last
-/// sync and DAV Push, the latter two kept up to date while the dialog is open.
-fn connect_status(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<dyn Fn()> {
+/// The "Server Status" group of account `id`: the server (asked each time the returned closure
+/// runs), the last sync and DAV Push, the latter two kept up to date while the page is open.
+fn connect_status(b: &gtk::Builder, id: i64) -> Rc<dyn Fn()> {
     let (server, server_icon): (adw::ActionRow, gtk::Image) =
         (get(b, "server_row"), get(b, "server_icon"));
     let (sync, sync_icon): (adw::ActionRow, gtk::Image) = (get(b, "sync_row"), get(b, "sync_icon"));
@@ -420,19 +415,19 @@ fn connect_status(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<dyn F
     let show = Rc::new(move || {
         // The last sync, as the sidebar dates say it ("Today 14:32").
         let now = core().local_now();
-        let last = core().last_sync().map(|t| {
+        let last = core().last_sync(id).map(|t| {
             let local = t + now - todav_core::now();
             gettext("Last synced: {time}")
                 .replace("{time}", &crate::dates::label(local, false, now))
         });
         let state = crate::sync_state();
-        match state.strip_prefix("error:") {
+        match crate::sync_error(id) {
             _ if state == "syncing" => set_status(&sync, &sync_icon, None, &gettext("Syncing…")),
             Some(e) => set_status(
                 &sync,
                 &sync_icon,
                 Some("error"),
-                &gettext("Failed: {error}").replace("{error}", e),
+                &gettext("Failed: {error}").replace("{error}", &e),
             ),
             None => match &last {
                 Some(l) => set_status(&sync, &sync_icon, Some("success"), l),
@@ -440,7 +435,7 @@ fn connect_status(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<dyn F
             },
         }
 
-        let p = core().push_status();
+        let p = core().push_status(id);
         let ntfy = !core()
             .setting("ntfy_url".into())
             .unwrap_or_default()
@@ -481,14 +476,13 @@ fn connect_status(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<dyn F
         set_status(&push, &push_icon, look, &text);
     });
     STATUS.set(Some(show.clone()));
-    dialog.connect_closed(|_| STATUS.set(None));
 
     Rc::new(move || {
         show();
         set_status(&server, &server_icon, None, &gettext("Checking…"));
         let (server, icon) = (server.downgrade(), server_icon.downgrade());
         glib::spawn_future_local(async move {
-            let r = gio::spawn_blocking(|| core().server_info()).await;
+            let r = gio::spawn_blocking(move || core().server_info(id)).await;
             let (Some(server), Some(icon)) = (server.upgrade(), icon.upgrade()) else {
                 return;
             };
@@ -515,57 +509,205 @@ fn connect_status(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<dyn F
     })
 }
 
-/// The "Account" group: a status row, then the shared GOA / server rows, applied at once.
-/// Turning GOA on (or picking another account) connects through it; turning it off goes back
-/// to the last browser sign-in, or disconnects without one. Signing in with the browser
-/// replaces the connection (or renews that sign-in).
-fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Connection> {
-    let goa = crate::goa_id();
-    let conn = Connection::new(goa.is_some(), goa.as_deref());
-    conn.attach(&get(b, "account"));
-    let status: adw::ActionRow = get(b, "status");
-    let icon: gtk::Image = get(b, "status_icon");
-    let sign_in: adw::SplitButton = get(b, "sign_in");
-    let sign_out: adw::SplitButton = get(b, "sign_out");
-    // Push and sync are about the account: only with one (local mode runs without).
-    let server_groups: [adw::PreferencesGroup; 2] = [get(b, "push"), get(b, "sync")];
-    let server_status: adw::PreferencesGroup = get(b, "server_status");
-    let check_server = connect_status(b, dialog);
-    // Everything here shows the actual connection, the switch included.
-    let describe = {
-        let (conn, sign_in, sign_out) = (conn.clone(), sign_in.clone(), sign_out.clone());
-        move || {
-            let goa = crate::goa_id().is_some();
-            let acc = core().account();
-            let host = acc.as_ref().map_or(String::new(), |a| {
-                a.url
-                    .split_once("://")
-                    .map_or(a.url.clone(), |(_, h)| h.to_string())
-            });
-            // Remembered but without a password (keyring cleared, GOA account gone): only in
-            // local mode, the app otherwise shows the welcome page. Sign In Again fixes it.
-            let connected = core().connected();
-            match &acc {
-                Some(a) if !connected => {
-                    status.set_title(
-                        &gettext("Account {name} is not connected").replace("{name}", &a.user),
-                    );
-                    status.set_subtitle(&host);
-                }
-                Some(a) if goa => {
-                    status.set_title(&gettext("Connected as {name}").replace("{name}", &a.user));
-                    status.set_subtitle(&format!("{host} · {}", gettext("GNOME Online Accounts")));
-                }
-                Some(a) => {
-                    status.set_title(&gettext("Signed in as {name}").replace("{name}", &a.user));
-                    status.set_subtitle(&host);
-                }
-                None => {
-                    status.set_title(&gettext("Not signed in"));
-                    status.set_subtitle("");
-                }
+/// The "Accounts" group: a row per account opening its page, and Add; with the settings sync
+/// choice, shown anew when accounts change.
+fn connect_accounts(b: &gtk::Builder, dialog: &adw::PreferencesDialog) {
+    let group: adw::PreferencesGroup = get(b, "accounts");
+    let rows: RefCell<Vec<adw::ActionRow>> = RefCell::default();
+    let settings_sync = connect_settings_sync(b);
+    let d = dialog.downgrade();
+    let show: Rc<dyn Fn()> = Rc::new(move || {
+        for r in rows.borrow_mut().drain(..) {
+            group.remove(&r);
+        }
+        let accounts = core().accounts();
+        for a in &accounts {
+            let row = adw::ActionRow::builder()
+                .title(crate::account_name(a))
+                .subtitle(account_state(a))
+                .activatable(true)
+                .build();
+            row.add_prefix(&gtk::Image::from_icon_name(account_icon(a)));
+            if a.enabled && a.kind == AccountKind::Nextcloud && !core().connected(a.id) {
+                let warning = gtk::Image::from_icon_name("dialog-warning-symbolic");
+                warning.add_css_class("warning");
+                row.add_suffix(&warning);
             }
-            icon.set_visible(acc.is_some());
+            row.add_suffix(&gtk::Image::from_icon_name("go-next-symbolic"));
+            let (d, id) = (d.clone(), a.id);
+            row.connect_activated(move |_| {
+                if let Some(d) = d.upgrade() {
+                    d.push_subpage(&account_page(&d, id));
+                }
+            });
+            group.add(&row);
+            rows.borrow_mut().push(row);
+        }
+        settings_sync();
+    });
+    show();
+    ACCOUNTS.set(Some(show));
+    dialog.connect_closed(|_| {
+        ACCOUNTS.set(None);
+        STATUS.set(None);
+    });
+    let d = dialog.clone();
+    get::<gtk::Button>(b, "add_account").connect_clicked(move |_| {
+        let d2 = d.clone();
+        crate::add_account::dialog(&d, move |id| {
+            accounts_changed();
+            crate::window::account_changed();
+            crate::calendar::refresh();
+            if let Some(a) = core().account(id) {
+                let name = crate::account_name(&a);
+                d2.add_toast(note(&gettext("{name} added").replace("{name}", &name)));
+            }
+        });
+    });
+}
+
+fn account_icon(a: &Account) -> &'static str {
+    match a.kind {
+        AccountKind::Local => "computer-symbolic",
+        AccountKind::Nextcloud if !a.source.is_empty() => "goa-panel-symbolic",
+        AccountKind::Nextcloud => "network-server-symbolic",
+    }
+}
+
+/// An account row's subtitle: what it is, or why it does not sync.
+fn account_state(a: &Account) -> String {
+    match a.kind {
+        _ if !a.enabled => pgettext("account", "Off"),
+        AccountKind::Local => gettext("Lists and calendars that stay on this computer"),
+        AccountKind::Nextcloud if !core().connected(a.id) => gettext("Not connected"),
+        AccountKind::Nextcloud if !a.source.is_empty() => gettext("GNOME Online Accounts"),
+        AccountKind::Nextcloud => gettext("Nextcloud server"),
+    }
+}
+
+/// "Sync settings with": off, or a Nextcloud account; the returned closure fills it anew.
+fn connect_settings_sync(b: &gtk::Builder) -> impl Fn() + 'static {
+    let row: adw::ComboRow = get(b, "settings_account");
+    let names: gtk::StringList = get(b, "settings_accounts");
+    let ntfy: adw::SwitchRow = get(b, "sync_ntfy");
+    let ids: Rc<RefCell<Vec<Option<i64>>>> = Rc::default();
+    let filling = Rc::new(Cell::new(false));
+    let (i, f, n) = (ids.clone(), filling.clone(), ntfy.clone());
+    row.connect_selected_notify(move |r| {
+        if f.get() {
+            return;
+        }
+        let id = i.borrow().get(r.selected() as usize).copied().flatten();
+        let _ = core().set_settings_account(id);
+        n.set_sensitive(id.is_some());
+        crate::sync_now(); // pulls that account's settings right away
+    });
+    move || {
+        filling.set(true);
+        let mut v = vec![None];
+        let mut labels = vec![pgettext("settings sync", "Off")];
+        for a in core().accounts() {
+            if a.kind == AccountKind::Nextcloud {
+                v.push(Some(a.id));
+                labels.push(crate::account_name(&a));
+            }
+        }
+        let labels: Vec<&str> = labels.iter().map(String::as_str).collect();
+        names.splice(0, names.n_items(), &labels);
+        let current = core().settings_account();
+        row.set_selected(v.iter().position(|i| *i == current).unwrap_or(0) as u32);
+        ntfy.set_sensitive(current.is_some());
+        *ids.borrow_mut() = v;
+        filling.set(false);
+    }
+}
+
+/// Account `id`'s page: switched on, its name; for a Nextcloud account how it is connected
+/// (signed in here: sign in again, the server's address) and the server status; Remove.
+fn account_page(dialog: &adw::PreferencesDialog, id: i64) -> adw::NavigationPage {
+    let b = view!("account");
+    let page: adw::NavigationPage = get(&b, "page");
+    let Some(a) = core().account(id) else {
+        return page;
+    };
+    page.set_title(&crate::account_name(&a));
+    let nextcloud = a.kind == AccountKind::Nextcloud;
+    let manual = nextcloud && a.source.is_empty();
+    get::<gtk::Widget>(&b, "connection").set_visible(nextcloud);
+
+    let enabled: adw::SwitchRow = get(&b, "enabled");
+    enabled.set_active(a.enabled);
+    enabled.connect_active_notify(move |r| {
+        let on = r.is_active();
+        glib::spawn_future_local(async move {
+            crate::enable_account(id, on).await;
+            accounts_changed();
+            status_changed();
+        });
+    });
+
+    // Shown with the name it has without one; applying that name gives that back.
+    let name: adw::EntryRow = get(&b, "name");
+    name.set_text(&crate::account_name(&a));
+    let p = page.clone();
+    name.connect_apply(move |e| {
+        let Some(mut a) = core().account(id) else {
+            return;
+        };
+        a.name = String::new();
+        let text = e.text().trim().to_string();
+        let given = if text == crate::account_name(&a) {
+            String::new()
+        } else {
+            text
+        };
+        let _ = core().rename_account(id, given);
+        if let Some(a) = core().account(id) {
+            p.set_title(&crate::account_name(&a));
+            e.set_text(&crate::account_name(&a));
+        }
+        accounts_changed();
+        crate::window::lists_changed();
+        crate::calendar::refresh();
+    });
+
+    let status: adw::ActionRow = get(&b, "status");
+    let icon: gtk::Image = get(&b, "status_icon");
+    let sign_in: adw::SplitButton = get(&b, "sign_in");
+    let cancel: gtk::Button = get(&b, "cancel_sign_in");
+    let server: UrlRow = (get(&b, "server_scheme"), get(&b, "server"));
+    let server_status: adw::PreferencesGroup = get(&b, "server_status");
+    server_status.set_visible(false); // a Nextcloud account's, while connected (`describe`)
+    set_url(&server, &a.url);
+    server.1.set_visible(manual);
+    sign_in.set_visible(manual);
+    let check_server: Rc<dyn Fn()> = if nextcloud {
+        connect_status(&b, id)
+    } else {
+        Rc::new(|| {})
+    };
+    let describe: Rc<dyn Fn()> = {
+        let (status, icon) = (status.clone(), icon.clone());
+        Rc::new(move || {
+            let Some(a) = core().account(id) else {
+                return;
+            };
+            let connected = core().connected(id);
+            let host = a.url.split_once("://").map_or(a.url.as_str(), |(_, h)| h);
+            if !connected {
+                status.set_title(&gettext("Not connected"));
+                status.set_subtitle(&if manual {
+                    gettext("Sign in again to sync it")
+                } else {
+                    gettext("Check the account in Settings → Online Accounts")
+                });
+            } else if manual {
+                status.set_title(&gettext("Signed in as {name}").replace("{name}", &a.user));
+                status.set_subtitle(host);
+            } else {
+                status.set_title(&gettext("Connected as {name}").replace("{name}", &a.user));
+                status.set_subtitle(&format!("{host} · {}", gettext("GNOME Online Accounts")));
+            }
             icon.set_icon_name(Some(if connected {
                 "object-select-symbolic"
             } else {
@@ -578,71 +720,48 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
                     icon.remove_css_class(class);
                 }
             }
-            for g in &server_groups {
-                g.set_sensitive(connected);
-            }
-            server_status.set_visible(connected);
-            if connected {
+            server_status.set_visible(connected && a.enabled);
+            if connected && a.enabled {
                 check_server();
             }
-            sign_out.set_visible(acc.is_some() && !goa);
-            sign_in.set_visible(acc.is_none());
-            conn.goa.set_active(goa); // its handler sees nothing to change
-            conn.goa.set_sensitive(conn.has_accounts());
+        })
+    };
+    if nextcloud {
+        describe();
+    }
+
+    // A new app password for the account (the same user on its server).
+    let reconnect = {
+        let (d, describe) = (dialog.downgrade(), describe.clone());
+        move |c: todav_core::Credentials| {
+            let (d, describe) = (d.clone(), describe.clone());
+            glib::spawn_future_local(async move {
+                let Some(a) = core().account(id) else { return };
+                let msg = if c.login_name != a.user {
+                    gettext("Signed in as {name}: add that as another account")
+                        .replace("{name}", &c.login_name)
+                } else {
+                    match crate::reconnect(id, a.url.clone(), c.app_password).await {
+                        Ok(()) => gettext("Signed in as {name}").replace("{name}", &a.user),
+                        Err(e) => e,
+                    }
+                };
+                describe();
+                accounts_changed();
+                crate::window::account_changed();
+                if let Some(d) = d.upgrade() {
+                    d.add_toast(note(&msg));
+                }
+            });
         }
     };
-    describe();
-
-    let (d, c, show) = (dialog.clone(), conn.clone(), describe.clone());
-    conn.connect_changed(move || {
-        let current = crate::goa_id();
-        let chosen = c.chosen();
-        if chosen.as_ref().map(|a| &a.id) == current.as_ref() {
-            return; // already so
-        }
-        c.goa.set_sensitive(false);
-        let (d, show) = (d.clone(), show.clone());
-        glib::spawn_future_local(async move {
-            let r = match chosen {
-                Some(a) => {
-                    let name = a.name.clone();
-                    crate::switch_account(crate::Target::Goa(a))
-                        .await
-                        .map(|()| gettext("Connected as {name}").replace("{name}", &name))
-                }
-                None => match crate::remembered_sign_in() {
-                    Some(c) => {
-                        let who = c.login_name.clone();
-                        crate::switch_account(crate::Target::Manual(c))
-                            .await
-                            .map(|()| gettext("Signed in as {name}").replace("{name}", &who))
-                    }
-                    None => crate::disconnect(false)
-                        .await
-                        .map(|()| gettext("Disconnected")),
-                },
-            };
-            if r.is_ok() && core().account().is_some() {
-                crate::window::account_changed();
-            }
-            show(); // also puts the switch back when that failed
-            d.add_toast(crate::window::note(&r.unwrap_or_else(|e| e)));
-        });
-    });
-
-    // Back from "Waiting for …" once a sign-in ends or is cancelled.
-    let cancel: gtk::Button = get(b, "cancel_sign_in");
     let reset = {
-        let (sign_in, sign_out, cancel) = (sign_in.clone(), sign_out.clone(), cancel.clone());
-        let labels = (sign_in.label(), sign_out.label());
-        let describe = describe.clone();
+        let (sign_in, cancel) = (sign_in.clone(), cancel.clone());
+        let label = sign_in.label();
         move || {
-            for (button, label) in [(&sign_in, &labels.0), (&sign_out, &labels.1)] {
-                button.set_sensitive(true);
-                button.set_label(label.as_deref().unwrap_or_default());
-            }
+            sign_in.set_sensitive(true);
+            sign_in.set_label(label.as_deref().unwrap_or_default());
             cancel.set_visible(false);
-            describe();
         }
     };
     let r = reset.clone();
@@ -650,154 +769,145 @@ fn connect_account(b: &gtk::Builder, dialog: &adw::PreferencesDialog) -> Rc<Conn
         crate::window::cancel_login();
         r();
     });
-
-    // Sign in with the browser (or by a copied link): renews the account signed in to here, or
-    // replaces the GOA one.
     let start = {
-        let (d, c, sign_in, sign_out) = (
-            dialog.clone(),
-            conn.clone(),
+        let (sign_in, cancel, d, reconnect) = (
             sign_in.clone(),
-            sign_out.clone(),
+            cancel.clone(),
+            dialog.downgrade(),
+            reconnect.clone(),
         );
         move |copy: bool| {
-            let server = url_text(&c.server);
-            if server.is_empty() {
-                d.add_toast(crate::window::note(&crate::window::no_server()));
-                return;
-            }
-            let button = if sign_in.is_visible() {
-                &sign_in
-            } else {
-                &sign_out
-            };
-            button.set_sensitive(false);
-            button.set_label(&if copy {
+            sign_in.set_sensitive(false);
+            sign_in.set_label(&if copy {
                 gettext("Waiting for Sign-In…")
             } else {
                 gettext("Waiting for Browser…")
             });
             cancel.set_visible(true);
-            let (d, reset) = (d.clone(), reset.clone());
+            let (d, reset, reconnect) = (d.clone(), reset.clone(), reconnect.clone());
+            let url = core().account(id).map(|a| a.url).unwrap_or_default();
             glib::spawn_future_local(async move {
-                let msg = match crate::window::browser_login(server, copy).await {
-                    Ok(Some(c)) => use_sign_in(c).await,
+                match crate::window::browser_login(url, copy).await {
+                    Ok(Some(c)) => reconnect(c),
                     Ok(None) => return, // cancelled: Cancel or closing the dialog reset it
-                    Err(e) => e,
-                };
+                    Err(e) => {
+                        if let Some(d) = d.upgrade() {
+                            d.add_toast(note(&e));
+                        }
+                    }
+                }
                 reset();
-                d.add_toast(crate::window::note(&msg));
             });
         }
     };
     let actions = gio::SimpleActionGroup::new();
-    for (name, copy) in [("sign-in", false), ("sign-in-copy", true)] {
-        let action = gio::SimpleAction::new(name, None);
-        let start = start.clone();
-        action.connect_activate(move |_, _| start(copy));
-        actions.add_action(&action);
-    }
-    // Or with a login name and app password typed in.
+    let copy = gio::SimpleAction::new("sign-in-copy", None);
+    let s = start.clone();
+    copy.connect_activate(move |_, _| s(true));
+    actions.add_action(&copy);
+    // Or with the app password typed in.
     let password = gio::SimpleAction::new("sign-in-password", None);
-    let (d, c, describe_) = (dialog.clone(), conn.clone(), describe.clone());
+    let d = dialog.downgrade();
     password.connect_activate(move |_, _| {
-        let server = url_text(&c.server);
-        if server.is_empty() {
-            d.add_toast(crate::window::note(&crate::window::no_server()));
+        let (Some(d), Some(a)) = (d.upgrade(), core().account(id)) else {
             return;
-        }
-        let (dd, show) = (d.clone(), describe_.clone());
-        crate::window::password_login(&d, server, move |c| {
-            let (d, show) = (dd.clone(), show.clone());
-            glib::spawn_future_local(async move {
-                let msg = use_sign_in(c).await;
-                show();
-                d.add_toast(crate::window::note(&msg));
-            });
-        });
+        };
+        crate::window::password_login(&d, a.url, Some(a.user), reconnect.clone());
     });
     actions.add_action(&password);
-    dialog.insert_action_group("account", Some(&actions));
+    page.insert_action_group("account", Some(&actions));
     sign_in.connect_clicked(move |_| start(false));
-    // Only offered for a browser sign-in; a GOA account is managed in GNOME Settings.
-    // The welcome page at once; pending changes still go up first, in the background.
-    let d = dialog.clone();
-    sign_out.connect_clicked(move |_| {
-        crate::forget_sign_in();
-        d.close();
-        crate::window::show_welcome();
-        glib::spawn_future_local(async {
-            if let Err(e) = crate::disconnect(true).await {
-                crate::window::toast(&e);
-            }
-        });
-    });
-    // A sign-in still waiting for the browser stops with the dialog.
-    dialog.connect_closed(|_| crate::window::cancel_login());
-    conn
-}
 
-/// The "Local lists and calendars" switch. Off hides those lists, nothing is deleted: when
-/// there are some it asks first; with no account it goes back to the welcome page.
-fn connect_local(b: &gtk::Builder, dialog: &adw::PreferencesDialog) {
-    let row: adw::SwitchRow = get(b, "local_mode");
-    row.set_active(crate::local_mode());
-    let d = dialog.clone();
-    row.connect_active_notify(move |r| {
-        let on = r.is_active();
-        if on == crate::local_mode() {
-            return; // put back after Cancel
+    // Another address: the same account on a moved server.
+    let (d, describe_, row) = (dialog.downgrade(), describe.clone(), server.1.clone());
+    row.connect_apply(move |_| {
+        let Some(a) = core().account(id) else { return };
+        let url = url_text(&server);
+        if url.is_empty() || url == a.url {
+            return;
         }
-        let account = core().connected();
-        let mut all = core().lists();
-        all.extend(core().calendars());
-        let dialog = d.clone();
-        let apply = move |on: bool| {
-            let _ = core().set_setting("local_mode".into(), on.to_string());
-            if account {
-                crate::window::account_changed();
-                crate::calendar::refresh();
-            } else {
-                dialog.close();
-                crate::window::show_welcome();
-            }
-        };
-        if on || (account && !all.iter().any(|l| l.local)) {
-            return apply(on);
-        }
-        let (d, r) = (d.clone(), r.clone());
+        let (d, describe) = (d.clone(), describe_.clone());
         glib::spawn_future_local(async move {
-            let alert = adw::AlertDialog::new(
-                Some(&gettext("Turn Off Local Lists?")),
-                Some(&gettext(
-                    "Local lists and calendars will be hidden until you turn them on again.",
-                )),
-            );
-            alert.add_responses(&[
-                ("cancel", &gettext("Cancel")),
-                ("off", &gettext("Turn Off")),
-            ]);
-            alert.set_response_appearance("off", adw::ResponseAppearance::Destructive);
-            alert.set_default_response(Some("cancel"));
-            alert.set_close_response("cancel");
-            if alert.choose_future(Some(&d)).await == "off" {
-                apply(false);
-            } else {
-                r.set_active(true);
+            let msg = match crate::password_load(&a.url, &a.user) {
+                None => gettext("No saved password: sign in again first"),
+                Some(pw) => match crate::reconnect(id, url, pw).await {
+                    Ok(()) => gettext("Nextcloud server changed"),
+                    Err(e) => e,
+                },
+            };
+            describe();
+            accounts_changed();
+            crate::window::account_changed();
+            crate::calendar::refresh();
+            if let Some(d) = d.upgrade() {
+                d.add_toast(note(&msg));
             }
         });
     });
+
+    let d = dialog.downgrade();
+    get::<gtk::Button>(&b, "remove").connect_clicked(move |_| {
+        if let Some(d) = d.upgrade() {
+            glib::spawn_future_local(remove_account(d, id));
+        }
+    });
+    page
 }
 
-/// Connect with credentials from a sign-in here; the message for a toast.
-async fn use_sign_in(c: todav_core::Credentials) -> String {
-    let who = c.login_name.clone();
-    match crate::switch_account(crate::Target::Manual(c)).await {
-        Ok(()) => {
-            crate::window::account_changed();
-            gettext("Signed in as {name}").replace("{name}", &who)
+/// Remove account `id` after asking; when its changes cannot be uploaded first, asks again
+/// whether to lose them.
+async fn remove_account(dialog: adw::PreferencesDialog, id: i64) {
+    let Some(a) = core().account(id) else { return };
+    let name = crate::account_name(&a);
+    let body = match a.kind {
+        AccountKind::Local => gettext(
+            "Its lists and calendars, with everything in them, are deleted from this device. \
+             This cannot be undone.",
+        ),
+        AccountKind::Nextcloud => gettext(
+            "Its lists and calendars leave this device; they stay on the server. Switch it \
+             off instead to only hide them.",
+        ),
+    };
+    let ask = |heading: String, body: String, yes: String| {
+        let alert = adw::AlertDialog::new(Some(&heading), Some(&body));
+        alert.add_responses(&[("cancel", &gettext("Cancel")), ("remove", &yes)]);
+        alert.set_response_appearance("remove", adw::ResponseAppearance::Destructive);
+        alert.set_default_response(Some("cancel"));
+        alert.set_close_response("cancel");
+        alert
+    };
+    let alert = ask(
+        gettext("Remove {name}?").replace("{name}", &name),
+        body,
+        gettext("Remove"),
+    );
+    if alert.choose_future(Some(&dialog)).await != "remove" {
+        return;
+    }
+    let mut r = crate::remove_account(id, false).await;
+    if let Err(e) = &r {
+        let alert = ask(
+            gettext("Remove Without Uploading?"),
+            gettext("{error}. Changes made here that the server does not have yet will be lost.")
+                .replace("{error}", e),
+            gettext("Remove Anyway"),
+        );
+        if alert.choose_future(Some(&dialog)).await != "remove" {
+            return;
         }
-        Err(e) => e,
+        r = crate::remove_account(id, true).await;
+    }
+    match r {
+        Ok(()) if core().accounts().is_empty() => {
+            dialog.close();
+        }
+        Ok(()) => {
+            dialog.pop_subpage();
+            accounts_changed();
+            dialog.add_toast(note(&gettext("{name} removed").replace("{name}", &name)));
+        }
+        Err(e) => dialog.add_toast(note(&e)),
     }
 }
 
@@ -836,37 +946,5 @@ fn connect_test(
             button.set_sensitive(true);
             dialog.add_toast(crate::window::note(&msg));
         });
-    });
-}
-
-/// Point the account at a new server address, keeping the user and app password.
-fn move_account(old: String, user: String, password: String, new: String) {
-    glib::spawn_future_local(async move {
-        let r = gio::spawn_blocking(move || -> Result<(), String> {
-            // Switching servers drops the local copy, so pending edits must reach the old one first.
-            core().sync().map_err(|e| {
-                gettext("Server not changed, cannot upload pending changes: {error}")
-                    .replace("{error}", &e.to_string())
-            })?;
-            let _ = core().push_unregister();
-            core()
-                .set_account(new.clone(), user.clone(), password.clone())
-                .map_err(|e| e.to_string())?;
-            crate::password_store(&new, &user, &password).map_err(|e| {
-                gettext("Cannot save password: {error}").replace("{error}", &e.to_string())
-            })?;
-            crate::password_clear(&old, &user);
-            Ok(())
-        })
-        .await;
-        match r {
-            Ok(Ok(())) => {
-                toast(&gettext("Nextcloud server changed"));
-                crate::sync_now();
-                crate::restart_push(); // register push on the new server now, not within the hour
-            }
-            Ok(Err(e)) => toast(&e),
-            Err(_) => toast(&gettext("Changing the server failed")),
-        }
     });
 }

@@ -55,13 +55,21 @@
   `DEVICE_ONLY` in `todav/core/src/settings.rs`.
 - Store settings with `Client::set_setting` / `Client::setting`. `set_setting` records the change
   time; when syncing, the newer value wins implicitly per key (the server wins ties).
-- Synced settings live in Nextcloud Files at `.config/todav/settings.json`, merged on every sync.
+- Synced settings live in Nextcloud Files at `.config/todav/settings.json` of the account picked
+  for them (device-only `settings_account`, `Client::set_settings_account`), merged on every sync
+  of that account.
 - The GNOME extension keeps no settings of its own: its options are app settings `ext_*`
   (`EXTENSION` in `todav/linux/app/src/settings.rs`, Preferences → Extension), read over D-Bus
   (`GetSettings`; it may set only those keys). Its settings button opens that page in the app.
-- The user can turn syncing off with "Sync settings with server" (Preferences → Accounts),
-  stored as the device-only `sync_settings` setting; on by default. The ntfy server
-  (`ntfy_url`) syncs with them unless "Sync ntfy server" (`sync_ntfy`) is off.
+- The user picks that account, or none, with "Sync settings with" (Preferences → Accounts); the
+  welcome page sets it to the account added there unless its switch is turned off. The ntfy
+  server (`ntfy_url`) syncs with them unless "Sync ntfy server" (`sync_ntfy`) is off.
+
+## Accounts
+
+- Lists belong to accounts (`accounts` table): Nextcloud ones and the local one, at most one.
+  Anything per server (connection, push registration, category file, last sync) is per account;
+  per-account `kv` keys are `a<id>_…` (`account::key`). Lists are keyed by their full URL.
 
 ## Undo
 

@@ -1,5 +1,6 @@
 //! `todav/config.json` in Nextcloud Files: category order and icons per list, plus grouping.
 
+use crate::caldav::Dav;
 use crate::json::Json;
 use crate::{Client, Error, Result, Task, store};
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -58,14 +59,15 @@ fn list_key(list_href: &str) -> &str {
 }
 
 impl Client {
-    /// Fetch config.json if it changed (ETag), or create it from the categories in use when missing.
-    pub(crate) fn sync_config(&self) -> Result<()> {
-        let dav = self.dav()?;
+    /// Fetch the account's config.json if it changed (ETag), or create it from the categories
+    /// in use when missing.
+    pub(crate) fn sync_config(&self, account: i64, dav: &Dav) -> Result<()> {
+        let k = |name: &str| crate::account::key(account, name);
         let (href, etag) = {
             let db = self.db.lock().unwrap();
             (
-                store::kv_get(&db, "config_href")?,
-                store::kv_get(&db, "config_etag")?,
+                store::kv_get(&db, &k("config_href"))?,
+                store::kv_get(&db, &k("config_etag"))?,
             )
         };
         let href = match href {
@@ -76,7 +78,7 @@ impl Client {
                     "/remote.php/dav/files/{}/todav/config.json",
                     list_key(&principal)
                 );
-                store::kv_set(&self.db.lock().unwrap(), "config_href", &h)?;
+                store::kv_set(&self.db.lock().unwrap(), &k("config_href"), &h)?;
                 h
             }
         };
@@ -90,7 +92,7 @@ impl Client {
             304 => return Ok(()),
             200 => (r.body, r.etag),
             404 => {
-                let body = self.default_config().to_string();
+                let body = self.default_config(account).to_string();
                 let dir = &href[..href.rfind('/').unwrap() + 1];
                 dav.request("MKCOL", dir, &[], "")?; // 405 if it exists: fine
                 let r = dav.request(
@@ -111,19 +113,20 @@ impl Client {
         };
         {
             let db = self.db.lock().unwrap();
-            store::kv_set(&db, "config_json", &body)?;
-            store::kv_set(&db, "config_etag", etag.as_deref().unwrap_or_default())?;
+            store::kv_set(&db, &k("config_json"), &body)?;
+            let etag = etag.as_deref().unwrap_or_default();
+            store::kv_set(&db, &k("config_etag"), etag)?;
         }
-        for l in self.lists() {
+        for l in self.lists().iter().filter(|l| l.account == account) {
             self.emit(&l.href, Vec::new());
         }
         Ok(())
     }
 
-    /// Categories in use per list, in order of first appearance.
-    fn default_config(&self) -> Json {
+    /// Categories in use per list of the account, in order of first appearance.
+    fn default_config(&self, account: i64) -> Json {
         let mut lists = BTreeMap::new();
-        for l in self.lists() {
+        for l in self.lists().into_iter().filter(|l| l.account == account) {
             let mut seen = HashSet::new();
             let cats: Vec<Json> = self
                 .tasks(l.href.clone(), true)
@@ -150,11 +153,14 @@ impl Client {
         ]))
     }
 
-    /// Configured categories of a list, in configured order.
+    /// Configured categories of a list (in its account's config.json), in configured order.
     pub fn categories(&self, list_href: String) -> Vec<CategoryMeta> {
-        let raw = store::kv_get(&self.db.lock().unwrap(), "config_json")
-            .ok()
-            .flatten();
+        let raw = {
+            let db = self.db.lock().unwrap();
+            let account = store::list_account(&db, &list_href).unwrap_or(0);
+            let k = crate::account::key(account, "config_json");
+            store::kv_get(&db, &k).ok().flatten()
+        };
         let Some(cfg) = raw.as_deref().and_then(Json::parse) else {
             return Vec::new();
         };
