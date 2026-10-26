@@ -371,6 +371,17 @@ impl Todav {
         Ok(self.c().set_done(uid, done)?)
     }
 
+    /// As `set_done`, one change for undo. With `tree`, completing also completes the task's
+    /// open subtasks and reopening reopens its completed parents (`SubtaskCompletion::Complete`).
+    pub fn set_done_tree(&self, uid: String, done: bool, tree: bool) -> Result<()> {
+        Ok(todav_app::tasks::set_done(self.c(), &uid, done, tree)?)
+    }
+
+    /// The task's open subtasks, at any depth.
+    pub fn open_subtasks(&self, uid: String) -> Vec<Task> {
+        todav_app::tasks::open_subtasks(self.c(), &uid)
+    }
+
     pub fn update_task(&self, uid: String, patch: TaskPatch) -> Result<()> {
         Ok(self.c().update_task(uid, patch.into())?)
     }
@@ -634,6 +645,15 @@ impl Todav {
 
     pub fn mini_dots(&self) -> bool {
         todav_app::prefs::mini_dots(self.c())
+    }
+
+    pub fn subtask_completion(&self) -> SubtaskCompletion {
+        todav_app::prefs::subtask_completion(self.c())
+    }
+
+    /// Whether a click on a task's title edits it in place (mouse and touchpad only).
+    pub fn inline_edit(&self) -> bool {
+        todav_app::prefs::inline_edit(self.c())
     }
 
     pub fn double_click_edit(&self) -> bool {

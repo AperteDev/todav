@@ -57,6 +57,32 @@ pub fn done_view(c: &Client) -> DoneView {
     }
 }
 
+/// What completing a task with open subtasks does (`complete_subtasks`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SubtaskCompletion {
+    /// They are completed too, and reopening one reopens its completed parents (as in Nextcloud
+    /// Tasks): a completed task never has open subtasks. The default.
+    Complete,
+    /// They stay open, under their completed parent.
+    Keep,
+    /// The front-end asks which of the two; where it cannot, they stay open.
+    Ask,
+}
+
+pub fn subtask_completion(c: &Client) -> SubtaskCompletion {
+    match c.setting("complete_subtasks".into()).as_deref() {
+        Some("keep") => SubtaskCompletion::Keep,
+        Some("ask") => SubtaskCompletion::Ask,
+        _ => SubtaskCompletion::Complete,
+    }
+}
+
+/// Whether a click on a task's title edits it in place (`inline_edit`; off by default). Only
+/// with a mouse or touchpad: a tap still opens the task.
+pub fn inline_edit(c: &Client) -> bool {
+    c.setting("inline_edit".into()).as_deref() == Some("true")
+}
+
 /// A switch that is on unless turned off.
 fn on(c: &Client, key: &str) -> bool {
     c.setting(key.into()).as_deref() != Some("false")

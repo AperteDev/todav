@@ -265,26 +265,25 @@ fn split(tasks: Vec<Task>, view: DoneView) -> (Vec<Task>, Vec<Task>) {
     (tree, finished)
 }
 
-/// (open tree, finished): a done task stays in the open tree while its parent does.
+/// (open tree, finished): a tree stays among the open tasks, done tasks and all, while a task in
+/// it is open; a completed parent with open subtasks keeps them under it.
 fn split_done(tasks: Vec<Task>) -> (Vec<Task>, Vec<Task>) {
     let by_uid: HashMap<&str, &Task> = tasks.iter().map(|t| (t.uid.as_str(), t)).collect();
-    let in_tree = |t: &Task| {
+    let top = |t: &Task| {
         let mut t = t;
-        for _ in 0..=by_uid.len() {
-            // bounded: RELATED-TO from a server can form a cycle
-            if !t.done {
-                return true;
-            }
+        // bounded: RELATED-TO from a server can form a cycle
+        for _ in 0..by_uid.len() {
             match t.parent_uid.as_deref().and_then(|p| by_uid.get(p)) {
                 Some(p) => t = p,
-                None => return false,
+                None => break,
             }
         }
-        false
+        t.uid.clone()
     };
+    let open: HashSet<String> = tasks.iter().filter(|t| !t.done).map(top).collect();
     let keep: HashSet<String> = tasks
         .iter()
-        .filter(|t| in_tree(t))
+        .filter(|t| open.contains(&top(t)))
         .map(|t| t.uid.clone())
         .collect();
     tasks.into_iter().partition(|t| keep.contains(&t.uid))
@@ -537,7 +536,7 @@ mod tests {
     }
 
     #[test]
-    fn done_subtasks_stay_under_open_parents() {
+    fn trees_stay_open_while_a_task_in_them_is() {
         let done = |uid, parent| Task {
             done: true,
             ..task(uid, None, parent)
@@ -554,11 +553,18 @@ mod tests {
         ];
         let (tree, finished) = split_done(tasks.clone());
         let uids = |v: &[Task]| v.iter().map(|t| t.uid.clone()).collect::<Vec<_>>();
-        assert_eq!(uids(&tree), ["root", "sub", "subsub", "open_under_closed"]);
         assert_eq!(
-            uids(&finished),
-            ["closed", "closed_sub", "loop_a", "loop_b"]
+            uids(&tree),
+            [
+                "root",
+                "sub",
+                "subsub",
+                "closed",
+                "closed_sub",
+                "open_under_closed"
+            ]
         );
+        assert_eq!(uids(&finished), ["loop_a", "loop_b"]);
 
         // In place: nothing finished. Hidden subtasks: done tasks under a shown parent go.
         let (all, none) = split(
@@ -575,8 +581,8 @@ mod tests {
             ..Default::default()
         };
         let (tree, finished) = split(tasks.clone(), hide(false));
-        assert_eq!(uids(&tree), ["root", "open_under_closed"]);
-        assert_eq!(uids(&finished), ["closed"]); // the loop has no top: both hide each other
+        assert_eq!(uids(&tree), ["root", "closed", "open_under_closed"]);
+        assert!(finished.is_empty()); // the loop has no top: both hide each other
         let (tree, _) = split(tasks, hide(true));
         assert_eq!(uids(&tree), ["root", "closed", "open_under_closed"]);
     }

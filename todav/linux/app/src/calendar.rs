@@ -9,7 +9,7 @@ mod week;
 
 use crate::i18n::{gettext, ngettext, pgettext};
 use crate::lists::class;
-use crate::window::{get, view};
+use crate::window::{get, tick, view};
 use crate::{core, dates, request_sync};
 use adw::prelude::*;
 use gtk::{gdk, gio, glib};
@@ -151,7 +151,7 @@ fn today() -> i64 {
 /// Add the Calendar page to the window's view stack.
 pub fn build(views: &adw::ViewStack) {
     let b = view!("calendar");
-    crate::window::add_banner(get(&b, "banner"));
+    crate::window::add_banner(get(&b, "banner"), get(&b, "update_banner"));
     let split: adw::NavigationSplitView = get(&b, "split");
     // Its own breakpoints, the narrowest last (the last matching one wins): tight, the view
     // switcher moves to a bar at the bottom and the sync button goes (F5 still syncs); narrow,
@@ -1105,11 +1105,7 @@ fn task_chip(c: &Rc<Cal>, t: &Task, label: &gtk::Widget, check_align: gtk::Align
         .valign(check_align)
         .build();
     let uid = t.uid.clone();
-    check.connect_toggled(move |b| {
-        if core().set_done(uid.clone(), b.is_active()).is_ok() {
-            request_sync();
-        }
-    });
+    check.connect_toggled(move |b| tick(b, &uid, || {}));
     let content = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     content.append(&check);
     if let Some(w) = crate::window::sync_warning(t) {
@@ -1294,10 +1290,8 @@ fn check_row(t: &Task, count: Rc<dyn Fn()>) -> gtk::CheckButton {
         .build();
     let uid = t.uid.clone();
     check.connect_toggled(move |c| {
-        if core().set_done(uid.clone(), c.is_active()).is_ok() {
-            count();
-            request_sync();
-        }
+        let count = count.clone();
+        tick(c, &uid, move || count())
     });
     check
 }
@@ -1630,11 +1624,7 @@ fn task_details(c: &Cal, t: &Task) -> gtk::Popover {
         .tooltip_text(gettext("Done"))
         .build();
     let uid = t.uid.clone();
-    check.connect_toggled(move |b| {
-        if core().set_done(uid.clone(), b.is_active()).is_ok() {
-            request_sync();
-        }
-    });
+    check.connect_toggled(move |b| tick(b, &uid, || {}));
     let title = gtk::Label::builder()
         .label(&t.summary)
         .xalign(0.0)
@@ -1828,11 +1818,7 @@ fn agenda_row(i: &Item) -> adw::ActionRow {
                 .valign(gtk::Align::Center)
                 .build();
             let uid = t.uid.clone();
-            check.connect_toggled(move |b| {
-                if core().set_done(uid.clone(), b.is_active()).is_ok() {
-                    request_sync();
-                }
-            });
+            check.connect_toggled(move |b| tick(b, &uid, || {}));
             row.add_prefix(&check);
             row.add_prefix(&dot);
             let (task, task2) = (t.clone(), t.clone());

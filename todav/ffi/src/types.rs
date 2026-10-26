@@ -225,6 +225,15 @@ pub enum Day {
 pub type Day = todav_app::dates::Day;
 
 #[uniffi::remote(Enum)]
+pub enum SubtaskCompletion {
+    Complete,
+    Keep,
+    Ask,
+}
+/// What completing a task with open subtasks does.
+pub type SubtaskCompletion = todav_app::prefs::SubtaskCompletion;
+
+#[uniffi::remote(Enum)]
 pub enum SidebarPage {
     Upcoming,
     Important,

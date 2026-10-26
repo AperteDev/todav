@@ -9,6 +9,7 @@ mod i18n;
 mod lists;
 mod reminders;
 mod settings;
+mod update;
 mod window;
 
 use adw::prelude::*;
@@ -472,7 +473,8 @@ fn main() -> glib::ExitCode {
             if sandbox() {
                 gio::ApplicationFlags::NON_UNIQUE
             } else {
-                gio::ApplicationFlags::empty()
+                // A restart after an update starts the new version before this one has quit.
+                gio::ApplicationFlags::ALLOW_REPLACEMENT
             },
         )
         .build();
@@ -489,9 +491,12 @@ fn main() -> glib::ExitCode {
         if restore_accounts() {
             start_background();
         }
+        update::watch(app.upcast_ref());
     });
     app.connect_activate(|app| window::present(app.upcast_ref()));
-    app.run()
+    let code = app.run();
+    update::exec_if_restarting();
+    code
 }
 
 glib::wrapper! {

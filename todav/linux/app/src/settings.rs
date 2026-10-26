@@ -199,6 +199,7 @@ pub fn present(parent: &adw::ApplicationWindow, page: Option<&str>) -> adw::Pref
     connect_choice(&b, "category_view", &["group", "tags", "none"]);
     connect_choice(&b, "done_tasks", &["group", "in_place", "last"]);
     connect_choice(&b, "done_subtasks", &["show", "hide", "last"]);
+    connect_choice(&b, "complete_subtasks", &["complete", "keep", "ask"]);
     connect_duration(&b, "task_duration");
     connect_duration(&b, "event_duration");
     let dots: adw::SwitchRow = get(&b, "mini_dots");
@@ -230,6 +231,12 @@ pub fn present(parent: &adw::ApplicationWindow, page: Option<&str>) -> adw::Pref
             crate::window::refresh_all();
         });
     }
+    let inline: adw::SwitchRow = get(&b, "inline_edit");
+    inline.set_active(prefs::inline_edit(core()));
+    inline.connect_active_notify(|r| {
+        let _ = core().set_setting("inline_edit".into(), r.is_active().to_string());
+        crate::window::refresh();
+    });
     let handles: adw::SwitchRow = get(&b, "drag_handles");
     handles.set_active(core().setting("drag_handles".into()).as_deref() == Some("true"));
     handles.connect_active_notify(|h| {

@@ -171,6 +171,11 @@ Adw.PreferencesDialog dialog {
         title: _("Completed subtasks");
         model: Gtk.StringList { strings [_("Show"), _("Hide"), _("Move to the end")] };
       }
+
+      Adw.ComboRow complete_subtasks {
+        title: _("Completing a task with open subtasks");
+        model: Gtk.StringList { strings [_("Completes them too"), _("Leaves them open"), _("Asks each time")] };
+      }
     }
 
     Adw.PreferencesGroup {
@@ -232,6 +237,11 @@ Adw.PreferencesDialog dialog {
       Adw.SwitchRow drag_handles {
         title: _("Drag handles");
         subtitle: _("Move tasks by a handle instead of the whole row, for touchscreens");
+      }
+
+      Adw.SwitchRow inline_edit {
+        title: _("Edit titles in place");
+        subtitle: _("Click a task’s title to change it, with a mouse or touchpad");
       }
     }
   }

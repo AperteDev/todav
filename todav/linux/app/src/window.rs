@@ -125,6 +125,11 @@ struct Ui {
     counts: RefCell<HashMap<String, (usize, usize)>>,
     /// Tasks are dragged by a handle (touchscreens) instead of the whole row.
     handles: Cell<bool>,
+    /// A click on a task's title edits it in place (`inline_edit`).
+    inline: Cell<bool>,
+    /// A title is being edited in place: rebuilds wait until it is done (`stale`: one waits).
+    renaming: Cell<bool>,
+    stale: Cell<bool>,
     /// The task being dragged and where it came from.
     dragging: RefCell<Option<(Task, Slot)>>,
     /// "+" buttons taking dropped tasks as subtasks of their task; for a tree row's drag-only
@@ -195,12 +200,21 @@ pub fn setup_actions(app: &adw::Application) {
     app.add_action(&prefs);
     let complete = gio::SimpleAction::new("complete", Some(glib::VariantTy::STRING));
     complete.connect_activate(|_, uid| {
+        // From a notification nobody can be asked: subtasks stay open unless set to complete.
+        let tree = prefs::subtask_completion(core()) == prefs::SubtaskCompletion::Complete;
         if let Some(uid) = uid.and_then(|u| u.str())
-            && core().set_done(uid.into(), true).is_ok()
+            && tasks::set_done(core(), uid, true, tree).is_ok()
         {
             request_sync();
         }
     });
+    let restart = gio::SimpleAction::new("restart", None);
+    restart.connect_activate(glib::clone!(
+        #[weak]
+        app,
+        move |_, _| crate::update::restart(&app, false)
+    ));
+    app.add_action(&restart);
     let shortcuts = gio::SimpleAction::new("shortcuts", None);
     shortcuts.connect_activate(|_, _| {
         if let Some(ui) = ui() {
@@ -354,12 +368,16 @@ pub fn lists_changed() {
 }
 
 thread_local! {
-    /// The banners on the Tasks and Calendar pages saying which accounts are not connected.
+    /// The banners on the Tasks and Calendar pages saying which accounts are not connected,
+    /// and those offering to restart into a newer version.
     static BANNERS: RefCell<Vec<adw::Banner>> = const { RefCell::new(Vec::new()) };
+    static UPDATE_BANNERS: RefCell<Vec<adw::Banner>> = const { RefCell::new(Vec::new()) };
 }
 
-pub fn add_banner(banner: adw::Banner) {
+/// A page's banners: `banner` for accounts not connected, `update` for a newer version.
+pub fn add_banner(banner: adw::Banner, update: adw::Banner) {
     BANNERS.with_borrow_mut(|b| b.push(banner));
+    UPDATE_BANNERS.with_borrow_mut(|b| b.push(update));
     update_banners();
 }
 
@@ -387,6 +405,15 @@ pub fn update_banners() {
         for b in banners {
             b.set_title(&title);
             b.set_revealed(!off.is_empty());
+        }
+    });
+    let updated = crate::update::updated();
+    UPDATE_BANNERS.with_borrow(|banners| {
+        for b in banners {
+            b.set_title(&gettext(
+                "Todav was updated: restart it to use the new version",
+            ));
+            b.set_revealed(updated);
         }
     });
 }
@@ -589,10 +616,18 @@ fn restore_size(window: &adw::ApplicationWindow, app: &adw::Application) {
         let _ = core().set_setting("window_size".into(), format!("{w}x{h}"));
         let _ = core().set_setting("window_maximized".into(), window.is_maximized().to_string());
     }
-    window.connect_close_request(|w| {
-        save(w);
-        glib::Propagation::Proceed
-    });
+    window.connect_close_request(glib::clone!(
+        #[weak]
+        app,
+        #[upgrade_or]
+        glib::Propagation::Proceed,
+        move |w| {
+            save(w);
+            // Once it is hidden: an update waiting restarts the app now.
+            glib::idle_add_local_once(move || crate::update::window_closed(&app));
+            glib::Propagation::Proceed
+        }
+    ));
     app.connect_shutdown(glib::clone!(
         #[weak]
         window,
@@ -645,6 +680,9 @@ fn build(app: &adw::Application) -> Rc<Ui> {
         tags: Cell::new(false),
         counts: RefCell::default(),
         handles: Cell::new(false),
+        inline: Cell::new(false),
+        renaming: Cell::new(false),
+        stale: Cell::new(false),
         dragging: RefCell::new(None),
         drop_mark: RefCell::new(None),
         adopters: RefCell::new(Vec::new()),
@@ -654,7 +692,7 @@ fn build(app: &adw::Application) -> Rc<Ui> {
         add_account: RefCell::new(None),
         last_error: RefCell::new(String::new()),
     });
-    add_banner(get(&b, "banner"));
+    add_banner(get(&b, "banner"), get(&b, "update_banner"));
     connect(&ui, &b);
     let views = get(&b, "views");
     connect_search(&ui, &get(&b, "task_search"), &get(&b, "task_query"), &views);
@@ -1193,6 +1231,10 @@ fn sidebar_hrefs(pages: &[(&str, usize)], lists: &[todav_core::List]) -> Vec<Str
 /// it is a row's (a ticked checkbox): GTK would move focus to a container and scroll that into
 /// view, so focus is dropped first.
 fn refresh_tasks(ui: &Rc<Ui>) {
+    if ui.renaming.get() {
+        ui.stale.set(true);
+        return;
+    }
     if GtkWindowExt::focus(&ui.window).is_some_and(|f| f.is_ancestor(&ui.groups)) {
         GtkWindowExt::set_focus(&ui.window, None::<&gtk::Widget>);
     }
@@ -1213,6 +1255,7 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
         ui.groups.remove(&c);
     }
     ui.adopters.borrow_mut().clear();
+    ui.inline.set(prefs::inline_edit(core()));
     let Some(href) = ui.current.borrow().clone() else {
         ui.title.set_title("");
         return;
@@ -1713,6 +1756,7 @@ fn task_row(ui: &Rc<Ui>, t: &Task, indent: usize, slot: Option<Slot>) -> adw::Ac
         row.add_suffix(&star_button(t));
     }
     row.add_suffix(&delete_button(t));
+    inline_title(ui, row.upcast_ref(), t);
     let (weak, task) = (Rc::downgrade(ui), t.clone());
     row.connect_activated(move |_| {
         if let Some(ui) = weak.upgrade() {
@@ -1720,6 +1764,130 @@ fn task_row(ui: &Rc<Ui>, t: &Task, indent: usize, slot: Option<Slot>) -> adw::Ac
         }
     });
     row
+}
+
+/// With `inline_edit` on, a click on the title text of task `t`'s `row` with a mouse or touchpad
+/// edits it in place, a text cursor showing over it; a tap, or a click beside it, still opens the
+/// task (or its subtasks). Enter or clicking elsewhere saves, Escape cancels.
+fn inline_title(ui: &Rc<Ui>, row: &gtk::Widget, t: &Task) {
+    if !ui.inline.get() {
+        return;
+    }
+    // The row's title (the header's, for an expander row: it comes first).
+    let Some(label) = descendants(row)
+        .into_iter()
+        .filter_map(|w| w.downcast::<gtk::Label>().ok())
+        .find(|l| l.has_css_class("title") && l.label() == t.summary)
+    else {
+        return;
+    };
+    // Where in the text (x, y in `row`) is: its byte index, or None beside it.
+    let at = {
+        let (row, label) = (row.clone(), label.clone());
+        move |x: f64, y: f64| {
+            let p = row.compute_point(&label, &gtk::graphene::Point::new(x as f32, y as f32))?;
+            let (ox, oy) = label.layout_offsets();
+            let layout = label.layout();
+            let (_, r) = layout.pixel_extents();
+            let (x, y) = (p.x() as i32 - ox, p.y() as i32 - oy);
+            let inside =
+                x >= r.x() && x < r.x() + r.width() && y >= r.y() && y < r.y() + r.height();
+            let s = gtk::pango::SCALE;
+            inside.then(|| layout.xy_to_index(x * s, y * s).1 as usize)
+        }
+    };
+    let pointer = |d: Option<gtk::gdk::Device>| {
+        use gtk::gdk::InputSource::{Mouse, Touchpad, Trackpoint};
+        d.is_some_and(|d| matches!(d.source(), Mouse | Touchpad | Trackpoint))
+    };
+    let motion = gtk::EventControllerMotion::new();
+    let (l, on) = (label.clone(), at.clone());
+    motion.connect_motion(move |m, x, y| {
+        let text = pointer(m.current_event_device()) && on(x, y).is_some();
+        l.set_cursor_from_name(text.then_some("text"));
+    });
+    let l = label.clone();
+    motion.connect_leave(move |_| l.set_cursor(None));
+    row.add_controller(motion);
+    // On release, so dragging the row by its title still works; claimed, the row is not opened.
+    let click = gtk::GestureClick::new();
+    click.set_propagation_phase(gtk::PropagationPhase::Capture);
+    let (weak, task) = (Rc::downgrade(ui), t.clone());
+    click.connect_released(move |g, n, x, y| {
+        let Some(ui) = weak.upgrade().filter(|ui| !ui.renaming.get()) else {
+            return;
+        };
+        if n != 1 || !pointer(g.current_event_device()) {
+            return;
+        }
+        if let Some(index) = at(x, y) {
+            g.set_state(gtk::EventSequenceState::Claimed);
+            edit_title(&ui, &label, &task, index);
+        }
+    });
+    row.add_controller(click);
+}
+
+/// Edit task `t`'s title in place of its row's `label`, the cursor at byte `index` of it.
+fn edit_title(ui: &Rc<Ui>, label: &gtk::Label, t: &Task, index: usize) {
+    let Some(parent) = label.parent().and_downcast::<gtk::Box>() else {
+        return;
+    };
+    let text = gtk::Text::builder().text(&t.summary).hexpand(true).build();
+    parent.insert_child_after(&text, Some(label));
+    label.set_visible(false);
+    ui.renaming.set(true);
+    let ended = Rc::new(Cell::new(false));
+    let finish = {
+        let (ui, label, text, t) = (ui.clone(), label.clone(), text.clone(), t.clone());
+        move |save: bool| {
+            if ended.replace(true) {
+                return;
+            }
+            let summary = text.text().trim().to_string();
+            ui.renaming.set(false);
+            // Not from within the text's own signal handler.
+            let (parent, label, text, ui2) =
+                (parent.clone(), label.clone(), text.clone(), ui.clone());
+            glib::idle_add_local_once(move || {
+                parent.remove(&text);
+                label.set_visible(true);
+                if ui2.stale.take() {
+                    refresh_tasks(&ui2);
+                }
+            });
+            if !save || summary.is_empty() || summary == t.summary {
+                return;
+            }
+            let patch = TaskPatch {
+                summary: Some(summary),
+                ..Default::default()
+            };
+            match core().update_task(t.uid.clone(), patch) {
+                Ok(()) => request_sync(),
+                Err(e) => ui.toasts.add_toast(note(&e.to_string())),
+            }
+        }
+    };
+    let finish = Rc::new(finish);
+    let f = finish.clone();
+    text.connect_activate(move |_| f(true));
+    let keys = gtk::EventControllerKey::new();
+    let f = finish.clone();
+    keys.connect_key_pressed(move |_, key, _, _| {
+        if key != gtk::gdk::Key::Escape {
+            return glib::Propagation::Proceed;
+        }
+        f(false);
+        glib::Propagation::Stop
+    });
+    text.add_controller(keys);
+    let focus = gtk::EventControllerFocus::new();
+    focus.connect_leave(move |_| finish(true));
+    text.add_controller(focus);
+    text.grab_focus_without_selecting();
+    let chars = t.summary.get(..index).map_or(0, |s| s.chars().count());
+    text.set_position(chars as i32);
 }
 
 /// A root task without subtasks: its "+" turns it into a `tree_row` ready for the first one.
@@ -1803,6 +1971,7 @@ fn tree_row(
     if let Some(w) = sync_warning(root) {
         row.add_suffix(&w);
     }
+    inline_title(ui, row.upcast_ref(), root);
     let (weak, uid) = (Rc::downgrade(ui), root.uid.clone());
     let empty = subs.is_empty();
     row.connect_expanded_notify(move |r| {
@@ -2202,12 +2371,62 @@ fn done_check(t: &Task) -> gtk::CheckButton {
         .valign(gtk::Align::Center)
         .build();
     let uid = t.uid.clone();
-    check.connect_toggled(move |c| {
-        if core().set_done(uid.clone(), c.is_active()).is_ok() {
+    check.connect_toggled(move |c| tick(c, &uid, || {}));
+    check
+}
+
+/// Complete or reopen task `uid` as its check `check` now says, then `after`. Its open subtasks
+/// are completed too, stay open or the user picks, as Preferences say (`complete_subtasks`);
+/// cancelled, the check is unticked again.
+pub fn tick(check: &gtk::CheckButton, uid: &str, after: impl Fn() + 'static) {
+    use prefs::SubtaskCompletion::{Ask, Complete};
+    let done = check.is_active();
+    let Some(t) = core().task(uid.into()).filter(|t| t.done != done) else {
+        return; // already so: unticked again after a cancel, or rebuilt
+    };
+    let mode = prefs::subtask_completion(core());
+    let finish = move |tree: bool| {
+        if tasks::set_done(core(), &t.uid, done, tree).is_ok() {
+            after();
             request_sync();
         }
+    };
+    if !done {
+        return finish(mode == Complete);
+    }
+    let open = tasks::open_subtasks(core(), uid).len();
+    if open == 0 || mode != Ask {
+        return finish(mode == Complete);
+    }
+    let check = check.clone();
+    glib::spawn_future_local(async move {
+        let title = t.summary.clone();
+        let alert = adw::AlertDialog::new(
+            Some(&gettext("Complete Subtasks Too?")),
+            Some(
+                &ngettext(
+                    "“{title}” has {n} open subtask.",
+                    "“{title}” has {n} open subtasks.",
+                    open as u64,
+                )
+                .replace("{title}", &title)
+                .replace("{n}", &open.to_string()),
+            ),
+        );
+        alert.add_responses(&[
+            ("cancel", &gettext("Cancel")),
+            ("alone", &gettext("Only This Task")),
+            ("all", &gettext("Complete All")),
+        ]);
+        alert.set_response_appearance("all", adw::ResponseAppearance::Suggested);
+        alert.set_default_response(Some("all"));
+        alert.set_close_response("cancel");
+        match alert.choose_future(Some(&check)).await.as_str() {
+            "all" => finish(true),
+            "alone" => finish(false),
+            _ => check.set_active(false),
+        }
     });
-    check
 }
 
 /// Priority levels as the star's menu and the edit dialog's picker list them, by action target.

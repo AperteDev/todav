@@ -2,7 +2,7 @@
 //! dragging a task somewhere does. Each drop is one change for undo.
 
 use crate::prefs;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use todav_core::{Client, Result, Sort, Task, TaskPatch};
 
 /// Pages shown above the lists while they have something.
@@ -263,6 +263,66 @@ pub fn drop_on_category(c: &Client, d: &Task, ds: &Slot, category: Option<String
     })
 }
 
+/// The open subtasks of task `uid`, at any depth.
+pub fn open_subtasks(c: &Client, uid: &str) -> Vec<Task> {
+    let Some(t) = c.task(uid.into()) else {
+        return Vec::new();
+    };
+    let all = c.tasks(t.list_href, true);
+    // Breadth-first; `seen` bounds it, as RELATED-TO from a server can form a cycle.
+    let mut seen = HashSet::from([uid.to_string()]);
+    let mut queue = vec![uid.to_string()];
+    let mut open = Vec::new();
+    while let Some(p) = queue.pop() {
+        for k in all.iter().filter(|k| k.parent_uid.as_deref() == Some(&p)) {
+            if seen.insert(k.uid.clone()) {
+                queue.push(k.uid.clone());
+                if !k.done {
+                    open.push(k.clone());
+                }
+            }
+        }
+    }
+    open
+}
+
+/// Complete or reopen task `uid`, as one change for undo. With `tree`, completing it completes
+/// its open subtasks and reopening it reopens its completed parents, so a completed task has
+/// no open subtasks (`SubtaskCompletion::Complete`).
+pub fn set_done(c: &Client, uid: &str, done: bool, tree: bool) -> Result<()> {
+    let Some(t) = c.task(uid.into()) else {
+        return Ok(());
+    };
+    let mut also = Vec::new();
+    if tree && done {
+        also = open_subtasks(c, uid).into_iter().map(|t| t.uid).collect();
+    } else if tree {
+        let mut seen = HashSet::from([t.uid.clone()]);
+        let mut parent = t.parent_uid.clone();
+        while let Some(p) = parent
+            .and_then(|p| c.task(p))
+            .filter(|p| seen.insert(p.uid.clone()))
+        {
+            if p.done {
+                also.push(p.uid.clone());
+            }
+            parent = p.parent_uid;
+        }
+    }
+    if t.done == done && also.is_empty() {
+        return Ok(());
+    }
+    c.together(|| {
+        if t.done != done {
+            c.set_done(t.uid.clone(), done)?;
+        }
+        for u in also {
+            c.set_done(u, done)?;
+        }
+        Ok(())
+    })
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
@@ -364,5 +424,63 @@ pub(crate) mod tests {
         );
         assert_eq!(entry_at(&subs, "a2", false), Some((4, 3)), "last");
         assert_eq!(entry_at(&subs, "b", false), None, "another tree");
+    }
+
+    #[test]
+    fn completing_a_tree_completes_its_subtasks_and_reopening_reopens_its_parents() {
+        use todav_core::AccountKind;
+        let dir = std::env::temp_dir().join(format!("todav-app-tree-{}", std::process::id()));
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let account = c
+            .add_account(
+                AccountKind::Local,
+                String::new(),
+                String::new(),
+                String::new(),
+            )
+            .unwrap();
+        let list = c
+            .create_list(account, "Tasks".into(), "#0082C9".into(), false)
+            .unwrap();
+        let add = |name: &str, parent: Option<&str>| {
+            let t = c.add_task(
+                list.clone(),
+                name.into(),
+                None,
+                parent.map(Into::into),
+                false,
+            );
+            t.unwrap().uid
+        };
+        let a = add("a", None);
+        let a1 = add("a1", Some(&a));
+        let a1x = add("a1x", Some(&a1));
+        let a2 = add("a2", Some(&a));
+        let done = |uid: &str| c.task(uid.into()).unwrap().done;
+        c.set_done(a2.clone(), true).unwrap();
+        let open: Vec<String> = open_subtasks(&c, &a).into_iter().map(|t| t.uid).collect();
+        assert_eq!(open.len(), 2, "a1 and a1x, not the done a2");
+
+        set_done(&c, &a, true, false).unwrap();
+        assert!(done(&a) && !done(&a1) && !done(&a1x), "alone");
+        c.undo(None).unwrap();
+
+        set_done(&c, &a, true, true).unwrap();
+        assert!(done(&a) && done(&a1) && done(&a1x) && done(&a2));
+        c.undo(None).unwrap();
+        assert!(
+            !done(&a) && !done(&a1) && !done(&a1x),
+            "one undo reverts it all"
+        );
+        assert!(done(&a2), "done before");
+
+        set_done(&c, &a, true, true).unwrap();
+        set_done(&c, &a1x, false, true).unwrap();
+        assert!(
+            !done(&a1x) && !done(&a1) && !done(&a),
+            "its parents reopened"
+        );
+        assert!(done(&a2), "a sibling stays done");
+        let _ = std::fs::remove_dir_all(dir);
     }
 }

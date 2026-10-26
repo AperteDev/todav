@@ -232,6 +232,8 @@ private fun Tasks(model: Main, screen: Screen) {
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     val sync by model.syncState.collectAsStateWithLifecycle()
+    val completing by model.completing.collectAsStateWithLifecycle()
+    completing?.let { (task, open) -> CompleteDialog(task.summary, open, model::complete) }
 
     LaunchedEffect(Unit) {
         model.messages.collect { (text, change) ->
@@ -301,6 +303,28 @@ private fun Tasks(model: Main, screen: Screen) {
             TaskList(model, screen, padding)
         }
     }
+}
+
+/** Whether completing a task completes its `open` subtasks too (`onAnswer(null)`: cancelled). */
+@Composable
+private fun CompleteDialog(title: String, open: Int, onAnswer: (Boolean?) -> Unit) {
+    AlertDialog(
+        onDismissRequest = { onAnswer(null) },
+        title = { Text(tr("Complete Subtasks Too?")) },
+        text = {
+            Text(
+                ntr("“{title}” has {n} open subtask.", "“{title}” has {n} open subtasks.", open.toLong())
+                    .replace("{title}", title).replace("{n}", "$open"),
+            )
+        },
+        confirmButton = { TextButton(onClick = { onAnswer(true) }) { Text(tr("Complete All")) } },
+        dismissButton = {
+            Row {
+                TextButton(onClick = { onAnswer(null) }) { Text(tr("Cancel")) }
+                TextButton(onClick = { onAnswer(false) }) { Text(tr("Only This Task")) }
+            }
+        },
+    )
 }
 
 @Composable

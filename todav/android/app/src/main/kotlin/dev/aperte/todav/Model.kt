@@ -8,6 +8,7 @@ import dev.aperte.todav.core.AccountKind
 import dev.aperte.todav.core.LoginFlow
 import dev.aperte.todav.core.SidebarPage
 import dev.aperte.todav.core.Starter
+import dev.aperte.todav.core.SubtaskCompletion
 import dev.aperte.todav.core.SyncState
 import dev.aperte.todav.core.TodavList
 import dev.aperte.todav.core.TodavTask
@@ -90,6 +91,9 @@ class Main(app: Application) : AndroidViewModel(app) {
 
     /** Messages for a snackbar, with the change an "Undo" reverts (if any). */
     val messages = MutableSharedFlow<Pair<String, ULong?>>(extraBufferCapacity = 8)
+
+    /** A task being completed with this many open subtasks, while the user picks whether they go too. */
+    val completing = MutableStateFlow<Pair<TodavTask, Int>?>(null)
 
     val signIn = MutableStateFlow<SignIn>(SignIn.Idle)
     private var polling: Job? = null
@@ -181,9 +185,26 @@ class Main(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Complete or reopen a task; its open subtasks go along, stay open or the user is asked. */
     fun setDone(task: TodavTask, done: Boolean) = act {
-        core.setDone(task.uid, done)
-        core.requestSync()
+        val mode = core.subtaskCompletion()
+        val open = if (done && mode == SubtaskCompletion.ASK) core.openSubtasks(task.uid).size else 0
+        if (open > 0) {
+            completing.value = task to open
+        } else {
+            core.setDoneTree(task.uid, done, mode == SubtaskCompletion.COMPLETE)
+            core.requestSync()
+        }
+    }
+
+    /** The answer to `completing`: with its subtasks or alone; null: cancelled. */
+    fun complete(subtasks: Boolean?) {
+        val task = completing.value?.first ?: return
+        completing.value = null
+        if (subtasks != null) act {
+            core.setDoneTree(task.uid, true, subtasks)
+            core.requestSync()
+        }
     }
 
     fun delete(task: TodavTask) = act {

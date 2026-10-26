@@ -315,6 +315,12 @@ Adw.NavigationSplitView split {
 
       // As the Tasks page's (src/window.rs `update_banners`).
       [top]
+      Adw.Banner update_banner {
+        button-label: _("Restart");
+        action-name: "app.restart";
+      }
+
+      [top]
       Adw.Banner banner {
         button-label: _("Sign In");
         action-name: "win.fix-account";
