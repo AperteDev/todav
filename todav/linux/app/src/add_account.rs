@@ -23,7 +23,9 @@ pub struct AddAccount {
     ntfy: (gtk::DropDown, adw::EntryRow),
     sync_settings: adw::SwitchRow,
     connect_goa: gtk::Button,
-    login: adw::SplitButton,
+    /// The ways to sign in to a server.
+    sign_in: gtk::Box,
+    login: gtk::Button,
     cancel_login: gtk::Button,
     welcome: bool,
     /// Runs with the new account's id.
@@ -47,6 +49,7 @@ pub fn new(welcome: bool, done: impl Fn(i64) + 'static) -> Rc<AddAccount> {
         ntfy: (get(&b, "ntfy_scheme"), get(&b, "ntfy")),
         sync_settings: get(&b, "sync_settings"),
         connect_goa: get(&b, "connect_goa"),
+        sign_in: get(&b, "sign_in"),
         login: get(&b, "login"),
         cancel_login: get(&b, "cancel_login"),
         welcome,
@@ -94,7 +97,7 @@ pub fn new(welcome: bool, done: impl Fn(i64) + 'static) -> Rc<AddAccount> {
             a.goa_account.set_visible(goa);
             a.server.1.set_visible(!goa);
             a.connect_goa.set_visible(goa);
-            a.login.set_visible(!goa);
+            a.sign_in.set_visible(!goa);
             if goa {
                 page.set_title(&gettext("GNOME Online Accounts"));
                 status.set_icon_name(Some("goa-panel-symbolic"));
@@ -190,12 +193,7 @@ impl AddAccount {
             self.root.add_toast(note(&no_server()));
             return;
         }
-        self.login.set_sensitive(false);
-        self.login.set_label(&if copy {
-            gettext("Waiting for Sign-In…")
-        } else {
-            gettext("Waiting for Browser…")
-        });
+        self.sign_in.set_visible(false);
         self.cancel_login.set_visible(true);
         let a = self.clone();
         glib::spawn_future_local(async move {
@@ -210,8 +208,7 @@ impl AddAccount {
     }
 
     fn reset_login(&self) {
-        self.login.set_sensitive(true);
-        self.login.set_label(&gettext("Sign In with Browser"));
+        self.sign_in.set_visible(true); // the GOA step hides it again when opened
         self.cancel_login.set_visible(false);
     }
 

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Todav\n"
 "Report-Msgid-Bugs-To: https://github.com/AperteDev/todav/issues\n"
-"POT-Creation-Date: 2026-10-26 12:10+0100\n"
+"POT-Creation-Date: 2026-10-26 12:45+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -102,52 +102,39 @@ msgid ""
 "This extension’s options are in Todav’s Preferences, on the Extension page."
 msgstr ""
 
-#: todav/linux/app/src/add_account.rs:65
+#: todav/linux/app/src/add_account.rs:68
 msgid "Its Nextcloud accounts are all added"
 msgstr ""
 
-#: todav/linux/app/src/add_account.rs:67
+#: todav/linux/app/src/add_account.rs:70
 msgid "No Nextcloud account in Settings → Online Accounts"
 msgstr ""
 
-#: todav/linux/app/src/add_account.rs:80 todav/linux/app/src/add_account.rs:84
+#: todav/linux/app/src/add_account.rs:83 todav/linux/app/src/add_account.rs:87
 #: todav/linux/app/ui/settings.blp:63
 msgid "Add Account"
 msgstr ""
 
-#: todav/linux/app/src/add_account.rs:82
+#: todav/linux/app/src/add_account.rs:85
 msgid ""
 "Tasks and calendars of another Nextcloud account, or kept on this device"
 msgstr ""
 
-#: todav/linux/app/src/add_account.rs:99 todav/linux/app/src/settings.rs:691
+#: todav/linux/app/src/add_account.rs:102 todav/linux/app/src/settings.rs:691
 #: todav/linux/app/src/settings.rs:817 todav/linux/app/ui/add-account.blp:37
 msgid "GNOME Online Accounts"
 msgstr ""
 
-#: todav/linux/app/src/add_account.rs:102
+#: todav/linux/app/src/add_account.rs:105
 msgid "Connect with a Nextcloud account from GNOME Settings"
 msgstr ""
 
-#: todav/linux/app/src/add_account.rs:105 todav/linux/app/ui/add-account.blp:52
+#: todav/linux/app/src/add_account.rs:108 todav/linux/app/ui/add-account.blp:52
 msgid "Nextcloud Server"
 msgstr ""
 
-#: todav/linux/app/src/add_account.rs:108
+#: todav/linux/app/src/add_account.rs:111
 msgid "Sign in to your Nextcloud; Todav gets an app password of its own"
-msgstr ""
-
-#: todav/linux/app/src/add_account.rs:195 todav/linux/app/src/settings.rs:890
-msgid "Waiting for Sign-In…"
-msgstr ""
-
-#: todav/linux/app/src/add_account.rs:197 todav/linux/app/src/settings.rs:892
-msgid "Waiting for Browser…"
-msgstr ""
-
-#: todav/linux/app/src/add_account.rs:214
-#: todav/linux/app/ui/add-account.blp:170
-msgid "Sign In with Browser"
 msgstr ""
 
 #: todav/linux/app/src/calendar.rs:211 todav/linux/app/src/lists.rs:311
@@ -350,7 +337,7 @@ msgstr ""
 
 #: todav/linux/app/src/calendar/dialog.rs:47 todav/linux/app/src/lists.rs:559
 #: todav/linux/app/src/settings.rs:982 todav/linux/app/ui/account.blp:34
-#: todav/linux/app/ui/add-account.blp:178 todav/linux/app/ui/edit-dialog.blp:23
+#: todav/linux/app/ui/add-account.blp:195 todav/linux/app/ui/edit-dialog.blp:23
 #: todav/linux/app/ui/event-dialog.blp:25 todav/linux/app/ui/list-dialog.blp:18
 #: todav/linux/app/ui/new-category.blp:18
 #: todav/linux/app/ui/password-login.blp:19
@@ -751,6 +738,14 @@ msgstr ""
 msgid "Signed in as {name}: add that as another account"
 msgstr ""
 
+#: todav/linux/app/src/settings.rs:890
+msgid "Waiting for Sign-In…"
+msgstr ""
+
+#: todav/linux/app/src/settings.rs:892
+msgid "Waiting for Browser…"
+msgstr ""
+
 #: todav/linux/app/src/settings.rs:940
 msgid "No saved password: sign in again first"
 msgstr ""
@@ -1079,7 +1074,7 @@ msgstr ""
 msgid "Sign In Again"
 msgstr ""
 
-#: todav/linux/app/ui/account.blp:44 todav/linux/app/ui/add-account.blp:172
+#: todav/linux/app/ui/account.blp:44
 msgid "More Sign-In Options"
 msgstr ""
 
@@ -1112,11 +1107,11 @@ msgstr ""
 msgid "Remove Account"
 msgstr ""
 
-#: todav/linux/app/ui/account.blp:110 todav/linux/app/ui/add-account.blp:193
+#: todav/linux/app/ui/account.blp:110 todav/linux/app/ui/add-account.blp:182
 msgid "Copy Login Link"
 msgstr ""
 
-#: todav/linux/app/ui/account.blp:111 todav/linux/app/ui/add-account.blp:194
+#: todav/linux/app/ui/account.blp:111 todav/linux/app/ui/add-account.blp:188
 msgid "Sign In with Password…"
 msgstr ""
 
@@ -1154,6 +1149,10 @@ msgstr ""
 
 #: todav/linux/app/ui/add-account.blp:164
 msgid "Connect"
+msgstr ""
+
+#: todav/linux/app/ui/add-account.blp:177
+msgid "Sign In with Browser"
 msgstr ""
 
 #: todav/linux/app/ui/calendar.blp:102

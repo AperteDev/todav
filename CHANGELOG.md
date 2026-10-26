@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "Local lists and calendars" switch; hidden local lists stay hidden, as a switched-off account.
 - An account without its password no longer shows the welcome page: its lists stay usable and
   the banner offers to sign in again.
+- Signing in to a server offers its three ways as buttons (with the browser, by a copied
+  login link, with a password) instead of a button with a menu; while the browser sign-in
+  waits, only Cancel shows.
 - Signing in again keeps the account: a different user is added as another account, and a GNOME
   Online Accounts account and a sign-in in Todav are separate accounts rather than one switch.
 

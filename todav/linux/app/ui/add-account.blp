@@ -166,19 +166,36 @@ Adw.ToastOverlay root {
                   styles ["suggested-action", "pill"]
                 }
 
-                Adw.SplitButton login {
-                  label: _("Sign In with Browser");
-                  menu-model: login_menu;
-                  dropdown-tooltip: _("More Sign-In Options");
+                // The ways to sign in to a server, one width; while one waits for the
+                // browser, only Cancel shows.
+                Gtk.Box sign_in {
+                  orientation: vertical;
+                  spacing: 12;
                   halign: center;
-                  styles ["suggested-action", "pill"]
+
+                  Gtk.Button login {
+                    label: _("Sign In with Browser");
+                    styles ["suggested-action", "pill"]
+                  }
+
+                  Gtk.Button {
+                    label: _("Copy Login Link");
+                    action-name: "add.copy-login";
+                    styles ["pill"]
+                  }
+
+                  Gtk.Button {
+                    label: _("Sign In with Password…");
+                    action-name: "add.password-login";
+                    styles ["pill"]
+                  }
                 }
 
                 Gtk.Button cancel_login {
                   label: _("Cancel");
                   halign: center;
                   visible: false;
-                  styles ["flat"]
+                  styles ["pill"]
                 }
               }
             }
@@ -187,9 +204,4 @@ Adw.ToastOverlay root {
       };
     }
   }
-}
-
-menu login_menu {
-  item (_("Copy Login Link"), "add.copy-login")
-  item (_("Sign In with Password…"), "add.password-login")
 }

@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Todav\n"
 "Report-Msgid-Bugs-To: https://github.com/AperteDev/todav/issues\n"
-"POT-Creation-Date: 2026-10-26 12:10+0100\n"
+"POT-Creation-Date: 2026-10-26 12:45+0100\n"
 "PO-Revision-Date: 2026-10-22 21:00+0200\n"
 "Last-Translator: \n"
 "Language-Team: French\n"
@@ -105,57 +105,44 @@ msgstr ""
 "Les options de cette extension se trouvent dans les Préférences de Todav, "
 "sur la page Extension."
 
-#: todav/linux/app/src/add_account.rs:65
+#: todav/linux/app/src/add_account.rs:68
 msgid "Its Nextcloud accounts are all added"
 msgstr "Tous ses comptes Nextcloud sont déjà ajoutés"
 
-#: todav/linux/app/src/add_account.rs:67
+#: todav/linux/app/src/add_account.rs:70
 msgid "No Nextcloud account in Settings → Online Accounts"
 msgstr "Aucun compte Nextcloud dans Paramètres → Comptes en ligne"
 
-#: todav/linux/app/src/add_account.rs:80 todav/linux/app/src/add_account.rs:84
+#: todav/linux/app/src/add_account.rs:83 todav/linux/app/src/add_account.rs:87
 #: todav/linux/app/ui/settings.blp:63
 msgid "Add Account"
 msgstr "Ajouter un compte"
 
-#: todav/linux/app/src/add_account.rs:82
+#: todav/linux/app/src/add_account.rs:85
 msgid ""
 "Tasks and calendars of another Nextcloud account, or kept on this device"
 msgstr ""
 "Les tâches et calendriers d’un autre compte Nextcloud, ou gardés sur cet "
 "appareil"
 
-#: todav/linux/app/src/add_account.rs:99 todav/linux/app/src/settings.rs:691
+#: todav/linux/app/src/add_account.rs:102 todav/linux/app/src/settings.rs:691
 #: todav/linux/app/src/settings.rs:817 todav/linux/app/ui/add-account.blp:37
 msgid "GNOME Online Accounts"
 msgstr "Comptes en ligne GNOME"
 
-#: todav/linux/app/src/add_account.rs:102
+#: todav/linux/app/src/add_account.rs:105
 msgid "Connect with a Nextcloud account from GNOME Settings"
 msgstr "Se connecter avec un compte Nextcloud des Paramètres GNOME"
 
-#: todav/linux/app/src/add_account.rs:105 todav/linux/app/ui/add-account.blp:52
+#: todav/linux/app/src/add_account.rs:108 todav/linux/app/ui/add-account.blp:52
 msgid "Nextcloud Server"
 msgstr "Serveur Nextcloud"
 
-#: todav/linux/app/src/add_account.rs:108
+#: todav/linux/app/src/add_account.rs:111
 msgid "Sign in to your Nextcloud; Todav gets an app password of its own"
 msgstr ""
 "Connectez-vous à votre Nextcloud ; Todav obtient son propre mot de passe "
 "d’application"
-
-#: todav/linux/app/src/add_account.rs:195 todav/linux/app/src/settings.rs:890
-msgid "Waiting for Sign-In…"
-msgstr "En attente de la connexion…"
-
-#: todav/linux/app/src/add_account.rs:197 todav/linux/app/src/settings.rs:892
-msgid "Waiting for Browser…"
-msgstr "En attente du navigateur…"
-
-#: todav/linux/app/src/add_account.rs:214
-#: todav/linux/app/ui/add-account.blp:170
-msgid "Sign In with Browser"
-msgstr "Se connecter dans le navigateur"
 
 #: todav/linux/app/src/calendar.rs:211 todav/linux/app/src/lists.rs:311
 #: todav/linux/app/ui/calendar.blp:54 todav/linux/app/ui/calendar.blp:217
@@ -357,7 +344,7 @@ msgstr "L’événement se répète."
 
 #: todav/linux/app/src/calendar/dialog.rs:47 todav/linux/app/src/lists.rs:559
 #: todav/linux/app/src/settings.rs:982 todav/linux/app/ui/account.blp:34
-#: todav/linux/app/ui/add-account.blp:178 todav/linux/app/ui/edit-dialog.blp:23
+#: todav/linux/app/ui/add-account.blp:195 todav/linux/app/ui/edit-dialog.blp:23
 #: todav/linux/app/ui/event-dialog.blp:25 todav/linux/app/ui/list-dialog.blp:18
 #: todav/linux/app/ui/new-category.blp:18
 #: todav/linux/app/ui/password-login.blp:19
@@ -769,6 +756,14 @@ msgstr "Connecté en tant que {name}"
 msgid "Signed in as {name}: add that as another account"
 msgstr "Connecté en tant que {name} : ajoutez-le comme un autre compte"
 
+#: todav/linux/app/src/settings.rs:890
+msgid "Waiting for Sign-In…"
+msgstr "En attente de la connexion…"
+
+#: todav/linux/app/src/settings.rs:892
+msgid "Waiting for Browser…"
+msgstr "En attente du navigateur…"
+
 #: todav/linux/app/src/settings.rs:940
 msgid "No saved password: sign in again first"
 msgstr "Aucun mot de passe enregistré : reconnectez-vous d’abord"
@@ -1108,7 +1103,7 @@ msgstr "Connexion"
 msgid "Sign In Again"
 msgstr "Se reconnecter"
 
-#: todav/linux/app/ui/account.blp:44 todav/linux/app/ui/add-account.blp:172
+#: todav/linux/app/ui/account.blp:44
 msgid "More Sign-In Options"
 msgstr "Plus d’options de connexion"
 
@@ -1141,11 +1136,11 @@ msgstr "Ouvrir l’application DAV Push dans le magasin d’applications Nextclo
 msgid "Remove Account"
 msgstr "Supprimer le compte"
 
-#: todav/linux/app/ui/account.blp:110 todav/linux/app/ui/add-account.blp:193
+#: todav/linux/app/ui/account.blp:110 todav/linux/app/ui/add-account.blp:182
 msgid "Copy Login Link"
 msgstr "Copier le lien de connexion"
 
-#: todav/linux/app/ui/account.blp:111 todav/linux/app/ui/add-account.blp:194
+#: todav/linux/app/ui/account.blp:111 todav/linux/app/ui/add-account.blp:188
 msgid "Sign In with Password…"
 msgstr "Se connecter avec un mot de passe…"
 
@@ -1186,6 +1181,10 @@ msgstr "Utiliser les mêmes paramètres sur tous les appareils"
 #: todav/linux/app/ui/add-account.blp:164
 msgid "Connect"
 msgstr "Se connecter"
+
+#: todav/linux/app/ui/add-account.blp:177
+msgid "Sign In with Browser"
+msgstr "Se connecter dans le navigateur"
 
 #: todav/linux/app/ui/calendar.blp:102
 msgid "Calendars"
