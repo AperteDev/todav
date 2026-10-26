@@ -79,6 +79,13 @@ Check(!t.CanSync() && t.SyncState() is SyncState.Idle, "service");
 t.DueReminders();
 t.NextReminder();
 
+// Translations from the Polish catalog (made by scripts/bindings.sh).
+var pl = new Translations(File.ReadAllBytes("../../target/bindings/pl.mo"));
+Check(pl.Gettext("Today") == "Dzisiaj", "gettext");
+Check(pl.Ngettext("{n} event", "{n} events", 5) == "{n} wydarzeń", "ngettext");
+Check(pl.Pgettext("category", "Other") == "Inne", "pgettext");
+Check(Translations.English().Ngettext("{n} event", "{n} events", 1) == "{n} event", "english");
+
 Check(listener.Changes > 0, "change events");
 Console.WriteLine($"C# bindings: ok ({listener.Changes} change events)");
 Directory.Delete(dir, true);

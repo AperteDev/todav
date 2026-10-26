@@ -65,6 +65,8 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 8.0.x
+      # msgfmt, for the catalog the smoke tests read.
+      - run: sudo apt-get install -y --no-install-recommends gettext
       - run: cargo fmt --check
         working-directory: todav/ffi
       - run: cargo clippy --all-targets --locked -- -D warnings

@@ -55,6 +55,8 @@
   placeholders by name (`{name}`) with `replace`; never build a sentence from translated pieces
   (other languages change word order and case), write each variant whole. Blueprint:
   `_("…")` / `C_("context", "…")`. Extension: `_()`, `ngettext()`, `pgettext()`.
+- Android and Windows translate with `Translations` from `todav/ffi` (`gettext`, `ngettext`,
+  `pgettext` over the same `.mo` catalogs), not `strings.xml` or `.resw`; the same rules apply.
 - Dates and times come from the locale (LC_TIME) through GLib formats; don't translate them.
 - After adding or changing text, run `scripts/i18n.sh` and commit the refreshed `po/` with the
   change. Translate new strings into Polish (reviewed by the user); add the other languages too

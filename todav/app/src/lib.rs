@@ -3,11 +3,12 @@
 //! drops, and the background service (sync worker, push listener, reminders).
 //!
 //! No text: it returns what to show (enums, times, ids) and the front-end words and formats it
-//! in its locale. Times are local wall-clock seconds, as in the core (`Client::local_now`).
+//! in its locale; front-ends without glibc's gettext read the catalogs with `i18n`. Times are local wall-clock seconds, as in the core (`Client::local_now`).
 
 pub mod accounts;
 pub mod calendar;
 pub mod dates;
+pub mod i18n;
 pub mod lists;
 pub mod prefs;
 pub mod service;

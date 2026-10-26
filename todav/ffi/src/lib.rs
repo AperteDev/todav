@@ -811,6 +811,47 @@ impl Todav {
     }
 }
 
+// --- translations ---------------------------------------------------------------------
+
+/// One language's messages, from the `todav` gettext catalogs: what the Linux app shows, with
+/// the same contexts and plural rules. Placeholders are named (`{n}`); fill them after.
+#[derive(uniffi::Object)]
+pub struct Translations(todav_app::i18n::Catalog);
+
+#[uniffi::export]
+impl Translations {
+    /// A language's catalog: the `.mo` file msgfmt makes of `po/<language>.po`.
+    #[uniffi::constructor]
+    pub fn new(mo: Vec<u8>) -> Result<Arc<Self>> {
+        match todav_app::i18n::Catalog::parse(&mo) {
+            Some(c) => Ok(Arc::new(Translations(c))),
+            None => Err(TodavError::Parse {
+                reason: "not a .mo file".into(),
+            }),
+        }
+    }
+
+    /// English: the messages as written.
+    #[uniffi::constructor]
+    pub fn english() -> Arc<Self> {
+        Arc::new(Translations(todav_app::i18n::Catalog::english()))
+    }
+
+    pub fn gettext(&self, msgid: String) -> String {
+        self.0.gettext(&msgid)
+    }
+
+    /// The form for `n` of a counted message.
+    pub fn ngettext(&self, one: String, many: String, n: u64) -> String {
+        self.0.ngettext(&one, &many, n)
+    }
+
+    /// A message with a context, for a short word that could translate two ways.
+    pub fn pgettext(&self, context: String, msgid: String) -> String {
+        self.0.pgettext(&context, &msgid)
+    }
+}
+
 // --- sign-in -------------------------------------------------------------------------------
 
 /// Start Nextcloud's Login Flow v2: open `login_url` in a browser, then poll.

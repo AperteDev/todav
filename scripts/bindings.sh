@@ -1,8 +1,8 @@
 #!/bin/sh
 # Build todav-ffi for this machine, generate its Kotlin and C# bindings into
 # todav/ffi/target/bindings and run the smoke tests against them (they need Gradle with a JDK 17,
-# and the .NET 8 SDK). The C# generator, uniffi-bindgen-cs, is built into target/tools the first
-# time, at the version matching the UniFFI in todav/ffi/Cargo.toml.
+# the .NET 8 SDK and msgfmt). The C# generator, uniffi-bindgen-cs, is built into target/tools the
+# first time, at the version matching the UniFFI in todav/ffi/Cargo.toml.
 #
 #     scripts/bindings.sh            # generate and test
 #     scripts/bindings.sh --no-test  # generate only
@@ -29,6 +29,9 @@ fi
   --out-dir target/bindings/cs --no-format
 
 [ "${1:-}" = --no-test ] && exit 0
+
+# A catalog for the smoke tests to read.
+msgfmt -o target/bindings/pl.mo "$root/po/pl.po"
 
 (cd tests/kotlin && gradle -q run --console=plain)
 (cd tests/csharp && dotnet run)

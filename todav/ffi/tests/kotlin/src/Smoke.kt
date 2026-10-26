@@ -79,6 +79,13 @@ fun main() {
     t.dueReminders()
     t.nextReminder()
 
+    // Translations from the Polish catalog (made by scripts/bindings.sh).
+    val pl = Translations(java.io.File("../../target/bindings/pl.mo").readBytes())
+    check(pl.gettext("Today") == "Dzisiaj")
+    check(pl.ngettext("{n} event", "{n} events", 5uL) == "{n} wydarzeń")
+    check(pl.pgettext("category", "Other") == "Inne")
+    check(Translations.english().ngettext("{n} event", "{n} events", 1uL) == "{n} event")
+
     check(changes > 0) { "no change events" }
     println("Kotlin bindings: ok ($changes change events)")
     dir.deleteRecursively()
