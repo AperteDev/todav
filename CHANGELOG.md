@@ -12,7 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Several accounts side by side: more Nextcloud accounts (through GNOME Online Accounts or
   signed in in Todav, on the same server or others) and the lists kept on this device, each an
   account in Preferences → Accounts. Add one with Add; each has its own page with its name, its
-  connection, Server Status and Remove. The sidebars and list pickers group lists by account.
+  connection, Server Status and Remove. The sidebars and list pickers group lists by account,
+  in the order set by dragging the accounts by their handles.
 - An account can be switched off: its lists and calendars are hidden and stop syncing, nothing
   is deleted.
 - "Sync settings with" in Preferences → Accounts picks the account settings sync through, or

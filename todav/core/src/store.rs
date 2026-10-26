@@ -103,6 +103,11 @@ CREATE TABLE accounts (
 );
 ALTER TABLE lists ADD COLUMN account INTEGER REFERENCES accounts(id) ON DELETE CASCADE;
 "#,
+    // The user's order of the accounts (and so of their lists); in the order added until moved.
+    r#"
+ALTER TABLE accounts ADD COLUMN position INTEGER NOT NULL DEFAULT 0;
+UPDATE accounts SET position = id;
+"#,
 ];
 
 /// `user_version` after the migration that adds accounts.

@@ -56,8 +56,8 @@ fn call(method: &str, params: &glib::Variant) -> Result<Option<glib::Variant>, S
     Ok(match method {
         // (href, name, open tasks, colour as the app shows it)
         "GetLists" => {
-            let lists: Vec<(String, String, u32, String)> = c
-                .lists()
+            // In the sidebar's order: by account.
+            let lists: Vec<(String, String, u32, String)> = crate::lists::by_place(c.lists())
                 .into_iter()
                 .map(|l| {
                     let color = crate::lists::color(&l);

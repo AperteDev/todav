@@ -83,7 +83,7 @@ development:
   name and app password. Passwords stay in the system keyring.
 - **Several accounts** side by side: Nextcloud accounts on one server or more, and lists kept on
   this device. Each can be switched off (its lists are hidden, nothing is deleted) and the
-  sidebar groups lists by account.
+  sidebar groups lists by account, in the order you drag them into.
 - Runs in the background: closing the window hides it, and reminders and sync keep working.
   Starts with your session.
 - A **GNOME Shell extension** with the open-task count in the top bar and a menu showing a task

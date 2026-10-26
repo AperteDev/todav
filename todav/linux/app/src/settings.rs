@@ -527,6 +527,9 @@ fn connect_accounts(b: &gtk::Builder, dialog: &adw::PreferencesDialog) {
                 .subtitle(account_state(a))
                 .activatable(true)
                 .build();
+            if accounts.len() > 1 {
+                connect_reorder(&row, a.id, &crate::account_name(a));
+            }
             row.add_prefix(&gtk::Image::from_icon_name(account_icon(a)));
             if a.enabled && a.kind == AccountKind::Nextcloud && !core().connected(a.id) {
                 let warning = gtk::Image::from_icon_name("dialog-warning-symbolic");
@@ -563,6 +566,111 @@ fn connect_accounts(b: &gtk::Builder, dialog: &adw::PreferencesDialog) {
                 d2.add_toast(note(&gettext("{name} added").replace("{name}", &name)));
             }
         });
+    });
+}
+
+/// Account rows move by their handle: a dragged row goes above or below the one it is dropped
+/// on (its upper or lower half), and everything that lists accounts follows the new order.
+fn connect_reorder(row: &adw::ActionRow, id: i64, title: &str) {
+    let handle = gtk::Image::from_icon_name("list-drag-handle-symbolic");
+    handle.set_tooltip_text(Some(&gettext("Drag to Move")));
+    handle.set_cursor_from_name(Some("grab"));
+    let drag = gtk::DragSource::new();
+    drag.set_actions(gtk::gdk::DragAction::MOVE);
+    drag.set_content(Some(&gtk::gdk::ContentProvider::for_value(&id.to_value())));
+    let (r, title) = (row.clone(), title.to_string());
+    drag.connect_drag_begin(move |_, drag| {
+        // The account's name on a card; the row stays in place, faded.
+        let card = gtk::Label::new(Some(&title));
+        card.add_css_class("drag-card");
+        if let Ok(icon) = gtk::DragIcon::for_drag(drag).downcast::<gtk::DragIcon>() {
+            icon.set_child(Some(&card));
+        }
+        r.add_css_class("dragged");
+    });
+    let r = row.clone();
+    drag.connect_drag_end(move |_, _, _| {
+        r.remove_css_class("dragged");
+        // Cancelled drags get no leave.
+        if let Some((_, w, c)) = DROP_MARK.take() {
+            w.remove_css_class(c);
+        }
+    });
+    handle.add_controller(drag);
+    row.add_prefix(&handle);
+
+    let below =
+        |dt: &gtk::DropTarget, y: f64| dt.widget().is_some_and(|w| y > f64::from(w.height()) / 2.0);
+    let drop = gtk::DropTarget::new(i64::static_type(), gtk::gdk::DragAction::MOVE);
+    drop.connect_motion(move |dt, _, y| {
+        if let Some(w) = dt.widget() {
+            mark(&w, below(dt, y));
+        }
+        gtk::gdk::DragAction::MOVE
+    });
+    drop.connect_leave(|dt| {
+        if let Some(w) = dt.widget() {
+            unmark(&w);
+        }
+    });
+    drop.connect_drop(move |dt, value, _, y| {
+        if let Some(w) = dt.widget() {
+            unmark(&w);
+        }
+        let Ok(moved) = value.get::<i64>() else {
+            return false;
+        };
+        if moved == id {
+            return false;
+        }
+        let mut ids: Vec<i64> = core().accounts().iter().map(|a| a.id).collect();
+        ids.retain(|i| *i != moved);
+        let at = ids.iter().position(|i| *i == id).unwrap_or(ids.len());
+        ids.insert(at + usize::from(below(dt, y)), moved);
+        let _ = core().reorder_accounts(ids);
+        // After the drop is done: the rows are made anew.
+        glib::idle_add_local_once(|| {
+            accounts_changed();
+            crate::window::lists_changed();
+            crate::calendar::refresh();
+        });
+        true
+    });
+    row.add_controller(drop);
+}
+
+thread_local! {
+    /// The drop line between account rows: (row dragged over, row showing it, its class).
+    static DROP_MARK: RefCell<Option<(gtk::Widget, gtk::Widget, &'static str)>> =
+        const { RefCell::new(None) };
+}
+
+/// Show where a drop on `owner` lands. Below it is drawn as the line above the next row when
+/// there is one, so the gap between two rows has a single line (as the task rows do).
+fn mark(owner: &gtk::Widget, below: bool) {
+    let (w, class) = match owner.next_sibling().filter(|_| below) {
+        Some(next) => (next, "drop-above"),
+        None => (
+            owner.clone(),
+            if below { "drop-below" } else { "drop-above" },
+        ),
+    };
+    DROP_MARK.with_borrow_mut(|m| {
+        if let Some((_, old, c)) = m.take() {
+            old.remove_css_class(c);
+        }
+        w.add_css_class(class);
+        *m = Some((owner.clone(), w, class));
+    });
+}
+
+/// Remove the line `owner` drew; one the row now entered drew stays.
+fn unmark(owner: &gtk::Widget) {
+    DROP_MARK.with_borrow_mut(|m| {
+        if m.as_ref().is_some_and(|(o, _, _)| o == owner) {
+            let (_, w, c) = m.take().unwrap();
+            w.remove_css_class(c);
+        }
     });
 }
 

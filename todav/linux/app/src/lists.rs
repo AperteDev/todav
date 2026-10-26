@@ -208,7 +208,7 @@ pub fn places() -> Vec<(String, i64)> {
         .collect()
 }
 
-/// Where account `id` comes among the accounts (the order they were added), for sorting.
+/// Where account `id` comes among the accounts (the user's order), for sorting.
 pub fn rank() -> impl Fn(i64) -> usize {
     let ids: Vec<i64> = core().accounts().iter().map(|a| a.id).collect();
     move |id| ids.iter().position(|i| *i == id).unwrap_or(usize::MAX)

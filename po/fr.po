@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Todav\n"
 "Report-Msgid-Bugs-To: https://github.com/AperteDev/todav/issues\n"
-"POT-Creation-Date: 2026-10-26 12:09+0100\n"
+"POT-Creation-Date: 2026-10-26 12:10+0100\n"
 "PO-Revision-Date: 2026-10-22 21:00+0200\n"
 "Last-Translator: \n"
 "Language-Team: French\n"
@@ -125,8 +125,8 @@ msgstr ""
 "Les tâches et calendriers d’un autre compte Nextcloud, ou gardés sur cet "
 "appareil"
 
-#: todav/linux/app/src/add_account.rs:99 todav/linux/app/src/settings.rs:583
-#: todav/linux/app/src/settings.rs:709 todav/linux/app/ui/add-account.blp:37
+#: todav/linux/app/src/add_account.rs:99 todav/linux/app/src/settings.rs:691
+#: todav/linux/app/src/settings.rs:817 todav/linux/app/ui/add-account.blp:37
 msgid "GNOME Online Accounts"
 msgstr "Comptes en ligne GNOME"
 
@@ -144,11 +144,11 @@ msgstr ""
 "Connectez-vous à votre Nextcloud ; Todav obtient son propre mot de passe "
 "d’application"
 
-#: todav/linux/app/src/add_account.rs:195 todav/linux/app/src/settings.rs:782
+#: todav/linux/app/src/add_account.rs:195 todav/linux/app/src/settings.rs:890
 msgid "Waiting for Sign-In…"
 msgstr "En attente de la connexion…"
 
-#: todav/linux/app/src/add_account.rs:197 todav/linux/app/src/settings.rs:784
+#: todav/linux/app/src/add_account.rs:197 todav/linux/app/src/settings.rs:892
 msgid "Waiting for Browser…"
 msgstr "En attente du navigateur…"
 
@@ -356,7 +356,7 @@ msgid "The event repeats."
 msgstr "L’événement se répète."
 
 #: todav/linux/app/src/calendar/dialog.rs:47 todav/linux/app/src/lists.rs:559
-#: todav/linux/app/src/settings.rs:874 todav/linux/app/ui/account.blp:34
+#: todav/linux/app/src/settings.rs:982 todav/linux/app/ui/account.blp:34
 #: todav/linux/app/ui/add-account.blp:178 todav/linux/app/ui/edit-dialog.blp:23
 #: todav/linux/app/ui/event-dialog.blp:25 todav/linux/app/ui/list-dialog.blp:18
 #: todav/linux/app/ui/new-category.blp:18
@@ -714,66 +714,70 @@ msgstr "{server}, en mode maintenance"
 msgid "Cannot reach the server: {error}"
 msgstr "Impossible de joindre le serveur : {error}"
 
-#: todav/linux/app/src/settings.rs:563
+#: todav/linux/app/src/settings.rs:566
 #, rust-format
 msgid "{name} added"
 msgstr "{name} ajouté"
 
-#: todav/linux/app/src/settings.rs:580
+#: todav/linux/app/src/settings.rs:576 todav/linux/app/src/window.rs:2054
+msgid "Drag to Move"
+msgstr "Faire glisser pour déplacer"
+
+#: todav/linux/app/src/settings.rs:688
 msgctxt "account"
 msgid "Off"
 msgstr "Désactivé"
 
-#: todav/linux/app/src/settings.rs:581 todav/linux/app/ui/add-account.blp:70
+#: todav/linux/app/src/settings.rs:689 todav/linux/app/ui/add-account.blp:70
 msgid "Lists and calendars that stay on this computer"
 msgstr "Des listes et calendriers qui restent sur cet ordinateur"
 
-#: todav/linux/app/src/settings.rs:582 todav/linux/app/src/settings.rs:698
+#: todav/linux/app/src/settings.rs:690 todav/linux/app/src/settings.rs:806
 msgid "Not connected"
 msgstr "Non connecté"
 
-#: todav/linux/app/src/settings.rs:584 todav/linux/app/ui/account.blp:51
+#: todav/linux/app/src/settings.rs:692 todav/linux/app/ui/account.blp:51
 #: todav/linux/app/ui/add-account.blp:126
 msgid "Nextcloud server"
 msgstr "Serveur Nextcloud"
 
-#: todav/linux/app/src/settings.rs:608
+#: todav/linux/app/src/settings.rs:716
 msgctxt "settings sync"
 msgid "Off"
 msgstr "Désactivée"
 
-#: todav/linux/app/src/settings.rs:700
+#: todav/linux/app/src/settings.rs:808
 msgid "Sign in again to sync it"
 msgstr "Reconnectez-vous pour le synchroniser"
 
-#: todav/linux/app/src/settings.rs:702
+#: todav/linux/app/src/settings.rs:810
 msgid "Check the account in Settings → Online Accounts"
 msgstr "Vérifiez le compte dans Paramètres → Comptes en ligne"
 
-#: todav/linux/app/src/settings.rs:705 todav/linux/app/src/settings.rs:745
+#: todav/linux/app/src/settings.rs:813 todav/linux/app/src/settings.rs:853
 #, rust-format
 msgid "Signed in as {name}"
 msgstr "Connecté en tant que {name}"
 
-#: todav/linux/app/src/settings.rs:708
+#: todav/linux/app/src/settings.rs:816
 #, rust-format
 msgid "Connected as {name}"
 msgstr "Connecté en tant que {name}"
 
-#: todav/linux/app/src/settings.rs:741
+#: todav/linux/app/src/settings.rs:849
 #, rust-format
 msgid "Signed in as {name}: add that as another account"
 msgstr "Connecté en tant que {name} : ajoutez-le comme un autre compte"
 
-#: todav/linux/app/src/settings.rs:832
+#: todav/linux/app/src/settings.rs:940
 msgid "No saved password: sign in again first"
 msgstr "Aucun mot de passe enregistré : reconnectez-vous d’abord"
 
-#: todav/linux/app/src/settings.rs:834
+#: todav/linux/app/src/settings.rs:942
 msgid "Nextcloud server changed"
 msgstr "Serveur Nextcloud modifié"
 
-#: todav/linux/app/src/settings.rs:864
+#: todav/linux/app/src/settings.rs:972
 msgid ""
 "Its lists and calendars, with everything in them, are deleted from this "
 "device. This cannot be undone."
@@ -781,7 +785,7 @@ msgstr ""
 "Ses listes et calendriers, avec tout leur contenu, sont supprimés de cet "
 "appareil. Cette action est irréversible."
 
-#: todav/linux/app/src/settings.rs:868
+#: todav/linux/app/src/settings.rs:976
 msgid ""
 "Its lists and calendars leave this device; they stay on the server. Switch "
 "it off instead to only hide them."
@@ -789,20 +793,20 @@ msgstr ""
 "Ses listes et calendriers quittent cet appareil ; ils restent sur le "
 "serveur. Désactivez-le plutôt pour seulement les masquer."
 
-#: todav/linux/app/src/settings.rs:881
+#: todav/linux/app/src/settings.rs:989
 #, rust-format
 msgid "Remove {name}?"
 msgstr "Supprimer {name} ?"
 
-#: todav/linux/app/src/settings.rs:883
+#: todav/linux/app/src/settings.rs:991
 msgid "Remove"
 msgstr "Supprimer"
 
-#: todav/linux/app/src/settings.rs:891
+#: todav/linux/app/src/settings.rs:999
 msgid "Remove Without Uploading?"
 msgstr "Supprimer sans envoyer ?"
 
-#: todav/linux/app/src/settings.rs:892
+#: todav/linux/app/src/settings.rs:1000
 #, rust-format
 msgid ""
 "{error}. Changes made here that the server does not have yet will be lost."
@@ -810,25 +814,25 @@ msgstr ""
 "{error}. Les modifications faites ici que le serveur n’a pas encore seront "
 "perdues."
 
-#: todav/linux/app/src/settings.rs:894
+#: todav/linux/app/src/settings.rs:1002
 msgid "Remove Anyway"
 msgstr "Supprimer quand même"
 
-#: todav/linux/app/src/settings.rs:908
+#: todav/linux/app/src/settings.rs:1016
 #, rust-format
 msgid "{name} removed"
 msgstr "{name} supprimé"
 
-#: todav/linux/app/src/settings.rs:942
+#: todav/linux/app/src/settings.rs:1050
 msgid "Connection works"
 msgstr "La connexion fonctionne"
 
-#: todav/linux/app/src/settings.rs:943
+#: todav/linux/app/src/settings.rs:1051
 #, rust-format
 msgid "Test failed: {error}"
 msgstr "Le test a échoué : {error}"
 
-#: todav/linux/app/src/settings.rs:944
+#: todav/linux/app/src/settings.rs:1052
 msgid "Test failed"
 msgstr "Le test a échoué"
 
@@ -1018,10 +1022,6 @@ msgstr "Ajouter une sous-tâche"
 #: todav/linux/app/src/window.rs:1914
 msgid "Add subtask"
 msgstr "Ajouter une sous-tâche"
-
-#: todav/linux/app/src/window.rs:2054
-msgid "Drag to Move"
-msgstr "Faire glisser pour déplacer"
 
 #: todav/linux/app/src/window.rs:2447 todav/linux/app/ui/edit-dialog.blp:95
 msgid "Priority"

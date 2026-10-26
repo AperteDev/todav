@@ -63,10 +63,12 @@ pub(crate) fn key(account: i64, name: &str) -> String {
 }
 
 impl Client {
-    /// Every account, in the order they were added.
+    /// Every account, in the user's order (`reorder_accounts`; the order added until then).
     pub fn accounts(&self) -> Vec<Account> {
         let db = self.db.lock().unwrap();
-        let st = db.prepare(&format!("SELECT {COLS} FROM accounts ORDER BY id"));
+        let st = db.prepare(&format!(
+            "SELECT {COLS} FROM accounts ORDER BY position, id"
+        ));
         st.and_then(|mut st| st.query_map([], row)?.collect())
             .unwrap_or_default()
     }
@@ -103,10 +105,29 @@ impl Client {
             return Err(Error::Exists);
         }
         db.execute(
-            "INSERT INTO accounts (kind, url, user, source) VALUES (?1, ?2, ?3, ?4)",
+            "INSERT INTO accounts (kind, url, user, source, position)
+             VALUES (?1, ?2, ?3, ?4, (SELECT COALESCE(MAX(position), 0) + 1 FROM accounts))",
             params![kind.as_str(), url, user, source],
         )?;
         Ok(db.last_insert_rowid())
+    }
+
+    /// Put the accounts in this order (ids; ones left out keep their place after them).
+    pub fn reorder_accounts(&self, ids: Vec<i64>) -> Result<()> {
+        let db = self.db.lock().unwrap();
+        let tx = db.unchecked_transaction()?;
+        tx.execute(
+            "UPDATE accounts SET position = position + ?1",
+            [ids.len() as i64],
+        )?;
+        for (i, id) in ids.iter().enumerate() {
+            tx.execute(
+                "UPDATE accounts SET position = ?2 WHERE id = ?1",
+                params![id, i as i64],
+            )?;
+        }
+        tx.commit()?;
+        Ok(())
     }
 
     /// Name it; empty gives back the front-end's name.
@@ -327,5 +348,11 @@ mod tests {
             c.accounts().iter().map(|a| a.id).collect::<Vec<_>>(),
             [b, here]
         );
+
+        // The user's order, new ones last.
+        c.reorder_accounts(vec![here]).unwrap();
+        let three = add("https://three.example").unwrap();
+        let order: Vec<i64> = c.accounts().iter().map(|a| a.id).collect();
+        assert_eq!(order, [here, b, three]);
     }
 }
