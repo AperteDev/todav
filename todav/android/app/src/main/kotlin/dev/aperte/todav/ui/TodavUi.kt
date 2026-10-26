@@ -86,6 +86,7 @@ import dev.aperte.todav.Place
 import dev.aperte.todav.Row as TaskRow
 import dev.aperte.todav.Screen
 import dev.aperte.todav.SignIn
+import dev.aperte.todav.Ticking
 import dev.aperte.todav.UPCOMING
 import dev.aperte.todav.accountName
 import dev.aperte.todav.core.SyncState
@@ -232,8 +233,8 @@ private fun Tasks(model: Main, screen: Screen) {
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     val sync by model.syncState.collectAsStateWithLifecycle()
-    val completing by model.completing.collectAsStateWithLifecycle()
-    completing?.let { (task, open) -> CompleteDialog(task.summary, open, model::complete) }
+    val ticking by model.ticking.collectAsStateWithLifecycle()
+    ticking?.let { SubtasksDialog(it, model::answer) }
 
     LaunchedEffect(Unit) {
         model.messages.collect { (text, change) ->
@@ -305,19 +306,24 @@ private fun Tasks(model: Main, screen: Screen) {
     }
 }
 
-/** Whether completing a task completes its `open` subtasks too (`onAnswer(null)`: cancelled). */
+/** Whether completing or reopening a task takes its subtasks along (`onAnswer(null)`: cancelled). */
 @Composable
-private fun CompleteDialog(title: String, open: Int, onAnswer: (Boolean?) -> Unit) {
+private fun SubtasksDialog(t: Ticking, onAnswer: (Boolean?) -> Unit) {
+    val n = t.subtasks.toLong()
+    val body = if (t.done) {
+        ntr("“{title}” has {n} open subtask.", "“{title}” has {n} open subtasks.", n)
+    } else {
+        ntr("“{title}” has {n} completed subtask.", "“{title}” has {n} completed subtasks.", n)
+    }
     AlertDialog(
         onDismissRequest = { onAnswer(null) },
-        title = { Text(tr("Complete Subtasks Too?")) },
-        text = {
-            Text(
-                ntr("“{title}” has {n} open subtask.", "“{title}” has {n} open subtasks.", open.toLong())
-                    .replace("{title}", title).replace("{n}", "$open"),
-            )
+        title = { Text(if (t.done) tr("Complete Subtasks Too?") else tr("Reopen Subtasks Too?")) },
+        text = { Text(body.replace("{title}", t.task.summary).replace("{n}", "$n")) },
+        confirmButton = {
+            TextButton(onClick = { onAnswer(true) }) {
+                Text(if (t.done) tr("Complete All") else tr("Reopen All"))
+            }
         },
-        confirmButton = { TextButton(onClick = { onAnswer(true) }) { Text(tr("Complete All")) } },
         dismissButton = {
             Row {
                 TextButton(onClick = { onAnswer(null) }) { Text(tr("Cancel")) }

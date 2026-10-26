@@ -371,15 +371,28 @@ impl Todav {
         Ok(self.c().set_done(uid, done)?)
     }
 
-    /// As `set_done`, one change for undo. With `tree`, completing also completes the task's
-    /// open subtasks and reopening reopens its completed parents (`SubtaskCompletion::Complete`).
-    pub fn set_done_tree(&self, uid: String, done: bool, tree: bool) -> Result<()> {
-        Ok(todav_app::tasks::set_done(self.c(), &uid, done, tree)?)
+    /// As `set_done`, one change for undo. With `subtasks`, its subtasks follow (the open ones
+    /// completed, or the completed ones reopened); with `parents`, reopening it reopens its
+    /// completed parents (`SubtaskCompletion::Complete`).
+    pub fn set_done_tree(
+        &self,
+        uid: String,
+        done: bool,
+        subtasks: bool,
+        parents: bool,
+    ) -> Result<()> {
+        Ok(todav_app::tasks::set_done(
+            self.c(),
+            &uid,
+            done,
+            subtasks,
+            parents,
+        )?)
     }
 
-    /// The task's open subtasks, at any depth.
-    pub fn open_subtasks(&self, uid: String) -> Vec<Task> {
-        todav_app::tasks::open_subtasks(self.c(), &uid)
+    /// The task's subtasks, at any depth, that are `done` or open.
+    pub fn subtasks(&self, uid: String, done: bool) -> Vec<Task> {
+        todav_app::tasks::subtasks(self.c(), &uid, done)
     }
 
     pub fn update_task(&self, uid: String, patch: TaskPatch) -> Result<()> {

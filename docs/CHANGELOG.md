@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Completing a task with open subtasks" in Preferences > Tasks: completing a task completes its
   open subtasks too (the default, as in Nextcloud Tasks; reopening a subtask then reopens its
   task), leaves them open, or asks each time.
+- Reopening a task with completed subtasks asks whether they reopen too.
 - "Edit titles in place" in Preferences > Tasks: a click on a task's title with a mouse or
   touchpad edits it right in the list. Off by default.
 - When Todav is updated while it runs, it restarts into the new version by itself if its window

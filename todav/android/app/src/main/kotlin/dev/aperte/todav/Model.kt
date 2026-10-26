@@ -66,6 +66,9 @@ data class Screen(
     val now: Long,
 )
 
+/** A task being completed (`done`) or reopened, with the subtasks that would stay behind. */
+data class Ticking(val task: TodavTask, val done: Boolean, val subtasks: Int)
+
 /** Signing in to a Nextcloud server. */
 sealed interface SignIn {
     data object Idle : SignIn
@@ -92,8 +95,8 @@ class Main(app: Application) : AndroidViewModel(app) {
     /** Messages for a snackbar, with the change an "Undo" reverts (if any). */
     val messages = MutableSharedFlow<Pair<String, ULong?>>(extraBufferCapacity = 8)
 
-    /** A task being completed with this many open subtasks, while the user picks whether they go too. */
-    val completing = MutableStateFlow<Pair<TodavTask, Int>?>(null)
+    /** A task being completed or reopened, while the user picks whether its subtasks go along. */
+    val ticking = MutableStateFlow<Ticking?>(null)
 
     val signIn = MutableStateFlow<SignIn>(SignIn.Idle)
     private var polling: Job? = null
@@ -185,26 +188,34 @@ class Main(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Complete or reopen a task; its open subtasks go along, stay open or the user is asked. */
+    /**
+     * Complete or reopen a task. Completed, its open subtasks go along, stay open or the user is
+     * asked, as the settings say; reopened, the user is asked whether its completed ones reopen
+     * too, every time.
+     */
     fun setDone(task: TodavTask, done: Boolean) = act {
         val mode = core.subtaskCompletion()
-        val open = if (done && mode == SubtaskCompletion.ASK) core.openSubtasks(task.uid).size else 0
-        if (open > 0) {
-            completing.value = task to open
+        // The subtasks left behind otherwise: open ones when completing, completed ones when reopening.
+        val n = core.subtasks(task.uid, !done).size
+        if (n > 0 && (!done || mode == SubtaskCompletion.ASK)) {
+            ticking.value = Ticking(task, done, n)
         } else {
-            core.setDoneTree(task.uid, done, mode == SubtaskCompletion.COMPLETE)
-            core.requestSync()
+            tick(task, done, done && mode == SubtaskCompletion.COMPLETE)
         }
     }
 
-    /** The answer to `completing`: with its subtasks or alone; null: cancelled. */
-    fun complete(subtasks: Boolean?) {
-        val task = completing.value?.first ?: return
-        completing.value = null
-        if (subtasks != null) act {
-            core.setDoneTree(task.uid, true, subtasks)
-            core.requestSync()
-        }
+    /** The answer to `ticking`: with its subtasks or alone; null: cancelled. */
+    fun answer(subtasks: Boolean?) {
+        val t = ticking.value ?: return
+        ticking.value = null
+        if (subtasks != null) act { tick(t.task, t.done, subtasks) }
+    }
+
+    private fun tick(task: TodavTask, done: Boolean, subtasks: Boolean) {
+        // Completing them all, reopening one reopens its completed parents.
+        val parents = !done && core.subtaskCompletion() == SubtaskCompletion.COMPLETE
+        core.setDoneTree(task.uid, done, subtasks, parents)
+        core.requestSync()
     }
 
     fun delete(task: TodavTask) = act {

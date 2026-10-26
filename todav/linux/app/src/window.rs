@@ -203,7 +203,7 @@ pub fn setup_actions(app: &adw::Application) {
         // From a notification nobody can be asked: subtasks stay open unless set to complete.
         let tree = prefs::subtask_completion(core()) == prefs::SubtaskCompletion::Complete;
         if let Some(uid) = uid.and_then(|u| u.str())
-            && tasks::set_done(core(), uid, true, tree).is_ok()
+            && tasks::set_done(core(), uid, true, tree, false).is_ok()
         {
             request_sync();
         }
@@ -2375,48 +2375,64 @@ fn done_check(t: &Task) -> gtk::CheckButton {
     check
 }
 
-/// Complete or reopen task `uid` as its check `check` now says, then `after`. Its open subtasks
-/// are completed too, stay open or the user picks, as Preferences say (`complete_subtasks`);
-/// cancelled, the check is unticked again.
+/// Complete or reopen task `uid` as its check `check` now says, then `after`. Completed, its open
+/// subtasks are completed too, stay open or the user picks, as Preferences say
+/// (`complete_subtasks`); reopened, the user picks whether its completed subtasks reopen too,
+/// every time. Cancelled, the check goes back.
 pub fn tick(check: &gtk::CheckButton, uid: &str, after: impl Fn() + 'static) {
     use prefs::SubtaskCompletion::{Ask, Complete};
     let done = check.is_active();
     let Some(t) = core().task(uid.into()).filter(|t| t.done != done) else {
-        return; // already so: unticked again after a cancel, or rebuilt
+        return; // already so: put back after a cancel, or rebuilt
     };
     let mode = prefs::subtask_completion(core());
-    let finish = move |tree: bool| {
-        if tasks::set_done(core(), &t.uid, done, tree).is_ok() {
+    // Completing them all, reopening one reopens its completed parents.
+    let parents = !done && mode == Complete;
+    let finish = move |subtasks: bool| {
+        if tasks::set_done(core(), &t.uid, done, subtasks, parents).is_ok() {
             after();
             request_sync();
         }
     };
-    if !done {
-        return finish(mode == Complete);
+    // The subtasks left behind otherwise: open ones when completing, completed ones when reopening.
+    let n = tasks::subtasks(core(), uid, !done).len();
+    if n == 0 {
+        return finish(false);
     }
-    let open = tasks::open_subtasks(core(), uid).len();
-    if open == 0 || mode != Ask {
+    if done && mode != Ask {
         return finish(mode == Complete);
     }
     let check = check.clone();
     glib::spawn_future_local(async move {
-        let title = t.summary.clone();
-        let alert = adw::AlertDialog::new(
-            Some(&gettext("Complete Subtasks Too?")),
-            Some(
-                &ngettext(
+        let (heading, body, all) = if done {
+            (
+                gettext("Complete Subtasks Too?"),
+                ngettext(
                     "“{title}” has {n} open subtask.",
                     "“{title}” has {n} open subtasks.",
-                    open as u64,
-                )
-                .replace("{title}", &title)
-                .replace("{n}", &open.to_string()),
-            ),
-        );
+                    n as u64,
+                ),
+                gettext("Complete All"),
+            )
+        } else {
+            (
+                gettext("Reopen Subtasks Too?"),
+                ngettext(
+                    "“{title}” has {n} completed subtask.",
+                    "“{title}” has {n} completed subtasks.",
+                    n as u64,
+                ),
+                gettext("Reopen All"),
+            )
+        };
+        let body = body
+            .replace("{title}", &t.summary)
+            .replace("{n}", &n.to_string());
+        let alert = adw::AlertDialog::new(Some(&heading), Some(&body));
         alert.add_responses(&[
             ("cancel", &gettext("Cancel")),
             ("alone", &gettext("Only This Task")),
-            ("all", &gettext("Complete All")),
+            ("all", &all),
         ]);
         alert.set_response_appearance("all", adw::ResponseAppearance::Suggested);
         alert.set_default_response(Some("all"));
@@ -2424,7 +2440,7 @@ pub fn tick(check: &gtk::CheckButton, uid: &str, after: impl Fn() + 'static) {
         match alert.choose_future(Some(&check)).await.as_str() {
             "all" => finish(true),
             "alone" => finish(false),
-            _ => check.set_active(false),
+            _ => check.set_active(!done),
         }
     });
 }
