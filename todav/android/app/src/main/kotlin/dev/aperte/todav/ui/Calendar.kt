@@ -2,7 +2,6 @@ package dev.aperte.todav.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -74,6 +73,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.animation.AnimatedVisibility
@@ -454,7 +454,7 @@ private fun MonthGrid(model: Main, month: Long, picked: Long?, colors: Map<Strin
     var target by remember { mutableStateOf<Long?>(null) }
     var moved by remember { mutableStateOf<Pair<Item, Change>?>(null) }
     moved?.let { (item, change) -> Reschedule(model, item, change) { moved = null } }
-    Column(Modifier.fillMaxSize().padding(horizontal = 4.dp)) {
+    Column(Modifier.fillMaxSize()) {
         WeekdayNames(start)
         for (w in 0 until 6) {
             Row(Modifier.fillMaxWidth().weight(1f)) {
@@ -463,7 +463,7 @@ private fun MonthGrid(model: Main, month: Long, picked: Long?, colors: Map<Strin
                     val here = days[w * 7 + d]
                     DayCell(
                         at, here, colors, at == today, at == picked || at == target, fields(at).monthValue == thisMonth,
-                        Modifier.weight(1f).fillMaxHeight().pointerInput(at, here) {
+                        Modifier.weight(1f).fillMaxHeight().gridLines(left = d > 0).pointerInput(at, here) {
                             // Held on a chip and moved: to the day it is let go over.
                             var held: Item? = null
                             var total = Offset.Zero
@@ -523,18 +523,32 @@ private fun WeekStrip(model: Main, day: Long, colors: Map<String, String>) {
         List(7) { n -> items.filter { onDay(it, start + n * DAY) } }
     }
     val today = midnight(model.core.localNow())
-    Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp).padding(bottom = 4.dp)) {
+    Column(Modifier.fillMaxWidth()) {
         WeekdayNames(start)
         Row(Modifier.fillMaxWidth().height(76.dp)) {
             for (d in 0 until 7) {
                 val at = start + d * DAY
-                DayCell(at, days[d], colors, at == today, at == day, true, Modifier.weight(1f).fillMaxHeight()) { model.pick(at) }
+                DayCell(at, days[d], colors, at == today, at == day, true, Modifier.weight(1f).fillMaxHeight().gridLines(left = d > 0)) {
+                    model.pick(at)
+                }
             }
         }
     }
     HorizontalDivider()
 }
 
+/** The calendar's grid, as the Linux app's: a faint line along the top and, `left`, between columns. */
+@Composable
+private fun Modifier.gridLines(left: Boolean): Modifier {
+    val line = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+    return drawBehind {
+        val w = 1.dp.toPx()
+        drawRect(line, size = Size(size.width, w))
+        if (left) drawRect(line, size = Size(w, size.height))
+    }
+}
+
+/** A day of the month grid: its number (today's on the accent), as many chips as fit, then "+n". */
 @Composable
 private fun DayCell(
     day: Long,
@@ -546,11 +560,8 @@ private fun DayCell(
     modifier: Modifier,
     onClick: () -> Unit,
 ) {
-    val outline = MaterialTheme.colorScheme.outlineVariant
     Column(
-        modifier.clip(RoundedCornerShape(8.dp))
-            .background(if (picked) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
-            .border(0.5.dp, outline.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+        modifier.background(if (picked) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent)
             .clickable(onClick = onClick)
             .padding(2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1019,7 +1030,6 @@ private fun Week(
         }
         HorizontalDivider()
         Box(Modifier.fillMaxSize().then(if (gutter) Modifier.verticalScroll(scroll) else Modifier.hoursScroll(scroll))) {
-            val line = MaterialTheme.colorScheme.outlineVariant
             val surface = MaterialTheme.colorScheme.surface
             Column {
                 for (h in 0 until 24) {
@@ -1028,7 +1038,7 @@ private fun Week(
                         for (d in cols) {
                             val at = start + d * DAY + h * 3600
                             Box(
-                                Modifier.weight(1f).fillMaxHeight().border(0.25.dp, line)
+                                Modifier.weight(1f).fillMaxHeight().gridLines(left = true)
                                     .clickable {
                                         val t = model.planning.value
                                         if (t == null) {
