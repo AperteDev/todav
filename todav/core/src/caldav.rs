@@ -226,8 +226,8 @@ pub struct RemoteList {
     pub events: bool,
     /// We may change it (shared read-only calendars and Birthdays may not).
     pub writable: bool,
-    /// Its place among the user's calendars (calendar-order; 0 when not set).
-    pub order: i64,
+    /// Its place among the user's calendars (calendar-order); None: the server keeps none.
+    pub order: Option<i64>,
 }
 
 pub enum SyncResult {
@@ -255,7 +255,19 @@ impl Dav {
         } else {
             format!("{url}/remote.php/dav/")
         };
-        let origin = origin(url);
+        let auth = format!(
+            "Basic {}",
+            crate::b64encode(format!("{user}:{password}").as_bytes(), false)
+        );
+        Dav::with(origin(url), root, auth)
+    }
+
+    /// A server signed in to with an OAuth access token (Google); `url` is the user's principal.
+    pub fn bearer(url: &str, token: &str) -> Dav {
+        Dav::with(origin(url), url.to_string(), format!("Bearer {token}"))
+    }
+
+    fn with(origin: String, root: String, auth: String) -> Dav {
         let agent = ureq::Agent::config_builder()
             .allow_non_standard_methods(true)
             .user_agent("Todav")
@@ -268,10 +280,7 @@ impl Dav {
             agent,
             origin,
             root,
-            auth: format!(
-                "Basic {}",
-                crate::b64encode(format!("{user}:{password}").as_bytes(), false)
-            ),
+            auth,
         }
     }
 
@@ -385,11 +394,12 @@ impl Dav {
         Ok(multistatus(&r.body)?.0)
     }
 
+    /// The user's principal; without one named, the root is (Google's is given as the root).
     pub fn principal(&self) -> Result<String> {
         let p = self.propfind(&self.root, "0", "<d:current-user-principal/>")?;
-        p.first()
+        Ok(p.first()
             .and_then(|r| r.props.find_text(DAV, "href"))
-            .ok_or_else(|| Error::Parse("no current-user-principal".into()))
+            .map_or_else(|| self.root.clone(), |h| percent_decode(&h)))
     }
 
     /// The collection the user's calendars are in.
@@ -398,6 +408,7 @@ impl Dav {
         let p = self.propfind(&principal, "0", "<c:calendar-home-set/>")?;
         p.first()
             .and_then(|r| r.props.find_text(DAV, "href"))
+            .map(|h| percent_decode(&h)) // Google's: "/caldav/v2/me%40gmail.com/"
             .ok_or_else(|| Error::Parse("no calendar-home-set".into()))
     }
 
@@ -441,8 +452,7 @@ impl Dav {
                     .map(|w| w.find_text(PUSH, "vapid-public-key").unwrap_or_default()),
                 order: p
                     .find_text(APPLE, "calendar-order")
-                    .and_then(|o| o.trim().parse().ok())
-                    .unwrap_or(0),
+                    .and_then(|o| o.trim().parse().ok()),
                 href: r.href,
                 tasks,
                 events,
@@ -458,7 +468,6 @@ impl Dav {
         let body = format!(
             r#"<?xml version="1.0" encoding="utf-8"?><d:sync-collection xmlns:d="DAV:" xmlns:c="{CALDAV}"><d:sync-token>{token}</d:sync-token><d:sync-level>1</d:sync-level><d:prop><d:getetag/><c:calendar-data/></d:prop></d:sync-collection>"#
         );
-        // TODO(v2): servers that omit calendar-data here need a calendar-multiget pass.
         let r = self.request("REPORT", href, &[("Depth", "1")], &body)?;
         if matches!(r.status, 403 | 409) && r.body.contains("valid-sync-token") {
             return Ok(SyncResult::InvalidToken);
@@ -469,24 +478,53 @@ impl Dav {
         let (resps, token) = multistatus(&r.body)?;
         let mut changed = Vec::new();
         let mut removed = Vec::new();
+        // Google's sync-collection leaves calendar-data out: fetched after.
+        let mut bare = Vec::new();
         for resp in resps {
             if resp.href.trim_end_matches('/') == self.path(href).trim_end_matches('/') {
                 continue;
             }
             if resp.status == 404 {
                 removed.push(resp.href);
-            } else if let (Some(etag), Some(data)) = (
-                resp.props.find_text(DAV, "getetag"),
-                resp.props.find(CALDAV, "calendar-data"),
-            ) {
-                changed.push((resp.href, etag, data.text.clone()));
+            } else if let Some(etag) = resp.props.find_text(DAV, "getetag") {
+                match resp.props.find(CALDAV, "calendar-data") {
+                    Some(data) => changed.push((resp.href, etag, data.text.clone())),
+                    None => bare.push(resp.href),
+                }
             }
+        }
+        for hrefs in bare.chunks(100) {
+            changed.extend(self.multiget(href, hrefs)?);
         }
         Ok(SyncResult::Changes {
             token: token.unwrap_or_default(),
             changed,
             removed,
         })
+    }
+
+    /// (href, etag, calendar data) of resources `hrefs` in calendar `href`.
+    fn multiget(&self, href: &str, hrefs: &[String]) -> Result<Vec<(String, String, String)>> {
+        let hrefs: String = hrefs
+            .iter()
+            .map(|h| format!("<d:href>{}</d:href>", xml_escape(&percent_encode_path(h))))
+            .collect();
+        let body = format!(
+            r#"<?xml version="1.0" encoding="utf-8"?><c:calendar-multiget xmlns:d="DAV:" xmlns:c="{CALDAV}"><d:prop><d:getetag/><c:calendar-data/></d:prop>{hrefs}</c:calendar-multiget>"#
+        );
+        let r = self.request("REPORT", href, &[("Depth", "1")], &body)?;
+        if r.status != 207 {
+            return Err(Error::Http(r.status, r.body));
+        }
+        Ok(multistatus(&r.body)?
+            .0
+            .into_iter()
+            .filter_map(|r| {
+                let etag = r.props.find_text(DAV, "getetag")?;
+                let data = r.props.find(CALDAV, "calendar-data")?.text.clone();
+                Some((r.href, etag, data))
+            })
+            .collect())
     }
 
     /// PUT with `If-Match` (update) or `If-None-Match: *` (create). Returns the new ETag if the server sent one.
@@ -580,10 +618,16 @@ impl Dav {
         }
     }
 
-    /// GET a resource: (etag, body), or None if gone.
+    /// GET a resource: (etag, body), or None if gone. Google sends no ETag header: then its
+    /// getetag property.
     pub fn get(&self, href: &str) -> Result<Option<(Option<String>, String)>> {
         let r = self.request("GET", href, &[], "")?;
         match r.status {
+            200 if r.etag.is_none() => {
+                let p = self.propfind(href, "0", "<d:getetag/>")?;
+                let etag = p.first().and_then(|p| p.props.find_text(DAV, "getetag"));
+                Ok(Some((etag, r.body)))
+            }
             200 => Ok(Some((r.etag, r.body))),
             404 => Ok(None),
             s => Err(Error::Http(s, r.body)),

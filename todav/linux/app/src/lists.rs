@@ -9,7 +9,7 @@ use gtk::{gdk, gio, glib};
 use std::cell::RefCell;
 use std::rc::Rc;
 use todav_app::lists::{PRESETS, color};
-use todav_core::List;
+use todav_core::{AccountKind, List};
 
 /// Swatches per row in the dialog.
 const COLUMNS: i32 = 7;
@@ -640,8 +640,14 @@ pub fn open(parent: &gtk::Widget, list: Option<List>, events: bool) {
         gettext("Delete List")
     });
     let delete_box: gtk::ListBox = get(&b, "delete_box");
+    // Google's calendars are deleted in Google Calendar.
+    let google = |l: &List| {
+        core()
+            .account(l.account)
+            .is_some_and(|a| a.kind == AccountKind::Google)
+    };
     match list {
-        Some(l) if l.writable => {
+        Some(l) if l.writable && !google(&l) => {
             let d = dialog.clone();
             delete.connect_activated(move |_| {
                 let (d, l, busy, fail) = (d.clone(), l.clone(), busy.clone(), fail.clone());

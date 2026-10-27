@@ -134,6 +134,15 @@ Adw.ToastOverlay root {
                 }
               }
 
+              // With a Google account chosen: what Todav does with it.
+              Gtk.Label google_note {
+                label: _("Only Nextcloud is fully supported. With Google, Todav shows and edits the events of your calendars: there are no task lists, and calendars are added and deleted in Google Calendar.");
+                wrap: true;
+                justify: center;
+                visible: false;
+                styles ["dimmed"]
+              }
+
               // The welcome page's: for this device, not the account.
               Adw.PreferencesGroup welcome_options {
                 visible: false;

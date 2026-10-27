@@ -33,11 +33,16 @@ pub fn by_place(c: &Client, mut lists: Vec<List>) -> Vec<List> {
     lists
 }
 
-/// The accounts new lists can go to now: switched on, and connected for a Nextcloud account.
+/// The accounts new lists can go to now: switched on, and connected for a Nextcloud account
+/// (Google's calendars are made in Google Calendar).
 pub fn places(c: &Client) -> Vec<i64> {
     c.accounts()
         .into_iter()
-        .filter(|a| a.enabled && (a.kind == AccountKind::Local || c.connected(a.id)))
+        .filter(|a| match a.kind {
+            AccountKind::Local => a.enabled,
+            AccountKind::Nextcloud => a.enabled && c.connected(a.id),
+            AccountKind::Google => false,
+        })
         .map(|a| a.id)
         .collect()
 }

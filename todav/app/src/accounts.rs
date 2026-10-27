@@ -35,12 +35,14 @@ impl From<todav_core::Error> for Error {
     }
 }
 
-/// Add a Nextcloud account at `url` and connect it; `source` says where its password comes from
-/// (empty: signed in in Todav, the password goes into the keyring). With `settings`, settings
-/// sync through it.
+/// Add a Nextcloud or Google account (`kind`) at `url` and connect it; `source` says where its
+/// password comes from (empty: signed in in Todav, the password goes into the keyring). With
+/// `settings`, settings sync through it (Nextcloud only).
+#[allow(clippy::too_many_arguments)]
 pub fn add(
     c: &Client,
     keyring: &dyn Keyring,
+    kind: AccountKind,
     url: &str,
     user: &str,
     password: String,
@@ -49,7 +51,8 @@ pub fn add(
 ) -> Result<i64, Error> {
     let url = url.trim_end_matches('/').to_string();
     let empty = source.is_empty();
-    let id = c.add_account(AccountKind::Nextcloud, url.clone(), user.into(), source)?;
+    let settings = settings && kind == AccountKind::Nextcloud;
+    let id = c.add_account(kind, url.clone(), user.into(), source)?;
     if empty && let Err(e) = keyring.store(&url, user, &password) {
         let _ = c.remove_account(id);
         return Err(Error::SavePassword(e));
@@ -93,7 +96,7 @@ pub fn remove(c: &Client, keyring: &dyn Keyring, id: i64, force: bool) -> Result
     let Some(a) = c.account(id) else {
         return Ok(());
     };
-    if a.kind == AccountKind::Nextcloud && !force {
+    if a.kind != AccountKind::Local && !force {
         if c.connected(id) {
             c.sync_account(id).map_err(Error::Upload)?;
         } else if c.pending(Some(id)) {
@@ -111,8 +114,26 @@ pub fn syncing(c: &Client, a: &Account) -> bool {
     a.enabled && c.connected(a.id)
 }
 
+/// The server answered that the account does not let Todav at its calendars: a Google account
+/// whose sign-in was given no calendar access.
+pub fn no_access(error: &str) -> bool {
+    error.contains("insufficientPermissions") || error.contains("insufficient authentication")
+}
+
 /// The host of a Nextcloud account's server, as its default name shows it ("user@host").
 pub fn host(a: &Account) -> &str {
     let host = a.url.split_once("://").map_or(a.url.as_str(), |(_, h)| h);
     host.trim_end_matches('/')
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn google_without_calendar_access() {
+        // What Google answers a sign-in given no calendar access, as the sync reports it.
+        let body = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<errors xmlns=\"http://schemas.google.com/g/2005\">\n <error>\n  <domain>GData</domain>\n  <code>insufficientPermissions</code>\n  <internalReason>Insufficient Permission</internalReason>\n </error>\n</errors>";
+        let e = todav_core::Error::Http(403, body.into()).to_string();
+        assert!(super::no_access(&e));
+        assert!(!super::no_access("HTTP 403: Forbidden"));
+    }
 }

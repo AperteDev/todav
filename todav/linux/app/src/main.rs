@@ -201,24 +201,37 @@ pub fn account_name(a: &Account) -> String {
     match a.kind {
         AccountKind::Local => i18n::gettext("On This Device"),
         AccountKind::Nextcloud => format!("{}@{}", a.user, todav_app::accounts::host(a)),
+        AccountKind::Google => a.user.clone(),
     }
 }
 
-/// Connect a Nextcloud account with its saved password: from GNOME Online Accounts (its
-/// `source`) or Todav's keyring entry. False without one (keyring cleared, GOA account gone or
-/// with tasks turned off).
+/// Connect a Nextcloud or Google account with its saved password: from GNOME Online Accounts
+/// (its `source`) or Todav's keyring entry. False without one (keyring cleared, GOA account
+/// gone or with tasks or calendars turned off).
 pub fn connect_saved(a: &Account) -> bool {
-    if a.kind != AccountKind::Nextcloud {
+    if a.kind == AccountKind::Local {
         return false;
     }
     let pw = if a.source.is_empty() {
         password_load(&a.url, &a.user)
     } else if goa::accounts().iter().any(|g| g.id == a.source) {
-        goa::password(&a.source)
+        goa::password(&a.source, a.kind)
     } else {
         None
     };
     pw.is_some_and(|pw| core().connect(a.id, pw).is_ok())
+}
+
+/// Google's access tokens last an hour: each minute the connected accounts take the one GOA
+/// has now, renewed when ten minutes or less were left.
+fn renew_tokens() {
+    std::thread::spawn(|| {
+        for a in core().accounts() {
+            if a.kind == AccountKind::Google && a.enabled && core().connected(a.id) {
+                connect_saved(&a);
+            }
+        }
+    });
 }
 
 /// Connect every account with its saved password; false when there is none (the welcome page
@@ -270,33 +283,57 @@ fn account_error(e: todav_app::accounts::Error) -> String {
     }
 }
 
-/// A Nextcloud account to add.
+/// A Nextcloud or Google account to add.
 pub enum Target {
     Goa(goa::Account),
     /// Signed in here (browser or password); the app password goes into Todav's keyring entry.
     Manual(todav_core::Credentials),
 }
 
-/// Add a Nextcloud account and connect it (`settings`: settings sync through it), then run
-/// the background service with it.
+/// Add a Nextcloud or Google account and connect it (`settings`: settings sync through it),
+/// then run the background service with it. A Google account whose calendars Google keeps from
+/// Todav is not added.
 pub async fn add_account(target: Target, settings: bool) -> Result<i64, String> {
     let id = gio::spawn_blocking(move || -> Result<i64, String> {
-        let (url, user, pw, source) = match target {
+        let (kind, url, user, pw, source) = match target {
             Target::Goa(a) => {
-                let pw = goa::password(&a.id).ok_or_else(|| {
+                let pw = goa::password(&a.id, a.kind).ok_or_else(|| {
                     i18n::gettext("Online Accounts has no password for this account")
                 })?;
-                (a.url, a.user, pw, a.id)
+                (a.kind, a.url, a.user, pw, a.id)
             }
-            Target::Manual(c) => (c.server, c.login_name, c.app_password, String::new()),
+            Target::Manual(c) => (
+                AccountKind::Nextcloud,
+                c.server,
+                c.login_name,
+                c.app_password,
+                String::new(),
+            ),
         };
-        todav_app::accounts::add(core(), &Secrets, &url, &user, pw, source, settings)
-            .map_err(account_error)
+        let id =
+            todav_app::accounts::add(core(), &Secrets, kind, &url, &user, pw, source, settings)
+                .map_err(account_error)?;
+        if kind == AccountKind::Google
+            && let Err(e) = core().sync_account(id)
+            && todav_app::accounts::no_access(&e.to_string())
+        {
+            let _ = core().remove_account(id);
+            return Err(no_calendar_access());
+        }
+        Ok(id)
     })
     .await
     .map_err(|_| i18n::gettext("Connecting failed"))??;
     started();
     Ok(id)
+}
+
+/// What to do when Google gave Todav no access to the calendars.
+pub fn no_calendar_access() -> String {
+    i18n::gettext(
+        "Google gave no access to your calendars. Remove the account in Settings → Online \
+         Accounts and add it again, ticking the access to Google Calendar",
+    )
 }
 
 /// The local account, the first time with a task list holding a task to start from and an
@@ -387,6 +424,7 @@ pub fn start_background() {
         glib::ControlFlow::Continue
     });
     glib::timeout_add_seconds_local(60, || {
+        renew_tokens();
         service().tick(window::is_active());
         glib::ControlFlow::Continue
     });

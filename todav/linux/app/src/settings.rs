@@ -344,11 +344,14 @@ fn set_status(row: &adw::ActionRow, icon: &gtk::Image, look: Option<&str>, text:
 
 /// The "Server Status" group of account `id`: the server (asked each time the returned closure
 /// runs), the last sync and DAV Push, the latter two kept up to date while the page is open.
-fn connect_status(b: &gtk::Builder, id: i64) -> Rc<dyn Fn()> {
+/// Google's has only the last sync.
+fn connect_status(b: &gtk::Builder, id: i64, google: bool) -> Rc<dyn Fn()> {
     let (server, server_icon): (adw::ActionRow, gtk::Image) =
         (get(b, "server_row"), get(b, "server_icon"));
     let (sync, sync_icon): (adw::ActionRow, gtk::Image) = (get(b, "sync_row"), get(b, "sync_icon"));
     let (push, push_icon): (adw::ActionRow, gtk::Image) = (get(b, "push_row"), get(b, "push_icon"));
+    server.set_visible(!google);
+    push.set_visible(!google);
     let get_push: gtk::Button = get(b, "get_push");
     get_push.connect_clicked(|button| {
         let window = button.root().and_downcast::<gtk::Window>();
@@ -366,6 +369,12 @@ fn connect_status(b: &gtk::Builder, id: i64) -> Rc<dyn Fn()> {
         let state = crate::sync_state();
         match crate::service().sync_error(id) {
             _ if state == "syncing" => set_status(&sync, &sync_icon, None, &gettext("Syncing…")),
+            Some(e) if todav_app::accounts::no_access(&e) => set_status(
+                &sync,
+                &sync_icon,
+                Some("error"),
+                &crate::no_calendar_access(),
+            ),
             Some(e) => set_status(
                 &sync,
                 &sync_icon,
@@ -422,6 +431,9 @@ fn connect_status(b: &gtk::Builder, id: i64) -> Rc<dyn Fn()> {
 
     Rc::new(move || {
         show();
+        if google {
+            return;
+        }
         set_status(&server, &server_icon, None, &gettext("Checking…"));
         let (server, icon) = (server.downgrade(), server_icon.downgrade());
         glib::spawn_future_local(async move {
@@ -474,7 +486,7 @@ fn connect_accounts(b: &gtk::Builder, dialog: &adw::PreferencesDialog) {
                 connect_reorder(&row, a.id, &crate::account_name(a));
             }
             row.add_prefix(&gtk::Image::from_icon_name(account_icon(a)));
-            if a.enabled && a.kind == AccountKind::Nextcloud && !core().connected(a.id) {
+            if a.enabled && a.kind != AccountKind::Local && !core().connected(a.id) {
                 let warning = gtk::Image::from_icon_name("dialog-warning-symbolic");
                 warning.add_css_class("warning");
                 row.add_suffix(&warning);
@@ -582,8 +594,8 @@ fn connect_reorder(row: &adw::ActionRow, id: i64, title: &str) {
 fn account_icon(a: &Account) -> &'static str {
     match a.kind {
         AccountKind::Local => "computer-symbolic",
-        AccountKind::Nextcloud if !a.source.is_empty() => "goa-panel-symbolic",
-        AccountKind::Nextcloud => "network-server-symbolic",
+        AccountKind::Nextcloud if a.source.is_empty() => "network-server-symbolic",
+        AccountKind::Nextcloud | AccountKind::Google => "goa-panel-symbolic",
     }
 }
 
@@ -592,7 +604,8 @@ fn account_state(a: &Account) -> String {
     match a.kind {
         _ if !a.enabled => pgettext("account", "Off"),
         AccountKind::Local => gettext("Lists and calendars that stay on this computer"),
-        AccountKind::Nextcloud if !core().connected(a.id) => gettext("Not connected"),
+        _ if !core().connected(a.id) => gettext("Not connected"),
+        AccountKind::Google => gettext("Google Calendar"),
         AccountKind::Nextcloud if !a.source.is_empty() => gettext("GNOME Online Accounts"),
         AccountKind::Nextcloud => gettext("Nextcloud server"),
     }
@@ -644,9 +657,11 @@ fn account_page(dialog: &adw::PreferencesDialog, id: i64) -> adw::NavigationPage
         return page;
     };
     page.set_title(&crate::account_name(&a));
-    let nextcloud = a.kind == AccountKind::Nextcloud;
-    let manual = nextcloud && a.source.is_empty();
-    get::<gtk::Widget>(&b, "connection").set_visible(nextcloud);
+    let remote = a.kind != AccountKind::Local;
+    let google = a.kind == AccountKind::Google;
+    let manual = a.kind == AccountKind::Nextcloud && a.source.is_empty();
+    get::<gtk::Widget>(&b, "connection").set_visible(remote);
+    get::<gtk::Widget>(&b, "google_note").set_visible(google);
 
     let enabled: adw::SwitchRow = get(&b, "enabled");
     enabled.set_active(a.enabled);
@@ -690,12 +705,12 @@ fn account_page(dialog: &adw::PreferencesDialog, id: i64) -> adw::NavigationPage
     let cancel: gtk::Button = get(&b, "cancel_sign_in");
     let server: UrlRow = (get(&b, "server_scheme"), get(&b, "server"));
     let server_status: adw::PreferencesGroup = get(&b, "server_status");
-    server_status.set_visible(false); // a Nextcloud account's, while connected (`describe`)
+    server_status.set_visible(false); // a synced account's, while connected (`describe`)
     set_url(&server, &a.url);
     server.1.set_visible(manual);
     sign_in.set_visible(manual);
-    let check_server: Rc<dyn Fn()> = if nextcloud {
-        connect_status(&b, id)
+    let check_server: Rc<dyn Fn()> = if remote {
+        connect_status(&b, id, google)
     } else {
         Rc::new(|| {})
     };
@@ -706,7 +721,10 @@ fn account_page(dialog: &adw::PreferencesDialog, id: i64) -> adw::NavigationPage
                 return;
             };
             let connected = core().connected(id);
-            let host = a.url.split_once("://").map_or(a.url.as_str(), |(_, h)| h);
+            let host = match a.kind {
+                AccountKind::Google => "Google",
+                _ => a.url.split_once("://").map_or(a.url.as_str(), |(_, h)| h),
+            };
             if !connected {
                 status.set_title(&gettext("Not connected"));
                 status.set_subtitle(&if manual {
@@ -739,7 +757,7 @@ fn account_page(dialog: &adw::PreferencesDialog, id: i64) -> adw::NavigationPage
             }
         })
     };
-    if nextcloud {
+    if remote {
         describe();
     }
 
@@ -877,7 +895,7 @@ async fn remove_account(dialog: adw::PreferencesDialog, id: i64) {
             "Its lists and calendars, with everything in them, are deleted from this device. \
              This cannot be undone.",
         ),
-        AccountKind::Nextcloud => gettext(
+        AccountKind::Nextcloud | AccountKind::Google => gettext(
             "Its lists and calendars leave this device; they stay on the server. Switch it \
              off instead to only hide them.",
         ),

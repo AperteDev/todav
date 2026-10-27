@@ -20,8 +20,8 @@ Adw.NavigationPage page {
         }
       }
 
-      // Nextcloud accounts: how it is connected. Signed in here: "Sign In Again" (a new app
-      // password) and the server's address. A GOA account is managed in GNOME Settings.
+      // Nextcloud and Google accounts: how it is connected. Signed in here: "Sign In Again" (a
+      // new app password) and the server's address. A GOA account is managed in GNOME Settings.
       Adw.PreferencesGroup connection {
         title: _("Connection");
 
@@ -56,6 +56,18 @@ Adw.NavigationPage page {
             valign: center;
             model: Gtk.StringList { strings ["https", "http"] };
             styles ["flat"]
+          }
+        }
+
+        // Google's: what Todav does with it.
+        Adw.ActionRow google_note {
+          title: _("Calendars Only");
+          subtitle: _("Only Nextcloud is fully supported. With Google, Todav shows and edits the events of your calendars: there are no task lists, and calendars are added and deleted in Google Calendar.");
+          visible: false;
+
+          [prefix]
+          Gtk.Image {
+            icon-name: "dialog-information-symbolic";
           }
         }
       }

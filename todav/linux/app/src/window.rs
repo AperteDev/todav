@@ -337,7 +337,16 @@ pub fn present(app: &adw::Application) {
 /// The welcome page, made anew (GNOME Online Accounts may have changed); the window shows the
 /// first account's lists once it is added.
 fn welcome(ui: &Rc<Ui>) {
-    let add = crate::add_account::new(true, |_| account_changed());
+    let add = crate::add_account::new(true, |id| {
+        account_changed();
+        // Google's calendars hold no tasks: the calendar, not an empty task list.
+        if core()
+            .account(id)
+            .is_some_and(|a| a.kind == AccountKind::Google)
+        {
+            crate::calendar::show_day(core().local_now());
+        }
+    });
     ui.welcome.set_child(Some(&add.root));
     ui.add_account.replace(Some(add));
     ui.current.take();
@@ -388,7 +397,7 @@ pub fn add_banner(banner: adw::Banner, update: adw::Banner) {
 /// Online Accounts account gone): their lists are here, nothing syncs.
 pub fn disconnected() -> Vec<todav_core::Account> {
     let mut v = core().accounts();
-    v.retain(|a| a.enabled && a.kind == AccountKind::Nextcloud && !core().connected(a.id));
+    v.retain(|a| a.enabled && a.kind != AccountKind::Local && !core().connected(a.id));
     v
 }
 
@@ -1114,6 +1123,17 @@ fn refresh_lists(ui: &Rc<Ui>) {
         .and_downcast::<gio::SimpleAction>()
     {
         sync.set_enabled(crate::can_sync());
+    }
+    // Nowhere to make lists (e.g. only Google's calendars): no "New List" or "New Calendar".
+    let places = !crate::lists::places().is_empty();
+    for name in ["new-list", "new-calendar"] {
+        if let Some(a) = ui
+            .window
+            .lookup_action(name)
+            .and_downcast::<gio::SimpleAction>()
+        {
+            a.set_enabled(places);
+        }
     }
     update_banners();
     let lists = todav_app::lists::by_place(core(), core().lists());

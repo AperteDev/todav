@@ -3,7 +3,7 @@
 use crate::caldav::{Dav, RemoteList, SyncResult};
 use crate::ical::Calendar;
 use crate::store::Kind;
-use crate::{Client, Error, Result, store};
+use crate::{AccountKind, Client, Error, Result, store};
 use rusqlite::params;
 use std::collections::HashSet;
 
@@ -87,9 +87,15 @@ impl Client {
         for l in &remote {
             self.pull(&dav, &dav.absolute(&l.href), &mut report)?;
         }
-        self.sync_config(id, &dav)?;
-        if self.settings_account() == Some(id) {
-            self.sync_settings(id, &dav)?;
+        // The categories and settings are files in Nextcloud.
+        if self
+            .account(id)
+            .is_some_and(|a| a.kind == AccountKind::Nextcloud)
+        {
+            self.sync_config(id, &dav)?;
+            if self.settings_account() == Some(id) {
+                self.sync_settings(id, &dav)?;
+            }
         }
         self.mark_synced(id)?;
         drop(_guard);
@@ -165,7 +171,13 @@ impl Client {
         events: bool,
     ) -> Result<String> {
         let kind = self.account(account).ok_or(Error::NoAccount)?.kind;
-        if kind == crate::AccountKind::Local {
+        if kind == AccountKind::Google {
+            return Err(Error::Http(
+                405,
+                "Google calendars are made in Google Calendar".into(),
+            ));
+        }
+        if kind == AccountKind::Local {
             let href = format!("{}{}/", store::LOCAL, crate::new_uid());
             self.db.lock().unwrap().execute(
                 "INSERT INTO lists (href, display_name, color, has_tasks, has_events, account)
@@ -204,17 +216,18 @@ impl Client {
     }
 
     /// Put lists in this order (hrefs, those of one account as a sidebar shows them; the
-    /// others keep their place): at once here, on the server (its calendar-order, shared with
-    /// Nextcloud's apps) at the next sync.
+    /// others keep their place): at once here, on a Nextcloud server (its calendar-order,
+    /// shared with Nextcloud's apps) at the next sync; Google keeps none.
     pub fn reorder_lists(&self, hrefs: Vec<String>) -> Result<()> {
         {
             let db = self.db.lock().unwrap();
             let tx = db.unchecked_transaction()?;
             for (i, href) in hrefs.iter().enumerate() {
                 tx.execute(
-                    "UPDATE lists SET position = ?2, position_dirty = ?3
+                    "UPDATE lists SET position = ?2, position_dirty = COALESCE(
+                       (SELECT kind = 'nextcloud' FROM accounts WHERE id = lists.account), 0)
                      WHERE href = ?1 AND position != ?2",
-                    params![href, i as i64, !href.starts_with(store::LOCAL)],
+                    params![href, i as i64],
                 )?;
             }
             tx.commit()?;
@@ -229,6 +242,16 @@ impl Client {
     /// bin for a while) and here; changes to it can no longer be undone.
     pub fn delete_list(&self, href: String) -> Result<()> {
         let _guard = self.sync_lock.lock().unwrap();
+        let account = store::list_account(&self.db.lock().unwrap(), &href)?;
+        if self
+            .account(account)
+            .is_some_and(|a| a.kind == AccountKind::Google)
+        {
+            return Err(Error::Http(
+                405,
+                "Google calendars are deleted in Google Calendar".into(),
+            ));
+        }
         if !href.starts_with(store::LOCAL) {
             self.list_dav(&href)?.delete(&href, None, None)?;
         }
@@ -248,13 +271,13 @@ impl Client {
         let tx = db.unchecked_transaction()?;
         let keep: HashSet<String> = remote.iter().map(|l| dav.absolute(&l.href)).collect();
         for l in remote {
-            // An order not sent yet stays ours.
+            // An order not sent yet stays ours, as ours does where the server keeps none.
             tx.execute(
                 "INSERT INTO lists (href, display_name, color, ctag, push_topic, has_tasks, has_events, writable, account, position)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, COALESCE(?10, 0))
                  ON CONFLICT(href) DO UPDATE SET display_name = ?2, color = ?3, ctag = ?4, push_topic = ?5,
                    has_tasks = ?6, has_events = ?7, writable = ?8, account = ?9,
-                   position = CASE WHEN position_dirty THEN position ELSE ?10 END",
+                   position = CASE WHEN position_dirty OR ?10 IS NULL THEN position ELSE ?10 END",
                 params![
                     dav.absolute(&l.href),
                     l.display_name,

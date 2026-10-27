@@ -181,7 +181,16 @@ impl Todav {
     ) -> Result<i64> {
         let k = KeyringAdapter(keyring);
         let c = self.c();
-        let id = todav_app::accounts::add(c, &k, &url, &user, password, String::new(), settings)?;
+        let id = todav_app::accounts::add(
+            c,
+            &k,
+            AccountKind::Nextcloud,
+            &url,
+            &user,
+            password,
+            String::new(),
+            settings,
+        )?;
         Ok(id)
     }
 

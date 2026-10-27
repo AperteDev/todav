@@ -1,4 +1,5 @@
-//! Adding an account: first its kind (GNOME Online Accounts, a Nextcloud server, this device),
+//! Adding an account: first its kind (GNOME Online Accounts' Nextcloud and Google accounts, a
+//! Nextcloud server, this device),
 //! then the account to connect. The welcome page shows it for the first account, with this
 //! device's ntfy server and whether settings sync through the account; Preferences → Accounts
 //! shows it in a dialog for more.
@@ -16,12 +17,16 @@ pub struct AddAccount {
     /// What to show: the steps, with their own toasts.
     pub root: adw::ToastOverlay,
     view: adw::NavigationView,
-    /// GNOME Online Accounts' Nextcloud accounts not added yet.
+    /// GNOME Online Accounts' Nextcloud and Google accounts not added yet.
     goa: Vec<goa::Account>,
     goa_account: adw::ComboRow,
+    /// What a Google account gives, under it when one is chosen.
+    google_note: gtk::Label,
     server: (gtk::DropDown, adw::EntryRow),
     ntfy: (gtk::DropDown, adw::EntryRow),
     sync_settings: adw::SwitchRow,
+    /// The welcome page's ntfy server and settings sync (Nextcloud's).
+    welcome_options: gtk::Widget,
     connect_goa: gtk::Button,
     /// The ways to sign in to a server.
     sign_in: gtk::Box,
@@ -45,9 +50,11 @@ pub fn new(welcome: bool, done: impl Fn(i64) + 'static) -> Rc<AddAccount> {
             .filter(|g| !added.contains(&g.id))
             .collect(),
         goa_account: get(&b, "goa_account"),
+        google_note: get(&b, "google_note"),
         server: (get(&b, "server_scheme"), get(&b, "server")),
         ntfy: (get(&b, "ntfy_scheme"), get(&b, "ntfy")),
         sync_settings: get(&b, "sync_settings"),
+        welcome_options: get(&b, "welcome_options"),
         connect_goa: get(&b, "connect_goa"),
         sign_in: get(&b, "sign_in"),
         login: get(&b, "login"),
@@ -65,18 +72,24 @@ pub fn new(welcome: bool, done: impl Fn(i64) + 'static) -> Rc<AddAccount> {
     use_goa.set_subtitle(&if !names.is_empty() {
         names.join(", ")
     } else if added.iter().any(|s| !s.is_empty()) {
-        gettext("Its Nextcloud accounts are all added")
+        gettext("Its Nextcloud and Google accounts are all added")
     } else {
-        gettext("No Nextcloud account in Settings → Online Accounts")
+        gettext("No Nextcloud or Google account in Settings → Online Accounts")
     });
     use_goa.set_sensitive(!a.goa.is_empty());
+    let weak = Rc::downgrade(&a);
+    a.goa_account.connect_selected_notify(move |_| {
+        if let Some(a) = weak.upgrade() {
+            a.show_google_note();
+        }
+    });
     let local = core()
         .accounts()
         .iter()
         .any(|a| a.kind == AccountKind::Local);
     get::<adw::ActionRow>(&b, "use_local").set_visible(!local);
     get::<gtk::Widget>(&b, "later").set_visible(welcome);
-    get::<gtk::Widget>(&b, "welcome_options").set_visible(welcome);
+    a.welcome_options.set_visible(welcome);
     if !welcome {
         let intro: adw::StatusPage = get(&b, "intro");
         intro.set_icon_name(None);
@@ -102,9 +115,12 @@ pub fn new(welcome: bool, done: impl Fn(i64) + 'static) -> Rc<AddAccount> {
                 page.set_title(&gettext("GNOME Online Accounts"));
                 status.set_icon_name(Some("goa-panel-symbolic"));
                 status.set_description(Some(&gettext(
-                    "Connect with a Nextcloud account from GNOME Settings",
+                    "Connect with a Nextcloud or Google account from GNOME Settings",
                 )));
+                a.show_google_note();
             } else {
+                a.google_note.set_visible(false);
+                a.welcome_options.set_visible(a.welcome);
                 page.set_title(&gettext("Nextcloud Server"));
                 status.set_icon_name(Some("network-server-symbolic"));
                 status.set_description(Some(&gettext(
@@ -207,6 +223,16 @@ impl AddAccount {
         });
     }
 
+    /// A Google account chosen: what it gives, and neither push nor settings sync with it.
+    fn show_google_note(&self) {
+        let google = self
+            .goa
+            .get(self.goa_account.selected() as usize)
+            .is_some_and(|g| g.kind == AccountKind::Google);
+        self.google_note.set_visible(google);
+        self.welcome_options.set_visible(self.welcome && !google);
+    }
+
     fn reset_login(&self) {
         self.sign_in.set_visible(true); // the GOA step hides it again when opened
         self.cancel_login.set_visible(false);
@@ -234,6 +260,13 @@ impl AddAccount {
         let settings = self.welcome && self.sync_settings.is_active();
         match crate::add_account(target, settings).await {
             Ok(id) => (self.done)(id),
+            // Too long for a toast, and what to do next.
+            Err(e) if e == crate::no_calendar_access() => {
+                let alert =
+                    adw::AlertDialog::new(Some(&gettext("No Access to Calendars")), Some(&e));
+                alert.add_response("close", &gettext("Close"));
+                alert.present(Some(&self.root));
+            }
             Err(e) => self.root.add_toast(note(&e)),
         }
     }

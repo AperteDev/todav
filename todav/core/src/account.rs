@@ -1,5 +1,5 @@
-//! Accounts: where lists are kept. A Nextcloud account syncs over CalDAV; the local account
-//! (one at most) keeps its lists on this device only. Each list belongs to one
+//! Accounts: where lists are kept. A Nextcloud account syncs over CalDAV, a Google one too (its
+//! calendars' events only); the local account (one at most) keeps its lists on this device only. Each list belongs to one
 //! (`lists.account`); a switched-off account's lists are hidden and not synced, nothing is
 //! deleted.
 
@@ -13,6 +13,10 @@ pub enum AccountKind {
     Nextcloud,
     /// Lists on this device only (`store::LOCAL`), never synced.
     Local,
+    /// Google Calendar over CalDAV with an OAuth access token as the password: events only;
+    /// its calendars can be renamed and recoloured, not created or deleted, and their order
+    /// stays on this device.
+    Google,
 }
 
 impl AccountKind {
@@ -20,6 +24,7 @@ impl AccountKind {
         match self {
             AccountKind::Nextcloud => "nextcloud",
             AccountKind::Local => "local",
+            AccountKind::Google => "google",
         }
     }
 }
@@ -30,7 +35,7 @@ pub struct Account {
     pub kind: AccountKind,
     /// Given by the user; empty: the front-end names it ("user@host", "On This Device").
     pub name: String,
-    /// The server, as signed in to (Nextcloud).
+    /// The server, as signed in to (Nextcloud); Google: the user's CalDAV principal.
     pub url: String,
     pub user: String,
     /// The front-end's note on where the password comes from: on Linux the GNOME Online
@@ -47,6 +52,7 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Account> {
         id: r.get(0)?,
         kind: match r.get::<_, String>(1)?.as_str() {
             "local" => AccountKind::Local,
+            "google" => AccountKind::Google,
             _ => AccountKind::Nextcloud,
         },
         name: r.get(2)?,
@@ -157,10 +163,14 @@ impl Client {
     }
 
     /// The password is kept in memory only; front-ends keep it in the platform keyring (or
-    /// get it from where `Account::source` says).
+    /// get it from where `Account::source` says). Google's is an access token: connect again
+    /// with a fresh one before it expires.
     pub fn connect(&self, id: i64, password: String) -> Result<()> {
         let a = self.account(id).ok_or(Error::NoAccount)?;
-        let dav = Dav::new(&a.url, &a.user, &password);
+        let dav = match a.kind {
+            AccountKind::Google => Dav::bearer(&a.url, &password),
+            _ => Dav::new(&a.url, &a.user, &password),
+        };
         self.dav.lock().unwrap().insert(id, Arc::new(dav));
         Ok(())
     }
@@ -283,7 +293,7 @@ mod tests {
             tasks: true,
             events: false,
             writable: true,
-            order: 0,
+            order: None,
         }
     }
 
@@ -304,7 +314,7 @@ mod tests {
         let dav = c.dav(id).unwrap();
         let list = |name: &str, order| RemoteList {
             display_name: name.into(),
-            order,
+            order: Some(order),
             ..remote(&format!("/cal/{name}/"))
         };
         let names = |c: &Client| {
@@ -329,6 +339,36 @@ mod tests {
         c.save_lists(id, &dav, &[list("b", 1), list("a", 1), list("c", 0)])
             .unwrap();
         assert_eq!(names(&c), ["b", "c", "a"]);
+
+        // Google keeps no order: ours stays here, nothing for the server.
+        let g = c
+            .add_account(
+                AccountKind::Google,
+                "https://g.example/caldav/v2/kris/user".into(),
+                "kris".into(),
+                "".into(),
+            )
+            .unwrap();
+        c.connect(g, "token".into()).unwrap();
+        let gdav = c.dav(g).unwrap();
+        let unordered = |name: &str| RemoteList {
+            display_name: name.into(),
+            ..remote(&format!("/g/{name}/"))
+        };
+        c.save_lists(g, &gdav, &[unordered("y"), unordered("x")])
+            .unwrap();
+        let gl = |n: &str| gdav.absolute(&format!("/g/{n}/"));
+        c.reorder_lists(vec![gl("y"), gl("x")]).unwrap();
+        assert!(!c.pending(Some(g)));
+        c.save_lists(g, &gdav, &[unordered("x"), unordered("y")])
+            .unwrap();
+        let google: Vec<String> = c
+            .lists()
+            .into_iter()
+            .filter(|l| l.account == g)
+            .map(|l| l.display_name)
+            .collect();
+        assert_eq!(google, ["y", "x"]);
 
         // Lists on this device: kept here, nothing for a server.
         let here = c

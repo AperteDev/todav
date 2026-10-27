@@ -1,6 +1,8 @@
-//! GNOME Online Accounts: a Nextcloud account set up in Settings, used instead of signing in here.
+//! GNOME Online Accounts: a Nextcloud or Google account set up in Settings, used instead of
+//! signing in here.
 
 use gtk::{gio, glib};
+use todav_core::AccountKind;
 
 const BUS: &str = "org.gnome.OnlineAccounts";
 const ACCOUNT: &str = "org.gnome.OnlineAccounts.Account";
@@ -11,6 +13,8 @@ pub struct Account {
     pub id: String,
     /// "user@host", as GNOME shows it.
     pub name: String,
+    pub kind: AccountKind,
+    /// Nextcloud: the server; Google: the user's CalDAV principal.
     pub url: String,
     pub user: String,
 }
@@ -19,7 +23,8 @@ fn bus() -> Option<gio::DBusConnection> {
     gio::bus_get_sync(gio::BusType::Session, gio::Cancellable::NONE).ok()
 }
 
-/// Nextcloud accounts with calendars and tasks turned on, by name. Empty without GOA.
+/// Nextcloud accounts with calendars and tasks turned on and Google accounts with calendars
+/// turned on, by name. Empty without GOA.
 pub fn accounts() -> Vec<Account> {
     let Some(reply) = bus().and_then(|b| {
         b.call_sync(
@@ -50,10 +55,12 @@ pub fn accounts() -> Vec<Account> {
                 .unwrap_or(false)
         };
         // "owncloud" is GOA's provider for Nextcloud.
-        if text(ACCOUNT, "ProviderType").as_deref() != Some("owncloud")
-            || off("CalendarDisabled")
-            || off("TodoDisabled")
-        {
+        let kind = match text(ACCOUNT, "ProviderType").as_deref() {
+            Some("owncloud") if !off("TodoDisabled") => AccountKind::Nextcloud,
+            Some("google") => AccountKind::Google,
+            _ => continue,
+        };
+        if off("CalendarDisabled") {
             continue;
         }
         let (Some(id), Some(user), Some(uri)) = (
@@ -65,7 +72,11 @@ pub fn accounts() -> Vec<Account> {
         };
         out.push(Account {
             name: text(ACCOUNT, "PresentationIdentity").unwrap_or_else(|| user.clone()),
-            url: server_url(&uri),
+            url: match kind {
+                AccountKind::Google => uri,
+                _ => server_url(&uri),
+            },
+            kind,
             id,
             user,
         });
@@ -81,18 +92,28 @@ fn field(dict: &glib::Variant, key: &str) -> Option<glib::Variant> {
         .map(|e| e.child_value(1))
 }
 
-/// The account's app password, from GOA (which keeps it in the keyring).
-pub fn password(id: &str) -> Option<String> {
+/// What account `id` signs in with: Nextcloud's app password (GOA keeps it in the keyring), or
+/// Google's access token, valid for at least ten more minutes (GOA renews it).
+pub fn password(id: &str, kind: AccountKind) -> Option<String> {
+    let (iface, method, args, reply) = match kind {
+        AccountKind::Google => ("OAuth2Based", "GetAccessToken", None, "(si)"),
+        _ => (
+            "PasswordBased",
+            "GetPassword",
+            Some(glib::Variant::from(("",))),
+            "(s)",
+        ),
+    };
     bus()?
         .call_sync(
             Some(BUS),
             &format!("/org/gnome/OnlineAccounts/Accounts/{id}"),
-            "org.gnome.OnlineAccounts.PasswordBased",
-            "GetPassword",
-            Some(&glib::Variant::from(("",))),
-            glib::VariantTy::new("(s)").ok(),
+            &format!("org.gnome.OnlineAccounts.{iface}"),
+            method,
+            args.as_ref(),
+            glib::VariantTy::new(reply).ok(),
             gio::DBusCallFlags::NONE,
-            5000,
+            30000,
             gio::Cancellable::NONE,
         )
         .ok()?

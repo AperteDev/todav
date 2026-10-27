@@ -85,6 +85,7 @@ pub struct Account {
 pub enum AccountKind {
     Nextcloud,
     Local,
+    Google,
 }
 
 #[uniffi::remote(Record)]
