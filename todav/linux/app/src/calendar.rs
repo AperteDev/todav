@@ -130,6 +130,8 @@ struct Cal {
     flash: Cell<Option<(i64, std::time::Instant)>>,
     /// Midnight of the day the views are around (the selected day).
     anchor: Cell<i64>,
+    /// The anchor was reached by stepping (a month's first day), not picked: not highlighted.
+    browsed: Cell<bool>,
     /// The collections the sidebar shows, in its order.
     lists: RefCell<Vec<List>>,
     /// The hidden ones the sidebar rows show.
@@ -230,6 +232,7 @@ pub fn build(views: &adw::ViewStack) {
         pending: Cell::new(false),
         flash: Cell::new(None),
         anchor: Cell::new(today()),
+        browsed: Cell::new(false),
         lists: RefCell::new(Vec::new()),
         hidden: RefCell::new(HashSet::new()),
     });
@@ -356,8 +359,14 @@ fn mode(c: &Cal) -> Mode {
 
 /// Move to the day `f` picks from the current one.
 fn go(f: impl FnOnce(i64) -> i64) {
+    visit(f, false);
+}
+
+/// Move to the day `f` picks; `browsed`: reached by a step, not picked, so not highlighted.
+fn visit(f: impl FnOnce(i64) -> i64, browsed: bool) {
     if let Some(c) = cal() {
         c.anchor.set(f(c.anchor.get()));
+        c.browsed.set(browsed);
         c.search.set_search_mode(false);
         refresh();
     }
@@ -373,11 +382,11 @@ fn step(by: i64) {
                 .add_days(1 - d.day_of_month())
                 .and_then(|f| f.add_months(by as i32));
             if let Ok(f) = first {
-                go(|_| dates::midnight(&f));
+                visit(|_| dates::midnight(&f), true);
             }
         }
-        Mode::Week => go(|a| a + by * 7 * DAY),
-        Mode::Agenda => go(|a| a + by * AGENDA_STEP * DAY),
+        Mode::Week => visit(|a| a + by * 7 * DAY, true),
+        Mode::Agenda => visit(|a| a + by * AGENDA_STEP * DAY, true),
     }
 }
 
@@ -444,6 +453,7 @@ pub fn show_day(t: i64) {
     c.split.set_show_content(true);
     let day = t - t.rem_euclid(DAY);
     c.anchor.set(day);
+    c.browsed.set(false);
     c.flash.set(Some((
         day,
         std::time::Instant::now() + crate::window::FLASH,
@@ -920,7 +930,7 @@ fn render_month(c: &Rc<Cal>) -> i64 {
         if day == today {
             cell.add_css_class("today");
         }
-        if day == anchor {
+        if day == anchor && !c.browsed.get() {
             cell.add_css_class("selected");
         }
         let num = gtk::Label::builder()
@@ -970,6 +980,7 @@ fn select_in_month(day: i64) {
         return go(|_| day);
     }
     c.anchor.set(day);
+    c.browsed.set(false);
     let mut d = week_start(first);
     let mut row = c.month.first_child();
     while let Some(r) = row {

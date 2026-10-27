@@ -96,7 +96,7 @@ fn render(c: &Rc<Cal>) {
     for n in 0..42 {
         let day = start + n * DAY;
         let inside = dates::fields(day).month() == month;
-        let selected = day == anchor && inside;
+        let selected = day == anchor && inside && !c.browsed.get();
         // Under the number, a dot for each calendar with something that day (three at most).
         let dots = gtk::Box::builder()
             .spacing(2)
