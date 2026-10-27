@@ -2,8 +2,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Compose draws everything; this is the window until it does. -->
     <style name="Theme.Todav" parent="android:Theme.Material.Light.NoActionBar">
-        <!-- The splash screen (Android 12+): the launcher icon on the brand colour, not on
-             white. -->
-        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/splash_background</item>
+        <!-- The splash screen (Android 12+): the launcher icon on the wallpaper's accent, as the
+             app's dynamic colours' primary container (values-night: its dark tone). -->
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@android:color/system_accent1_100</item>
     </style>
 </resources>
