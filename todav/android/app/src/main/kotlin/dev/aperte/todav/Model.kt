@@ -50,19 +50,25 @@ const val IMPORTANT = "important"
 sealed interface Dest {
     data object Home : Dest
     data class Task(val uid: String) : Dest
-    /** An event to edit (`uid`), or a new one (`uid` null) starting at `start` (0: now). */
+    /**
+     * An event to edit (`uid`), or a new one (`uid` null) starting at `start` (0: now); a new one
+     * with `account` and no `list` waits for a calendar of that account to be picked.
+     */
     data class EventEdit(
         val list: String?,
         val uid: String?,
         val recurrenceId: Long?,
         val start: Long,
         val allDay: Boolean = false,
+        val account: Long? = null,
     ) : Dest
     data object Search : Dest
     data object Settings : Dest
     data class SettingsPage(val page: dev.aperte.todav.ui.Page) : Dest
     data class Account(val id: Long) : Dest
     data object AddAccount : Dest
+    /** A home-screen widget's settings. */
+    data class WidgetSettings(val id: Int) : Dest
 }
 
 /**

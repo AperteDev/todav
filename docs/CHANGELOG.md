@@ -16,9 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   delete with Undo); drag tasks to reorder
   them, make them subtasks or change their category; month, week and agenda views where events
   and tasks move by dragging; an event editor with repeating events; "To Plan" for putting tasks
-  into hours of the week; search; settings and accounts; reminders; push through UnifiedPush; a
-  home-screen widget; "New Task" from the launcher; adding shared text as a task; keyboard
-  shortcuts.
+  into hours of the week; search; settings and accounts; reminders; push through UnifiedPush;
+  "New Task" from the launcher; adding shared text as a task; keyboard shortcuts.
+- Android: home-screen widgets, read-only as the GNOME extension: a task list (or Upcoming,
+  Important) by category with its subtasks, the month with a dot per calendar on each day, the
+  coming week's agenda, a day's hours, and a month planner with bars across the days. Each has a
+  settings button (its account, its list or calendars, its add button) and an add button;
+  Settings → Widgets lists them, with the background's opacity and the corners' radius of all.
 - Android: a launcher icon of its own, the calendar page filling whatever shape the launcher gives
   icons, with a themed version; the app opens on it over the system's accent colour, light or
   dark with it.

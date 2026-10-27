@@ -94,7 +94,8 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
         }
     }
     val calendars = remember {
-        core.byPlace(core.calendars()).filter { it.writable || it.href == ev?.listHref }
+        core.byPlace(core.calendars())
+            .filter { (it.writable || it.href == ev?.listHref) && (dest.account == null || it.account == dest.account) }
     }
     val duration = remember { core.eventDuration() }
     var summary by rememberSaveable { mutableStateOf(ev?.summary ?: "") }
@@ -102,9 +103,11 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
     var notes by rememberSaveable { mutableStateOf(ev?.description ?: "") }
     var calendar by rememberSaveable {
         mutableStateOf(
-            ev?.listHref ?: dest.list
-                ?: core.setting("last_calendar")?.takeIf { l -> calendars.any { it.href == l } }
-                ?: calendars.firstOrNull()?.href,
+            ev?.listHref ?: dest.list ?: if (dest.account != null) {
+                null // a calendar of it to pick
+            } else {
+                core.setting("last_calendar")?.takeIf { l -> calendars.any { it.href == l } } ?: calendars.firstOrNull()?.href
+            },
         )
     }
     var allDay by rememberSaveable { mutableStateOf(ev?.allDay ?: dest.allDay) }

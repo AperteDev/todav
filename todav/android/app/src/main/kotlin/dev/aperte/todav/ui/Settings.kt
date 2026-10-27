@@ -38,6 +38,7 @@ import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LocalCafe
 import androidx.compose.material.icons.outlined.VolunteerActivism
+import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PhoneAndroid
@@ -75,6 +76,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.aperte.todav.Dest
 import dev.aperte.todav.Main
 import dev.aperte.todav.SignIn
+import dev.aperte.todav.WidgetKind
+import dev.aperte.todav.WidgetsSettings
 import dev.aperte.todav.accountName
 import dev.aperte.todav.core.AccountKind
 import dev.aperte.todav.core.SyncState
@@ -90,7 +93,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** The settings' pages, as the Linux app's Preferences (the extension's become the widget's). */
-enum class Page { GENERAL, ACCOUNTS, TASKS, CALENDAR, ABOUT }
+enum class Page { GENERAL, ACCOUNTS, TASKS, CALENDAR, WIDGETS, ABOUT }
 
 /** The minutes a duration setting may take (`todav_app::prefs::DURATIONS`). */
 private val DURATIONS = listOf(15L, 30, 45, 60, 90, 120, 180)
@@ -107,9 +110,13 @@ private fun sortNames() = listOf(
 /** The keys of `sortNames`, as `todav_app::prefs::SORTS`. */
 private val SORTS = listOf("manual", "newest", "oldest", "due_soonest", "due_latest", "priority")
 
+@Composable
+private fun Frame(model: Main, title: String, content: @Composable () -> Unit) = SettingsFrame(title, model::back, content)
+
+/** A settings page: its title in a large bar with a back button, its sections under it, centred on wide screens. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun Frame(model: Main, title: String, content: @Composable () -> Unit) {
+fun SettingsFrame(title: String, onBack: () -> Unit, content: @Composable () -> Unit) {
     val bar = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     BoxWithConstraints {
         // The bar's back button and title over the content, centred on wide screens; its colour
@@ -122,7 +129,7 @@ private fun Frame(model: Main, title: String, content: @Composable () -> Unit) {
                     title = { Text(title) },
                     navigationIcon = {
                         Tip(tr("Back")) {
-                            IconButton(onClick = model::back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Back")) }
+                            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Back")) }
                         }
                     },
                     windowInsets = TopAppBarDefaults.windowInsets.add(WindowInsets(left = side, right = side)),
@@ -147,11 +154,15 @@ private val SETTINGS_WIDTH = 720.dp
 @Composable
 fun SettingsPage(model: Main) {
     Frame(model, tr("Settings")) {
-        val pages = listOf(
+        // Widgets only while some are placed.
+        val context = LocalContext.current
+        val widgets = remember { WidgetKind.placed(context).isNotEmpty() }
+        val pages = listOfNotNull(
             Triple(Page.GENERAL, tr("General"), Icons.Outlined.Palette),
             Triple(Page.ACCOUNTS, tr("Accounts"), Icons.Outlined.AccountCircle),
             Triple(Page.TASKS, tr("Tasks"), Icons.Outlined.TaskAlt),
             Triple(Page.CALENDAR, tr("Calendar"), Icons.Outlined.CalendarMonth),
+            Triple(Page.WIDGETS, tr("Widgets"), Icons.Outlined.Widgets).takeIf { widgets },
             Triple(Page.ABOUT, tr("About Todav"), Icons.Outlined.Info),
         )
         Section(null) {
@@ -173,6 +184,7 @@ fun SettingsSubpage(model: Main, page: Page) {
         Page.ACCOUNTS -> Frame(model, tr("Accounts")) { Accounts(model) }
         Page.TASKS -> Frame(model, tr("Tasks")) { TaskSettings(model) }
         Page.CALENDAR -> Frame(model, tr("Calendar")) { CalendarSettings(model) }
+        Page.WIDGETS -> Frame(model, tr("Widgets")) { WidgetsSettings(model) }
         Page.ABOUT -> Frame(model, tr("About Todav")) { About(model) }
     }
 }
@@ -201,6 +213,19 @@ private fun ChoiceRow(
 ) {
     val value = setting(model, key)
     val current = shown ?: values.indexOf(value).coerceAtLeast(0)
+    PickRow(title, names, current, subtitle, enabled) { i -> if (onPick != null) onPick(i) else model.setSetting(key, values[i]) }
+}
+
+/** A row naming the one of `names` picked (`current`), which a dialog of radio buttons changes. */
+@Composable
+fun PickRow(
+    title: String,
+    names: List<String>,
+    current: Int,
+    subtitle: String? = null,
+    enabled: Boolean = true,
+    onPick: (Int) -> Unit,
+) {
     var open by remember { mutableStateOf(false) }
     Item(
         headlineContent = { Text(title) },
@@ -215,7 +240,7 @@ private fun ChoiceRow(
     if (open) {
         Choose(title, names, current, onDismiss = { open = false }) { i ->
             open = false
-            if (onPick != null) onPick(i) else model.setSetting(key, values[i])
+            onPick(i)
         }
     }
 }

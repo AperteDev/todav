@@ -73,7 +73,7 @@ class TodavApp : Application() {
             // The next reminder's alarm and the widgets, again after changes settle.
             changes.debounce(1_000).collect {
                 runCatching { Reminders.schedule(this@TodavApp) }
-                TasksWidget.refresh(this@TodavApp)
+                WidgetKind.refreshAll(this@TodavApp)
             }
         }
     }

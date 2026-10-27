@@ -98,6 +98,12 @@ class MainActivity : ComponentActivity() {
                 model.show(View.TASKS)
                 model.sharedText.value = ""
             }
+            NEW_EVENT -> newEvent(
+                model,
+                intent.getLongExtra("day", 0).takeIf { intent.hasExtra("day") },
+                intent.getStringExtra("calendar"),
+                intent.getLongExtra("account", -1).takeIf { it >= 0 },
+            )
         }
     }
 
@@ -172,5 +178,6 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val NEW_TASK = "dev.aperte.todav.NEW_TASK"
+        const val NEW_EVENT = "dev.aperte.todav.NEW_EVENT"
     }
 }

@@ -94,6 +94,7 @@ fun TodavUi(model: Main) {
                     is Dest.SettingsPage -> SettingsSubpage(model, dest.page)
                     is Dest.Account -> AccountPage(model, dest.id)
                     Dest.AddAccount -> AddAccountPage(model)
+                    is Dest.WidgetSettings -> dev.aperte.todav.WidgetPage(model.todav, dest.id, model::back)
                 }
             }
         }

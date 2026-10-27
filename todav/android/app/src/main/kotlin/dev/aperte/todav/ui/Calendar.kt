@@ -396,10 +396,13 @@ fun WorkDaysDialog(model: Main, onDismiss: () -> Unit) {
     )
 }
 
-/** A new event on the day the calendar shows (the add button, the shortcut). */
-fun newEvent(model: Main) {
-    val day = model.day.value ?: midnight(model.core.localNow())
-    model.newEvent.value = Dest.EventEdit(null, null, null, newStart(model, day), false)
+/**
+ * A new event on `day` (else the day the calendar shows: the add button, the shortcut), in
+ * `list` or, with only `account`, in a calendar of it still to pick (a widget's add button).
+ */
+fun newEvent(model: Main, day: Long? = null, list: String? = null, account: Long? = null) {
+    val d = day ?: model.day.value ?: midnight(model.core.localNow())
+    model.newEvent.value = Dest.EventEdit(list, null, null, newStart(model, d), false, account)
 }
 
 /** A new event's start: the next full hour on `day` when it is today, else 9:00 there. */

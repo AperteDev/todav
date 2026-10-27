@@ -70,10 +70,11 @@
         <receiver
             android:name=".ReminderReceiver"
             android:exported="false" />
+        <!-- The widgets. Their labels are the widget picker's, which cannot use gettext. -->
         <receiver
             android:name=".TasksWidgetReceiver"
             android:exported="true"
-            android:label="Todav">
+            android:label="Tasks">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -81,9 +82,56 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget" />
         </receiver>
+        <receiver
+            android:name=".MonthWidgetReceiver"
+            android:exported="true"
+            android:label="Month">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_month" />
+        </receiver>
+        <receiver
+            android:name=".AgendaWidgetReceiver"
+            android:exported="true"
+            android:label="Agenda">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_agenda" />
+        </receiver>
+        <receiver
+            android:name=".DayWidgetReceiver"
+            android:exported="true"
+            android:label="Day">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_day" />
+        </receiver>
+        <receiver
+            android:name=".PlannerWidgetReceiver"
+            android:exported="true"
+            android:label="Month Planner">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_planner" />
+        </receiver>
+        <!-- A task of its own: leaving a widget's settings goes back to the home screen. -->
         <activity
             android:name=".WidgetConfigure"
-            android:exported="true">
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:taskAffinity="">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>
