@@ -32,7 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Android: System Calendars, on the welcome page and in Settings → Accounts → Add Account, shows
   the calendars of the device's own accounts (Google, Exchange, DAVx⁵…), read-only. None is shown
   at first; each is turned on in the account's page, and changes to them show up at once.
-  With nowhere to add a list, calendar, task or event (only these calendars), the add buttons
+  One Todav already syncs itself (DAVx⁵'s copy of a Nextcloud calendar, say) is marked "Already
+  in Todav", as its events would show twice. With nowhere to add a list, calendar, task or event (only these calendars), the add buttons
   are not shown.
 - A read-only calendar's events can no longer be changed, rather than the server refusing the
   change later; on Android their details no longer offer Edit and Delete.

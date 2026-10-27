@@ -821,6 +821,7 @@ private fun SystemCalendarRows(model: Main) {
     }
     val calendars = load(changes, initial = null) { SystemCalendars.all(context) } ?: return
     val on = load(changes, initial = SystemCalendars.enabled(model.core)) { SystemCalendars.enabled(model.core) }
+    val inTodav = load(changes, initial = emptyMap()) { SystemCalendars.inTodav(context, model.core) }
     if (calendars.isEmpty()) {
         Section(tr("Calendars")) {
             Item(
@@ -834,6 +835,15 @@ private fun SystemCalendarRows(model: Main) {
             cals.forEach { c ->
                 Item(
                     headlineContent = { Text(c.name) },
+                    // Turned on, its events would show twice.
+                    supportingContent = inTodav[c.id]?.let { name ->
+                        @Composable {
+                            Text(
+                                tr("Already in Todav as “{name}”").replace("{name}", name),
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    },
                     leadingContent = { Box(Modifier.size(14.dp).background(Color(c.color or 0xFF000000.toInt()), CircleShape)) },
                     trailingContent = {
                         Switch(c.id in on, { v ->

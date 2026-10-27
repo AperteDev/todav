@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Todav\n"
 "Report-Msgid-Bugs-To: https://github.com/AperteDev/todav/issues\n"
-"POT-Creation-Date: 2026-10-27 22:24+0100\n"
+"POT-Creation-Date: 2026-10-27 23:01+0100\n"
 "PO-Revision-Date: 2026-10-22 21:00+0200\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
@@ -80,7 +80,7 @@ msgstr "Deshacer"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:245
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:427
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:888
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:898
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:257
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:259
 #: todav/linux/app/ui/account.blp:87 todav/linux/app/ui/settings.blp:97
@@ -433,8 +433,8 @@ msgstr "Añade un evento"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:277
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:813
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:825
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:833
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:826
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:834
 #: todav/linux/app/ui/calendar.blp:117
 msgid "Calendars"
 msgstr "Calendarios"
@@ -1824,60 +1824,64 @@ msgstr "Permitir el acceso a los calendarios"
 msgid "To show the calendars of the accounts on this device"
 msgstr "Para mostrar los calendarios de las cuentas de este dispositivo"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:827
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:828
 msgid "No calendars on this device"
 msgstr "No hay calendarios en este dispositivo"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:828
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:829
 msgid "Accounts added in the system’s settings, such as Google, bring theirs"
 msgstr ""
 "Las cuentas añadidas en los ajustes del sistema, como Google, traen los suyos"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:858
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:842
+msgid "Already in Todav as “{name}”"
+msgstr "Ya está en Todav como «{name}»"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:868
 #: todav/linux/app/src/settings.rs:437
 msgid "Checking…"
 msgstr "Comprobando…"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:862
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:872
 #: todav/linux/app/src/settings.rs:449
 #, rust-format
 msgid "{server}, in maintenance mode"
 msgstr "{server}, en modo de mantenimiento"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:864
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:874
 #: todav/linux/app/src/settings.rs:459
 #, rust-format
 msgid "Cannot reach the server: {error}"
 msgstr "No se puede contactar con el servidor: {error}"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:869
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:879
 #: todav/linux/app/src/settings.rs:371
 msgid "Syncing…"
 msgstr "Sincronizando…"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:870
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:880
 #: todav/linux/app/src/settings.rs:382
 #, rust-format
 msgid "Failed: {error}"
 msgstr "Falló: {error}"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:873
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:883
 #: todav/linux/app/src/settings.rs:366
 #, rust-format
 msgid "Last synced: {time}"
 msgstr "Última sincronización: {time}"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:875
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:885
 #: todav/linux/app/src/settings.rs:386
 msgid "Not synced yet"
 msgstr "Aún no sincronizado"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:880
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:890
 #: todav/linux/app/src/settings.rs:397
 msgid "Checked at the next sync"
 msgstr "Se comprobará en la próxima sincronización"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:881
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:891
 msgid ""
 "Not available on this server, so changes made elsewhere show up at the next "
 "check. Install the DAV Push app on Nextcloud to see them within seconds"
@@ -1886,7 +1890,7 @@ msgstr ""
 "aparecen en la siguiente comprobación. Instala la aplicación DAV Push en "
 "Nextcloud para verlos en segundos"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:882
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:892
 msgid ""
 "Available on this server. Install a UnifiedPush distributor such as ntfy to "
 "see changes made elsewhere within seconds"
@@ -1894,27 +1898,27 @@ msgstr ""
 "Disponible en este servidor. Instala un distribuidor de UnifiedPush como "
 "ntfy para ver en segundos los cambios hechos en otro lugar"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:883
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:893
 #: todav/linux/app/src/settings.rs:421
 msgid "Registering…"
 msgstr "Registrando…"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:884
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:894
 #: todav/linux/app/src/settings.rs:425
 msgid "On: changes made elsewhere show up within seconds"
 msgstr "Activo: los cambios hechos en otro lugar aparecen en segundos"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:886
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:896
 #: todav/linux/app/ui/account.blp:77
 msgid "Server Status"
 msgstr "Estado del servidor"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:887
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:897
 #: todav/linux/app/ui/account.blp:80
 msgid "Server"
 msgstr "Servidor"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:889
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:899
 #: todav/linux/app/ui/account.blp:94
 msgid "DAV Push"
 msgstr "DAV Push"

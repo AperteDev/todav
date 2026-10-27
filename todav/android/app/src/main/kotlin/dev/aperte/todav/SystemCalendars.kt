@@ -48,6 +48,30 @@ object SystemCalendars {
         return out.sortedWith(compareBy({ it.account.lowercase() }, { it.name.lowercase() }))
     }
 
+    /**
+     * Calendars Todav already syncs itself (DAVx⁵'s of the same server, say), by id: the name of
+     * Todav's own. Told by their events' UIDs, as the system keeps no server URL for them.
+     */
+    fun inTodav(context: Context, core: Todav): Map<Long, String> {
+        if (!allowed(context)) return emptyMap()
+        val names = core.calendars().associate { it.href to it.displayName }
+        val tried = mutableMapOf<Long, Int>()
+        val out = mutableMapOf<Long, String>()
+        val columns = arrayOf(Events.CALENDAR_ID, Events.UID_2445)
+        val where = "${Events.UID_2445} IS NOT NULL AND ${Events.DELETED} = 0 AND ${Events.ORIGINAL_ID} IS NULL"
+        context.contentResolver.query(Events.CONTENT_URI, columns, where, null, null)?.use { c ->
+            while (c.moveToNext()) {
+                val cal = c.getLong(0)
+                // ponytail: the first 20 events of each decide; enough unless one mixes both.
+                val n = tried.getOrDefault(cal, 0)
+                if (cal in out || n >= 20) continue
+                tried[cal] = n + 1
+                core.event(c.getString(1))?.listHref?.let { names[it] }?.let { out[cal] = it }
+            }
+        }
+        return out
+    }
+
     fun enabled(core: Todav): Set<Long> =
         core.setting("system_calendars").orEmpty().split(',').mapNotNull { it.toLongOrNull() }.toSet()
 
