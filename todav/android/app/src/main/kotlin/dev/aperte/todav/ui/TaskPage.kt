@@ -300,7 +300,7 @@ fun Reminders(model: Main, reminders: MutableList<Long>, allDay: Boolean, event:
     val custom = remember { mutableStateListOf<Int>() }
     Section(tr("Reminders")) {
         reminders.forEachIndexed { i, offset ->
-            val preset = presets.indexOfFirst { it.second == offset }.takeIf { i !in custom }
+            val preset = presets.indexOfFirst { it.second == offset }.takeIf { it >= 0 && i !in custom }
             ChoiceItem(
                 null,
                 presets.map { it.first } + tr("Custom…"),
