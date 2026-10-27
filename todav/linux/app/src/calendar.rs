@@ -1753,16 +1753,63 @@ fn pop_up(pop: gtk::Popover, parent: &impl IsA<gtk::Widget>) {
     pop.popup();
 }
 
+/// A details popover's title; with `rename`, a click edits it in place, Enter (or clicking
+/// elsewhere) saves it, Escape keeps the old one.
+fn title_label(text: &str, rename: Option<Box<dyn Fn(String)>>) -> gtk::Widget {
+    let Some(rename) = rename else {
+        let l = gtk::Label::builder()
+            .label(text)
+            .xalign(0.0)
+            .wrap(true)
+            .hexpand(true)
+            .build();
+        l.add_css_class("title-4");
+        return l.upcast();
+    };
+    let l = gtk::EditableLabel::builder()
+        .text(text)
+        .hexpand(true)
+        .tooltip_text(gettext("Click to rename"))
+        .build();
+    l.add_css_class("title-4");
+    let old = RefCell::new(text.to_string());
+    l.connect_editing_notify(move |l| {
+        let new = l.text().trim().to_string();
+        if l.is_editing() || new.is_empty() || new == *old.borrow() {
+            return;
+        }
+        *old.borrow_mut() = new.clone();
+        rename(new);
+    });
+    l.upcast()
+}
+
 /// An event's details: what, when, where, which calendar, notes, tasks.
 fn details(c: &Cal, e: &Event) -> gtk::Popover {
     let b = details_box();
-    let title = gtk::Label::builder()
-        .label(&e.summary)
-        .xalign(0.0)
-        .wrap(true)
-        .build();
-    title.add_css_class("title-4");
-    b.append(&title);
+    let ev = e.clone();
+    let rename = move |name: String| {
+        let ev = ev.clone();
+        let apply = move |scope: Scope| {
+            let patch = EventPatch {
+                summary: Some(name.clone()),
+                ..Default::default()
+            };
+            let (list, uid) = (ev.list_href.clone(), ev.uid.clone());
+            match core().update_event(list, uid, ev.recurrence_id, scope, patch) {
+                Ok(()) => request_sync(),
+                Err(err) => crate::window::toast(&err.to_string()),
+            }
+        };
+        match cal() {
+            Some(c) if ev.recurring => {
+                dialog::ask_scope(&c.split, &gettext("Rename Repeating Event?"), false, apply)
+            }
+            _ => apply(Scope::All),
+        }
+    };
+    let rename = writable(c, &e.list_href).then(|| Box::new(rename) as Box<dyn Fn(String)>);
+    b.append(&title_label(&e.summary, rename));
     b.append(&line("x-office-calendar-symbolic", &span_text(e)));
     if e.recurring {
         b.append(&line("media-playlist-repeat-symbolic", &gettext("Repeats")));
@@ -1824,16 +1871,17 @@ fn task_details(c: &Cal, t: &Task) -> gtk::Popover {
         .build();
     let uid = t.uid.clone();
     check.connect_toggled(move |b| tick(b, &uid, || {}));
-    let title = gtk::Label::builder()
-        .label(&t.summary)
-        .xalign(0.0)
-        .wrap(true)
-        .hexpand(true)
-        .build();
-    title.add_css_class("title-4");
+    let uid = t.uid.clone();
+    let rename = move |name: String| {
+        let patch = TaskPatch {
+            summary: Some(name),
+            ..Default::default()
+        };
+        save(&uid, patch);
+    };
     let head = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     head.append(&check);
-    head.append(&title);
+    head.append(&title_label(&t.summary, Some(Box::new(rename))));
     b.append(&head);
     if let Some(e) = &t.sync_error {
         b.append(&line(

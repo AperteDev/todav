@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (Monday to Friday at first); 3 Days moves a day at a time; Day shows its
   week above the hours. Ctrl+4, Ctrl+5 and Ctrl+6 open them. On Linux the views are now picked
   from a menu.
+- Calendar: an event's or a task's title can be changed right in its details popover: click it,
+  type, press Enter.
 
 ### Fixed
 
