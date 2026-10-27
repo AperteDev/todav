@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Linux: the sidebar can be hidden with the button at the start of the header or F9; in a
   narrow window it opens over the content instead of in place of it.
 
+### Changed
+
+- Calendar: in the agenda, as in the GNOME extension, a task is a ring in its list's colour, with
+  a tick when done, and an event a dot; a task is ticked in its details, not in the agenda.
+
 ### Fixed
 
 - On a new installation, reminders never went off.

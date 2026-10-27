@@ -49,6 +49,7 @@ pub fn paint() {
             let (cls, col) = (class(&l.href), color(l));
             format!(
                 ".dot.{cls}, .chip.all-day.{cls} {{ background-color: {col}; }}
+                 .ring.{cls} {{ color: {col}; }}
                  .chip.all-day.{cls} {{ color: white; }}
                  .chip.{cls}:not(.all-day) {{ background-color: alpha({col}, 0.18); }}\n"
             )

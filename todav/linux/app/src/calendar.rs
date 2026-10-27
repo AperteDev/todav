@@ -74,6 +74,9 @@ button.block.task { padding-left: 4px; }
 .chip.cancelled label { text-decoration-line: line-through; }
 .more { padding: 0 6px; min-height: 20px; font-size: smaller; }
 .dot { min-width: 10px; min-height: 10px; border-radius: 9999px; }
+.ring { min-width: 12px; min-height: 12px; border: 2px solid; border-radius: 9999px; }
+.ring image { -gtk-icon-size: 10px; }
+row.done label.title { text-decoration-line: line-through; opacity: 0.55; }
 .day:drop(active), .all-day-cell:drop(active), list.plan:drop(active) { box-shadow: inset 0 0 0 2px @accent_bg_color; background: alpha(@accent_bg_color, 0.12); }
 .week .weekdays label.today { color: @accent_color; font-weight: bold; opacity: 1; }
 .all-day-row { border-bottom: 1px solid alpha(currentColor, 0.15); }
@@ -2023,14 +2026,37 @@ fn render_search(c: &Rc<Cal>) {
     }
 }
 
+/// An agenda row's mark in its list's colour, as the extension's and Android's: an event's dot
+/// (`done` None) or a task's larger ring, a tick in it when done, in a slot as wide either way so
+/// the titles line up. Only a mark: a task is ticked in its details.
+fn mark(list: &str, done: Option<bool>) -> gtk::Box {
+    let slot = gtk::Box::builder()
+        .width_request(18)
+        .valign(gtk::Align::Center)
+        .build();
+    // Not wider than the slot: the tick's expanding (to centre it in the ring) stops here.
+    let m = gtk::Box::builder()
+        .hexpand(false)
+        .halign(gtk::Align::Center)
+        .valign(gtk::Align::Center)
+        .build();
+    m.add_css_class(if done.is_some() { "ring" } else { "dot" });
+    m.add_css_class(&class(list));
+    if done == Some(true) {
+        let tick = gtk::Image::from_icon_name("object-select-symbolic");
+        tick.set_hexpand(true);
+        m.set_tooltip_text(Some(&gettext("Done")));
+        m.append(&tick);
+    }
+    slot.append(&m);
+    slot
+}
+
 fn agenda_row(i: &Item) -> adw::ActionRow {
     let row = adw::ActionRow::builder()
         .use_markup(false)
         .activatable(true)
         .build();
-    let dot = gtk::Box::builder().valign(gtk::Align::Center).build();
-    dot.add_css_class("dot");
-    dot.add_css_class(&class(i.list()));
     match i {
         Item::Event(e) => {
             row.set_title(&e.summary);
@@ -2044,7 +2070,7 @@ fn agenda_row(i: &Item) -> adw::ActionRow {
                 None => time,
             };
             row.set_subtitle(&sub);
-            row.add_prefix(&dot);
+            row.add_prefix(&mark(&e.list_href, None));
             let (ev, ev2) = (e.clone(), e.clone());
             let open = on_clicks(
                 &row,
@@ -2062,14 +2088,10 @@ fn agenda_row(i: &Item) -> adw::ActionRow {
             } else {
                 format!("{task} · {}", fmt(at, "%H:%M"))
             });
-            let check = gtk::CheckButton::builder()
-                .active(t.done)
-                .valign(gtk::Align::Center)
-                .build();
-            let uid = t.uid.clone();
-            check.connect_toggled(move |b| tick(b, &uid, || {}));
-            row.add_prefix(&check);
-            row.add_prefix(&dot);
+            row.add_prefix(&mark(&t.list_href, Some(t.done)));
+            if t.done {
+                row.add_css_class("done");
+            }
             let (task, task2) = (t.clone(), t.clone());
             let open = on_clicks(
                 &row,
