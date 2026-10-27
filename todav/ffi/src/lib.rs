@@ -12,7 +12,8 @@ use std::sync::{Arc, OnceLock};
 use todav_app::service::Service;
 use todav_core::{
     Account, AccountKind, CategoryGroup, CategoryMeta, Client, Credentials, DoneView, Event,
-    EventTime, LoginFlow, PushRegistration, PushStatus, Refused, Scope, ServerInfo, Sort, Task,
+    EventTime, LoginFlow, PushRegistration, PushStatus, Refused, Repeat, Scope, ServerInfo, Sort,
+    Task,
 };
 
 mod error;
@@ -1086,6 +1087,13 @@ pub fn stays_put(dragged: Task, from: Slot, target: Task, to: Slot, above: bool)
 }
 
 // --- the calendar ----------------------------------------------------------------------
+
+/// An existing repeat rule as a plain repeat for the event editor; None: kept as it is
+/// ("Custom").
+#[uniffi::export]
+pub fn plain_repeat(rule: String) -> Option<Repeat> {
+    todav_app::calendar::plain_repeat(&rule)
+}
 
 /// A task's place on the calendar.
 #[uniffi::export]

@@ -2,7 +2,7 @@
 //! repeating event asks which occurrences it is for.
 
 use super::*;
-use todav_core::rrule::{Freq, Rule};
+use todav_core::rrule::Freq;
 use todav_core::{EventPatch, EventTime, Repeat, Scope};
 
 const FREQS: [Freq; 4] = [Freq::Daily, Freq::Weekly, Freq::Monthly, Freq::Yearly];
@@ -17,22 +17,12 @@ fn unit(freq: u32, n: u64) -> String {
     }
 }
 
-/// How an existing rule shows in the dialog: as one of its plain choices, or as "Custom" (kept
-/// unless the user picks another).
+/// How an existing rule shows in the dialog: as one of its plain choices (1 daily … 4 yearly,
+/// every n, until), or as "Custom" (kept unless the user picks another).
 fn plain(rule: &str) -> Option<(usize, i64, Option<i64>)> {
-    let r = Rule::parse(rule)?;
-    let simple = r.supported
-        && r.count.is_none()
-        && r.by_day.len() <= 1
-        && r.by_month_day.is_empty()
-        && r.by_month.is_empty()
-        && r.by_set_pos.is_empty();
-    if !simple {
-        return None;
-    }
-    let until = r.until.as_deref().and_then(todav_core::ical::parse_time);
+    let r = todav_app::calendar::plain_repeat(rule)?;
     let freq = FREQS.iter().position(|f| *f == r.freq)? + 1;
-    Some((freq, r.interval, until.map(|u| u - u.rem_euclid(DAY))))
+    Some((freq, r.interval, r.until))
 }
 
 /// Ask which occurrences of a repeating event a change (or delete) is for.
@@ -481,21 +471,4 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
     });
     dialog.present(Some(&c.split));
     get(&b, "summary")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn plain_rules_show_as_choices() {
-        assert_eq!(plain("FREQ=WEEKLY;INTERVAL=2"), Some((2, 2, None)));
-        assert_eq!(plain("FREQ=YEARLY"), Some((4, 1, None)));
-        assert_eq!(
-            plain("FREQ=DAILY;UNTIL=20261031T235959Z").map(|p| p.2.is_some()),
-            Some(true)
-        );
-        assert_eq!(plain("FREQ=WEEKLY;BYDAY=MO,WE,FR"), None, "custom");
-        assert_eq!(plain("FREQ=MONTHLY;COUNT=3"), None, "custom");
-    }
 }

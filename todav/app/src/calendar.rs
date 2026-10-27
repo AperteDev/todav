@@ -3,7 +3,8 @@
 
 use crate::{DAY, dates, prefs};
 use std::collections::HashMap;
-use todav_core::{Client, Due, Event, EventTime, Result, Task, TaskPatch};
+use todav_core::rrule::{Freq, Rule};
+use todav_core::{Client, Due, Event, EventTime, Repeat, Result, Task, TaskPatch};
 
 /// Something on the calendar.
 #[derive(Clone, Debug)]
@@ -518,6 +519,32 @@ pub fn lanes(days: &[Vec<usize>], max: usize) -> (Vec<Piece>, [Vec<usize>; 7]) {
     (pieces, more)
 }
 
+/// How an existing repeat rule shows in an event editor: as a plain repeat (every n days,
+/// weeks, months or years, maybe until a day), or None for one only kept as it is ("Custom").
+pub fn plain_repeat(rule: &str) -> Option<Repeat> {
+    let r = Rule::parse(rule)?;
+    let simple = r.supported
+        && r.count.is_none()
+        && r.by_day.len() <= 1
+        && r.by_month_day.is_empty()
+        && r.by_month.is_empty()
+        && r.by_set_pos.is_empty();
+    if !simple
+        || !matches!(
+            r.freq,
+            Freq::Daily | Freq::Weekly | Freq::Monthly | Freq::Yearly
+        )
+    {
+        return None;
+    }
+    let until = r.until.as_deref().and_then(todav_core::ical::parse_time);
+    Some(Repeat {
+        freq: r.freq,
+        interval: r.interval,
+        until: until.map(|u| u - u.rem_euclid(DAY)),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -593,5 +620,18 @@ mod tests {
         let back = unplan(&t).unwrap();
         assert_eq!(due(back.due), Some((at("20261014"), true)));
         assert!(matches!(back.start, Some(None)));
+    }
+
+    #[test]
+    fn plain_rules_show_as_choices() {
+        let p = |r: &str| plain_repeat(r).map(|r| (r.freq, r.interval, r.until.is_some()));
+        assert_eq!(p("FREQ=WEEKLY;INTERVAL=2"), Some((Freq::Weekly, 2, false)));
+        assert_eq!(p("FREQ=YEARLY"), Some((Freq::Yearly, 1, false)));
+        assert_eq!(
+            p("FREQ=DAILY;UNTIL=20261031T235959Z"),
+            Some((Freq::Daily, 1, true))
+        );
+        assert_eq!(p("FREQ=WEEKLY;BYDAY=MO,WE,FR"), None, "custom");
+        assert_eq!(p("FREQ=MONTHLY;COUNT=3"), None, "custom");
     }
 }
