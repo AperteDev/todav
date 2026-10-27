@@ -125,6 +125,21 @@
     "hide": "on_success"
   },
   {
+    "label": "android: fold emulator",
+    // The foldable emulator closed, the app on its cover screen as on a phone.
+    "command": "make -C todav/android fold",
+    "use_new_terminal": false,
+    "reveal": "no_focus",
+    "hide": "on_success"
+  },
+  {
+    "label": "android: unfold emulator",
+    "command": "make -C todav/android unfold",
+    "use_new_terminal": false,
+    "reveal": "no_focus",
+    "hide": "on_success"
+  },
+  {
     "label": "android: wipe emulator data",
     "command": "make -C todav/android wipe",
     "use_new_terminal": false,

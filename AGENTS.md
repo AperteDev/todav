@@ -109,17 +109,23 @@
   `todav/android/gradle.properties` (`todav.platform`, `todav.buildTools`, `todav.ndk`,
   `todav.image`), which the build scripts read too. Change a version there only, then remove the
   old package (`sdkmanager --uninstall …`) so copies don't pile up; the SDK is several GB.
-- The emulator image is the one Noogle's `scripts/setup-avd.sh` uses by default (Android 15 with
-  Play Store), so both share one copy. Noogle roots that image (Magisk) when it sets up its own
-  AVD; the `todav` AVD may then boot with Magisk, which doesn't matter for Todav.
+- The emulator image (Android 16 with Play Store) is one Noogle's AVDs use too, so both share one
+  copy; keep the Android 15 one, Noogle's default. Noogle may root its images (Magisk); the
+  `todav` AVD may then boot with Magisk, which doesn't matter for Todav. Android 15's images
+  don't fold a foldable AVD (no device states), hence 16.
 - System packages it needs (sdk.sh names the missing ones, it installs none): `rustup` (stable;
   sdk.sh adds the Android targets), `cargo-ndk`, `android-tools` (adb: the SDK's adb is a link to
   it, as two adb versions drop the emulator), `jdk21-openjdk` (Gradle runs on JDK 21 through
   `JAVA_HOME`), `gettext`, `unzip`; `/dev/kvm` writable.
-- The emulator is the `todav` AVD on `emulator-5580`, next to Noogle's (5554 and up). Drive it
-  with adb: `adb exec-out screencap -p > shot.png`, `adb shell input tap X Y` (1080×2400 px),
-  `adb shell input text …`, `adb shell input keyevent 66` (Enter); `make logs` for the app's log.
-  Its dialog about the computer's RAM is advisory.
+- The emulator is the `todav` AVD on `emulator-5580`, next to Noogle's (5554 and up): a foldable,
+  the Pixel 9 Pro Fold profile with the Honor Magic V5's screens, so one AVD tries both layouts.
+  Open: 2172×2352 px, 827 dp wide (the navigation rail and the sidebar pane); `make fold`: its
+  cover screen, 1060×2376 px, 404 dp wide (a phone: the navigation bar); `make unfold` opens it.
+  Drive it with adb: `adb shell input tap X Y` (pixels of the screen in use), `adb shell input
+  text …`, `adb shell input keyevent 66` (Enter); `make logs` for the app's log. Screenshots
+  need the display: `adb exec-out screencap -d ID -p > shot.png`, ID from `adb shell dumpsys
+  SurfaceFlinger --display-id` (the first open, the second folded); without `-d` a warning lands
+  in the PNG. Its dialog about the computer's RAM is advisory.
 
 ## Testing the Linux app
 

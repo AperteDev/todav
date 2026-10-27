@@ -96,9 +96,17 @@ setup() {
 
 	if ! emulator -list-avds | grep -qx "$avd"; then
 		echo "Creating the $avd AVD..."
-		echo no | avdmanager create avd -n "$avd" -k "$image" -d pixel_7 > /dev/null
-		# Type with the computer's keyboard.
-		sed -i 's/^hw.keyboard=no$/hw.keyboard=yes/' "$HOME/.android/avd/$avd.avd/config.ini"
+		# A foldable (`make fold` / `make unfold`): open it tries wide layouts, folded its cover
+		# screen is a phone's. Google's Pixel 9 Pro Fold with the Honor Magic V5's screens (open
+		# 2172×2352, 827×896 dp; cover 1060×2376, 404 dp wide); typing with the computer's keyboard.
+		echo no | avdmanager create avd -n "$avd" -k "$image" -d pixel_9_pro_fold > /dev/null
+		sed -i -e 's/^hw.keyboard=no$/hw.keyboard=yes/' \
+			-e 's/^hw.lcd.width=.*/hw.lcd.width=2172/' -e 's/^hw.lcd.height=.*/hw.lcd.height=2352/' \
+			-e 's/^hw.lcd.density=.*/hw.lcd.density=420/' \
+			-e 's/^hw.displayRegion.0.1.width=.*/hw.displayRegion.0.1.width=1060/' \
+			-e 's/^hw.displayRegion.0.1.height=.*/hw.displayRegion.0.1.height=2376/' \
+			-e 's/^hw.sensor.hinge.areas=.*/hw.sensor.hinge.areas=1086-0-0-2352/' \
+			"$HOME/.android/avd/$avd.avd/config.ini"
 	fi
 	echo "Ready: $sdk, AVD $avd ($image)"
 }
@@ -117,6 +125,8 @@ start() {
 		running || { echo "The emulator exited, see $log"; exit 1; }
 		sleep 2
 	done
+	# No lock screen, which folding would show, its swipe asleep after a few seconds.
+	adb shell locksettings set-disabled true > /dev/null
 	echo "Booted: $ANDROID_SERIAL"
 }
 
