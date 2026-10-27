@@ -225,9 +225,24 @@ pub fn reorderable(row: &gtk::ListBoxRow, l: &List, siblings: Vec<String>) {
     drop.connect_accept(move |_, _| {
         DRAGGED.with_borrow(|d| d.as_ref().is_some_and(|d| *d != own && s.contains(d)))
     });
+    // Where the dragged list lands next to this one, or None where it already is.
+    let own = l.href.clone();
+    let order = Rc::new(move |below: bool| {
+        let moved = DRAGGED.with_borrow(Clone::clone)?;
+        let mut order = siblings.clone();
+        order.retain(|h| *h != moved);
+        let at = order.iter().position(|h| *h == own).unwrap_or(order.len());
+        order.insert(at + usize::from(below), moved);
+        (order != siblings).then_some(order)
+    });
+    let o = order.clone();
     drop.connect_motion(move |dt, _, y| {
         if let Some(w) = dt.widget() {
-            mark(&w, below(dt, y));
+            if o(below(dt, y)).is_some() {
+                mark(&w, below(dt, y));
+            } else {
+                unmark(&w);
+            }
         }
         gdk::DragAction::MOVE
     });
@@ -236,22 +251,13 @@ pub fn reorderable(row: &gtk::ListBoxRow, l: &List, siblings: Vec<String>) {
             unmark(&w);
         }
     });
-    let own = l.href.clone();
-    drop.connect_drop(move |dt, value, _, y| {
+    drop.connect_drop(move |dt, _, _, y| {
         if let Some(w) = dt.widget() {
             unmark(&w);
         }
-        let Some(moved) = value
-            .get::<glib::Variant>()
-            .ok()
-            .and_then(|v| v.get::<String>())
-        else {
+        let Some(order) = order(below(dt, y)) else {
             return false;
         };
-        let mut order = siblings.clone();
-        order.retain(|h| *h != moved);
-        let at = order.iter().position(|h| *h == own).unwrap_or(order.len());
-        order.insert(at + usize::from(below(dt, y)), moved);
         if let Err(e) = core().reorder_lists(order) {
             crate::window::toast(&e.to_string());
             return true;
