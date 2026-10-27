@@ -32,6 +32,8 @@ install-data:
 	done
 	mkdir -p $(DESTDIR)$(DATADIR)/dbus-1/services
 	sed 's|@bindir@|$(BINDIR)|' data/$(ID).service.in > $(DESTDIR)$(DATADIR)/dbus-1/services/$(ID).service
+	install -Dm644 data/$(ID).search-provider.ini \
+	  $(DESTDIR)$(DATADIR)/gnome-shell/search-providers/$(ID).search-provider.ini
 	install -Dm644 data/$(ID).svg $(DESTDIR)$(ICONS)/scalable/apps/$(ID).svg
 	install -Dm644 data/$(ID)-symbolic.svg $(DESTDIR)$(ICONS)/symbolic/apps/$(ID)-symbolic.svg
 
@@ -82,6 +84,7 @@ uninstall:
 	rm -f $(BINDIR)/todav-linux $(DATADIR)/applications/$(ID).desktop \
 	  $(DATADIR)/metainfo/$(ID).metainfo.xml \
 	  $(DATADIR)/dbus-1/services/$(ID).service $(AUTOSTART)/$(ID).desktop \
+	  $(DATADIR)/gnome-shell/search-providers/$(ID).search-provider.ini \
 	  $(ICONS)/scalable/apps/$(ID).svg $(ICONS)/symbolic/apps/$(ID)-symbolic.svg \
 	  $(LOCALE)/*/LC_MESSAGES/todav.mo
 

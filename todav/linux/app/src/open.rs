@@ -37,7 +37,7 @@ pub fn open(app: &adw::Application, files: &[gio::File]) {
 }
 
 /// Show the task (on its list) or the event (its day) link `url` is to.
-fn show(url: &str) {
+pub fn show(url: &str) {
     use todav_app::links::{Link, parse};
     let found = match parse(url) {
         Some(Link::Task(uid)) if core().task(uid.clone()).is_some() => {

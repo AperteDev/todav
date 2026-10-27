@@ -88,6 +88,7 @@ appstreamcli validate --no-net %{buildroot}%{_metainfodir}/dev.aperte.Todav.meta
 %{_datadir}/applications/dev.aperte.Todav.desktop
 %{_metainfodir}/dev.aperte.Todav.metainfo.xml
 %{_datadir}/dbus-1/services/dev.aperte.Todav.service
+%{_datadir}/gnome-shell/search-providers/dev.aperte.Todav.search-provider.ini
 %{_datadir}/icons/hicolor/scalable/apps/dev.aperte.Todav.svg
 %{_datadir}/icons/hicolor/symbolic/apps/dev.aperte.Todav-symbolic.svg
 %config(noreplace) %{_sysconfdir}/xdg/autostart/dev.aperte.Todav.desktop

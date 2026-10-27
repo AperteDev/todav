@@ -9,6 +9,7 @@ mod i18n;
 mod lists;
 mod open;
 mod reminders;
+mod search;
 mod settings;
 mod update;
 mod window;
@@ -569,6 +570,7 @@ mod imp {
         fn dbus_register(&self, conn: &gio::DBusConnection, path: &str) -> Result<(), glib::Error> {
             self.parent_dbus_register(conn, path)?;
             crate::dbus::register(conn, path);
+            crate::search::register(conn);
             Ok(())
         }
     }

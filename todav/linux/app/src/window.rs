@@ -96,6 +96,7 @@ struct Ui {
     /// The search, `folded`: while set, the page shows matching tasks of every list.
     query: RefCell<String>,
     search: gtk::SearchBar,
+    search_entry: gtk::SearchEntry,
     cat_section: gtk::Box,
     cat_list: gtk::ListBox,
     /// Category of each `cat_list` row; None is "Other" (no category).
@@ -686,6 +687,7 @@ fn build(app: &adw::Application) -> Rc<Ui> {
         current: RefCell::new(None),
         query: RefCell::new(String::new()),
         search: get(&b, "task_search"),
+        search_entry: get(&b, "task_query"),
         title: get(&b, "title"),
         sync_state: get(&b, "sync_state"),
         entry: get(&b, "entry"),
@@ -757,6 +759,18 @@ fn connect_search(
         *ui.query.borrow_mut() = folded(e.text().trim());
         refresh_tasks(&ui);
     });
+}
+
+/// The Tasks page searching for `text` (from the Activities overview's search).
+pub fn search(text: &str) {
+    if let Some(app) = gio::Application::default().and_downcast::<adw::Application>() {
+        present(&app);
+    }
+    let Some(ui) = ui() else { return };
+    let _ = WidgetExt::activate_action(&ui.window, "win.page", Some(&"tasks".to_variant()));
+    ui.search.set_search_mode(true);
+    ui.search_entry.set_text(text);
+    ui.search_entry.set_position(-1);
 }
 
 /// Text as search compares it: lower case, without diacritics ("Żarówki" → "zarowki").
