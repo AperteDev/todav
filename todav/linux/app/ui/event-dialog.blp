@@ -249,6 +249,12 @@ Adw.Dialog dialog {
             selection-mode: none;
             styles ["boxed-list"]
 
+            // A link that opens the event in Todav, to paste elsewhere.
+            Adw.ButtonRow copy_link {
+              title: _("Copy Link");
+              start-icon-name: "edit-copy-symbolic";
+            }
+
             Adw.ButtonRow delete {
               title: _("Delete Event");
               styles ["destructive-action"]

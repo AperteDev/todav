@@ -1,5 +1,6 @@
 //! What Todav is asked to open: iCalendar files (as the system's calendar app, by `text/calendar`),
-//! their events and tasks imported into the calendar and the list picked for them.
+//! their events and tasks imported into the calendar and the list picked for them; and links to
+//! a task or an event (`todav://`, `todav_app::links`), shown where they are.
 
 use crate::core;
 use crate::i18n::{gettext, ngettext};
@@ -11,6 +12,12 @@ use todav_core::List;
 pub fn open(app: &adw::Application, files: &[gio::File]) {
     crate::window::present(app);
     for file in files {
+        // GIO knows no such scheme: the URI as given, not `has_uri_scheme`.
+        let uri = file.uri();
+        if uri.starts_with("todav:") {
+            show(&uri);
+            continue;
+        }
         let file = file.clone();
         glib::spawn_future_local(async move {
             let name = file
@@ -27,6 +34,31 @@ pub fn open(app: &adw::Application, files: &[gio::File]) {
             }
         });
     }
+}
+
+/// Show the task (on its list) or the event (its day) link `url` is to.
+fn show(url: &str) {
+    use todav_app::links::{Link, parse};
+    let found = match parse(url) {
+        Some(Link::Task(uid)) if core().task(uid.clone()).is_some() => {
+            crate::window::show_task(&uid);
+            true
+        }
+        Some(Link::Event(uid)) => core()
+            .event(uid)
+            .map(|e| crate::calendar::show_day(e.start))
+            .is_some(),
+        _ => false,
+    };
+    if !found {
+        crate::window::toast(&gettext("Not found: it may have been deleted"));
+    }
+}
+
+/// Put the link to a task or an event on the clipboard.
+pub fn copy_link(widget: &impl IsA<gtk::Widget>, link: String) {
+    widget.clipboard().set_text(&link);
+    crate::window::toast(&gettext("Link copied"));
 }
 
 /// Ask where the events and tasks of iCalendar text `ics` (file `name`) go, then import them.

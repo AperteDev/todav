@@ -2833,6 +2833,9 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
             d.close();
         }
     });
+    let link = todav_app::links::task(&t.uid);
+    get::<adw::ButtonRow>(&b, "copy_link")
+        .connect_activated(move |row| crate::open::copy_link(row, link.clone()));
     let (task, d) = (t.clone(), dialog.downgrade());
     get::<adw::ButtonRow>(&b, "delete").connect_activated(move |_| {
         if let Some(d) = d.upgrade() {

@@ -323,6 +323,9 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
     let delete_box: gtk::ListBox = get(&b, "delete_box");
     delete_box.set_visible(e.is_some());
     if let Some(ev) = e.clone() {
+        let link = todav_app::links::event(&ev.uid);
+        get::<adw::ButtonRow>(&b, "copy_link")
+            .connect_activated(move |row| crate::open::copy_link(row, link.clone()));
         let d = dialog.downgrade();
         get::<adw::ButtonRow>(&b, "delete").connect_activated(move |_| {
             let Some(d) = d.upgrade() else { return };

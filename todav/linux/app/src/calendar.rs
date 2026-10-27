@@ -1622,9 +1622,10 @@ fn reminders_line(at: &[i64]) -> Option<gtk::Box> {
 /// What a details popover's Delete and Edit… buttons do.
 type Buttons = (Box<dyn Fn()>, Box<dyn Fn()>);
 
-/// A details popover holding `b`, with Delete and Edit… under it when `buttons` are given.
-/// Changes made in it (a task ticked or added) redraw the views once it closes, not under it.
-fn details_popover(b: &gtk::Box, buttons: Option<Buttons>) -> gtk::Popover {
+/// A details popover holding `b`, with Copy Link (to `link`) under it, and Delete and Edit… when
+/// `buttons` are given. Changes made in it (a task ticked or added) redraw the views once it
+/// closes, not under it.
+fn details_popover(b: &gtk::Box, link: String, buttons: Option<Buttons>) -> gtk::Popover {
     let pop = gtk::Popover::builder().child(b).build();
     pop.connect_show(|_| {
         if let Some(c) = cal() {
@@ -1639,9 +1640,22 @@ fn details_popover(b: &gtk::Box, buttons: Option<Buttons>) -> gtk::Popover {
             }
         }
     });
+    // Delete at the left edge, away from Edit… at the right.
+    let row = gtk::Box::builder().spacing(6).margin_top(4).build();
+    let copy = gtk::Button::builder()
+        .icon_name("edit-copy-symbolic")
+        .tooltip_text(gettext("Copy Link"))
+        .build();
+    copy.add_css_class("flat");
+    let p = pop.downgrade();
+    copy.connect_clicked(move |button| {
+        crate::open::copy_link(button, link.clone());
+        if let Some(p) = p.upgrade() {
+            p.popdown();
+        }
+    });
+    b.append(&row);
     if let Some((on_delete, on_edit)) = buttons {
-        // Delete at the left edge, away from Edit… at the right.
-        let row = gtk::Box::builder().spacing(6).margin_top(4).build();
         let delete = gtk::Button::builder()
             .icon_name("user-trash-symbolic")
             .tooltip_text(gettext("Delete"))
@@ -1667,8 +1681,10 @@ fn details_popover(b: &gtk::Box, buttons: Option<Buttons>) -> gtk::Popover {
             on_edit();
         });
         row.append(&delete);
+        row.append(&copy);
         row.append(&edit);
-        b.append(&row);
+    } else {
+        row.append(&copy);
     }
     pop
 }
@@ -1873,7 +1889,7 @@ fn details(c: &Cal, e: &Event) -> gtk::Popover {
             Box::new(on_edit) as Box<dyn Fn()>,
         )
     });
-    details_popover(&b, buttons)
+    details_popover(&b, todav_app::links::event(&e.uid), buttons)
 }
 
 /// A task's details, as an event's: tick it, when, which list and category, its event, notes,
@@ -1941,7 +1957,8 @@ fn task_details(c: &Cal, t: &Task) -> gtk::Popover {
     let on_delete = move || crate::window::delete_task(&task);
     let task = t.clone();
     let on_edit = move || crate::window::edit_task(&task);
-    details_popover(&b, Some((Box::new(on_delete), Box::new(on_edit))))
+    let link = todav_app::links::task(&t.uid);
+    details_popover(&b, link, Some((Box::new(on_delete), Box::new(on_edit))))
 }
 
 fn render_agenda(c: &Rc<Cal>) {

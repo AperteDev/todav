@@ -9,6 +9,7 @@ pub mod accounts;
 pub mod calendar;
 pub mod dates;
 pub mod i18n;
+pub mod links;
 pub mod lists;
 pub mod prefs;
 pub mod service;
