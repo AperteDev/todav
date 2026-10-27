@@ -110,6 +110,30 @@ pub fn double_click_edit(c: &Client) -> bool {
     on(c, "double_click_edit")
 }
 
+/// The weekdays the Work Week view shows (`work_days`, comma-separated, 0 = Sunday): one to six
+/// of them, in order; Monday to Friday by default.
+pub fn work_days(c: &Client) -> Vec<i64> {
+    let mut days: Vec<i64> = c
+        .setting("work_days".into())
+        .unwrap_or_default()
+        .split(',')
+        .filter_map(|d| d.trim().parse().ok())
+        .filter(|d| (0..7).contains(d))
+        .collect();
+    days.sort();
+    days.dedup();
+    if (1..=6).contains(&days.len()) {
+        days
+    } else {
+        vec![1, 2, 3, 4, 5]
+    }
+}
+
+pub fn set_work_days(c: &Client, days: &[i64]) {
+    let v: Vec<String> = days.iter().map(i64::to_string).collect();
+    let _ = c.set_setting("work_days".into(), v.join(","));
+}
+
 /// Lengths offered for a new task's or event's time, in minutes.
 pub const DURATIONS: [i64; 7] = [15, 30, 45, 60, 90, 120, 180];
 

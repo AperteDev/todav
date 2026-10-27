@@ -42,6 +42,21 @@ pub fn week_start(t: i64, first: i64) -> i64 {
     day - (day.div_euclid(DAY) + 4 - first).rem_euclid(7) * DAY
 }
 
+/// The weekday of `t`, 0 = Sunday.
+pub fn weekday(t: i64) -> i64 {
+    (t.div_euclid(DAY) + 4).rem_euclid(7)
+}
+
+/// The days of the week holding `t` (weeks starting on `first`) that are among `weekdays`
+/// (0 = Sunday), in order: the Work Week view's days.
+pub fn days_of_week(t: i64, first: i64, weekdays: &[i64]) -> Vec<i64> {
+    let start = week_start(t, first);
+    (0..7)
+        .map(|d| start + d * DAY)
+        .filter(|d| weekdays.contains(&weekday(*d)))
+        .collect()
+}
+
 /// How a day is named, seen from the day of `now`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Day {
@@ -145,6 +160,19 @@ mod tests {
 
     fn at(s: &str) -> i64 {
         todav_core::ical::parse_time(s).unwrap()
+    }
+
+    #[test]
+    fn a_work_week_is_its_weekdays_in_order() {
+        let wed = at("20261014T120000");
+        assert_eq!(weekday(wed), 3);
+        let days = |first, weekdays: &[i64]| days_of_week(wed, first, weekdays);
+        let (mon, fri, sun) = (at("20261012"), at("20261016"), at("20261011"));
+        assert_eq!(days(1, &[1, 2, 3, 4, 5]).first(), Some(&mon));
+        assert_eq!(days(1, &[1, 2, 3, 4, 5]).last(), Some(&fri));
+        // Sunday ends a week starting on Monday, and starts one starting on Sunday.
+        assert_eq!(days(1, &[0, 5]), vec![fri, at("20261018")]);
+        assert_eq!(days(0, &[0, 5]), vec![sun, fri]);
     }
 
     #[test]

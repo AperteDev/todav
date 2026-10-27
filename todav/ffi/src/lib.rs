@@ -680,6 +680,15 @@ impl Todav {
         todav_app::prefs::double_click_edit(self.c())
     }
 
+    /// The weekdays the Work Week view shows (0 Sunday), one to six.
+    pub fn work_days(&self) -> Vec<i64> {
+        todav_app::prefs::work_days(self.c())
+    }
+
+    pub fn set_work_days(&self, days: Vec<i64>) {
+        todav_app::prefs::set_work_days(self.c(), &days)
+    }
+
     /// Seconds a planned task's slot lasts.
     pub fn task_duration(&self) -> i64 {
         todav_app::prefs::task_duration(self.c())
@@ -989,6 +998,12 @@ pub fn month_first(t: i64) -> i64 {
 #[uniffi::export]
 pub fn week_start(t: i64, first: i64) -> i64 {
     todav_app::dates::week_start(t, first)
+}
+
+/// The days of the week holding `t` that are among `weekdays` (0 Sunday): a work week.
+#[uniffi::export]
+pub fn days_of_week(t: i64, first: i64, weekdays: Vec<i64>) -> Vec<i64> {
+    todav_app::dates::days_of_week(t, first, &weekdays)
 }
 
 /// How a day is named, seen from `now`.
