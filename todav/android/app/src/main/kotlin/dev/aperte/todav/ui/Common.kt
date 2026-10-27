@@ -294,13 +294,10 @@ fun Tip(label: String, content: @Composable () -> Unit) = TooltipBox(
     content = content,
 )
 
-/** The add button (a task or an event, as `label` says): flat in the navigation bar or rail, raised over a pane. */
+/** The add button (a task or an event, as `label` says), flat in the navigation bar or rail. */
 @Composable
-fun AddButton(label: String, inBar: Boolean, onClick: () -> Unit) = Tip(label) {
-    FloatingActionButton(
-        onClick = onClick,
-        elevation = if (inBar) FloatingActionButtonDefaults.bottomAppBarFabElevation() else FloatingActionButtonDefaults.elevation(),
-    ) {
+fun AddButton(label: String, onClick: () -> Unit) = Tip(label) {
+    FloatingActionButton(onClick = onClick, elevation = FloatingActionButtonDefaults.bottomAppBarFabElevation()) {
         Icon(Icons.Default.Add, label)
     }
 }

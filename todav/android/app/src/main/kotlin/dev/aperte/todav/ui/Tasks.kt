@@ -26,7 +26,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.IconToggleButton
@@ -138,15 +137,10 @@ fun newTask(model: Main) {
     model.sharedText.value = ""
 }
 
-/**
- * The task list shown (a list, Upcoming or Important), with its top bar, and the add button
- * when `addButton` (no navigation bar or rail holds it: both panes are shown).
- */
+/** The task list shown (a list, Upcoming or Important), with its top bar. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun TasksPane(model: Main, screen: Screen, addButton: Boolean) {
-    val drawer = LocalDrawer.current
-    val scope = rememberCoroutineScope()
+fun TasksPane(model: Main, screen: Screen) {
     val sync by model.syncState.collectAsStateWithLifecycle()
     // The subtask being added to (its parent), from a row's menu.
     var addingTo by remember { mutableStateOf<TodavTask?>(null) }
@@ -166,13 +160,6 @@ fun TasksPane(model: Main, screen: Screen, addButton: Boolean) {
                 title = { Text(screen.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 subtitle = { Text(ntr("{n} open", "{n} open", screen.open.toLong()).replace("{n}", "${screen.open}")) },
                 scrollBehavior = bar,
-                navigationIcon = {
-                    Tip(tr("Task lists")) {
-                        IconButton(onClick = { scope.launch { drawer?.open() } }) {
-                            Icon(Icons.Default.Menu, tr("Task lists"))
-                        }
-                    }
-                },
                 actions = {
                     Tip(tr("Search")) {
                         IconButton(onClick = { model.open(Dest.Search) }) { Icon(Icons.Default.Search, tr("Search")) }
@@ -184,7 +171,6 @@ fun TasksPane(model: Main, screen: Screen, addButton: Boolean) {
                 },
             )
         },
-        floatingActionButton = { if (addButton) AddButton(tr("Add Task"), inBar = false) { newTask(model) } },
     ) { padding ->
         val refreshing = pulling && sync == SyncState.Syncing
         PullToRefreshBox(

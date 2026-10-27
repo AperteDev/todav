@@ -9,8 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Android: a full Material 3 Expressive app. Tasks and Calendar side by side on unfolded foldables and
-  tablets, switched by a navigation bar on phones; a task page with everything the Linux edit
+- Android: a full Material 3 Expressive app. Tasks and Calendar switched by a navigation bar on
+  phones and a rail on wider screens, whose menu button shows the lists and calendars: a page
+  of its own on phones, a sidebar that can be hidden on unfolded foldables and tablets; a task page with everything the Linux edit
   dialog has; swipe right to complete and left to delete, both with Undo; drag tasks to reorder
   them, make them subtasks or change their category; month, week and agenda views where events
   and tasks move by dragging; an event editor with repeating events; "To Plan" for putting tasks

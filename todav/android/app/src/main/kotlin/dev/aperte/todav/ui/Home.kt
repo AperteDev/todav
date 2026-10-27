@@ -1,24 +1,35 @@
 package dev.aperte.todav.ui
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CalendarMonth
@@ -28,13 +39,10 @@ import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
-import androidx.compose.material3.DrawerState
-import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationDrawerItem
@@ -47,15 +55,15 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -72,71 +80,69 @@ import dev.aperte.todav.accountName
 import dev.aperte.todav.core.SyncState
 import dev.aperte.todav.ntr
 import dev.aperte.todav.tr
-import kotlinx.coroutines.launch
-
-/** How wide the window is, by Material's window size classes. */
-enum class Width { COMPACT, MEDIUM, EXPANDED }
-
-/** The drawer, for the panes' menu buttons; null where there is none to open. */
-val LocalDrawer = compositionLocalOf<DrawerState?> { null }
 
 /** The snackbar of the home screen. */
 val LocalSnackbar = compositionLocalOf { SnackbarHostState() }
 
 /**
- * Tasks and Calendar: switched by a navigation bar on phones and a rail on medium widths, side
- * by side on expanded ones (unfolded foldables, tablets). The drawer holds the task lists and
- * the calendars to show.
+ * Tasks or Calendar, switched by a navigation bar on phones and a rail from 700 dp (unfolded
+ * foldables, tablets, phones on their side; the Linux app folds its sidebar at that width too).
+ * Their menu button shows the sidebar (the task lists or the calendars to show): a page over the
+ * whole width on phones, a pane beside the view, shown at first, on wider screens.
  */
 @Composable
 fun Home(model: Main) {
     val screen = model.screen.collectAsStateWithLifecycle().value ?: return
-    val drawer = rememberDrawerState(DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     val view by model.view.collectAsStateWithLifecycle()
     val ticking by model.ticking.collectAsStateWithLifecycle()
     ticking?.let { SubtasksDialog(it, model::answer) }
     Messages(model, screen, snackbar)
+    // Each its own: turning a phone doesn't cover its view with a page left open in the pane.
+    var page by rememberSaveable { mutableStateOf(false) }
+    var pane by rememberSaveable { mutableStateOf(true) }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val width = when {
-            maxWidth < 600.dp -> Width.COMPACT
-            maxWidth < 840.dp -> Width.MEDIUM
-            else -> Width.EXPANDED
+        val wide = maxWidth >= 700.dp
+        val sidebar = if (wide) pane else page
+        val menu = { if (wide) pane = !pane else page = !page }
+        val show = { v: View ->
+            page = false
+            model.show(v)
         }
-        val both = width == Width.EXPANDED
-        ModalNavigationDrawer(
-            drawerState = drawer,
-            gesturesEnabled = drawer.isOpen,
-            drawerContent = {
-                ModalDrawerSheet {
-                    Drawer(model, screen, if (both) null else view) {
-                        scope.launch { drawer.close() }
+        // The add button, for what is shown: a task or an event.
+        val add = { if (view == View.TASKS) newTask(model) else newEvent(model) }
+        BackHandler(enabled = !wide && page) { page = false }
+        Scaffold(
+            snackbarHost = { SnackbarHost(snackbar) },
+            bottomBar = { if (!wide) Switcher(view, page, menu, show, add) },
+            contentWindowInsets = WindowInsets(0),
+        ) { padding ->
+            androidx.compose.runtime.CompositionLocalProvider(LocalSnackbar provides snackbar) {
+                Row(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
+                    if (wide) {
+                        Rail(view, pane, menu, show, add)
+                        AnimatedVisibility(
+                            pane,
+                            enter = expandHorizontally(expandFrom = Alignment.Start),
+                            exit = shrinkHorizontally(shrinkTowards = Alignment.Start),
+                        ) {
+                            Row(Modifier.fillMaxHeight()) {
+                                Sidebar(model, screen, view, Modifier.width(300.dp)) {}
+                                VerticalDivider()
+                            }
+                        }
                     }
-                }
-            },
-        ) {
-            // The add button, for what is shown: a task or an event.
-            val add = { if (view == View.TASKS) newTask(model) else newEvent(model) }
-            Scaffold(
-                snackbarHost = { SnackbarHost(snackbar) },
-                bottomBar = { if (width == Width.COMPACT) Switcher(view, model::show, add) },
-                contentWindowInsets = WindowInsets(0),
-            ) { padding ->
-                androidx.compose.runtime.CompositionLocalProvider(
-                    LocalDrawer provides drawer,
-                    LocalSnackbar provides snackbar,
-                ) {
-                    Row(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
-                        if (width == Width.MEDIUM) Rail(view, model::show, add)
-                        if (both) {
-                            // No bar or rail: each pane has its own add button.
-                            Box(Modifier.weight(1f).fillMaxHeight()) { TasksPane(model, screen, addButton = true) }
-                            VerticalDivider()
-                            Box(Modifier.weight(1f).fillMaxHeight()) { CalendarPane(model, addButton = true) }
-                        } else {
-                            Panes(model, screen, view, Modifier.weight(1f).fillMaxHeight())
+                    Box(Modifier.weight(1f).fillMaxHeight()) {
+                        Panes(model, screen, view, Modifier.fillMaxSize())
+                        if (!wide) {
+                            androidx.compose.animation.AnimatedVisibility(
+                                sidebar,
+                                enter = slideInHorizontally { -it },
+                                exit = slideOutHorizontally { -it },
+                            ) {
+                                Sidebar(model, screen, view, Modifier.fillMaxSize()) { page = false }
+                            }
                         }
                     }
                 }
@@ -154,36 +160,55 @@ private fun Panes(model: Main, screen: Screen, view: View, modifier: Modifier) {
     val pager = rememberPagerState(initialPage = view.ordinal) { 2 }
     LaunchedEffect(view) { if (pager.currentPage != view.ordinal) pager.animateScrollToPage(view.ordinal) }
     HorizontalPager(pager, modifier, userScrollEnabled = false, beyondViewportPageCount = 1) { page ->
-        if (page == View.TASKS.ordinal) TasksPane(model, screen, addButton = false) else CalendarPane(model, addButton = false)
+        if (page == View.TASKS.ordinal) TasksPane(model, screen) else CalendarPane(model)
     }
 }
 
 private fun addLabel(view: View) = if (view == View.TASKS) tr("Add Task") else tr("New Event")
 
-/** Tasks and Calendar, and the add button at the end (as a bottom app bar has it), to take less room. */
+/** What the menu button shows: the task lists or the calendars. */
+private fun menuLabel(view: View) = if (view == View.TASKS) tr("Task lists") else tr("Calendars")
+
+/**
+ * The sidebar's menu button (selected while its page is shown), Tasks and Calendar, and the add
+ * button at the end (as a bottom app bar has it), to take less room.
+ */
 @Composable
-private fun Switcher(view: View, onShow: (View) -> Unit, onAdd: () -> Unit) {
+private fun Switcher(view: View, page: Boolean, onMenu: () -> Unit, onShow: (View) -> Unit, onAdd: () -> Unit) {
     NavigationBar {
         NavigationBarItem(
-            selected = view == View.TASKS,
+            selected = page,
+            onClick = onMenu,
+            icon = { Icon(Icons.Default.Menu, null) },
+            label = { Text(menuLabel(view)) },
+        )
+        NavigationBarItem(
+            selected = !page && view == View.TASKS,
             onClick = { onShow(View.TASKS) },
             icon = { Icon(if (view == View.TASKS) Icons.Filled.TaskAlt else Icons.Outlined.TaskAlt, null) },
             label = { Text(tr("Tasks")) },
         )
         NavigationBarItem(
-            selected = view == View.CALENDAR,
+            selected = !page && view == View.CALENDAR,
             onClick = { onShow(View.CALENDAR) },
             icon = { Icon(if (view == View.CALENDAR) Icons.Filled.CalendarMonth else Icons.Outlined.CalendarMonth, null) },
             label = { Text(tr("Calendar")) },
         )
-        Box(Modifier.padding(end = 12.dp)) { AddButton(addLabel(view), inBar = true, onClick = onAdd) }
+        Box(Modifier.padding(end = 12.dp)) { AddButton(addLabel(view), onAdd) }
     }
 }
 
-/** Tasks and Calendar, under the add button. */
+/** The sidebar's menu button and the add button, then Tasks and Calendar. */
 @Composable
-private fun Rail(view: View, onShow: (View) -> Unit, onAdd: () -> Unit) {
-    NavigationRail(header = { AddButton(addLabel(view), inBar = true, onClick = onAdd) }) {
+private fun Rail(view: View, pane: Boolean, onMenu: () -> Unit, onShow: (View) -> Unit, onAdd: () -> Unit) {
+    NavigationRail(
+        header = {
+            Tip(menuLabel(view)) {
+                IconToggleButton(checked = pane, onCheckedChange = { onMenu() }) { Icon(Icons.Default.Menu, menuLabel(view)) }
+            }
+            AddButton(addLabel(view), onAdd)
+        },
+    ) {
         NavigationRailItem(
             selected = view == View.TASKS,
             onClick = { onShow(View.TASKS) },
@@ -257,15 +282,20 @@ private fun SubtasksDialog(t: Ticking, onAnswer: (Boolean?) -> Unit) {
 }
 
 /**
- * The task lists (with Upcoming and Important) and, with the calendar shown, the calendars to
- * show or hide; `view` null: both are shown. New list and Settings at the end.
+ * The sidebar: the task lists (with Upcoming and Important) or, with the calendar shown, the
+ * calendars to show or hide; New list and Settings at the end. `close` hides its page on phones,
+ * after picking a list.
  */
 @Composable
-private fun Drawer(model: Main, screen: Screen, view: View?, close: () -> Unit) {
+private fun Sidebar(model: Main, screen: Screen, view: View, modifier: Modifier, close: () -> Unit) {
     var newList by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<String?>(null) }
     val calendars by model.calendarLists.collectAsStateWithLifecycle()
-    LazyColumn(contentPadding = PaddingValues(vertical = 12.dp)) {
+    LazyColumn(
+        modifier.background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Vertical)),
+        contentPadding = PaddingValues(vertical = 12.dp),
+    ) {
         item {
             Text(
                 "Todav",
@@ -273,14 +303,14 @@ private fun Drawer(model: Main, screen: Screen, view: View?, close: () -> Unit) 
                 modifier = Modifier.padding(horizontal = 28.dp, vertical = 16.dp),
             )
         }
-        if (view != View.CALENDAR) {
+        if (view == View.TASKS) {
             items(screen.places, key = { "t:" + it.key }) { place ->
                 place.heading?.let { DrawerHeading(it) }
                 NavigationDrawerItem(
                     label = { Text(place.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     icon = { PlaceIcon(place) },
                     badge = { if (place.count > 0) Text("${place.count}") },
-                    selected = place.key == screen.current && view != null,
+                    selected = place.key == screen.current,
                     onClick = {
                         model.select(place.key)
                         model.show(View.TASKS)
@@ -292,10 +322,7 @@ private fun Drawer(model: Main, screen: Screen, view: View?, close: () -> Unit) 
                 )
             }
         }
-        if (view != View.TASKS) {
-            item(key = "calendars") {
-                if (view == null) HorizontalDivider(Modifier.padding(vertical = 8.dp, horizontal = 28.dp))
-            }
+        if (view == View.CALENDAR) {
             items(calendars, key = { "c:" + it.href }) { c ->
                 c.heading?.let { DrawerHeading(it) }
                 NavigationDrawerItem(
@@ -327,10 +354,7 @@ private fun Drawer(model: Main, screen: Screen, view: View?, close: () -> Unit) 
                 label = { Text(tr("Settings")) },
                 icon = { Icon(Icons.Outlined.Settings, null) },
                 selected = false,
-                onClick = {
-                    close()
-                    model.open(Dest.Settings)
-                },
+                onClick = { model.open(Dest.Settings) },
                 modifier = Modifier.padding(horizontal = 12.dp),
             )
         }

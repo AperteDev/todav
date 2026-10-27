@@ -35,7 +35,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.CalendarViewDay
 import androidx.compose.material.icons.outlined.CalendarViewMonth
@@ -69,7 +68,6 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -162,7 +160,6 @@ import java.time.LocalDate
 import java.time.temporal.WeekFields
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Read from the core off the main thread, again whenever one of `keys` changes. */
@@ -202,14 +199,12 @@ fun eventWhen(e: Event, now: Long): String {
 }
 
 /**
- * The calendar: Month, Week or Agenda, as the Linux app's, with Today and the view menu, and the
- * button adding an event when `addButton` (both panes shown). Months and weeks change with a swipe.
+ * The calendar: Month, Week or Agenda, as the Linux app's, with Today and the view menu. Months
+ * and weeks change with a swipe.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CalendarPane(model: Main, addButton: Boolean) {
-    val drawer = LocalDrawer.current
-    val scope = rememberCoroutineScope()
+fun CalendarPane(model: Main) {
     val mode by model.calMode.collectAsStateWithLifecycle()
     val picked by model.day.collectAsStateWithLifecycle()
     val now = remember { model.core.localNow() }
@@ -231,11 +226,6 @@ fun CalendarPane(model: Main, addButton: Boolean) {
         topBar = {
             TopAppBar(
                 title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                navigationIcon = {
-                    Tip(tr("Calendars")) {
-                        IconButton(onClick = { scope.launch { drawer?.open() } }) { Icon(Icons.Default.Menu, tr("Calendars")) }
-                    }
-                },
                 actions = {
                     Tip(tr("Today")) {
                         IconButton(onClick = { model.pick(midnight(model.core.localNow())) }) {
@@ -271,7 +261,6 @@ fun CalendarPane(model: Main, addButton: Boolean) {
                 },
             )
         },
-        floatingActionButton = { if (addButton) AddButton(tr("New Event"), inBar = false) { newEvent(model) } },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             planning?.takeIf { mode.hours() }?.let { t ->
