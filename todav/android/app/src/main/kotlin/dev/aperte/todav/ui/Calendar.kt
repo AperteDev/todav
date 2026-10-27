@@ -2,6 +2,7 @@ package dev.aperte.todav.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -721,7 +722,7 @@ private fun DayList(model: Main, day: Long, onItem: (Item) -> Unit, modifier: Mo
             }
         }
         items(entries, key = { "${it.item.list()}:${it.item.title()}:${(it.item as? Item.Event)?.event?.start ?: 0}:${it.time}" }) {
-            AgendaRow(model, it, onItem)
+            AgendaRow(it, onItem)
         }
     }
 }
@@ -747,14 +748,18 @@ private fun AgendaView(model: Main, day: Long, onItem: (Item) -> Unit) {
         entries.groupBy { it.day }.forEach { (d, es) ->
             stickyHeader(key = "d$d") { Heading(dayLabel(d, true, now).replaceFirstChar { it.titlecase() }) }
             items(es, key = { "$d:${it.item.list()}:${it.item.title()}:${it.time}:${(it.item as? Item.Event)?.event?.start}" }) {
-                AgendaRow(model, it, onItem)
+                AgendaRow(it, onItem)
             }
         }
     }
 }
 
+/**
+ * An agenda row: its time, its mark (an event's dot, a task's ring, in its list's colour), its
+ * title. Tapped, its details open, where a task is ticked: the ring only shows whether it is done.
+ */
 @Composable
-private fun AgendaRow(model: Main, e: AgendaEntry, onItem: (Item) -> Unit) {
+private fun AgendaRow(e: AgendaEntry, onItem: (Item) -> Unit) {
     val item = e.item
     Row(
         Modifier.fillMaxWidth().clickable { onItem(item) }.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -772,19 +777,21 @@ private fun AgendaRow(model: Main, e: AgendaEntry, onItem: (Item) -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.width(64.dp),
         )
-        if (item is Item.Task) {
-            Checkbox(
-                checked = item.task.done,
-                onCheckedChange = { model.setDone(item.task, it) },
-                modifier = Modifier.size(24.dp),
-            )
-        } else {
-            Box(Modifier.size(12.dp).background(parseColor(e.color), CircleShape))
+        val color = parseColor(e.color)
+        Box(Modifier.size(20.dp), Alignment.Center) {
+            if (item is Item.Task) {
+                Box(Modifier.size(18.dp).border(2.dp, color, CircleShape), Alignment.Center) {
+                    if (item.task.done) Icon(Icons.Default.Check, null, Modifier.size(12.dp), tint = color)
+                }
+            } else {
+                Box(Modifier.size(12.dp).background(color, CircleShape))
+            }
         }
         Column(Modifier.weight(1f)) {
             Text(
                 item.title(),
                 textDecoration = if (item.done()) TextDecoration.LineThrough else null,
+                color = if (item.done()) MaterialTheme.colorScheme.onSurfaceVariant else Color.Unspecified,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
