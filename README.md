@@ -140,6 +140,11 @@ development:
   a task, and keyboard shortcuts.
 - Signs in with the browser or an app password; with the Nextcloud app installed, its accounts
   fill in the server and login name.
+- Syncs with your Nextcloud by itself: it does not need DAVx⁵ (or the Nextcloud app). If you
+  keep DAVx⁵ for other apps, both can sync the same Nextcloud side by side.
+- System Calendars shows the calendars of the phone's other accounts (Google, Exchange,
+  DAVx⁵…) read-only. It marks the ones Todav already syncs itself, such as DAVx⁵'s copies of
+  your Nextcloud calendars; turned on, their events would show twice.
 
 ## Getting started
 
@@ -149,7 +154,8 @@ Todav needs GNOME 49 or newer, or Android 10 or newer. The GNOME Shell extension
 [latest release](https://github.com/AperteDev/todav/releases/latest) and open it on your phone
 (allow your browser or file manager to install apps when asked). Until Google Play and F-Droid,
 it is a test build signed differently each release: uninstall the previous version before
-installing a new one (lists on the device only are lost; your Nextcloud's sync back).
+installing a new one (lists on the device only are lost; your Nextcloud's sync back). Todav
+syncs with your Nextcloud itself; you don't need DAVx⁵ for it.
 
 **Arch Linux and derivatives** (Manjaro, EndeavourOS, CachyOS…): install from the
 [AUR](https://aur.archlinux.org/packages?K=todav) with an AUR helper:
