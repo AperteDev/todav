@@ -238,10 +238,12 @@ fun CalendarPane(model: Main) {
     var viewMenu by remember { mutableStateOf(false) }
     // In the model: the add button floating over the calendar hides meanwhile.
     val toPlan by model.toPlan.collectAsStateWithLifecycle()
-    // Only for the views with hours.
-    LaunchedEffect(mode) { if (!mode.hours()) model.toPlan.value = false }
-    // A task from "To Plan" held and dragged over the hours.
+    // Not for the agenda, which takes no drops.
+    LaunchedEffect(mode) { if (mode == CalMode.AGENDA) model.toPlan.value = false }
+    // A task from "To Plan" held and dragged over the hours or days.
     var plan by remember { mutableStateOf<Planning?>(null) }
+    // A task from "To Plan" opened in its editor.
+    var editing by remember { mutableStateOf<String?>(null) }
     val changes by model.todav.changes.collectAsStateWithLifecycle()
     // Changed on another device and synced.
     LaunchedEffect(changes) { model.workDays.value = withContext(Dispatchers.IO) { model.core.workDays() } }
@@ -261,7 +263,7 @@ fun CalendarPane(model: Main) {
                             Icon(Icons.Outlined.Today, tr("Today"))
                         }
                     }
-                    if (mode.hours()) {
+                    if (mode != CalMode.AGENDA) {
                         Tip(tr("To Plan")) {
                             IconButton(onClick = { model.toPlan.value = true }) { Icon(Icons.Outlined.Inbox, tr("To Plan")) }
                         }
@@ -298,10 +300,11 @@ fun CalendarPane(model: Main) {
             }
             plan?.let { CancelTarget(it, Modifier.align(Alignment.TopCenter)) }
             // Over the views, under the top bar: drawn in this window, so a task held in it
-            // goes on being dragged over the hours once it hides.
+            // goes on being dragged over the calendar once it hides.
             if (toPlan) {
-                // Due by the end of what is shown.
+                // Due by the end of what is shown: the month grid's six weeks, or the days.
                 val until = when (mode) {
+                    CalMode.MONTH -> weekStart(monthFirst(day), firstWeekday()) + 42 * DAY
                     CalMode.THREE_DAYS -> day + 3 * DAY
                     CalMode.DAY -> day + DAY
                     else -> weekStart(day, firstWeekday()) + 7 * DAY
@@ -309,16 +312,23 @@ fun CalendarPane(model: Main) {
                 ToPlanSheet(
                     model, until, colors, plan,
                     onHold = { plan = it },
+                    onEdit = {
+                        model.toPlan.value = false
+                        editing = it.uid
+                    },
                     onDrop = {
                         val p = plan ?: return@ToPlanSheet
                         plan = null
-                        // Onto an hour: planned there. Onto the cancel target or anywhere else:
-                        // back in the sheet.
-                        val slot = p.slot().takeIf { !p.overCancel() }
-                        if (slot != null) {
-                            model.toPlan.value = false
-                            model.update(p.task.uid, model.core.planAt(p.task, slot))
+                        // Onto an hour or a day: planned there, as on Linux. Onto the cancel
+                        // target or anywhere else: back in the sheet.
+                        val to = p.target().takeIf { !p.overCancel() } ?: return@ToPlanSheet
+                        model.toPlan.value = false
+                        val patch = if (to.day) {
+                            (dev.aperte.todav.core.dayDrop(Item.Task(p.task), to.at, false) as? Change.Task)?.patch
+                        } else {
+                            model.core.planAt(p.task, to.at)
                         }
+                        patch?.let { model.update(p.task.uid, it) }
                     },
                 ) { model.toPlan.value = false }
             }
@@ -331,6 +341,11 @@ fun CalendarPane(model: Main) {
         // Keyed, so another new event gets a sheet of its own.
         androidx.compose.runtime.key(dest) {
             DetailsSheet({ model.newEvent.value = null }, full = { EventPage(model, dest, it) })
+        }
+    }
+    editing?.let { uid ->
+        androidx.compose.runtime.key(uid) {
+            DetailsSheet({ editing = null }, full = { TaskPage(model, uid, it) })
         }
     }
 }
@@ -489,44 +504,60 @@ private fun MonthGrid(model: Main, month: Long, picked: Long?, colors: Map<Strin
     var target by remember { mutableStateOf<Long?>(null) }
     var moved by remember { mutableStateOf<Pair<Item, Change>?>(null) }
     moved?.let { (item, change) -> Reschedule(model, item, change) { moved = null } }
+    // A task from "To Plan" dragged over: the day under the finger, if on these weeks.
+    val plan = LocalPlanning.current
+    val weeks = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    val dayAt = { w: Offset ->
+        weeks[0]?.takeIf { it.isAttached && it.boundsInWindow().contains(w) }?.let { g ->
+            val p = g.windowToLocal(w)
+            val col = (p.x / (g.size.width / 7f)).toInt().coerceIn(0, 6)
+            val row = (p.y / (g.size.height / 6f)).toInt().coerceIn(0, 5)
+            start + (row * 7 + col) * DAY
+        }
+    }
+    PlanTarget(plan) { w -> dayAt(w)?.let { PlanDrop(it, true) } }
+    // Only when the day under it changes, not every move.
+    val planDay by remember(plan) { derivedStateOf { plan?.let { dayAt(it.at) } } }
     Column(Modifier.fillMaxSize()) {
         WeekdayNames(start)
-        for (w in 0 until 6) {
-            Row(Modifier.fillMaxWidth().weight(1f)) {
-                for (d in 0 until 7) {
-                    val at = start + (w * 7 + d) * DAY
-                    val here = days[w * 7 + d]
-                    DayCell(
-                        at, here, colors, at == today, at == picked || at == target, fields(at).monthValue == thisMonth,
-                        Modifier.weight(1f).fillMaxHeight().gridLines(left = d > 0).pointerInput(at, here) {
-                            // Held on a chip and moved: to the day it is let go over.
-                            var held: Item? = null
-                            var total = Offset.Zero
-                            detectDragGesturesAfterLongPress(
-                                onDragStart = { p ->
-                                    // Under the day's number (2 dp in, 22 dp), chips 13 sp and 1 dp apart.
-                                    held = here.getOrNull(((p.y - 24.dp.toPx()) / (13.sp.toPx() + 1.dp.toPx())).toInt())
-                                    total = Offset.Zero
-                                    target = held?.let { at }
-                                },
-                                onDrag = { change, amount ->
-                                    if (held != null) {
-                                        change.consume()
-                                        total += amount
-                                        val rows = Math.round(total.y / size.height)
-                                        val cols = Math.round(total.x / size.width)
-                                        target = at + (rows * 7L + cols) * DAY
-                                    }
-                                },
-                                onDragEnd = {
-                                    val (item, day) = held to target
-                                    target = null
-                                    if (item != null && day != null && day != at) moved = item to dev.aperte.todav.core.dayDrop(item, day, false)
-                                },
-                                onDragCancel = { target = null },
-                            )
-                        },
-                    ) { model.pick(at) }
+        Column(Modifier.fillMaxWidth().weight(1f).onGloballyPositioned { weeks[0] = it }) {
+            for (w in 0 until 6) {
+                Row(Modifier.fillMaxWidth().weight(1f)) {
+                    for (d in 0 until 7) {
+                        val at = start + (w * 7 + d) * DAY
+                        val here = days[w * 7 + d]
+                        DayCell(
+                            at, here, colors, at == today, at == picked || at == target || at == planDay, fields(at).monthValue == thisMonth,
+                            Modifier.weight(1f).fillMaxHeight().gridLines(left = d > 0).pointerInput(at, here) {
+                                // Held on a chip and moved: to the day it is let go over.
+                                var held: Item? = null
+                                var total = Offset.Zero
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = { p ->
+                                        // Under the day's number (2 dp in, 22 dp), chips 13 sp and 1 dp apart.
+                                        held = here.getOrNull(((p.y - 24.dp.toPx()) / (13.sp.toPx() + 1.dp.toPx())).toInt())
+                                        total = Offset.Zero
+                                        target = held?.let { at }
+                                    },
+                                    onDrag = { change, amount ->
+                                        if (held != null) {
+                                            change.consume()
+                                            total += amount
+                                            val rows = Math.round(total.y / size.height)
+                                            val cols = Math.round(total.x / size.width)
+                                            target = at + (rows * 7L + cols) * DAY
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        val (item, day) = held to target
+                                        target = null
+                                        if (item != null && day != null && day != at) moved = item to dev.aperte.todav.core.dayDrop(item, day, false)
+                                    },
+                                    onDragCancel = { target = null },
+                                )
+                            },
+                        ) { model.pick(at) }
+                    }
                 }
             }
         }
@@ -1052,14 +1083,7 @@ private fun Week(
             if (p.x < left || n !in cols.indices) null else start + cols[n] * DAY + (minutes / 15 * 15).coerceIn(0, 24 * 60 - 15) * 60
         }
     }
-    if (plan != null) {
-        val key = remember { Any() }
-        val find by rememberUpdatedState(slotAt)
-        DisposableEffect(plan) {
-            plan.targets[key] = { find(it) }
-            onDispose { plan.targets.remove(key) }
-        }
-    }
+    PlanTarget(plan) { w -> slotAt(w)?.let { PlanDrop(it, false) } }
     val duration = remember(plan) { if (plan != null) model.core.taskDuration() else 0L }
     // Held, a block may be moved over the next days' pages: drawn over them.
     Column(Modifier.fillMaxSize().zIndex(if (drag != null) 1f else 0f)) {
@@ -1233,14 +1257,14 @@ private fun Reschedule(model: Main, item: Item, change: Change, onDone: () -> Un
 class Planning(val task: TodavTask, at: Offset) {
     var at by mutableStateOf(at)
 
-    /** The hours of each day page shown: the slot under a point, if theirs. */
-    val targets = mutableMapOf<Any, (Offset) -> Long?>()
+    /** The hours of each day page shown, or the month grid's days: what is under a point, if theirs. */
+    val targets = mutableMapOf<Any, (Offset) -> PlanDrop?>()
 
     /** Where the cancel target is, in the window. */
     var cancel: Rect? = null
 
-    /** The slot it would be planned into, dropped now. */
-    fun slot(): Long? = targets.values.firstNotNullOfOrNull { it(at) }
+    /** Where it would go, dropped now. */
+    fun target(): PlanDrop? = targets.values.firstNotNullOfOrNull { it(at) }
 
     /** Whether it is over the cancel target; reads `at` first, so a composable asking follows the finger. */
     fun overCancel(): Boolean {
@@ -1250,6 +1274,21 @@ class Planning(val task: TodavTask, at: Offset) {
 }
 
 val LocalPlanning = compositionLocalOf<Planning?> { null }
+
+/** Where a dragged task goes: the hour slot starting `at`, or the day `at` (a month grid's). */
+data class PlanDrop(val at: Long, val day: Boolean)
+
+/** Make `targets`' entry `key` find what `find` finds under a point, while this is composed. */
+@Composable
+private fun PlanTarget(plan: Planning?, find: (Offset) -> PlanDrop?) {
+    if (plan == null) return
+    val key = remember { Any() }
+    val current by rememberUpdatedState(find)
+    DisposableEffect(plan) {
+        plan.targets[key] = { current(it) }
+        onDispose { plan.targets.remove(key) }
+    }
+}
 
 /** Where a task from "To Plan" goes once dropped at `slot`, if it is on `day`: a block as it would be. */
 @Composable
@@ -1301,7 +1340,7 @@ private fun DragCard(plan: Planning) {
         // Read first, so this follows the finger from the start.
         val at = plan.at
         val c = box[0]?.takeIf { it.isAttached }
-        if (c != null && plan.slot() == null) {
+        if (c != null && plan.target()?.day != false) {
             val p = c.windowToLocal(at)
             Surface(
                 Modifier.offset { IntOffset(p.x.roundToInt() - 24.dp.roundToPx(), p.y.roundToInt() - 72.dp.roundToPx()) }
@@ -1336,6 +1375,7 @@ private fun ToPlanSheet(
     colors: Map<String, String>,
     plan: Planning?,
     onHold: (Planning) -> Unit,
+    onEdit: (TodavTask) -> Unit,
     onDrop: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -1395,7 +1435,13 @@ private fun ToPlanSheet(
                             groups.forEach { (group, title) ->
                                 item(key = title) { SectionTitle(title) }
                                 items(group, key = { it.uid }) { t ->
-                                    PlanRow(t, colors, now, onTap = { model.messages.tryEmit(hint to null) }, onHold = onHold, onDrop = onDrop)
+                                    PlanRow(
+                                        t, colors, now,
+                                        onTap = { model.messages.tryEmit(hint to null) },
+                                        onEdit = { onEdit(t) },
+                                        onHold = onHold,
+                                        onDrop = onDrop,
+                                    )
                                 }
                             }
                         }
@@ -1407,11 +1453,20 @@ private fun ToPlanSheet(
 }
 
 /**
- * A task in "To Plan": its list's colour, its title and the day it is due (red when overdue).
- * Held, it is dragged (`onHold`, then its [Planning] follows the finger) until let go (`onDrop`).
+ * A task in "To Plan": its list's colour, its title, the day it is due (red when overdue) and
+ * a button opening its editor. Held, it is dragged (`onHold`, then its [Planning] follows the
+ * finger) until let go (`onDrop`).
  */
 @Composable
-private fun PlanRow(t: TodavTask, colors: Map<String, String>, now: Long, onTap: () -> Unit, onHold: (Planning) -> Unit, onDrop: () -> Unit) {
+private fun PlanRow(
+    t: TodavTask,
+    colors: Map<String, String>,
+    now: Long,
+    onTap: () -> Unit,
+    onEdit: () -> Unit,
+    onHold: (Planning) -> Unit,
+    onDrop: () -> Unit,
+) {
     val place = remember { arrayOfNulls<LayoutCoordinates>(1) }
     val haptics = LocalHapticFeedback.current
     Line(
@@ -1439,7 +1494,7 @@ private fun PlanRow(t: TodavTask, colors: Map<String, String>, now: Long, onTap:
                     },
                 )
             }
-            .padding(vertical = 12.dp),
+            .padding(vertical = 4.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(t.summary, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -1449,6 +1504,9 @@ private fun PlanRow(t: TodavTask, colors: Map<String, String>, now: Long, onTap:
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (dev.aperte.todav.core.overdue(t, now)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+            Tip(tr("Edit…")) {
+                IconButton(onClick = onEdit) { Icon(Icons.Outlined.Edit, tr("Edit…")) }
             }
         }
     }
