@@ -17,6 +17,9 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CalendarMonth
@@ -289,16 +292,66 @@ private fun Accounts(model: Main) {
     val changes by model.todav.changes.collectAsStateWithLifecycle()
     val accounts = load(changes, initial = model.core.accounts()) { model.core.accounts() }
     Group(tr("Accounts"))
-    accounts.forEach { a ->
+    // The order everything lists accounts in: dragged by the handles, as in the Linux app.
+    var order by remember(accounts) { mutableStateOf(accounts) }
+    // The handles' gestures outlive recompositions: they read the order through this.
+    val current by androidx.compose.runtime.rememberUpdatedState(order)
+    var held by remember { mutableStateOf<Long?>(null) }
+    var shift by remember { mutableStateOf(0f) }
+    // Keyed by account, so a row keeps its handle's gesture while it moves.
+    order.forEach { a -> androidx.compose.runtime.key(a.id) {
         ListItem(
             headlineContent = { Text(accountName(a)) },
             supportingContent = { Text(accountKind(model, a)) },
             leadingContent = {
                 Icon(if (a.kind == AccountKind.LOCAL) Icons.Outlined.PhoneAndroid else Icons.Outlined.AccountCircle, null)
             },
+            trailingContent = if (order.size > 1) {
+                {
+                    Icon(
+                        Icons.Default.DragHandle,
+                        tr("Drag to Move"),
+                        Modifier.pointerInput(a.id) {
+                            detectVerticalDragGestures(
+                                onDragStart = {
+                                    held = a.id
+                                    shift = 0f
+                                },
+                                onVerticalDrag = { change, dy ->
+                                    change.consume()
+                                    shift += dy
+                                    // Past half a row: one place up or down.
+                                    val row = 72.dp.toPx()
+                                    val i = current.indexOfFirst { it.id == a.id }
+                                    val to = (i + Math.round(shift / row)).coerceIn(0, current.lastIndex)
+                                    if (to != i) {
+                                        order = current.toMutableList().apply { add(to, removeAt(i)) }
+                                        shift -= (to - i) * row
+                                    }
+                                },
+                                onDragEnd = {
+                                    held = null
+                                    val ids = current.map { it.id }
+                                    model.act {
+                                        model.core.reorderAccounts(ids)
+                                        model.todav.changed()
+                                    }
+                                },
+                                onDragCancel = {
+                                    held = null
+                                    order = accounts
+                                },
+                            )
+                        },
+                    )
+                }
+            } else {
+                null
+            },
+            tonalElevation = if (held == a.id) 4.dp else 0.dp,
             modifier = Modifier.clickable { model.open(Dest.Account(a.id)) },
         )
-    }
+    } }
     ListItem(
         headlineContent = { Text(tr("Add Account")) },
         leadingContent = { Icon(Icons.Outlined.Add, null) },

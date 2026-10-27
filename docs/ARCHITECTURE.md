@@ -408,8 +408,8 @@ Kotlin + Jetpack Compose (Material 3) on top of the core and `todav-app` via Uni
 - Task page (full screen, Save as one undo step): the Linux edit dialog's fields (title, list, category, priority, its event, note, start, due date with time, reminders as presets or a custom span), its subtasks (ticked and added at once), Delete.
 - Calendar: Month (six weeks, as many chips a day as fit, the picked day's events and tasks underneath or beside it), Week (hour grid, overlapping blocks side by side, the top row for what takes no hours, the current time) and Agenda (60 days); months and weeks change with a swipe; Today, a view menu and the add button. An item opens a details sheet as the Linux popover (an event's tasks or a task's subtasks with a field adding one; Edit, Delete); a tap on an empty hour adds an event there. The event page has the Linux event dialog's fields and asks which occurrences a change or delete is for.
 - A hardware keyboard has the Linux app's shortcuts (Ctrl+F search, Ctrl+Z undo, Ctrl+R or F5 sync, Ctrl+N a new task or event, Ctrl+T today, Ctrl+1/2/3 the calendar's views, Ctrl+, settings), listed in Android's shortcuts helper; saving a task or an event says so with Undo.
-- Settings: General (style, language through the system's per-app setting, start page, notifications), Accounts (each account's page: on/off, name, connection, server status, Remove; "Sync settings with"; push status), Tasks, Calendar, About. The extension's options have no counterpart: each widget picks its list when placed.
-- Not done: moving a task to another list by dragging it onto the drawer, reordering accounts.
+- Settings: General (style, language through the system's per-app setting, start page, notifications), Accounts (in the order they are dragged to by their handles, `reorder_accounts`; each account's page: on/off, name, connection, server status, Remove; "Sync settings with"; push status), Tasks, Calendar, About. The extension's options have no counterpart: each widget picks its list when placed.
+- Not done: moving a task to another list by dragging it onto the drawer (Move to List in its menu does it).
 
 **Push and sync**
 
