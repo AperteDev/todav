@@ -42,7 +42,6 @@ import androidx.compose.material.icons.outlined.CalendarViewDay
 import androidx.compose.material.icons.outlined.CalendarViewMonth
 import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.CalendarViewWeek
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Today
 import androidx.compose.material.icons.outlined.ViewAgenda
 import androidx.compose.material.icons.outlined.ViewColumn
@@ -193,7 +192,6 @@ fun CalendarPane(model: Main, addButton: Boolean) {
     var details by remember { mutableStateOf<Item?>(null) }
     var viewMenu by remember { mutableStateOf(false) }
     var toPlan by remember { mutableStateOf(false) }
-    var workDays by remember { mutableStateOf(false) }
     val planning by model.planning.collectAsStateWithLifecycle()
     val changes by model.todav.changes.collectAsStateWithLifecycle()
     // Changed on another device and synced.
@@ -236,20 +234,7 @@ fun CalendarPane(model: Main, addButton: Boolean) {
                                 DropdownMenuItem(
                                     text = { Text(modeName(m)) },
                                     leadingIcon = { Icon(modeIcon(m), null) },
-                                    trailingIcon = {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            if (m == mode) Icon(Icons.Default.Check, null)
-                                            // Work Week's days are picked right beside it.
-                                            if (m == CalMode.WORK_WEEK) {
-                                                Tip(tr("Work Week Days")) {
-                                                    IconButton(onClick = {
-                                                        viewMenu = false
-                                                        workDays = true
-                                                    }) { Icon(Icons.Outlined.Settings, tr("Work Week Days")) }
-                                                }
-                                            }
-                                        }
-                                    },
+                                    trailingIcon = { if (m == mode) Icon(Icons.Default.Check, null) },
                                     onClick = {
                                         viewMenu = false
                                         model.setMode(m)
@@ -299,7 +284,6 @@ fun CalendarPane(model: Main, addButton: Boolean) {
         }
         ToPlanSheet(model, until, colors) { toPlan = false }
     }
-    if (workDays) WorkDaysDialog(model) { workDays = false }
 }
 
 /** Whether the view shows hours (a week, some days or one). */

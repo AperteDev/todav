@@ -269,7 +269,7 @@ pub fn build(views: &adw::ViewStack) {
         });
     }
     for b in &c.view_buttons {
-        b.set_create_popup_func(|b| b.set_popover(Some(&view_menu(b))));
+        b.set_create_popup_func(|b| b.set_popover(Some(&view_menu())));
     }
     label_views(&c);
     // Shrinking keeps the views, as on the Tasks page; the sidebar is a Back away.
@@ -425,15 +425,13 @@ fn label_views(c: &Cal) {
     }
 }
 
-/// The views to pick from, the current one checked, their shortcuts beside them; Work Week has a
-/// button choosing its days.
-fn view_menu(button: &gtk::MenuButton) -> gtk::Popover {
+/// The views to pick from, the current one checked, their shortcuts beside them. Work Week's days
+/// are picked in Preferences.
+fn view_menu() -> gtk::Popover {
     let list = gtk::Box::new(gtk::Orientation::Vertical, 0);
     let pop = gtk::Popover::builder().child(&list).build();
     pop.add_css_class("view-menu");
     let current = cal().map(|c| c.mode.get());
-    // As wide as each other, so the shortcuts line up beside Work Week's button.
-    let same = gtk::SizeGroup::new(gtk::SizeGroupMode::Horizontal);
     for m in Mode::ALL {
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
         row.append(
@@ -451,10 +449,8 @@ fn view_menu(button: &gtk::MenuButton) -> gtk::Popover {
         let check = gtk::Image::from_icon_name("object-select-symbolic");
         check.set_opacity(if current == Some(m) { 1.0 } else { 0.0 });
         row.append(&check);
-        // Not expanding as its label does: the size group sets its width.
-        let pick = gtk::Button::builder().child(&row).hexpand(false).build();
+        let pick = gtk::Button::builder().child(&row).build();
         pick.add_css_class("flat");
-        same.add_widget(&pick);
         let p = pop.downgrade();
         pick.connect_clicked(move |_| {
             if let Some(p) = p.upgrade() {
@@ -462,26 +458,7 @@ fn view_menu(button: &gtk::MenuButton) -> gtk::Popover {
             }
             set_mode(m);
         });
-        let line = gtk::Box::new(gtk::Orientation::Horizontal, 2);
-        line.append(&pick);
-        if m == Mode::WorkWeek {
-            let days = gtk::Button::builder()
-                .icon_name("emblem-system-symbolic")
-                .tooltip_text(gettext("Work Week Days"))
-                .build();
-            days.add_css_class("flat");
-            let (p, button) = (pop.downgrade(), button.downgrade());
-            days.connect_clicked(move |_| {
-                if let Some(p) = p.upgrade() {
-                    p.popdown();
-                }
-                if let Some(b) = button.upgrade() {
-                    work_days_dialog(&b, || {});
-                }
-            });
-            line.append(&days);
-        }
-        list.append(&line);
+        list.append(&pick);
     }
     pop
 }
