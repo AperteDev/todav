@@ -79,7 +79,8 @@ pub(super) fn row(
         Some(gdk::Rectangle::new(x0, y, (x1 - x0).max(1), LANE - 2))
     });
 
-    // Dropped on an item rather than a cell: the day under the pointer.
+    // Dropped on an item rather than a cell: the day under the pointer, lit up as a cell is
+    // under a drop (its own target takes over over its background).
     let column = Rc::new(Cell::new(0));
     let (col, week) = (column.clone(), week.to_vec());
     let drop = item_drop(
@@ -87,12 +88,30 @@ pub(super) fn row(
         |_| true,
         move |i| drop_on_day(i, week[col.get()], all_day),
     );
+    let lit = base.clone();
     drop.connect_motion(move |t, x, _| {
         let width = t.widget().map_or(1, |w| w.width().max(1));
         column.set(((x * n as f64 / width as f64) as usize).min(n - 1));
+        light(&lit, Some(column.get()));
         gdk::DragAction::MOVE
     });
+    drop.connect_leave(move |_| light(&base, None));
     overlay
+}
+
+/// Mark the cell at `col` of the cells in `base` (none: unmark them) as under a drop.
+fn light(base: &gtk::Box, col: Option<usize>) {
+    let mut cell = base.first_child();
+    let mut i = 0;
+    while let Some(w) = cell {
+        if col == Some(i) {
+            w.add_css_class("drop-over");
+        } else {
+            w.remove_css_class("drop-over");
+        }
+        cell = w.next_sibling();
+        i += 1;
+    }
 }
 
 /// The day cells of a row made by `row`.

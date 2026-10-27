@@ -40,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - On a new installation, reminders never went off.
 - The calendar no longer highlights the first day of a month or week moved to with the arrows
   as if it had been picked.
+- Calendar: a task or event dragged over the events of a day lights the day up, as over its
+  free space.
 
 ## [1.3.1] - 2026-10-26
 

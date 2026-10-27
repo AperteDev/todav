@@ -77,7 +77,7 @@ button.block.task { padding-left: 4px; }
 .ring { min-width: 12px; min-height: 12px; border: 2px solid; border-radius: 9999px; }
 .ring image { -gtk-icon-size: 10px; }
 row.done label.title { text-decoration-line: line-through; opacity: 0.55; }
-.day:drop(active), .all-day-cell:drop(active), list.plan:drop(active) { box-shadow: inset 0 0 0 2px @accent_bg_color; background: alpha(@accent_bg_color, 0.12); }
+.day:drop(active), .all-day-cell:drop(active), .drop-over, list.plan:drop(active) { box-shadow: inset 0 0 0 2px @accent_bg_color; background: alpha(@accent_bg_color, 0.12); }
 .week .weekdays label.today { color: @accent_color; font-weight: bold; opacity: 1; }
 .all-day-row { border-bottom: 1px solid alpha(currentColor, 0.15); }
 .all-day-cell { padding: 2px; min-height: 26px; }
