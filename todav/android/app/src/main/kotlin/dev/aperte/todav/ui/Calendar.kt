@@ -79,11 +79,32 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.material3.Surface
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.scrollable
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.text.input.ImeAction
@@ -574,21 +595,103 @@ private fun DayCell(
     }
 }
 
+/** An item in its list's colour: a small one-line chip, or `large`, a row to tap. */
 @Composable
-private fun Chip(item: Item, colors: Map<String, String>) {
+private fun Chip(item: Item, colors: Map<String, String>, large: Boolean = false, onClick: (() -> Unit)? = null) {
     val color = parseColor(colors[item.list()])
     Text(
         item.title(),
-        fontSize = 10.sp,
-        lineHeight = 13.sp,
-        maxLines = 1,
-        overflow = TextOverflow.Clip,
+        fontSize = if (large) 14.sp else 10.sp,
+        lineHeight = if (large) 20.sp else 13.sp,
+        maxLines = if (large) 2 else 1,
+        overflow = if (large) TextOverflow.Ellipsis else TextOverflow.Clip,
         color = if (item is Item.Event) Color.White else MaterialTheme.colorScheme.onSurface,
         textDecoration = if (item.done()) TextDecoration.LineThrough else null,
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(3.dp))
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(if (large) 12.dp else 3.dp))
             .background(if (item is Item.Event) color else color.copy(alpha = 0.25f))
-            .padding(horizontal = 2.dp),
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = if (large) 12.dp else 2.dp, vertical = if (large) 14.dp else 0.dp),
     )
+}
+
+/**
+ * A day's items above the hours, as many as fit (then "+n"). Chips this small are hard to hit, so
+ * the whole day is one target: a tap opens its only item, or shows them all larger to pick from.
+ */
+@Composable
+private fun TopCell(day: Long, now: Long, items: List<Item>, colors: Map<String, String>, onItem: (Item) -> Unit, modifier: Modifier) {
+    var open by remember { mutableStateOf(false) }
+    var at by remember { mutableStateOf(Offset.Zero) }
+    val chip = with(LocalDensity.current) { 13.sp.toDp() } + 1.dp
+    BoxWithConstraints(
+        modifier.onGloballyPositioned { at = it.positionOnScreen() }
+            .clickable(enabled = items.isNotEmpty()) { if (items.size == 1) onItem(items[0]) else open = true }.padding(1.dp),
+    ) {
+        val fit = ((maxHeight + 1.dp) / chip).toInt().coerceAtLeast(1)
+        val shown = if (items.size <= fit) items else items.take(fit - 1)
+        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            shown.forEach { Chip(it, colors) }
+            if (shown.size < items.size) {
+                Text("+${items.size - shown.size}", fontSize = 10.sp, lineHeight = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+    if (open) DayItems(day, now, at, items, colors, onDismiss = { open = false }, onPick = onItem)
+}
+
+/** A popup over the whole window (its content places itself). */
+private object Whole : PopupPositionProvider {
+    override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize, layoutDirection: LayoutDirection, popupContentSize: IntSize) =
+        IntOffset.Zero
+}
+
+/**
+ * All of `day`'s `items` as large rows over the dimmed screen, growing out of the day above the
+ * hours (`at`, on the screen); a tap picks one, a tap outside closes it.
+ */
+@Composable
+private fun DayItems(day: Long, now: Long, at: Offset, items: List<Item>, colors: Map<String, String>, onDismiss: () -> Unit, onPick: (Item) -> Unit) {
+    val shown = remember { MutableTransitionState(false).apply { targetState = true } }
+    // Gone once it has shrunk away.
+    if (!shown.targetState && shown.isIdle) LaunchedEffect(Unit) { onDismiss() }
+    // Where the popup is on the screen: it may start below the status bar.
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    Popup(Whole, onDismissRequest = { shown.targetState = false }, properties = PopupProperties(focusable = true)) {
+        BoxWithConstraints(Modifier.fillMaxSize().onGloballyPositioned { origin = it.positionOnScreen() }) {
+            AnimatedVisibility(shown, enter = fadeIn(), exit = fadeOut()) {
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.32f)).pointerInput(Unit) { detectTapGestures { shown.targetState = false } })
+            }
+            val width = 280.dp
+            val room = with(LocalDensity.current) { (constraints.maxWidth - width.roundToPx()).coerceAtLeast(0) }
+            AnimatedVisibility(
+                shown,
+                Modifier.offset { IntOffset((at.x - origin.x).toInt().coerceIn(0, room), (at.y - origin.y).toInt().coerceAtLeast(0)) },
+                enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
+                exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top),
+            ) {
+                Surface(
+                    Modifier.width(width).heightIn(max = 440.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    shadowElevation = 6.dp,
+                ) {
+                    Column(Modifier.verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            dayLabel(day, true, now).replaceFirstChar { it.titlecase() },
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.padding(start = 4.dp, bottom = 4.dp),
+                        )
+                        items.forEach { item ->
+                            Chip(item, colors, large = true) {
+                                shown.targetState = false
+                                onPick(item)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /** What is on `day`, as agenda rows, with a heading. */
@@ -792,14 +895,24 @@ private fun DaysView(model: Main, day: Long, colors: Map<String, String>, count:
  * hour labels' `verticalScroll` on the same state.
  */
 private fun Modifier.hoursScroll(state: androidx.compose.foundation.ScrollState) = this
-    .drawWithContent { clipRect(left = -size.width * 8, right = size.width * 9) { this@drawWithContent.drawContent() } }
+    // A clipping layer, which taps respect too: the hours scrolled up stay out of the row above.
+    .graphicsLayer {
+        clip = true
+        shape = TopAndBottom
+    }
     .scrollable(state, Orientation.Vertical, reverseDirection = true)
     .layout { measurable, constraints ->
         val p = measurable.measure(constraints.copy(maxHeight = Constraints.Infinity))
         layout(p.width, constraints.maxHeight) { p.place(0, -state.value) }
     }
 
-/** Height of the row above the hours holding `n` chips a day, scrolling past six. */
+/** Its bounds above and below; far past them at the sides. */
+private object TopAndBottom : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density) =
+        Outline.Rectangle(Rect(-size.width * 8, 0f, size.width * 9, size.height))
+}
+
+/** Height of the row above the hours holding `n` chips a day. */
 private fun topHeight(n: Int): Dp = if (n == 0) 0.dp else (n * 14 + 2).dp.coerceAtMost(96.dp)
 
 /** Hour `h`'s label, at the line starting it (none at midnight). */
@@ -903,17 +1016,11 @@ private fun Week(
             }
         }
         // What takes no hours: all-day events and tasks due on a date.
-        if (if (top != null) top > 0.dp else fullest > 0) {
-            Row(
-                Modifier.fillMaxWidth().padding(start = inset).then(if (top != null) Modifier.height(top) else Modifier.heightIn(max = 96.dp))
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                for (n in cols.indices) {
-                    Column(Modifier.weight(1f).padding(1.dp), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        week.top.getOrElse(n) { emptyList() }.forEach { item ->
-                            Box(Modifier.clickable { onItem(item) }) { Chip(item, colors) }
-                        }
-                    }
+        val topH = top ?: topHeight(fullest)
+        if (topH > 0.dp) {
+            Row(Modifier.fillMaxWidth().padding(start = inset).height(topH)) {
+                cols.forEachIndexed { n, d ->
+                    TopCell(start + d * DAY, now, week.top.getOrElse(n) { emptyList() }, colors, onItem, Modifier.weight(1f).fillMaxHeight())
                 }
             }
         }
