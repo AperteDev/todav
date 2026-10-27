@@ -28,8 +28,6 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.IconToggleButton
 import androidx.compose.material.icons.filled.Refresh
@@ -699,7 +697,6 @@ private fun TaskItem(
             if (screen.stars && priorityColor(task.priority) != null) {
                 Box(Modifier.size(18.dp)) { StarIcon(task.priority) }
             }
-            if (pinnable(screen, task, row.depth)) Pin(model, task)
             // The options, also opened by a long press on the row.
             var options by remember { mutableStateOf(false) }
             Box {
@@ -760,21 +757,6 @@ private fun Meta(model: Main, task: TodavTask, row: TaskRow, now: Long) {
 
 /** Top-level rows of a list can be pinned, as on Linux (with pins shown). */
 private fun pinnable(screen: Screen, task: TodavTask, depth: Int) = screen.pins && depth == 0 && task.parentUid == null
-
-/** A row's pin, accented while pinned (in the Pinned group): a tap pins or unpins it. */
-@Composable
-private fun Pin(model: Main, task: TodavTask) {
-    val label = if (task.pinned) tr("Unpin") else tr("Pin")
-    Tip(label) {
-        IconToggleButton(task.pinned, { model.update(task.uid, TaskPatch(pinned = it)) }) {
-            Icon(
-                if (task.pinned) Icons.Default.PushPin else Icons.Outlined.PushPin,
-                label,
-                tint = if (task.pinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
 
 /**
  * A row's options: its priority as a row of stars (the current one marked), then Edit, Add
