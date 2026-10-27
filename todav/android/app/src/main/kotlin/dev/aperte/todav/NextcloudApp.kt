@@ -134,6 +134,7 @@ object NextcloudApp {
                 service?.let { return it }
                 val latch = CountDownLatch(1)
                 bound = latch
+                runCatching { context.unbindService(connection) }
                 val intent = Intent().setComponent(ComponentName(pkg, "com.owncloud.android.services.AccountManagerService"))
                 if (!context.bindService(intent, connection, Context.BIND_AUTO_CREATE)) {
                     throw IllegalStateException(tr("The Nextcloud app is not installed"))
@@ -144,7 +145,19 @@ object NextcloudApp {
         }
 
         override fun send(method: String, url: String, headers: List<HttpHeader>, body: String): HttpReply {
-            val r = request(method, url, headers.map { it.name to it.value }, body)
+            val h = headers.map { it.name to it.value }
+            val r = try {
+                try {
+                    request(method, url, h, body)
+                } catch (_: android.os.DeadObjectException) {
+                    // The app's process went away (Android stopped it): bind again, once.
+                    service = null
+                    request(method, url, h, body)
+                }
+            } catch (e: Exception) {
+                // A plain reason for the sync's message, not the exception's stack.
+                throw dev.aperte.todav.core.TodavException.Net(e.message ?: e.javaClass.simpleName)
+            }
             return HttpReply(r.status.toUShort(), r.headers.map { HttpHeader(it.key, it.value) }, r.body)
         }
 
