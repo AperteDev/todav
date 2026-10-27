@@ -146,6 +146,8 @@ fun AccountChoice(model: Main, welcome: Boolean) {
             runCatching { model.core.addAccount(AccountKind.SYSTEM, "", "", "") }.onSuccess { id ->
                 model.todav.changed()
                 model.todav.systemCalendarsChanged()
+                // They hold events only: the calendar behind the page.
+                model.show(dev.aperte.todav.View.CALENDAR)
                 model.back()
                 model.open(Dest.Account(id))
             }
@@ -171,7 +173,7 @@ fun AccountChoice(model: Main, welcome: Boolean) {
                     if (!welcome) model.back()
                 }
             }
-            if (!welcome && model.core.accounts().none { it.kind == AccountKind.SYSTEM }) {
+            if (model.core.accounts().none { it.kind == AccountKind.SYSTEM }) {
                 Choice(
                     tr("System Calendars"),
                     tr("Calendars of the accounts on this device, such as Google, shown read-only"),

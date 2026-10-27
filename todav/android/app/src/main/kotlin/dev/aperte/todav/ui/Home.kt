@@ -124,15 +124,19 @@ fun Home(model: Main) {
             page = false
             model.show(v)
         }
-        // The add button, for what is shown: a task or an event.
+        // The add button, for what is shown: a task or an event; none with nowhere to put it (only
+        // the system's calendars, say).
         val add = { if (view == View.TASKS) newTask(model) else newEvent(model) }
+        val canAdd = remember(screen, view) {
+            if (view == View.TASKS) model.core.lists().any { it.writable } else model.core.calendars().any { it.writable }
+        }
         BackHandler(enabled = !wide && page) { page = false }
         Scaffold(
             snackbarHost = { SnackbarHost(snackbar) },
-            bottomBar = { if (!wide) Switcher(view, page, menu, show, add) },
+            bottomBar = { if (!wide) Switcher(view, page, menu, show, add.takeIf { canAdd }) },
             floatingActionButton = {
                 // Not over the calendar's "To Plan" sheet, which is under this layer.
-                if (wide && !(toPlan && view == View.CALENDAR)) Box(Modifier.navigationBarsPadding()) { AddButton(addLabel(view), raised = true, onClick = add) }
+                if (wide && canAdd && !(toPlan && view == View.CALENDAR)) Box(Modifier.navigationBarsPadding()) { AddButton(addLabel(view), raised = true, onClick = add) }
             },
             contentWindowInsets = WindowInsets(0),
         ) { padding ->
@@ -200,7 +204,7 @@ private fun menuLabel() = tr("Lists")
  * button at the end (as a bottom app bar has it), to take less room.
  */
 @Composable
-private fun Switcher(view: View, page: Boolean, onMenu: () -> Unit, onShow: (View) -> Unit, onAdd: () -> Unit) {
+private fun Switcher(view: View, page: Boolean, onMenu: () -> Unit, onShow: (View) -> Unit, onAdd: (() -> Unit)?) {
     NavigationBar {
         NavigationBarItem(
             selected = page,
@@ -220,7 +224,7 @@ private fun Switcher(view: View, page: Boolean, onMenu: () -> Unit, onShow: (Vie
             icon = { Icon(if (view == View.CALENDAR) Icons.Filled.CalendarMonth else Icons.Outlined.CalendarMonth, null) },
             label = { Text(tr("Calendar")) },
         )
-        Box(Modifier.padding(end = 12.dp)) { AddButton(addLabel(view), raised = false, onClick = onAdd) }
+        if (onAdd != null) Box(Modifier.padding(end = 12.dp)) { AddButton(addLabel(view), raised = false, onClick = onAdd) }
     }
 }
 
@@ -428,13 +432,16 @@ private fun Sidebar(model: Main, screen: Screen, view: View, modifier: Modifier,
         }
         item(key = "end") {
             HorizontalDivider(Modifier.padding(vertical = 8.dp, horizontal = 28.dp))
-            NavigationDrawerItem(
-                label = { Text(if (view == View.CALENDAR) tr("New Calendar…") else tr("New List…")) },
-                icon = { Icon(Icons.Outlined.Add, null) },
-                selected = false,
-                onClick = { newList = true },
-                modifier = Modifier.padding(horizontal = 12.dp),
-            )
+            // Nowhere to make one (only the system's calendars, say): not offered.
+            if (model.core.places().isNotEmpty()) {
+                NavigationDrawerItem(
+                    label = { Text(if (view == View.CALENDAR) tr("New Calendar…") else tr("New List…")) },
+                    icon = { Icon(Icons.Outlined.Add, null) },
+                    selected = false,
+                    onClick = { newList = true },
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
+            }
             NavigationDrawerItem(
                 label = { Text(tr("Settings")) },
                 icon = { Icon(Icons.Outlined.Settings, null) },
