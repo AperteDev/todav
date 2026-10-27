@@ -557,3 +557,121 @@ fn events_sync_with_their_zone_and_recurrence() {
             .all(|e| e.list_href != f.href)
     );
 }
+
+/// What the Nextcloud Android app's single sign-on lets through: no REPORT, MKCALENDAR or
+/// PROPPATCH (refused as the app does, before the server), PROPFIND always at depth 1.
+struct LikeTheNextcloudApp {
+    agent: ureq::Agent,
+    auth: String,
+}
+
+impl todav_core::caldav::Transport for LikeTheNextcloudApp {
+    fn send(
+        &self,
+        method: &str,
+        url: &str,
+        headers: &[(&str, &str)],
+        body: &str,
+    ) -> todav_core::Result<todav_core::caldav::HttpResponse> {
+        if matches!(method, "REPORT" | "MKCALENDAR" | "PROPPATCH") {
+            return Err(todav_core::Error::Net(format!("{method} not supported")));
+        }
+        let mut b = ureq::http::Request::builder()
+            .method(method)
+            .uri(url)
+            .header("Authorization", &self.auth);
+        for (k, v) in headers {
+            if !k.eq_ignore_ascii_case("depth") {
+                b = b.header(*k, *v);
+            }
+        }
+        if method == "PROPFIND" {
+            b = b.header("Depth", "1");
+        }
+        let req = b.body(body.to_string()).unwrap();
+        let mut r = self
+            .agent
+            .run(req)
+            .map_err(|e| todav_core::Error::Net(e.to_string()))?;
+        let header = |n: &str| {
+            r.headers()
+                .get(n)
+                .and_then(|v| v.to_str().ok())
+                .map(str::to_string)
+        };
+        let (etag, location) = (header("etag"), header("location"));
+        Ok(todav_core::caldav::HttpResponse {
+            status: r.status().as_u16(),
+            etag,
+            location,
+            body: r.body_mut().read_to_string().unwrap(),
+        })
+    }
+}
+
+#[test]
+fn a_device_through_the_nextcloud_app_syncs_without_report() {
+    let f = Fixture::new("sso");
+    let (url, user, pass) = env();
+    let dir = std::env::temp_dir().join(format!("todav-it-sso-c-{}", now()));
+    let c = Client::open(dir.to_string_lossy().into()).unwrap();
+    let id = c
+        .add_account(
+            AccountKind::Nextcloud,
+            url.clone(),
+            user.clone(),
+            "nextcloud-app:Test".into(),
+        )
+        .unwrap();
+    let agent = ureq::Agent::config_builder()
+        .allow_non_standard_methods(true)
+        .http_status_as_error(false)
+        .build()
+        .new_agent();
+    let auth = format!(
+        "Basic {}",
+        todav_core::b64encode(format!("{user}:{pass}").as_bytes(), false)
+    );
+    c.connect_transport(id, std::sync::Arc::new(LikeTheNextcloudApp { agent, auth }))
+        .unwrap();
+    assert!(!c.can_manage_lists(id));
+    c.sync().into_result().unwrap();
+    assert!(c.lists().iter().any(|l| l.href == f.href), "lists found");
+
+    // Added on a normal device: arrives.
+    let t =
+        f.a.add_task(f.href.clone(), "From a".into(), None, None, false)
+            .unwrap();
+    f.a.sync().into_result().unwrap();
+    c.sync().into_result().unwrap();
+    assert_eq!(c.task(t.uid.clone()).unwrap().summary, "From a");
+
+    // Edited here: goes up; nothing changed meanwhile is fetched again.
+    c.update_task(
+        t.uid.clone(),
+        todav_core::TaskPatch {
+            summary: Some("Edited through the app".into()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    c.sync().into_result().unwrap();
+    f.a.sync().into_result().unwrap();
+    assert_eq!(
+        f.a.task(t.uid.clone()).unwrap().summary,
+        "Edited through the app"
+    );
+
+    // Deleted elsewhere: gone here too.
+    f.a.delete_task(t.uid.clone()).unwrap();
+    f.a.sync().into_result().unwrap();
+    c.sync().into_result().unwrap();
+    assert!(c.task(t.uid).is_none());
+
+    // Lists cannot be made through it.
+    assert!(matches!(
+        c.create_list(id, "it-no".into(), "#0082C9".into(), false),
+        Err(todav_core::Error::Unsupported)
+    ));
+    let _ = std::fs::remove_dir_all(dir);
+}

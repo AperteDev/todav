@@ -4,6 +4,7 @@ use crate::json::Json;
 use crate::{Error, Result, ServerInfo};
 use quick_xml::events::Event;
 use quick_xml::name::ResolveResult;
+use std::collections::HashMap;
 
 pub const DAV: &str = "DAV:";
 pub const CALDAV: &str = "urn:ietf:params:xml:ns:caldav";
@@ -204,11 +205,31 @@ pub struct HttpResponse {
     pub body: String,
 }
 
+/// Sends requests for an account whose connection the front-end makes: the Nextcloud Android
+/// app's single sign-on, which authenticates them itself. It passes GET, POST, PUT, DELETE,
+/// PATCH, PROPFIND (always Depth 1), MKCOL (without a body) and HEAD only, so a `Dav` over one
+/// is `limited`: it syncs by ETags instead of REPORT and cannot create or change calendars.
+pub trait Transport: Send + Sync {
+    /// `url` is the full URL; the response's `etag` and `location` are its headers'. A 401 is
+    /// returned as it is (the core makes it `Error::Auth`).
+    fn send(
+        &self,
+        method: &str,
+        url: &str,
+        headers: &[(&str, &str)],
+        body: &str,
+    ) -> Result<HttpResponse>;
+}
+
+enum Http {
+    Agent { agent: ureq::Agent, auth: String },
+    Transport(std::sync::Arc<dyn Transport>),
+}
+
 pub struct Dav {
-    agent: ureq::Agent,
+    http: Http,
     origin: String,
     root: String,
-    auth: String,
 }
 
 #[derive(Debug, Clone)]
@@ -247,13 +268,6 @@ pub fn origin(url: &str) -> String {
 impl Dav {
     /// `url` is the Nextcloud base (https://cloud.example) or a full DAV root.
     pub fn new(url: &str, user: &str, password: &str) -> Dav {
-        let url = url.trim_end_matches('/');
-        let root = if url.contains("/remote.php/") {
-            format!("{url}/")
-        } else {
-            format!("{url}/remote.php/dav/")
-        };
-        let origin = origin(url);
         let agent = ureq::Agent::config_builder()
             .allow_non_standard_methods(true)
             .user_agent("Todav")
@@ -262,15 +276,35 @@ impl Dav {
             .timeout_connect(Some(CONNECT_TIMEOUT))
             .build()
             .new_agent();
+        let auth = format!(
+            "Basic {}",
+            crate::b64encode(format!("{user}:{password}").as_bytes(), false)
+        );
+        Dav::with(url, Http::Agent { agent, auth })
+    }
+
+    /// The server at `url`, reached through the front-end's `transport`.
+    pub fn with_transport(url: &str, transport: std::sync::Arc<dyn Transport>) -> Dav {
+        Dav::with(url, Http::Transport(transport))
+    }
+
+    fn with(url: &str, http: Http) -> Dav {
+        let url = url.trim_end_matches('/');
+        let root = if url.contains("/remote.php/") {
+            format!("{url}/")
+        } else {
+            format!("{url}/remote.php/dav/")
+        };
         Dav {
-            agent,
-            origin,
+            http,
+            origin: origin(url),
             root,
-            auth: format!(
-                "Basic {}",
-                crate::b64encode(format!("{user}:{password}").as_bytes(), false)
-            ),
         }
+    }
+
+    /// Reached through a `Transport`: no REPORT, MKCALENDAR or PROPPATCH.
+    pub fn limited(&self) -> bool {
+        matches!(self.http, Http::Transport(_))
     }
 
     pub fn url(&self, href: &str) -> String {
@@ -303,63 +337,33 @@ impl Dav {
         headers: &[(&str, &str)],
         body: &str,
     ) -> Result<HttpResponse> {
-        let req = || {
-            let mut b = ureq::http::Request::builder()
-                .method(method)
-                .uri(self.url(href))
-                .header("Authorization", &self.auth);
-            if !body.is_empty()
-                && !headers
-                    .iter()
-                    .any(|(k, _)| k.eq_ignore_ascii_case("content-type"))
-            {
-                b = b.header("Content-Type", "application/xml; charset=utf-8");
-            }
-            for (k, v) in headers {
-                // Also one stored before ETags were made strong (below).
-                let v = if k.eq_ignore_ascii_case("if-match") {
-                    strong(v)
-                } else {
-                    v
-                };
-                b = b.header(*k, v);
-            }
-            b.body(body.to_string())
-                .map_err(|e| Error::Net(e.to_string()))
+        let mut h: Vec<(&str, &str)> = Vec::with_capacity(headers.len() + 1);
+        if !body.is_empty()
+            && !headers
+                .iter()
+                .any(|(k, _)| k.eq_ignore_ascii_case("content-type"))
+        {
+            h.push(("Content-Type", "application/xml; charset=utf-8"));
+        }
+        for &(k, v) in headers {
+            // Also one stored before ETags were made strong (below).
+            let v = if k.eq_ignore_ascii_case("if-match") {
+                strong(v)
+            } else {
+                v
+            };
+            h.push((k, v));
+        }
+        let url = self.url(href);
+        let mut r = match &self.http {
+            Http::Agent { agent, auth } => send(agent, auth, method, &url, &h, body)?,
+            Http::Transport(t) => t.send(method, &url, &h, body)?,
         };
-        // A connection the server never answers is tried again rather than waited out (until
-        // the global timeout): nothing was sent on it yet.
-        let mut tries = 0;
-        let mut resp = loop {
-            match self.agent.run(req()?) {
-                Err(ureq::Error::Timeout(ureq::Timeout::Connect)) if tries < CONNECT_TRIES => {
-                    tries += 1
-                }
-                r => break r.map_err(|e| Error::Net(e.to_string()))?,
-            }
-        };
-        let header = |n: &str| {
-            resp.headers()
-                .get(n)
-                .and_then(|v| v.to_str().ok())
-                .map(str::to_string)
-        };
-        let etag = header("etag").map(|e| strong(&e).to_string());
-        let location = header("location");
-        let status = resp.status().as_u16();
-        let body = resp
-            .body_mut()
-            .read_to_string()
-            .map_err(|e| Error::Net(e.to_string()))?;
-        if status == 401 {
+        if r.status == 401 {
             return Err(Error::Auth);
         }
-        Ok(HttpResponse {
-            status,
-            etag,
-            location,
-            body,
-        })
+        r.etag = r.etag.map(|e| strong(&e).to_string());
+        Ok(r)
     }
 
     /// What `status.php` at the server's base (before `/remote.php/`) says.
@@ -383,9 +387,18 @@ impl Dav {
         Ok(multistatus(&r.body)?.0)
     }
 
+    /// The response for `href` itself among a PROPFIND's (a limited `Dav`'s are Depth 1).
+    fn own<'a>(&self, resps: &'a [DavResponse], href: &str) -> Option<&'a DavResponse> {
+        let me = self.path(href).trim_end_matches('/');
+        resps
+            .iter()
+            .find(|r| self.path(&r.href).trim_end_matches('/') == me)
+            .or(resps.first())
+    }
+
     pub fn principal(&self) -> Result<String> {
         let p = self.propfind(&self.root, "0", "<d:current-user-principal/>")?;
-        p.first()
+        self.own(&p, &self.root)
             .and_then(|r| r.props.find_text(DAV, "href"))
             .ok_or_else(|| Error::Parse("no current-user-principal".into()))
     }
@@ -394,7 +407,7 @@ impl Dav {
     pub fn home(&self) -> Result<String> {
         let principal = self.principal()?;
         let p = self.propfind(&principal, "0", "<c:calendar-home-set/>")?;
-        p.first()
+        self.own(&p, &principal)
             .and_then(|r| r.props.find_text(DAV, "href"))
             .ok_or_else(|| Error::Parse("no calendar-home-set".into()))
     }
@@ -483,6 +496,52 @@ impl Dav {
         })
     }
 
+    /// `sync_collection` for a limited `Dav` (no REPORT): the members' ETags by PROPFIND, a GET
+    /// of each one not in `known` (href → ETag, empty for a full sync) with that ETag, and the
+    /// known ones no longer there as removed. The token is the collection's ctag: while it
+    /// stays the same nothing is listed.
+    pub fn sync_by_etags(
+        &self,
+        href: &str,
+        token: &str,
+        known: &HashMap<String, String>,
+    ) -> Result<SyncResult> {
+        let resps = self.propfind(href, "1", "<d:getetag/><cs:getctag/>")?;
+        let me = self.path(href).trim_end_matches('/');
+        let own = |r: &&DavResponse| r.href.trim_end_matches('/') == me;
+        let ctag = resps
+            .iter()
+            .find(own)
+            .and_then(|r| r.props.find_text(CS, "getctag"));
+        let new_token = format!("ctag:{}", ctag.as_deref().unwrap_or_default());
+        if ctag.is_some() && new_token == token {
+            return Ok(SyncResult::Changes {
+                token: new_token,
+                changed: Vec::new(),
+                removed: Vec::new(),
+            });
+        }
+        let listed: Vec<(String, String)> = resps
+            .into_iter()
+            .filter(|r| !own(&r) && r.status == 200 && r.href.ends_with(".ics"))
+            .filter_map(|r| Some((r.props.find_text(DAV, "getetag")?, r.href)))
+            .map(|(etag, href)| (href, etag))
+            .collect();
+        let (fetch, removed) = etag_diff(known, &listed);
+        let mut changed = Vec::new();
+        for (h, etag) in fetch {
+            // Gone meanwhile: the next listing says so.
+            if let Some((got, data)) = self.get(&h)? {
+                changed.push((h, got.unwrap_or(etag), data));
+            }
+        }
+        Ok(SyncResult::Changes {
+            token: new_token,
+            changed,
+            removed,
+        })
+    }
+
     /// PUT with `If-Match` (update) or `If-None-Match: *` (create). Returns the new ETag if the server sent one.
     /// `dont_notify`: our own push registration URL, so the server does not echo this change back to us.
     pub fn put(
@@ -524,6 +583,9 @@ impl Dav {
 
     /// Create calendar `href` for tasks, or for events (`events`); which it holds stays.
     pub fn mkcalendar(&self, href: &str, name: &str, color: &str, events: bool) -> Result<()> {
+        if self.limited() {
+            return Err(Error::Unsupported);
+        }
         let comp = if events { "VEVENT" } else { "VTODO" };
         let body = format!(
             r#"<?xml version="1.0" encoding="utf-8"?><c:mkcalendar xmlns:d="DAV:" xmlns:c="{CALDAV}" xmlns:a="{APPLE}"><d:set><d:prop>{}<c:supported-calendar-component-set><c:comp name="{comp}"/></c:supported-calendar-component-set></d:prop></d:set></c:mkcalendar>"#,
@@ -538,6 +600,9 @@ impl Dav {
 
     /// Rename and recolour calendar `href`.
     pub fn proppatch(&self, href: &str, name: &str, color: &str) -> Result<()> {
+        if self.limited() {
+            return Err(Error::Unsupported);
+        }
         let body = format!(
             r#"<?xml version="1.0" encoding="utf-8"?><d:propertyupdate xmlns:d="DAV:" xmlns:a="{APPLE}"><d:set><d:prop>{}</d:prop></d:set></d:propertyupdate>"#,
             name_and_color(name, color)
@@ -571,6 +636,76 @@ impl Dav {
             s => Err(Error::Http(s, r.body)),
         }
     }
+}
+
+/// Which of the `listed` (href, ETag) members to fetch (new, or another ETag than the `known`
+/// one), and which known hrefs are no longer listed.
+fn etag_diff(
+    known: &HashMap<String, String>,
+    listed: &[(String, String)],
+) -> (Vec<(String, String)>, Vec<String>) {
+    let fetch = listed
+        .iter()
+        .filter(|(h, e)| known.get(h).is_none_or(|k| strong(k) != strong(e)))
+        .cloned()
+        .collect();
+    let removed = known
+        .keys()
+        .filter(|h| !listed.iter().any(|(l, _)| l == *h))
+        .cloned()
+        .collect();
+    (fetch, removed)
+}
+
+/// One request with ureq and Basic auth.
+fn send(
+    agent: &ureq::Agent,
+    auth: &str,
+    method: &str,
+    url: &str,
+    headers: &[(&str, &str)],
+    body: &str,
+) -> Result<HttpResponse> {
+    let req = || {
+        let mut b = ureq::http::Request::builder()
+            .method(method)
+            .uri(url)
+            .header("Authorization", auth);
+        for (k, v) in headers {
+            b = b.header(*k, *v);
+        }
+        b.body(body.to_string())
+            .map_err(|e| Error::Net(e.to_string()))
+    };
+    // A connection the server never answers is tried again rather than waited out (until
+    // the global timeout): nothing was sent on it yet.
+    let mut tries = 0;
+    let mut resp = loop {
+        match agent.run(req()?) {
+            Err(ureq::Error::Timeout(ureq::Timeout::Connect)) if tries < CONNECT_TRIES => {
+                tries += 1
+            }
+            r => break r.map_err(|e| Error::Net(e.to_string()))?,
+        }
+    };
+    let header = |n: &str| {
+        resp.headers()
+            .get(n)
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_string)
+    };
+    let (etag, location) = (header("etag"), header("location"));
+    let status = resp.status().as_u16();
+    let body = resp
+        .body_mut()
+        .read_to_string()
+        .map_err(|e| Error::Net(e.to_string()))?;
+    Ok(HttpResponse {
+        status,
+        etag,
+        location,
+        body,
+    })
 }
 
 /// A proxy that compresses a response marks its ETag weak ("W/"), and If-Match never matches a
@@ -664,5 +799,28 @@ mod tests {
         assert_eq!(crate::b64decode("_-8").unwrap(), [0xff, 0xef]);
         assert_eq!(percent_encode_path("/a b/ż.ics"), "/a%20b/%C5%BC.ics");
         assert_eq!(percent_decode("/a%20b/%C5%BC.ics"), "/a b/ż.ics");
+    }
+
+    #[test]
+    fn etag_diff_fetches_new_and_changed_and_drops_gone() {
+        let s = |a: &str, b: &str| (a.to_string(), b.to_string());
+        let known: HashMap<String, String> = [
+            s("/c/same.ics", "\"1\""),
+            s("/c/edited.ics", "\"1\""),
+            s("/c/gone.ics", "\"1\""),
+        ]
+        .into();
+        let listed = [
+            s("/c/same.ics", "W/\"1\""),
+            s("/c/edited.ics", "\"2\""),
+            s("/c/new.ics", "\"1\""),
+        ];
+        let (fetch, removed) = etag_diff(&known, &listed);
+        assert_eq!(fetch, [listed[1].clone(), listed[2].clone()]);
+        assert_eq!(removed, ["/c/gone.ics"]);
+        // A full sync knows nothing: everything is fetched, nothing removed.
+        let (fetch, removed) = etag_diff(&HashMap::new(), &listed);
+        assert_eq!(fetch.len(), 3);
+        assert!(removed.is_empty());
     }
 }

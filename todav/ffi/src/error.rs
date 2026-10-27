@@ -39,6 +39,9 @@ pub enum TodavError {
     },
     /// The account has edits not on the server yet and is not connected to upload them.
     NotUploaded,
+    /// The account's connection cannot do it: one through the Nextcloud app cannot create,
+    /// rename or recolour a calendar.
+    Unsupported,
 }
 
 impl std::fmt::Display for TodavError {
@@ -57,11 +60,19 @@ impl std::fmt::Display for TodavError {
             TodavError::SavePassword { reason } => write!(f, "cannot save password: {reason}"),
             TodavError::Upload { reason } => write!(f, "cannot upload pending changes: {reason}"),
             TodavError::NotUploaded => write!(f, "changes not uploaded yet"),
+            TodavError::Unsupported => write!(f, "not possible with this account's connection"),
         }
     }
 }
 
 impl std::error::Error for TodavError {}
+
+/// A front-end's callback (a `Transport`) failing in a way it did not declare.
+impl From<uniffi::UnexpectedUniFFICallbackError> for TodavError {
+    fn from(e: uniffi::UnexpectedUniFFICallbackError) -> Self {
+        TodavError::Net { reason: e.reason }
+    }
+}
 
 impl From<todav_core::Error> for TodavError {
     fn from(e: todav_core::Error) -> Self {
@@ -83,6 +94,7 @@ impl From<todav_core::Error> for TodavError {
             E::Net(reason) => TodavError::Net { reason },
             E::Parse(reason) => TodavError::Parse { reason },
             E::Db(reason) => TodavError::Db { reason },
+            E::Unsupported => TodavError::Unsupported,
         }
     }
 }

@@ -81,6 +81,12 @@ impl Client {
     ) -> Result<Vec<PushRegistration>> {
         let _guard = self.push_lock.lock().unwrap();
         let dav = self.dav(account)?;
+        // Through the Nextcloud Android app every request carries a query string ("?" at
+        // least), and Nextcloud answers a registration POST with one 404: such accounts get
+        // their changes by the periodic syncs.
+        if dav.limited() {
+            return Ok(Vec::new());
+        }
         let lifetime = (expires_in_secs as i64).min(MAX_EXPIRY);
         let (public, auth) = self.push_keys()?;
         let lists = {
