@@ -24,13 +24,9 @@ stop:
 wipe:
 	./sdk.sh wipe
 
-# The foldable emulator closed, on its cover screen (the swipe keeps the app open, as Android asks
-# after folding), or open.
+# The foldable emulator closed, apps going on on its cover screen, or open.
 fold:
-	adb shell input keyevent KEYCODE_WAKEUP
 	adb emu fold
-	sleep 2
-	adb shell input swipe 530 2100 530 700 200
 
 unfold:
 	adb emu unfold

@@ -109,10 +109,10 @@
   `todav/android/gradle.properties` (`todav.platform`, `todav.buildTools`, `todav.ndk`,
   `todav.image`), which the build scripts read too. Change a version there only, then remove the
   old package (`sdkmanager --uninstall …`) so copies don't pile up; the SDK is several GB.
-- The emulator image (Android 16 with Play Store) is one Noogle's AVDs use too, so both share one
-  copy; keep the Android 15 one, Noogle's default. Noogle may root its images (Magisk); the
-  `todav` AVD may then boot with Magisk, which doesn't matter for Todav. Android 15's images
-  don't fold a foldable AVD (no device states), hence 16.
+- The emulator is the one for developing apps (Todav; Notav later too), on a stock image: Android
+  17 with Google APIs (Chrome, `adb root`), one no project that modifies the system uses. Noogle
+  patches its images (Magisk) and keeps its own AVDs and image packages; leave those alone, even
+  when `todav.image` changes. Android 15's images don't fold a foldable AVD (no device states).
 - System packages it needs (sdk.sh names the missing ones, it installs none): `rustup` (stable;
   sdk.sh adds the Android targets), `cargo-ndk`, `android-tools` (adb: the SDK's adb is a link to
   it, as two adb versions drop the emulator), `jdk21-openjdk` (Gradle runs on JDK 21 through
@@ -121,6 +121,9 @@
   the Pixel 9 Pro Fold profile with the Honor Magic V5's screens, so one AVD tries both layouts.
   Open: 2172×2352 px, 827 dp wide (the navigation rail and the sidebar pane); `make fold`: its
   cover screen, 1060×2376 px, 404 dp wide (a phone: the navigation bar); `make unfold` opens it.
+  It stays on and unlocked (no screen timeout, no lock screen) and the app stays open across a
+  fold; `sdk.sh start` sets that up. A change whose layout differs by width (bars, panes, sheets,
+  dialogs, the calendar's grids) is checked both folded and open; anything else on one is enough.
   Drive it with adb: `adb shell input tap X Y` (pixels of the screen in use), `adb shell input
   text …`, `adb shell input keyevent 66` (Enter); `make logs` for the app's log. Screenshots
   need the display: `adb exec-out screencap -d ID -p > shot.png`, ID from `adb shell dumpsys

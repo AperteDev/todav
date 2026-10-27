@@ -8,9 +8,10 @@
 #
 # One SDK for every project: ~/Android/Sdk (or $ANDROID_HOME), as Android Studio and Noogle's
 # scripts/setup-avd.sh use it. It gets exactly the versions gradle.properties names, so the build
-# never downloads copies of its own; the emulator's image is Noogle's default, so one copy (5 GB)
-# serves both. Nothing system-wide is installed: missing tools are named with the command that
-# installs them.
+# never downloads copies of its own. The emulator is the one for developing apps (Todav, later
+# Notav too), on a stock image no system-modding project uses: Noogle patches its own images
+# (Magisk) and keeps its own AVDs. Nothing system-wide is installed: missing tools are named with
+# the command that installs them.
 #
 # adb: the SDK's platform-tools stay installed (the SDK and Gradle check for them), but their adb
 # is a link to android-tools' /usr/bin/adb. Two adb versions keep restarting the server and drop
@@ -120,14 +121,39 @@ start() {
 		# Its own session, so it outlives the task that started it.
 		setsid nohup emulator -avd "$avd" -port "$port" -no-snapshot-save -no-metrics \
 			-crash-report-mode never "$@" > "$log" 2>&1 &
+		booted
+		always_on
 	fi
+	booted
+	echo "Booted: $ANDROID_SERIAL"
+}
+
+booted() {
 	until [ "$(adb shell getprop sys.boot_completed 2> /dev/null | tr -d '\r')" = 1 ]; do
 		running || { echo "The emulator exited, see $log"; exit 1; }
 		sleep 2
 	done
-	# No lock screen, which folding would show, its swipe asleep after a few seconds.
+}
+
+# Always on and unlocked, as a phone in use: no screen timeout, no lock screen, apps kept open on
+# folding. The last is the device's fold states, which the emulator writes into /data on the first
+# boot: closed without "sleep" (Android's setting for it, "Continue using apps on fold", is off in
+# the emulator). Read as Android's framework starts, so it is restarted after that change (`adb
+# root` works on Google APIs images).
+always_on() {
+	adb shell settings put system screen_off_timeout 2147483647
 	adb shell locksettings set-disabled true > /dev/null
-	echo "Booted: $ANDROID_SERIAL"
+	adb root > /dev/null
+	adb wait-for-device
+	local states=/data/system/devicestate/device_state_configuration.xml
+	if adb shell grep -q TRIGGER_SLEEP "$states"; then
+		adb shell "sed -i /TRIGGER_SLEEP/d $states && sync"
+		echo "Restarting Android's framework..."
+		adb shell 'setprop sys.boot_completed 0; stop; start'
+		booted
+	fi
+	adb unroot > /dev/null
+	adb wait-for-device
 }
 
 stop() {
