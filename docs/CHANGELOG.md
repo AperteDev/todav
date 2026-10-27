@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   into hours of the week; search; settings and accounts; reminders; push through UnifiedPush; a
   home-screen widget; "New Task" from the launcher; adding shared text as a task; keyboard
   shortcuts.
+- Android: the launcher icon shows the whole calendar inside its shape, and the app opens on the
+  icon over the brand colour, light or dark with the system.
 - Android: About Todav in Settings has a Support section with the Ko-fi, GitHub Sponsors and
   Liberapay links, as About on Linux.
 - Android: an account of the Nextcloud app on the device fills in the server and login name

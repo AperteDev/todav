@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Compose draws everything; this is the window until it does. -->
-    <style name="Theme.Todav" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.Todav" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- The splash screen (Android 12+): the whole icon on the brand colour, not the
+             launcher's circle of it on white. -->
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/splash_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@drawable/ic_launcher_foreground</item>
+    </style>
 </resources>
