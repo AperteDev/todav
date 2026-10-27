@@ -25,6 +25,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.material3.ScaffoldDefaults
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -32,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -69,11 +75,14 @@ private fun unit(freq: Freq, n: Long) = when (freq) {
 
 /**
  * A new event, or an occurrence of one to change: what the Linux event dialog has. Changing or
- * deleting an occurrence of a repeating event asks which occurrences it is for.
+ * deleting an occurrence of a repeating event asks which occurrences it is for. In a details
+ * sheet (`sheet`), Cancel goes back to the details, Save and Delete close it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EventPage(model: Main, dest: Dest.EventEdit) {
+fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = null) {
+    val cancel = { sheet?.collapse() ?: model.back() }
+    val done = { sheet?.close() ?: model.back() }
     val core = model.core
     // The occurrence edited: the one starting at `dest.start` (events() expands the series).
     val ev: Event? = remember(dest) {
@@ -171,7 +180,7 @@ fun EventPage(model: Main, dest: Dest.EventEdit) {
                     core.updateEvent(list, uid, null, Scope.ALL, rest)
                 }
             }
-            model.back()
+            done()
             return
         }
         val apply = { scope: Scope ->
@@ -179,27 +188,32 @@ fun EventPage(model: Main, dest: Dest.EventEdit) {
                 if (!nothing) core.updateEvent(ev.listHref, ev.uid, ev.recurrenceId, scope, patch)
                 if (moved) core.moveEvent(ev.listHref, ev.uid, list)
             }
-            model.back()
+            done()
         }
         // How a series repeats, or which calendar it is in, is about all of it.
         if (ev.recurring && !nothing && !repeatChanged && !moved) askScope = apply else apply(Scope.ALL)
     }
 
     BackHandler(enabled = changed) { discard = true }
+    sheet?.let { LaunchedEffect(changed) { it.locked = changed } }
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(if (ev == null) tr("New Event") else tr("Event")) },
                 navigationIcon = {
                     Tip(tr("Cancel")) {
-                        IconButton(onClick = { if (changed) discard = true else model.back() }) {
+                        IconButton(onClick = { if (changed) discard = true else cancel() }) {
                             Icon(Icons.Default.Close, tr("Cancel"))
                         }
                     }
                 },
                 actions = { TextButton(onClick = ::save, enabled = calendar != null) { Text(tr("Save")) } },
+                windowInsets = if (sheet != null) WindowInsets(0) else TopAppBarDefaults.windowInsets,
+                colors = if (sheet != null) TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent) else TopAppBarDefaults.topAppBarColors(),
             )
         },
+        containerColor = if (sheet != null) Color.Transparent else MaterialTheme.colorScheme.background,
+        contentWindowInsets = if (sheet != null) WindowInsets.navigationBars else ScaffoldDefaults.contentWindowInsets,
     ) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()),
@@ -313,7 +327,7 @@ fun EventPage(model: Main, dest: Dest.EventEdit) {
                 model.synced()
                 model.messages.tryEmit(tr("“{title}” deleted").replace("{title}", ev.summary) to core.lastChange())
             }
-            model.back()
+            done()
         }
     }
     if (discard) {
@@ -323,7 +337,8 @@ fun EventPage(model: Main, dest: Dest.EventEdit) {
             confirmButton = {
                 TextButton(onClick = {
                     discard = false
-                    model.back()
+                    sheet?.locked = false
+                    cancel()
                 }) { Text(tr("Discard")) }
             },
             dismissButton = { TextButton(onClick = { discard = false }) { Text(tr("Keep Editing")) } },

@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -86,9 +85,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
@@ -1226,9 +1223,9 @@ private fun PlanRow(t: TodavTask, colors: Map<String, String>, now: Long, onClic
 /**
  * An event or a task, as the Linux app's details popover: its title (edited in place), when,
  * where, its calendar or list, notes, Edit and Delete, then its tasks (an event's) or subtasks (a
- * task's) with a field adding one. Opened half way; pulled all the way up, it opens the edit page.
+ * task's) with a field adding one. As tall as that; pulled all the way up (or by Edit…), the
+ * same sheet becomes its editor.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
     val core = model.core
@@ -1239,26 +1236,19 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
     var renamed by remember { mutableStateOf<String?>(null) }
     val lists = load(initial = emptyMap<String, TodavList>()) { (core.calendars() + core.lists()).associateBy { it.href } }
     val colors = load(changes, initial = emptyMap<String, String>()) { core.colors() }
-    val edit = {
-        onDismiss()
-        when (item) {
-            is Item.Event -> item.event.let { e -> model.open(Dest.EventEdit(e.listHref, e.uid, e.recurrenceId, e.start, e.allDay)) }
-            is Item.Task -> model.open(Dest.Task(item.task.uid))
-        }
-    }
-    val sheet = rememberModalBottomSheetState()
-    // While a field is typed in, the sheet goes up to show it over the keyboard, not to the edit page.
-    var typing by remember { mutableStateOf(false) }
-    LaunchedEffect(typing) { if (typing) sheet.expand() }
-    LaunchedEffect(sheet) {
-        snapshotFlow { sheet.currentValue }.collect { if (it == SheetValue.Expanded && !typing) edit() }
-    }
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet) {
+    DetailsSheet(
+        onDismiss,
+        full = { sheet ->
+            when (item) {
+                is Item.Event -> item.event.let { e -> EventPage(model, Dest.EventEdit(e.listHref, e.uid, e.recurrenceId, e.start, e.allDay), sheet) }
+                is Item.Task -> TaskPage(model, item.task.uid, sheet)
+            }
+        },
+    ) { sheet ->
+        val edit = { sheet.expand() }
+        val dismiss = { sheet.close() }
         Column(
-            // As tall as the screen, so it opens half way and can be pulled up.
-            Modifier.fillMaxSize().padding(horizontal = 24.dp).padding(bottom = 24.dp).imePadding()
-                .onFocusChanged { typing = it.hasFocus }
-                .verticalScroll(rememberScrollState()),
+            Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             when (item) {
@@ -1314,12 +1304,12 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
                         OutlinedButton(onClick = edit) { Text(tr("Edit…")) }
                         dev.aperte.todav.core.unplan(t)?.let { patch ->
                             TextButton(onClick = {
-                                onDismiss()
+                                dismiss()
                                 model.update(t.uid, patch)
                             }) { Text(tr("Unplan")) }
                         }
                         TextButton(onClick = {
-                            onDismiss()
+                            dismiss()
                             model.delete(t)
                         }) { Text(tr("Delete"), color = MaterialTheme.colorScheme.error) }
                     }

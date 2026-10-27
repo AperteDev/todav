@@ -30,6 +30,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.material3.ScaffoldDefaults
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -75,16 +80,19 @@ import dev.aperte.todav.tr
 /**
  * A task's page: what the Linux app's edit dialog has (title, list, category, priority, event,
  * note, start, due date, reminders), its subtasks, and Delete. The fields are saved together
- * with Save (one undo step); subtasks change at once.
+ * with Save (one undo step); subtasks change at once. In a details sheet (`sheet`), Cancel goes
+ * back to the details, Save and Delete close it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TaskPage(model: Main, uid: String) {
+fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null) {
+    val cancel = { sheet?.collapse() ?: model.back() }
+    val done = { sheet?.close() ?: model.back() }
     // Read again on every change, for its subtasks and a sync that changed it.
     val changes by model.todav.changes.collectAsStateWithLifecycle()
     val task = remember(changes) { model.core.task(uid) }
     if (task == null) {
-        LaunchedEffect(Unit) { model.back() }
+        LaunchedEffect(Unit) { done() }
         return
     }
     val core = model.core
@@ -125,11 +133,12 @@ fun TaskPage(model: Main, uid: String) {
             core.updateTask(uid, patch)
             if (to != null) core.moveTask(uid, to)
         }
-        model.back()
+        done()
     }
 
-    val close = { if (changed) discard = true else model.back() }
+    val close = { if (changed) discard = true else cancel() }
     androidx.activity.compose.BackHandler(enabled = changed) { discard = true }
+    sheet?.let { LaunchedEffect(changed) { it.locked = changed } }
 
     Scaffold(
         topBar = {
@@ -137,8 +146,12 @@ fun TaskPage(model: Main, uid: String) {
                 title = { Text(tr("Edit Task")) },
                 navigationIcon = { Tip(tr("Cancel")) { IconButton(onClick = close) { Icon(Icons.Default.Close, tr("Cancel")) } } },
                 actions = { TextButton(onClick = ::save, enabled = summary.isNotBlank()) { Text(tr("Save")) } },
+                windowInsets = if (sheet != null) WindowInsets(0) else TopAppBarDefaults.windowInsets,
+                colors = if (sheet != null) TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent) else TopAppBarDefaults.topAppBarColors(),
             )
         },
+        containerColor = if (sheet != null) Color.Transparent else MaterialTheme.colorScheme.background,
+        contentWindowInsets = if (sheet != null) WindowInsets.navigationBars else ScaffoldDefaults.contentWindowInsets,
     ) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()),
@@ -238,7 +251,7 @@ fun TaskPage(model: Main, uid: String) {
                 TextButton(onClick = {
                     confirmDelete = false
                     model.delete(task)
-                    model.back()
+                    done()
                 }) { Text(tr("Delete"), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(tr("Cancel")) } },
@@ -251,7 +264,8 @@ fun TaskPage(model: Main, uid: String) {
             confirmButton = {
                 TextButton(onClick = {
                     discard = false
-                    model.back()
+                    sheet?.locked = false
+                    cancel()
                 }) { Text(tr("Discard")) }
             },
             dismissButton = { TextButton(onClick = { discard = false }) { Text(tr("Keep Editing")) } },
