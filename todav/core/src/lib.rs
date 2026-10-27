@@ -851,9 +851,6 @@ pub enum Error {
     Net(String),
     Parse(String),
     Db(String),
-    /// The account's connection cannot do it (one through the Nextcloud app: create, rename
-    /// or recolour a calendar).
-    Unsupported,
 }
 
 impl std::fmt::Display for Error {
@@ -876,7 +873,6 @@ impl std::fmt::Display for Error {
             Error::Net(s) => write!(f, "network: {s}"),
             Error::Parse(s) => write!(f, "parse: {s}"),
             Error::Db(s) => write!(f, "database: {s}"),
-            Error::Unsupported => write!(f, "not possible with this account's connection"),
         }
     }
 }

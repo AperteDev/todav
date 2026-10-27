@@ -165,25 +165,6 @@ impl Client {
         Ok(())
     }
 
-    /// Connect account `id` through the front-end's `transport` (the Nextcloud Android app's
-    /// single sign-on), which authenticates its requests itself.
-    pub fn connect_transport(
-        &self,
-        id: i64,
-        transport: Arc<dyn crate::caldav::Transport>,
-    ) -> Result<()> {
-        let a = self.account(id).ok_or(Error::NoAccount)?;
-        let dav = Dav::with_transport(&a.url, transport);
-        self.dav.lock().unwrap().insert(id, Arc::new(dav));
-        Ok(())
-    }
-
-    /// Whether lists of account `id` can be created, renamed and recoloured: not through a
-    /// transport, which cannot send MKCALENDAR or PROPPATCH.
-    pub fn can_manage_lists(&self, id: i64) -> bool {
-        self.dav(id).map_or(true, |d| !d.limited())
-    }
-
     /// Connected for this run: `connect` gave the password. An account stays without one,
     /// e.g. when the keyring no longer has it; its lists are there, nothing syncs.
     pub fn connected(&self, id: i64) -> bool {

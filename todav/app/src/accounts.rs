@@ -61,26 +61,6 @@ pub fn add(
     Ok(id)
 }
 
-/// Add a Nextcloud account whose requests go through the front-end's `transport` (the
-/// Nextcloud Android app's single sign-on: `source` names its account there) and connect it.
-/// With `settings`, settings sync through it.
-pub fn add_with_transport(
-    c: &Client,
-    url: &str,
-    user: &str,
-    source: String,
-    transport: std::sync::Arc<dyn todav_core::caldav::Transport>,
-    settings: bool,
-) -> Result<i64, Error> {
-    let url = url.trim_end_matches('/').to_string();
-    let id = c.add_account(AccountKind::Nextcloud, url, user.into(), source)?;
-    c.connect_transport(id, transport)?;
-    if settings {
-        let _ = c.set_settings_account(Some(id));
-    }
-    Ok(id)
-}
-
 /// Account `id` (signed in in Todav) at `url` with `password`: a new app password, or the same
 /// user on a moved server (then its lists come again from there, after the edits waiting for
 /// the old one went up).

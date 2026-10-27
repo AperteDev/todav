@@ -64,58 +64,6 @@ pub trait EventFilter: Send + Sync {
     fn hit(&self, event: Event) -> bool;
 }
 
-/// Sends one request for an account whose connection the front-end makes (the Nextcloud Android
-/// app's single sign-on, which authenticates it): see `Todav::add_nextcloud_app`. Such a
-/// connection has no REPORT, MKCALENDAR or PROPPATCH; the core syncs it by ETags.
-#[uniffi::export(callback_interface)]
-pub trait Transport: Send + Sync {
-    /// `url` is the full URL. A failed request's status comes back as it is; only a request
-    /// that could not be made is an error.
-    fn send(
-        &self,
-        method: String,
-        url: String,
-        headers: Vec<HttpHeader>,
-        body: String,
-    ) -> std::result::Result<HttpReply, TodavError>;
-}
-
-struct TransportAdapter(Box<dyn Transport>);
-
-impl todav_core::caldav::Transport for TransportAdapter {
-    fn send(
-        &self,
-        method: &str,
-        url: &str,
-        headers: &[(&str, &str)],
-        body: &str,
-    ) -> todav_core::Result<todav_core::caldav::HttpResponse> {
-        let headers = headers
-            .iter()
-            .map(|(name, value)| HttpHeader {
-                name: (*name).into(),
-                value: (*value).into(),
-            })
-            .collect();
-        let r = self
-            .0
-            .send(method.into(), url.into(), headers, body.into())
-            .map_err(|e| todav_core::Error::Net(e.to_string()))?;
-        let header = |n: &str| {
-            r.headers
-                .iter()
-                .find(|h| h.name.eq_ignore_ascii_case(n))
-                .map(|h| h.value.clone())
-        };
-        Ok(todav_core::caldav::HttpResponse {
-            status: r.status,
-            etag: header("etag"),
-            location: header("location"),
-            body: r.body,
-        })
-    }
-}
-
 struct ListenerAdapter(Box<dyn Listener>);
 
 impl todav_core::ChangeListener for ListenerAdapter {
@@ -285,41 +233,6 @@ impl Todav {
 
     pub fn connected(&self, id: i64) -> bool {
         self.c().connected(id)
-    }
-
-    /// Add a Nextcloud account whose requests go through `transport` (`source`: the front-end's
-    /// note of where, e.g. "nextcloud-app:<account name>"); with `settings`, settings sync
-    /// through it.
-    pub fn add_nextcloud_app(
-        &self,
-        url: String,
-        user: String,
-        source: String,
-        transport: Box<dyn Transport>,
-        settings: bool,
-    ) -> Result<i64> {
-        let t = Arc::new(TransportAdapter(transport));
-        Ok(todav_app::accounts::add_with_transport(
-            self.c(),
-            &url,
-            &user,
-            source,
-            t,
-            settings,
-        )?)
-    }
-
-    /// Connect account `id` through `transport` for this run.
-    pub fn connect_transport(&self, id: i64, transport: Box<dyn Transport>) -> Result<()> {
-        Ok(self
-            .c()
-            .connect_transport(id, Arc::new(TransportAdapter(transport)))?)
-    }
-
-    /// Whether lists of account `id` can be created, renamed and recoloured (not through a
-    /// `Transport`).
-    pub fn can_manage_lists(&self, id: i64) -> bool {
-        self.c().can_manage_lists(id)
     }
 
     /// Switched on and connected.

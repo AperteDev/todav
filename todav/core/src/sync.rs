@@ -5,7 +5,7 @@ use crate::ical::Calendar;
 use crate::store::Kind;
 use crate::{Client, Error, Result, store};
 use rusqlite::params;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 #[derive(Debug, Default)]
 pub struct SyncReport {
@@ -455,39 +455,18 @@ impl Client {
             )
             .map_err(|_| Error::NotFound(list_href.into()))?
         };
-        let (full, res) = if dav.limited() {
-            // A full sync (no token yet) fetches all; else what changed since the stored ETags.
-            let known: HashMap<String, String> = if token.is_empty() {
-                HashMap::new()
-            } else {
-                let db = self.db.lock().unwrap();
-                store::synced(&db, list_href)?
-                    .into_iter()
-                    .filter_map(|o| Some((o.href?, o.etag.unwrap_or_default())))
-                    .collect()
-            };
-            (
-                token.is_empty(),
-                dav.sync_by_etags(list_href, &token, &known)?,
-            )
-        } else {
-            match dav.sync_collection(list_href, &token)? {
-                SyncResult::InvalidToken => (true, dav.sync_collection(list_href, "")?),
-                // Nextcloud answers a token it never issued (calendar recreated under the same URL)
-                // with its current token and no changes, as if nothing happened.
-                SyncResult::Changes {
-                    token: t,
-                    changed,
-                    removed,
-                } if !token.is_empty()
-                    && t != token
-                    && changed.is_empty()
-                    && removed.is_empty() =>
-                {
-                    (true, dav.sync_collection(list_href, "")?)
-                }
-                r => (token.is_empty(), r),
+        let (full, res) = match dav.sync_collection(list_href, &token)? {
+            SyncResult::InvalidToken => (true, dav.sync_collection(list_href, "")?),
+            // Nextcloud answers a token it never issued (calendar recreated under the same URL)
+            // with its current token and no changes, as if nothing happened.
+            SyncResult::Changes {
+                token: t,
+                changed,
+                removed,
+            } if !token.is_empty() && t != token && changed.is_empty() && removed.is_empty() => {
+                (true, dav.sync_collection(list_href, "")?)
             }
+            r => (token.is_empty(), r),
         };
         let SyncResult::Changes {
             token: new_token,

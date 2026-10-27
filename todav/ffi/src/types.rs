@@ -656,18 +656,3 @@ pub struct DueReminders {
     pub tasks: Vec<Task>,
     pub events: Vec<Event>,
 }
-
-/// A header of a request or response a `Transport` sends.
-#[derive(uniffi::Record)]
-pub struct HttpHeader {
-    pub name: String,
-    pub value: String,
-}
-
-/// What came back for a `Transport`'s request.
-#[derive(uniffi::Record)]
-pub struct HttpReply {
-    pub status: u16,
-    pub headers: Vec<HttpHeader>,
-    pub body: String,
-}
