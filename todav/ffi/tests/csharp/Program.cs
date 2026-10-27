@@ -49,7 +49,7 @@ Check(TodavCore.SubtaskCounts(t.Tasks(list.Href, true))[task.Uid].Open == 1, "co
 var cal = t.Calendars().Single();
 var at = day + 10 * 3600;
 t.AddEvent(cal.Href, "Dentist", new EventTime(at, at + 3600, false), new long[] { -900 });
-var agenda = t.Agenda(day, 1);
+var agenda = t.Agenda(day, 1, null);
 Check(agenda.Any(e => e.Item is Item.Event ev && ev.EventValue.Summary == "Dentist"
     && e.Time is Time.At a && a.Time == at), "agenda");
 var ev = t.Events(day, day + 86400).Single();

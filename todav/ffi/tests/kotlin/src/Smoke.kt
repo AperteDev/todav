@@ -50,7 +50,7 @@ fun main() {
     val cal = t.calendars().single()
     val at = day + 10 * 3600
     t.addEvent(cal.href, "Dentist", EventTime(at, at + 3600, false), listOf(-900L))
-    val agenda = t.agenda(day, 1)
+    val agenda = t.agenda(day, 1, null)
     check(agenda.any { (it.item as? Item.Event)?.event?.summary == "Dentist" && it.time == Time.At(at) })
     val event = t.events(day, day + 86400).single()
     val moved = dayDrop(Item.Event(event), day + 86400, false) as Change.Event
