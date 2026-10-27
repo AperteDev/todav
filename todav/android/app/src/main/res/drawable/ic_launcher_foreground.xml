@@ -60,12 +60,12 @@
             android:pathData="M31.25,3a0.75,0.75 0 0 1 0.75,0.75v14.5a0.75,0.75 0 0 1 -1.5,0v-14.5a0.75,0.75 0 0 1 0.75,-0.75zM52.25,3a0.75,0.75 0 0 1 0.75,0.75v14.5a0.75,0.75 0 0 1 -1.5,0v-14.5a0.75,0.75 0 0 1 0.75,-0.75zM73.25,3a0.75,0.75 0 0 1 0.75,0.75v14.5a0.75,0.75 0 0 1 -1.5,0v-14.5a0.75,0.75 0 0 1 0.75,-0.75zM94.25,3a0.75,0.75 0 0 1 0.75,0.75v14.5a0.75,0.75 0 0 1 -1.5,0v-14.5a0.75,0.75 0 0 1 0.75,-0.75z" />
     </group>
     <!-- The page's tasks (dots and bars on the left, days on the right) and the tick, zoomed in
-         more. -->
+         more: spaced on the page as on the app icon, a row's height under the header. -->
     <group
-        android:translateX="12.5"
-        android:translateY="13"
-        android:scaleX="0.65"
-        android:scaleY="0.65">
+        android:translateX="8"
+        android:translateY="4.5"
+        android:scaleX="0.72"
+        android:scaleY="0.72">
         <path android:strokeColor="#9ccbf0" android:strokeWidth="5.5" android:strokeLineCap="round" android:pathData="M34.75 54h23" />
         <path android:strokeColor="#57c778" android:strokeWidth="5.5" android:strokeLineCap="round" android:pathData="M34.75 67h23" />
         <path android:strokeColor="#8ec4ee" android:strokeWidth="5.5" android:strokeLineCap="round" android:pathData="M34.75 80h7.25" />
