@@ -112,6 +112,10 @@ object WidgetPrefs {
     fun opacity(c: Context) = prefs(c).getInt("opacity", 100)
     fun setOpacity(c: Context, v: Int) = prefs(c).edit().putInt("opacity", v).apply()
 
+    /** Whether the widgets show a settings button (else: the launcher's own, Settings → Widgets). */
+    fun gear(c: Context) = prefs(c).getBoolean("gear", false)
+    fun setGear(c: Context, v: Boolean) = prefs(c).edit().putBoolean("gear", v).apply()
+
     /** The corners' radius, in dp. */
     fun radius(c: Context) = prefs(c).getInt("radius", 24)
     fun setRadius(c: Context, v: Int) = prefs(c).edit().putInt("radius", v).apply()
@@ -167,7 +171,8 @@ fun widgetList(context: Context, app: TodavApp, id: Int, mine: List<TodavList>):
 
 /** A Glance widget of Todav's: read again on every change (and its settings') while it shows. */
 abstract class TodavWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Exact
+    // One layout for every size the launcher gives: each is sent whole, and a big one may not arrive.
+    override val sizeMode: SizeMode = SizeMode.Single
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val app = context.applicationContext as TodavApp
@@ -177,7 +182,10 @@ abstract class TodavWidget : GlanceAppWidget() {
         hours24 = android.text.format.DateFormat.is24HourFormat(context)
         provideContent {
             val changes by app.changes.collectAsState()
-            GlanceTheme { Content(context, app, widget, changes) }
+            // All of it again: parts reading the widgets' settings would be skipped otherwise.
+            androidx.compose.runtime.key(changes) {
+                GlanceTheme { Content(context, app, widget, changes) }
+            }
         }
     }
 
@@ -217,14 +225,14 @@ fun WidgetButton(icon: Int, label: String, action: Action, filled: Boolean = fal
     }
 }
 
-/** The settings button of widget `id`, and its add button opening `add` when it shows one. */
+/** The settings button of widget `id` when they show, and its add button opening `add` when it shows one. */
 @Composable
 fun RowScope.WidgetButtons(context: Context, id: Int, add: Intent?) {
     // The data keeps each widget's intent apart: intents differing only in extras are one.
     val settings = Intent(context, WidgetConfigure::class.java)
         .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
         .setData(Uri.parse("todav-widget://$id"))
-    WidgetButton(R.drawable.ic_widget_settings, tr("Settings"), actionStartActivity(settings))
+    if (WidgetPrefs.gear(context)) WidgetButton(R.drawable.ic_widget_settings, tr("Settings"), actionStartActivity(settings))
     if (add != null && WidgetPrefs.add(context, id)) {
         Spacer(GlanceModifier.width(4.dp))
         WidgetButton(R.drawable.ic_widget_add, tr("Add"), actionStartActivity(add), filled = true)
@@ -264,8 +272,37 @@ fun widgetColor(hex: String?) = FixedColor(parseColor(hex))
 fun openTask(context: Context, uid: String) =
     Intent(context, MainActivity::class.java).putExtra("task", uid).setData(Uri.parse("todav-task://$uid"))
 
-fun openDay(context: Context, day: Long) =
-    Intent(context, MainActivity::class.java).putExtra("day", day).setData(Uri.parse("todav-day://$day"))
+/** Opening the calendar on `day`; with `month`, in the month view. */
+fun openDay(context: Context, day: Long, month: Boolean = false) =
+    Intent(context, MainActivity::class.java).putExtra("day", day).setData(Uri.parse("todav-day://$day/$month"))
+        .apply { if (month) putExtra("view", "month") }
+
+/** Opening an event (this occurrence) in its editor, as a task opens in its. */
+fun openEvent(context: Context, e: dev.aperte.todav.core.Event) =
+    Intent(context, MainActivity::class.java)
+        .putExtra("event", e.uid).putExtra("event_list", e.listHref).putExtra("event_start", e.start).putExtra("all_day", e.allDay)
+        .apply { e.recurrenceId?.let { putExtra("event_rid", it) } }
+        .setData(Uri.parse("todav-event://${e.listHref.hashCode()}/${e.uid}/${e.start}"))
+
+/** Opening a calendar item: an event or a task, in its editor. */
+fun openItem(context: Context, item: dev.aperte.todav.core.Item) = when (item) {
+    is dev.aperte.todav.core.Item.Event -> openEvent(context, item.event)
+    is dev.aperte.todav.core.Item.Task -> openTask(context, item.task.uid)
+}
+
+/** Glance's rows and columns take 10 children at most: `parts` in nested ones of 10 when more. */
+@Composable
+fun Chunked(vertical: Boolean, modifier: GlanceModifier, parts: List<@Composable () -> Unit>) {
+    val group = @Composable { m: GlanceModifier, ps: List<@Composable () -> Unit> ->
+        if (vertical) Column(m) { ps.forEach { it() } } else Row(m) { ps.forEach { it() } }
+    }
+    if (parts.size <= 10) {
+        group(modifier, parts)
+    } else {
+        val inner = if (vertical) GlanceModifier.fillMaxWidth() else GlanceModifier
+        group(modifier, parts.chunked(10).map { c -> @Composable { group(inner, c) } })
+    }
+}
 
 // --- tasks ------------------------------------------------------------------------------------
 

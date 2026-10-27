@@ -17,6 +17,7 @@ import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidgetManager
+import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.action.actionStartActivity
@@ -65,11 +66,11 @@ import kotlin.math.floor
 private val OFFSET = intPreferencesKey("offset")
 private val BY = ActionParameters.Key<Int>("by")
 
-/** An arrow of a calendar widget: turned on or back `BY`, or with 0 back to today. */
+/** An arrow of a calendar widget: turned on or back `BY`. */
 class Turn : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         val by = parameters[BY] ?: 0
-        updateAppWidgetState(context, glanceId) { it[OFFSET] = if (by == 0) 0 else (it[OFFSET] ?: 0) + by }
+        updateAppWidgetState(context, glanceId) { it[OFFSET] = (it[OFFSET] ?: 0) + by }
         val id = GlanceAppWidgetManager(context).getAppWidgetId(glanceId)
         WidgetKind.of(context, id)?.widget()?.update(context, glanceId)
     }
@@ -97,16 +98,16 @@ private fun newEvent(context: Context, id: Int, account: Long?, shown: List<Toda
         }
 }
 
-/** A calendar widget's header: arrows around `title` (tapped: back to today), then its buttons. */
+/** A calendar widget's header: arrows around `title` (tapped: `open`, the month or day in the app), then its buttons. */
 @Composable
-private fun TurnHeader(context: Context, id: Int, title: String, add: Intent) {
+private fun TurnHeader(context: Context, id: Int, title: String, open: Intent, add: Intent) {
     Row(GlanceModifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         WidgetButton(R.drawable.ic_widget_prev, tr("Previous"), actionRunCallback<Turn>(actionParametersOf(BY to -1)))
         Text(
             title,
             maxLines = 1,
             style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 16.sp, textAlign = TextAlign.Center, color = GlanceTheme.colors.onSurface),
-            modifier = GlanceModifier.defaultWeight().clickable(actionRunCallback<Turn>(actionParametersOf(BY to 0))),
+            modifier = GlanceModifier.defaultWeight().clickable(actionStartActivity(open)),
         )
         WidgetButton(R.drawable.ic_widget_next, tr("Next"), actionRunCallback<Turn>(actionParametersOf(BY to 1)))
         Spacer(GlanceModifier.width(4.dp))
@@ -192,7 +193,7 @@ class MonthWidget : TodavWidget() {
         val (account, shown) = remember(changes) { widgetCalendars(context, app, widget) }
         val dots = remember(changes, offset, shown) { core.dayColors(start, weeks * 7L, shown.map { it.href }) }
         WidgetFrame(context) {
-            TurnHeader(context, widget, monthTitle(first), newEvent(context, widget, account, shown, today))
+            TurnHeader(context, widget, monthTitle(first), openDay(context, first, month = true), newEvent(context, widget, account, shown, today))
             WeekdayNames(start)
             for (w in 0 until weeks) {
                 Row(GlanceModifier.fillMaxWidth().defaultWeight()) {
@@ -271,7 +272,7 @@ class AgendaWidget : TodavWidget() {
     @Composable
     private fun AgendaRow(context: Context, e: dev.aperte.todav.core.AgendaEntry) {
         val item = e.item
-        val open = (item as? Item.Task)?.let { openTask(context, it.task.uid) } ?: openDay(context, e.day)
+        val open = openItem(context, item)
         Row(
             GlanceModifier.fillMaxWidth().clickable(actionStartActivity(open)).padding(horizontal = 4.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -349,43 +350,42 @@ class DayWidget : TodavWidget() {
             0 -> tr("Today")
             1 -> tr("Tomorrow")
             -1 -> tr("Yesterday")
-            else -> format(day, "EEEE d MMMM").replaceFirstChar { it.titlecase() }
+            else -> format(day, "EEE d MMM").replaceFirstChar { it.titlecase() }
         }
         WidgetFrame(context) {
-            TurnHeader(context, widget, title, newEvent(context, widget, account, shown, day))
-            for ((item, color) in allDay) {
-                Box(
-                    GlanceModifier.fillMaxWidth().padding(bottom = 2.dp),
-                ) {
-                    Box(
-                        GlanceModifier.fillMaxWidth().cornerRadius(6.dp).background(widgetColor(color))
-                            .clickable(actionStartActivity(open(context, item, day))).padding(horizontal = 8.dp, vertical = 3.dp),
-                    ) {
-                        // A task at a time but of no length goes here too, after its time.
-                        val at = (item as? Item.Task)?.task?.let { t ->
-                            if (t.start != null) t.start.takeUnless { t.startAllDay } else t.due.takeUnless { t.dueAllDay }
-                        }
-                        Text(
-                            listOfNotNull(at?.let(::time), item.title()).joinToString("  "),
-                            maxLines = 1,
-                            style = TextStyle(
-                                fontSize = 12.sp,
-                                color = ColorProvider(androidx.compose.ui.graphics.Color.White),
-                                textDecoration = if (item.done()) TextDecoration.LineThrough else null,
-                            ),
-                        )
-                    }
-                }
-            }
+            TurnHeader(context, widget, title, openDay(context, day), newEvent(context, widget, account, shown, day))
             // From an hour before now today, else from the first thing (8:00 at the latest).
             val from = if (offset == 0) {
                 (((now - day) / 3600).toInt() - 1).coerceIn(0, 23)
             } else {
                 minOf(timed.minOfOrNull { ((it.from - day) / 3600).toInt() } ?: 8, 8)
             }
+            // What takes all day on top, scrolling with the hours.
             LazyColumn {
+                items(allDay) { (item, color) -> AllDay(context, item, color) }
                 item { Timeline(context, day, from, timed, if (offset == 0) now else null) }
             }
+        }
+    }
+
+    @Composable
+    private fun AllDay(context: Context, item: Item, color: String?) {
+        Box(GlanceModifier.fillMaxWidth().padding(bottom = 2.dp)) {
+            // A task at a time but of no length goes here too, after its time.
+            val at = (item as? Item.Task)?.task?.let { t ->
+                if (t.start != null) t.start.takeUnless { t.startAllDay } else t.due.takeUnless { t.dueAllDay }
+            }
+            Text(
+                listOfNotNull(at?.let(::time), item.title()).joinToString("  "),
+                maxLines = 1,
+                style = TextStyle(
+                    fontSize = 12.sp,
+                    color = ColorProvider(androidx.compose.ui.graphics.Color.White),
+                    textDecoration = if (item.done()) TextDecoration.LineThrough else null,
+                ),
+                modifier = GlanceModifier.fillMaxWidth().cornerRadius(6.dp).background(widgetColor(color))
+                    .clickable(actionStartActivity(openItem(context, item))).padding(horizontal = 8.dp, vertical = 3.dp),
+            )
         }
     }
 
@@ -394,41 +394,45 @@ class DayWidget : TodavWidget() {
         val start = day + fromHour * 3600L
         fun dp(seconds: Long): Dp = HOUR * (seconds / 3600f)
         Box(GlanceModifier.fillMaxWidth()) {
-            Column(GlanceModifier.fillMaxWidth()) {
-                for (h in fromHour until 24) {
-                    Row(GlanceModifier.fillMaxWidth().height(HOUR)) {
-                        Text(hourLabel(h), style = TextStyle(fontSize = 11.sp, color = GlanceTheme.colors.onSurfaceVariant), modifier = GlanceModifier.width(44.dp))
-                        Box(GlanceModifier.defaultWeight().height(1.dp).background(GlanceTheme.colors.outline)) {}
-                    }
-                }
-            }
-            Row(GlanceModifier.fillMaxWidth().padding(start = 46.dp)) {
-                for (lane in lanes(blocks.filter { it.to > start }, 1800)) {
-                    Column(GlanceModifier.defaultWeight()) {
-                        var at = start
-                        for (b in lane) {
-                            val from = maxOf(b.from, start)
-                            if (from > at) Spacer(GlanceModifier.height(dp(from - at)))
-                            val shown = maxOf(b.to, from + 1800)
-                            Box(GlanceModifier.fillMaxWidth().height(dp(shown - from)).padding(end = 2.dp, bottom = 1.dp)) {
-                                Box(
-                                    GlanceModifier.fillMaxSize().cornerRadius(6.dp).background(widgetColor(b.color))
-                                        .clickable(actionStartActivity(open(context, b.item, day))).padding(horizontal = 6.dp, vertical = 2.dp),
-                                ) {
-                                    Text(
-                                        b.item.title(),
-                                        maxLines = maxOf(1, ((shown - from) / 1800).toInt()),
-                                        style = TextStyle(
-                                            fontSize = 12.sp,
-                                            color = ColorProvider(androidx.compose.ui.graphics.Color.White),
-                                            textDecoration = if (b.item.done()) TextDecoration.LineThrough else null,
-                                        ),
-                                    )
-                                }
-                            }
-                            at = shown
+            Chunked(
+                true, GlanceModifier.fillMaxWidth(),
+                (fromHour until 24).map { h ->
+                    @Composable {
+                        Row(GlanceModifier.fillMaxWidth().height(HOUR)) {
+                            Text(hourLabel(h), style = TextStyle(fontSize = 11.sp, color = GlanceTheme.colors.onSurfaceVariant), modifier = GlanceModifier.width(44.dp))
+                            Box(GlanceModifier.defaultWeight().height(1.dp).background(GlanceTheme.colors.outline)) {}
                         }
                     }
+                },
+            )
+            // Four lanes at most side by side.
+            Row(GlanceModifier.fillMaxWidth().padding(start = 46.dp)) {
+                for (lane in lanes(blocks.filter { it.to > start }, 1800).take(4)) {
+                    var at = start
+                    val parts = mutableListOf<@Composable () -> Unit>()
+                    for (b in lane) {
+                        val from = maxOf(b.from, start)
+                        val gap = from - at
+                        if (gap > 0) parts += @Composable { Spacer(GlanceModifier.height(dp(gap))) }
+                        val shown = maxOf(b.to, from + 1800)
+                        parts += @Composable {
+                            Box(GlanceModifier.fillMaxWidth().height(dp(shown - from)).padding(end = 2.dp, bottom = 1.dp)) {
+                                Text(
+                                    b.item.title(),
+                                    maxLines = maxOf(1, ((shown - from) / 1800).toInt()),
+                                    style = TextStyle(
+                                        fontSize = 12.sp,
+                                        color = ColorProvider(androidx.compose.ui.graphics.Color.White),
+                                        textDecoration = if (b.item.done()) TextDecoration.LineThrough else null,
+                                    ),
+                                    modifier = GlanceModifier.fillMaxSize().cornerRadius(6.dp).background(widgetColor(b.color))
+                                        .clickable(actionStartActivity(openItem(context, b.item))).padding(horizontal = 6.dp, vertical = 2.dp),
+                                )
+                            }
+                        }
+                        at = shown
+                    }
+                    Chunked(true, GlanceModifier.defaultWeight(), parts)
                 }
             }
             if (now != null && now >= start) {
@@ -440,8 +444,6 @@ class DayWidget : TodavWidget() {
         }
     }
 
-    private fun open(context: Context, item: Item, day: Long) =
-        (item as? Item.Task)?.let { openTask(context, it.task.uid) } ?: openDay(context, day)
 }
 
 class DayWidgetReceiver : TodavWidgetReceiver() {
@@ -459,6 +461,9 @@ private class Bar(val item: Item, val first: Int, val last: Int, val color: Stri
  * the app there.
  */
 class PlannerWidget : TodavWidget() {
+    // Laid out for its size: bars span exact widths.
+    override val sizeMode: SizeMode = SizeMode.Exact
+
     @Composable
     override fun Content(context: Context, app: TodavApp, widget: Int, changes: Long) {
         val core = app.core
@@ -479,9 +484,9 @@ class PlannerWidget : TodavWidget() {
         val week = (size.height - 20.dp - 44.dp - 18.dp) / 6
         val number = 20.dp
         val bar = 15.dp
-        val fit = floor(((week - number - 1.dp) / bar)).toInt().coerceAtLeast(0)
+        val fit = floor(((week - number - 1.dp) / bar)).toInt().coerceIn(0, 8)
         WidgetFrame(context) {
-            TurnHeader(context, widget, monthTitle(first), newEvent(context, widget, account, shown, today))
+            TurnHeader(context, widget, monthTitle(first), openDay(context, first, month = true), newEvent(context, widget, account, shown, today))
             WeekdayNames(start)
             // Flat, a view for each number and bar: a widget has 500 at most.
             for (w in 0 until 6) {
@@ -498,23 +503,28 @@ class PlannerWidget : TodavWidget() {
                         }
                     }
                     for (lane in lanes(weeks[w]).take(fit)) {
-                        Row(GlanceModifier.fillMaxWidth().height(bar)) {
-                            var at = 0
-                            for (b in lane) {
-                                if (b.first > at) Spacer(GlanceModifier.width(cell * (b.first - at)))
-                                val color = parseColor(b.color).let { if (b.item.done()) it.copy(alpha = 0.5f) else it }
+                        var at = 0
+                        val parts = mutableListOf<@Composable () -> Unit>()
+                        for (b in lane) {
+                            if (b.first > at) {
+                                val gap = cell * (b.first - at)
+                                parts += @Composable { Spacer(GlanceModifier.width(gap)) }
+                            }
+                            val color = parseColor(b.color).let { if (b.item.done()) it.copy(alpha = 0.5f) else it }
+                            parts += @Composable {
                                 Text(
                                     b.item.title(),
                                     maxLines = 1,
                                     style = TextStyle(fontSize = 10.sp, color = ColorProvider(androidx.compose.ui.graphics.Color.White)),
                                     modifier = GlanceModifier.width(cell * (b.last - b.first + 1) - 2.dp).height(bar - 1.dp)
                                         .cornerRadius(3.dp).background(ColorProvider(color)).padding(horizontal = 3.dp)
-                                        .clickable(actionStartActivity(openDay(context, monday + b.first * DAY))),
+                                        .clickable(actionStartActivity(openItem(context, b.item))),
                                 )
-                                Spacer(GlanceModifier.width(2.dp))
-                                at = b.last + 1
                             }
+                            parts += @Composable { Spacer(GlanceModifier.width(2.dp)) }
+                            at = b.last + 1
                         }
+                        Chunked(false, GlanceModifier.fillMaxWidth().height(bar), parts)
                     }
                 }
             }

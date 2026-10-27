@@ -26,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -143,6 +144,18 @@ fun WidgetsSettings(model: Main) {
                     )
                 }
             },
+        )
+        var gear by remember { mutableStateOf(WidgetPrefs.gear(context)) }
+        val setGear = { on: Boolean ->
+            gear = on
+            WidgetPrefs.setGear(context, on)
+            redraw()
+        }
+        Item(
+            headlineContent = { Text(tr("Settings Button")) },
+            supportingContent = { Text(tr("Without it, a widget's settings open from its menu on the home screen")) },
+            trailingContent = { Switch(gear, setGear) },
+            modifier = Modifier.clickable { setGear(!gear) },
         )
     }
     // A section for each kind placed, a row for each widget of it.

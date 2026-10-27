@@ -92,6 +92,18 @@ class MainActivity : ComponentActivity() {
         }
         intent.getStringExtra("task")?.let { model.open(Dest.Task(it)) }
         if (intent.hasExtra("day")) model.showDay(intent.getLongExtra("day", 0))
+        // A widget's month: shown in the month view, for now (the view picked stays saved).
+        if (intent.getStringExtra("view") == "month") model.calMode.value = CalMode.MONTH
+        // A widget's event: this occurrence in its editor.
+        intent.getStringExtra("event")?.let { uid ->
+            model.open(
+                Dest.EventEdit(
+                    intent.getStringExtra("event_list"), uid,
+                    intent.getLongExtra("event_rid", 0).takeIf { intent.hasExtra("event_rid") },
+                    intent.getLongExtra("event_start", 0), intent.getBooleanExtra("all_day", false),
+                ),
+            )
+        }
         when (intent.action) {
             Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)?.let { model.sharedText.value = it }
             NEW_TASK -> {
