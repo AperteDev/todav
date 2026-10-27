@@ -156,8 +156,22 @@ fun TasksPane(model: Main, screen: Screen) {
     val sync by model.syncState.collectAsStateWithLifecycle()
     // The subtask being added to (its parent), from a row's menu.
     var addingTo by remember { mutableStateOf<TodavTask?>(null) }
+    // Pulled to refresh: shown until the sync it asked for has run, once, without dropping in
+    // between (the sync starts a moment after the pull ends).
     var pulling by remember { mutableStateOf(false) }
-    LaunchedEffect(sync) { if (sync != SyncState.Syncing) pulling = false }
+    var started by remember { mutableStateOf(false) }
+    LaunchedEffect(sync, pulling) {
+        when {
+            !pulling -> started = false
+            sync == SyncState.Syncing -> started = true
+            started -> pulling = false
+            else -> {
+                // No sync came of it (nothing to sync with): not held up for good.
+                delay(3000)
+                pulling = false
+            }
+        }
+    }
     // One row, the title and its count beside the buttons: tinted once the list scrolls under it.
     val bar = TopAppBarDefaults.pinnedScrollBehavior()
     val pull = rememberPullToRefreshState()
@@ -185,7 +199,7 @@ fun TasksPane(model: Main, screen: Screen) {
             )
         },
     ) { padding ->
-        val refreshing = pulling && sync == SyncState.Syncing
+        val refreshing = pulling
         PullToRefreshBox(
             isRefreshing = refreshing,
             onRefresh = {
@@ -196,6 +210,10 @@ fun TasksPane(model: Main, screen: Screen) {
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                     fromTop = !list.canScrollBackward
+                    do {
+                        val e = awaitPointerEvent(PointerEventPass.Initial)
+                        if (list.canScrollBackward) fromTop = false
+                    } while (e.changes.any { it.pressed })
                 }
             },
             state = pull,
@@ -210,10 +228,6 @@ fun TasksPane(model: Main, screen: Screen) {
         }
     }
     val shown = screen.list
-                    do {
-                        val e = awaitPointerEvent(PointerEventPass.Initial)
-                        if (list.canScrollBackward) fromTop = false
-                    } while (e.changes.any { it.pressed })
     // Shared text, or a new task (the add button, the shortcut): into the list shown, in the
     // category it is filtered to, else the first list.
     val shared by model.sharedText.collectAsStateWithLifecycle()
