@@ -25,12 +25,18 @@ pack: stage
 	rm -f $(ZIP)
 	cd $(STAGE) && zip -qr $(abspath $(ZIP)) .
 
-# Development: symlink the source dir so edits apply on the next shell start.
+# Development: a folder of links to each source file, so edits apply on the next shell start.
+# Not a link to this folder: removing or updating the extension (Extension Manager, an update
+# from extensions.gnome.org) deletes its folder's files, which through such a link are these.
+# Run again after adding a file.
 link:
-	@if [ -e $(DEST) ] && [ ! -L $(DEST) ]; then \
+	@if [ -e $(DEST) ] && [ ! -L $(DEST) ] && [ ! -L $(DEST)/metadata.json ]; then \
 	  echo "$(DEST) is an installed copy; run 'make uninstall' first"; exit 1; fi
-	mkdir -p $(dir $(DEST))
-	ln -sfn $(CURDIR) $(DEST)
+	if [ -L $(DEST) ]; then rm $(DEST); fi
+	for f in $$(find $(FILES) -type f); do \
+	  mkdir -p $(DEST)/$$(dirname $$f); \
+	  ln -sfn $(CURDIR)/$$f $(DEST)/$$f; \
+	done
 
 uninstall:
 	rm -rf $(DEST)
