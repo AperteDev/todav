@@ -3,6 +3,18 @@ package dev.aperte.todav.ui
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.exclude
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MediumFloatingActionButton
+import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -295,3 +307,37 @@ fun AddButton(label: String, inBar: Boolean, onClick: () -> Unit) = Tip(label) {
         Icon(Icons.Default.Add, label)
     }
 }
+
+/**
+ * An editor's actions, floating at the bottom end (over the keyboard while it is up): Save, large
+ * and in the accent colour, dimmed and doing nothing while `canSave` is false; Cancel, small,
+ * above it.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun EditorButtons(canSave: Boolean, onCancel: () -> Unit, onSave: () -> Unit) {
+    Column(
+        Modifier.windowInsetsPadding(WindowInsets.ime.exclude(WindowInsets.navigationBars)),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Tip(tr("Cancel")) {
+            SmallFloatingActionButton(
+                onClick = onCancel,
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            ) { Icon(Icons.Default.Close, tr("Cancel")) }
+        }
+        Tip(tr("Save")) {
+            MediumFloatingActionButton(
+                onClick = { if (canSave) onSave() },
+                containerColor = if (canSave) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest,
+                contentColor = if (canSave) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                modifier = Modifier.semantics { if (!canSave) disabled() },
+            ) { Icon(Icons.Default.Check, tr("Save"), Modifier.size(FloatingActionButtonDefaults.MediumIconSize)) }
+        }
+    }
+}
+
+/** Room at the end of an editor's fields, so `EditorButtons` don't cover the last one. */
+val EDITOR_END = 176.dp

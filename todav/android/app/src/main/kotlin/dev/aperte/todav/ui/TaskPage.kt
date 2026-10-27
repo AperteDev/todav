@@ -30,7 +30,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.TopAppBarDefaults
@@ -144,12 +146,11 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null) {
         topBar = {
             TopAppBar(
                 title = { Text(tr("Edit Task")) },
-                navigationIcon = { Tip(tr("Cancel")) { IconButton(onClick = close) { Icon(Icons.Default.Close, tr("Cancel")) } } },
-                actions = { TextButton(onClick = ::save, enabled = summary.isNotBlank()) { Text(tr("Save")) } },
                 windowInsets = if (sheet != null) WindowInsets(0) else TopAppBarDefaults.windowInsets,
                 colors = if (sheet != null) TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent) else TopAppBarDefaults.topAppBarColors(),
             )
         },
+        floatingActionButton = { EditorButtons(summary.isNotBlank(), close, ::save) },
         containerColor = if (sheet != null) Color.Transparent else MaterialTheme.colorScheme.background,
         contentWindowInsets = if (sheet != null) WindowInsets.navigationBars else ScaffoldDefaults.contentWindowInsets,
     ) { padding ->
@@ -239,6 +240,7 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null) {
                     ),
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text(tr("Delete Task")) }
+                Spacer(Modifier.height(EDITOR_END))
             }
         }
     }

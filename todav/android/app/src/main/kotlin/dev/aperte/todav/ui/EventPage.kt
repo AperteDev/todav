@@ -25,7 +25,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.TopAppBarDefaults
@@ -200,18 +202,11 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
         topBar = {
             TopAppBar(
                 title = { Text(if (ev == null) tr("New Event") else tr("Event")) },
-                navigationIcon = {
-                    Tip(tr("Cancel")) {
-                        IconButton(onClick = { if (changed) discard = true else cancel() }) {
-                            Icon(Icons.Default.Close, tr("Cancel"))
-                        }
-                    }
-                },
-                actions = { TextButton(onClick = ::save, enabled = calendar != null) { Text(tr("Save")) } },
                 windowInsets = if (sheet != null) WindowInsets(0) else TopAppBarDefaults.windowInsets,
                 colors = if (sheet != null) TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent) else TopAppBarDefaults.topAppBarColors(),
             )
         },
+        floatingActionButton = { EditorButtons(calendar != null, { if (changed) discard = true else cancel() }, ::save) },
         containerColor = if (sheet != null) Color.Transparent else MaterialTheme.colorScheme.background,
         contentWindowInsets = if (sheet != null) WindowInsets.navigationBars else ScaffoldDefaults.contentWindowInsets,
     ) { padding ->
@@ -310,6 +305,7 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
                         modifier = Modifier.fillMaxWidth(),
                     ) { Text(tr("Delete Event")) }
                 }
+                Spacer(Modifier.height(EDITOR_END))
             }
         }
     }
