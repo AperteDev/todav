@@ -172,6 +172,20 @@ pub fn can_drop(c: &Client, d: &Task, ds: &Slot, t: &Task, ts: &Slot) -> bool {
     !c.within(t.uid.clone(), d.uid.clone())
 }
 
+/// Would dropping `d` beside `t` only reorder it, which a sorted list puts back? `can_drop`
+/// refuses those; a front-end says why: the sort (of tasks or of subtasks) is not Manual.
+pub fn needs_manual(c: &Client, d: &Task, ds: &Slot, t: &Task, ts: &Slot) -> bool {
+    let order = prefs::order(c);
+    if d.uid == t.uid {
+        return false;
+    }
+    if ts.root {
+        let elsewhere = ds.group != ts.group || ds.pinned != ts.pinned;
+        return ds.root && !elsewhere && order.tasks != Sort::Manual;
+    }
+    d.parent_uid == t.parent_uid && order.subtasks != Sort::Manual
+}
+
 /// Move dragged task `d` above or below target `t`.
 pub fn drop_task(c: &Client, d: &Task, ds: &Slot, t: &Task, ts: &Slot, above: bool) -> Result<()> {
     c.together(|| {
@@ -426,6 +440,30 @@ pub(crate) mod tests {
         );
         assert_eq!(entry_at(&subs, "a2", false), Some((4, 3)), "last");
         assert_eq!(entry_at(&subs, "b", false), None, "another tree");
+    }
+
+    #[test]
+    fn reordering_siblings_needs_manual_sort_moving_elsewhere_does_not() {
+        let dir = std::env::temp_dir().join(format!("todav-app-manual-{}", std::process::id()));
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let slot = |group: Option<&str>| Slot {
+            group: group.map(Into::into),
+            pinned: false,
+            root: true,
+            next: None,
+        };
+        let (a, b) = (task("a", None), task("b", None));
+        c.set_setting("task_sort".into(), "due_soonest".into())
+            .unwrap();
+        assert!(needs_manual(&c, &a, &slot(None), &b, &slot(None)));
+        assert!(!can_drop(&c, &a, &slot(None), &b, &slot(None)));
+        assert!(
+            !needs_manual(&c, &a, &slot(None), &b, &slot(Some("Work"))),
+            "another category"
+        );
+        c.set_setting("task_sort".into(), "manual".into()).unwrap();
+        assert!(!needs_manual(&c, &a, &slot(None), &b, &slot(None)));
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]

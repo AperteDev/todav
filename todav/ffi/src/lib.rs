@@ -444,6 +444,12 @@ impl Todav {
         todav_app::tasks::can_drop(self.c(), &dragged, &from, &target, &to)
     }
 
+    /// Whether dropping `dragged` beside `target` would only reorder it, which a sorted list
+    /// undoes (`can_drop` refuses it): the reason to show.
+    pub fn needs_manual(&self, dragged: Task, from: Slot, target: Task, to: Slot) -> bool {
+        todav_app::tasks::needs_manual(self.c(), &dragged, &from, &target, &to)
+    }
+
     /// Move `dragged` above or below `target`.
     pub fn drop_task(
         &self,
