@@ -36,7 +36,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -212,13 +211,6 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
     BackHandler(enabled = changed) { discard = true }
     sheet?.let { LaunchedEffect(changed) { it.locked = changed } }
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(if (ev == null) tr("New Event") else tr("Event")) },
-                windowInsets = if (sheet != null) WindowInsets(0) else TopAppBarDefaults.windowInsets,
-                colors = if (sheet != null) TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent) else TopAppBarDefaults.topAppBarColors(),
-            )
-        },
         floatingActionButton = { EditorButtons(calendar != null, { if (changed) discard = true else cancel() }, ::save) },
         containerColor = if (sheet != null) Color.Transparent else MaterialTheme.colorScheme.background,
         contentWindowInsets = if (sheet != null) WindowInsets.navigationBars else ScaffoldDefaults.contentWindowInsets,
@@ -227,7 +219,8 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
             Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Column(Modifier.widthIn(max = 640.dp).fillMaxWidth()) {
+            Column(Modifier.widthIn(max = CONTENT_WIDTH).fillMaxWidth()) {
+                PageTitle(if (ev == null) tr("New Event") else tr("Event"))
                 if (calendars.isEmpty()) {
                     Text(
                         tr("No calendar to save to"),

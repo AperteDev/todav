@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -182,8 +183,9 @@ fun DetailsSheet(
                         if (details != null && up < 1f) {
                             Box(
                                 Modifier.graphicsLayer { alpha = 1 - up }.verticalScroll(rememberScrollState())
-                                    .onSizeChanged { body = it.height.toFloat() }.navigationBarsPadding(),
-                            ) { details(state) }
+                                    .onSizeChanged { body = it.height.toFloat() }.navigationBarsPadding().fillMaxWidth(),
+                                androidx.compose.ui.Alignment.TopCenter,
+                            ) { Box(Modifier.widthIn(max = CONTENT_WIDTH)) { details(state) } }
                         }
                         if (up > 0f || drag.targetValue == Rest.Full) {
                             Box(Modifier.fillMaxSize().graphicsLayer { alpha = up }) { full(state) }

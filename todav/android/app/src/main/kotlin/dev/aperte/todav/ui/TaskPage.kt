@@ -42,7 +42,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -159,13 +158,6 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null, draft: 
     sheet?.let { LaunchedEffect(changed) { it.locked = changed } }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(if (draft != null) tr("New Task") else tr("Edit Task")) },
-                windowInsets = if (sheet != null) WindowInsets(0) else TopAppBarDefaults.windowInsets,
-                colors = if (sheet != null) TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent) else TopAppBarDefaults.topAppBarColors(),
-            )
-        },
         floatingActionButton = { EditorButtons(summary.isNotBlank(), close, ::save) },
         containerColor = if (sheet != null) Color.Transparent else MaterialTheme.colorScheme.background,
         contentWindowInsets = if (sheet != null) WindowInsets.navigationBars else ScaffoldDefaults.contentWindowInsets,
@@ -174,7 +166,8 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null, draft: 
             Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Column(Modifier.widthIn(max = 640.dp).fillMaxWidth()) {
+            Column(Modifier.widthIn(max = CONTENT_WIDTH).fillMaxWidth()) {
+                PageTitle(if (draft != null) tr("New Task") else tr("Edit Task"))
                 task.syncError?.let { error ->
                     Card(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),

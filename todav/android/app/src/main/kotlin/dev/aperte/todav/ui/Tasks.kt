@@ -901,6 +901,7 @@ fun AddSheet(model: Main, list: String, parent: TodavTask?, category: String?, i
                     tr("Subtask of “{title}”").replace("{title}", it.summary),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 16.dp, bottom = 8.dp),
                 )
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

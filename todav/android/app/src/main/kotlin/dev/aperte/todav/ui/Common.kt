@@ -485,15 +485,44 @@ fun SuggestField(label: String, value: String, suggestions: List<String>, icon: 
     }
 }
 
-/** A section's title on a form page. */
+/**
+ * The widest a sheet's or an editor's content gets, centred: details, editors and the add sheet
+ * share it. Inside, [Group]s keep 16dp from its edges, and everything else starts 16dp further
+ * in, where a row's icon does.
+ */
+val CONTENT_WIDTH = 640.dp
+
+/** A section's title among [Line]s, in line with their marks. */
 @Composable
 fun SectionTitle(text: String) {
     Text(
         text,
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(top = 8.dp),
+        modifier = Modifier.padding(start = 16.dp, top = 8.dp),
     )
+}
+
+/** An editor's title, at the top of its content, in line with its rows' icons. */
+@Composable
+fun PageTitle(text: String) = Text(
+    text,
+    style = MaterialTheme.typography.headlineSmall,
+    modifier = Modifier.padding(start = 32.dp, end = 32.dp, top = 16.dp),
+)
+
+/**
+ * A line of a details sheet: `leading` (an icon, a colour, a checkbox) in an icon's room, then
+ * `content`, as an [Item]'s are placed, so details and their editor line up.
+ */
+@Composable
+fun Line(leading: @Composable () -> Unit, modifier: Modifier = Modifier, content: @Composable () -> Unit) = Row(
+    modifier.fillMaxWidth().padding(horizontal = 16.dp),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(12.dp),
+) {
+    Box(Modifier.size(24.dp), Alignment.Center) { leading() }
+    Box(Modifier.weight(1f)) { content() }
 }
 
 /** `content` (an icon button) with `label` as a tooltip when it is held or hovered. */

@@ -49,6 +49,10 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.EventRepeat
+import androidx.compose.material.icons.automirrored.outlined.Notes
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Place
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -1260,25 +1264,28 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
     ) { sheet ->
         val edit = { sheet.expand() }
         val dismiss = { sheet.close() }
+        // Groups 16dp from the edges, lines and buttons 16dp further in: as on the editor.
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            val buttons = Modifier.padding(horizontal = 16.dp)
             when (item) {
                 is Item.Event -> {
                     val e = item.event
-                    TitleField(e.summary, editable = lists[e.listHref]?.writable == true) { renamed = it }
-                    Text(eventWhen(e, now), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    e.location?.takeIf { it.isNotBlank() }?.let { Text(it) }
-                    ListLine(colors[e.listHref], lists[e.listHref]?.displayName ?: "")
-                    if (e.reminders.isNotEmpty()) {
-                        Text(
-                            ntr("{n} reminder", "{n} reminders", e.reminders.size.toLong()).replace("{n}", "${e.reminders.size}"),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
+                    Line({ Box(Modifier.size(18.dp).background(parseColor(colors[e.listHref]), RoundedCornerShape(4.dp))) }) {
+                        TitleField(e.summary, editable = lists[e.listHref]?.writable == true) { renamed = it }
                     }
-                    e.description?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Line({ Icon(Icons.Outlined.Schedule, null) }) { Text(eventWhen(e, now)) }
+                    e.location?.takeIf { it.isNotBlank() }?.let { Line({ Icon(Icons.Outlined.Place, null) }) { Text(it) } }
+                    Line({ ColorMark(colors[e.listHref]) }) { Text(lists[e.listHref]?.displayName ?: "") }
+                    if (e.reminders.isNotEmpty()) {
+                        Line({ Icon(Icons.Outlined.Notifications, null) }) {
+                            Text(ntr("{n} reminder", "{n} reminders", e.reminders.size.toLong()).replace("{n}", "${e.reminders.size}"))
+                        }
+                    }
+                    e.description?.takeIf { it.isNotBlank() }?.let { Line({ Icon(Icons.AutoMirrored.Outlined.Notes, null) }) { Text(it) } }
+                    Row(buttons, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         EditButton(edit)
                         TextButton(onClick = { askDelete = true }) { Text(tr("Delete"), color = MaterialTheme.colorScheme.error) }
                     }
@@ -1295,25 +1302,20 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
                 }
                 is Item.Task -> {
                     val t = remember(changes) { core.task(item.task.uid) } ?: item.task
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(t.done, { model.setDone(t, it) })
+                    Line({ Checkbox(t.done, { model.setDone(t, it) }) }) {
                         TitleField(t.summary, done = t.done) { model.update(t.uid, TaskPatch(summary = it)) }
                     }
                     // Its slot or due date, if any (from the task list it may have none).
                     if (t.start != null || t.due != null) {
                         val w = taskWhen(t)
-                        Text(dayLabel(w.at, w.allDay, now), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Line({ Icon(Icons.Outlined.Schedule, null) }) { Text(dayLabel(w.at, w.allDay, now)) }
                     }
-                    ListLine(colors[t.listHref], listOfNotNull(lists[t.listHref]?.displayName, t.category).joinToString(" · "))
-                    if (priorityColor(t.priority) != null) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            StarIcon(t.priority)
-                            Spacer(Modifier.width(8.dp))
-                            Text(priorityName(t.priority))
-                        }
+                    Line({ ColorMark(colors[t.listHref]) }) {
+                        Text(listOfNotNull(lists[t.listHref]?.displayName, t.category).joinToString(" · "))
                     }
-                    t.description?.takeIf { it.isNotBlank() }?.let { Text(it) }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (priorityColor(t.priority) != null) Line({ StarIcon(t.priority) }) { Text(priorityName(t.priority)) }
+                    t.description?.takeIf { it.isNotBlank() }?.let { Line({ Icon(Icons.AutoMirrored.Outlined.Notes, null) }) { Text(it) } }
+                    Row(buttons, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         EditButton(edit)
                         dev.aperte.todav.core.unplan(t)?.let { patch ->
                             TextButton(onClick = {
@@ -1327,7 +1329,7 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
                         }) { Text(tr("Delete"), color = MaterialTheme.colorScheme.error) }
                     }
                     val subs = remember(changes, t.uid) { core.subtasks(t.uid, false) + core.subtasks(t.uid, true) }
-                    SectionTitle(tr("Subtasks"))
+                    if (subs.isNotEmpty() || !t.done) SectionTitle(tr("Subtasks"))
                     subs.forEach { s -> CheckRow(model, s) }
                     if (!t.done) AddLine(tr("Add Subtask")) { text -> model.add(t.listHref, text, t.uid, t.category) }
                 }
@@ -1395,24 +1397,9 @@ private fun TitleField(title: String, editable: Boolean = true, done: Boolean = 
     )
 }
 
-/** Which calendar or list an item is in: its colour and name, as the Linux popover shows it. */
 @Composable
-private fun ListLine(color: String?, name: String) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(Modifier.size(12.dp).background(parseColor(color), CircleShape))
-        Text(name, style = MaterialTheme.typography.bodyMedium)
-    }
-}
-
-@Composable
-private fun CheckRow(model: Main, t: TodavTask) {
-    Row(
-        Modifier.fillMaxWidth().clickable { model.open(Dest.Task(t.uid)) },
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Checkbox(t.done, { model.setDone(t, it) })
-        Text(t.summary, textDecoration = if (t.done) TextDecoration.LineThrough else null, modifier = Modifier.weight(1f))
-    }
+private fun CheckRow(model: Main, t: TodavTask) = Line({ Checkbox(t.done, { model.setDone(t, it) }) }, Modifier.clickable { model.open(Dest.Task(t.uid)) }) {
+    Text(t.summary, textDecoration = if (t.done) TextDecoration.LineThrough else null)
 }
 
 /** A details sheet's Edit…, opening the sheet as the editor. */
