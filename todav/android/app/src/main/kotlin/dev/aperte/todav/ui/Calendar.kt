@@ -469,7 +469,8 @@ private fun MonthGrid(model: Main, month: Long, picked: Long?, colors: Map<Strin
                             var total = Offset.Zero
                             detectDragGesturesAfterLongPress(
                                 onDragStart = { p ->
-                                    held = here.getOrNull(((p.y - 26.dp.toPx()) / 15.dp.toPx()).toInt())
+                                    // Under the day's number (2 dp in, 22 dp), chips 13 sp and 1 dp apart.
+                                    held = here.getOrNull(((p.y - 24.dp.toPx()) / (13.sp.toPx() + 1.dp.toPx())).toInt())
                                     total = Offset.Zero
                                     target = held?.let { at }
                                 },
@@ -581,9 +582,13 @@ private fun DayCell(
             )
         }
         BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
-            // As many chips as fit; the rest as "+n".
-            val fit = ((maxHeight.value - 2) / 15).toInt().coerceAtLeast(0)
-            val shown = if (items.size <= fit) items else items.take((fit - 1).coerceAtLeast(0))
+            // As many chips as fit (13 sp, 1 dp apart); when not all do, room for "+n" (12 sp) under them.
+            val (chip, more) = with(LocalDensity.current) { 13.sp.toDp() + 1.dp to 12.sp.toDp() }
+            val shown = if (items.size <= ((maxHeight + 1.dp) / chip).toInt()) {
+                items
+            } else {
+                items.take(((maxHeight - more) / chip).toInt().coerceAtLeast(0))
+            }
             Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 shown.forEach { i -> Chip(i, colors) }
                 if (shown.size < items.size) {
