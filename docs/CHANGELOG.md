@@ -21,7 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Android: home-screen widgets, read-only as the GNOME extension: a task list (or Upcoming,
   Important) by category with its subtasks, the month with a dot per calendar on each day, the
   coming week's agenda, a day's hours, and a month planner with bars across the days. A task or
-  an event opens in its editor, a month's or day's title in the calendar. Each has an add button
+  an event opens in its editor (on the month planner, the day tapped), a month's or day's title
+  in the calendar. Each has an add button
   and settings (its list, or calendars other than those shown in the app; its add button), in
   the launcher's menu of the widget and in Settings → Widgets, which also sets their colours (the
   system's, or a background and a text colour for light and dark), the background's opacity, the

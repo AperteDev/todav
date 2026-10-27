@@ -525,40 +525,45 @@ class PlannerWidget : TodavWidget() {
             // Flat, a view for each number and bar: a widget has 500 at most.
             for (w in 0 until 6) {
                 val monday = start + w * 7 * DAY
-                Column(GlanceModifier.fillMaxWidth().height(week)) {
-                    Box(GlanceModifier.fillMaxWidth().height(1.dp).background(GlanceTheme.colors.outline)) {}
-                    Row(GlanceModifier.fillMaxWidth()) {
+                // A day opens wherever it is tapped, on a bar too (they are too small to aim at): the
+                // days take taps under the numbers and bars, which take none.
+                Box(GlanceModifier.fillMaxWidth().height(week)) {
+                    Row(GlanceModifier.fillMaxSize()) {
                         for (d in 0 until 7) {
-                            val day = monday + d * DAY
-                            DayNumber(
-                                day, today, day in first until next, number,
-                                GlanceModifier.width(cell).clickable(actionStartActivity(openDay(context, day))),
-                            )
+                            Box(GlanceModifier.width(cell).fillMaxHeight().clickable(actionStartActivity(openDay(context, monday + d * DAY)))) {}
                         }
                     }
-                    for (lane in lanes(weeks[w]).take(fit)) {
-                        var at = 0
-                        val parts = mutableListOf<@Composable () -> Unit>()
-                        for (b in lane) {
-                            if (b.first > at) {
-                                val gap = cell * (b.first - at)
-                                parts += @Composable { Spacer(GlanceModifier.width(gap)) }
+                    Column(GlanceModifier.fillMaxSize()) {
+                        Box(GlanceModifier.fillMaxWidth().height(1.dp).background(GlanceTheme.colors.outline)) {}
+                        Row(GlanceModifier.fillMaxWidth()) {
+                            for (d in 0 until 7) {
+                                val day = monday + d * DAY
+                                DayNumber(day, today, day in first until next, number, GlanceModifier.width(cell))
                             }
-                            val color = parseColor(b.color).let { if (b.item.done()) it.copy(alpha = 0.5f) else it }
-                            parts += @Composable {
-                                Text(
-                                    b.item.title(),
-                                    maxLines = 1,
-                                    style = TextStyle(fontSize = 10.sp, color = ColorProvider(androidx.compose.ui.graphics.Color.White)),
-                                    modifier = GlanceModifier.width(cell * (b.last - b.first + 1) - 2.dp).height(bar - 1.dp)
-                                        .cornerRadius(3.dp).background(ColorProvider(color)).padding(horizontal = 3.dp)
-                                        .clickable(actionStartActivity(openItem(context, b.item))),
-                                )
-                            }
-                            parts += @Composable { Spacer(GlanceModifier.width(2.dp)) }
-                            at = b.last + 1
                         }
-                        Chunked(false, GlanceModifier.fillMaxWidth().height(bar), parts)
+                        for (lane in lanes(weeks[w]).take(fit)) {
+                            var at = 0
+                            val parts = mutableListOf<@Composable () -> Unit>()
+                            for (b in lane) {
+                                if (b.first > at) {
+                                    val gap = cell * (b.first - at)
+                                    parts += @Composable { Spacer(GlanceModifier.width(gap)) }
+                                }
+                                val color = parseColor(b.color).let { if (b.item.done()) it.copy(alpha = 0.5f) else it }
+                                parts += @Composable {
+                                    Text(
+                                        b.item.title(),
+                                        maxLines = 1,
+                                        style = TextStyle(fontSize = 10.sp, color = ColorProvider(androidx.compose.ui.graphics.Color.White)),
+                                        modifier = GlanceModifier.width(cell * (b.last - b.first + 1) - 2.dp).height(bar - 1.dp)
+                                            .cornerRadius(3.dp).background(ColorProvider(color)).padding(horizontal = 3.dp),
+                                    )
+                                }
+                                parts += @Composable { Spacer(GlanceModifier.width(2.dp)) }
+                                at = b.last + 1
+                            }
+                            Chunked(false, GlanceModifier.fillMaxWidth().height(bar), parts)
+                        }
                     }
                 }
             }
