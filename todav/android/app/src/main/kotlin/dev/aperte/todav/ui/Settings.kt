@@ -6,6 +6,9 @@ import android.os.Build
 import android.provider.Settings as SystemSettings
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.add
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -105,28 +108,37 @@ private val SORTS = listOf("manual", "newest", "oldest", "due_soonest", "due_lat
 @Composable
 private fun Frame(model: Main, title: String, content: @Composable () -> Unit) {
     val bar = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-    Scaffold(
-        modifier = Modifier.nestedScroll(bar.nestedScrollConnection),
-        topBar = {
-            LargeFlexibleTopAppBar(
-                title = { Text(title) },
-                navigationIcon = {
-                    Tip(tr("Back")) {
-                        IconButton(onClick = model::back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Back")) }
-                    }
-                },
-                scrollBehavior = bar,
-            )
-        },
-    ) { padding ->
-        Column(
-            Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().padding(bottom = 24.dp)) { content() }
+    BoxWithConstraints {
+        // The bar's back button and title over the content, centred on wide screens; its colour
+        // still across the whole width.
+        val side = ((maxWidth - SETTINGS_WIDTH) / 2).coerceAtLeast(0.dp)
+        Scaffold(
+            modifier = Modifier.nestedScroll(bar.nestedScrollConnection),
+            topBar = {
+                LargeFlexibleTopAppBar(
+                    title = { Text(title) },
+                    navigationIcon = {
+                        Tip(tr("Back")) {
+                            IconButton(onClick = model::back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Back")) }
+                        }
+                    },
+                    windowInsets = TopAppBarDefaults.windowInsets.add(WindowInsets(left = side, right = side)),
+                    scrollBehavior = bar,
+                )
+            },
+        ) { padding ->
+            Column(
+                Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Column(Modifier.widthIn(max = SETTINGS_WIDTH).fillMaxWidth().padding(bottom = 24.dp)) { content() }
+            }
         }
     }
 }
+
+/** The widest the settings' rows get, centred. */
+private val SETTINGS_WIDTH = 720.dp
 
 /** The settings' first page: its pages, as Android's own settings list them. */
 @Composable
