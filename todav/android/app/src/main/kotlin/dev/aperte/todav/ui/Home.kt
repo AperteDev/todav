@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -116,12 +117,15 @@ fun Home(model: Main) {
         Scaffold(
             snackbarHost = { SnackbarHost(snackbar) },
             bottomBar = { if (!wide) Switcher(view, page, menu, show, add) },
+            floatingActionButton = {
+                if (wide) Box(Modifier.navigationBarsPadding()) { AddButton(addLabel(view), raised = true, onClick = add) }
+            },
             contentWindowInsets = WindowInsets(0),
         ) { padding ->
             androidx.compose.runtime.CompositionLocalProvider(LocalSnackbar provides snackbar) {
                 Row(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
                     if (wide) {
-                        Rail(view, pane, menu, show, add)
+                        Rail(view, pane, menu, show)
                         AnimatedVisibility(
                             pane,
                             enter = expandHorizontally(expandFrom = Alignment.Start),
@@ -194,19 +198,18 @@ private fun Switcher(view: View, page: Boolean, onMenu: () -> Unit, onShow: (Vie
             icon = { Icon(if (view == View.CALENDAR) Icons.Filled.CalendarMonth else Icons.Outlined.CalendarMonth, null) },
             label = { Text(tr("Calendar")) },
         )
-        Box(Modifier.padding(end = 12.dp)) { AddButton(addLabel(view), onAdd) }
+        Box(Modifier.padding(end = 12.dp)) { AddButton(addLabel(view), raised = false, onClick = onAdd) }
     }
 }
 
-/** The sidebar's menu button and the add button, then Tasks and Calendar. */
+/** The sidebar's menu button, then Tasks and Calendar; the add button floats in the corner. */
 @Composable
-private fun Rail(view: View, pane: Boolean, onMenu: () -> Unit, onShow: (View) -> Unit, onAdd: () -> Unit) {
+private fun Rail(view: View, pane: Boolean, onMenu: () -> Unit, onShow: (View) -> Unit) {
     NavigationRail(
         header = {
             Tip(menuLabel(view)) {
                 IconToggleButton(checked = pane, onCheckedChange = { onMenu() }) { Icon(Icons.Default.Menu, menuLabel(view)) }
             }
-            AddButton(addLabel(view), onAdd)
         },
     ) {
         NavigationRailItem(
