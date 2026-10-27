@@ -85,8 +85,8 @@ import dev.aperte.todav.tr
 val LocalSnackbar = compositionLocalOf { SnackbarHostState() }
 
 /**
- * Tasks or Calendar, switched by a navigation bar on phones and a rail from 700 dp (unfolded
- * foldables, tablets, phones on their side; the Linux app folds its sidebar at that width too).
+ * Tasks or Calendar, switched by a navigation bar on phones and a rail from 600 dp, Material's
+ * medium width (unfolded foldables, some under 700 dp, tablets, phones on their side).
  * Their menu button shows the sidebar (the task lists or the calendars to show): a page over the
  * whole width on phones, a pane beside the view, shown at first, on wider screens.
  */
@@ -103,7 +103,7 @@ fun Home(model: Main) {
     var pane by rememberSaveable { mutableStateOf(true) }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val wide = maxWidth >= 700.dp
+        val wide = maxWidth >= 600.dp
         val sidebar = if (wide) pane else page
         val menu = { if (wide) pane = !pane else page = !page }
         val show = { v: View ->
