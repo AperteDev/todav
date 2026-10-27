@@ -74,6 +74,8 @@ private fun summary(context: Context, app: TodavApp, kind: WidgetKind, id: Int):
             IMPORTANT -> tr("Important")
             else -> all.firstOrNull { it.href == h }?.displayName ?: ""
         }
+    } else if (!WidgetPrefs.own(context, id)) {
+        tr("Calendars shown in the app")
     } else {
         widgetCalendars(context, app, id).second.joinToString(", ") { it.displayName }
     }
@@ -201,7 +203,8 @@ fun WidgetPage(app: TodavApp, id: Int, onBack: () -> Unit) {
             val account = widgetAccount(context, app, id, all)
             val mine = all.filter { it.account == account }
             Section(null) {
-                if (accounts.size > 1) {
+                // A calendar widget's account goes with its own calendars, below.
+                if (tasks && accounts.size > 1) {
                     PickRow(tr("Account"), accounts.map { accountName(it) }, accounts.indexOfFirst { it.id == account }) { i ->
                         WidgetPrefs.setAccount(context, id, accounts[i].id)
                         changed()
@@ -227,10 +230,28 @@ fun WidgetPage(app: TodavApp, id: Int, onBack: () -> Unit) {
                 )
             }
             if (!tasks) {
+                val own = WidgetPrefs.own(context, id)
                 // None picked means all; at least one stays picked.
                 val picked = WidgetPrefs.calendars(context, id).filter { h -> mine.any { it.href == h } }.toSet()
                     .ifEmpty { mine.map { it.href }.toSet() }
                 Section(tr("Calendars")) {
+                    val setOwn = { on: Boolean ->
+                        WidgetPrefs.setOwn(context, id, on)
+                        changed()
+                    }
+                    Item(
+                        headlineContent = { Text(tr("Choose Calendars")) },
+                        supportingContent = { Text(tr("Otherwise those shown in the app")) },
+                        trailingContent = { Switch(own, setOwn) },
+                        modifier = Modifier.clickable { setOwn(!own) },
+                    )
+                    if (!own) return@Section
+                    if (accounts.size > 1) {
+                        PickRow(tr("Account"), accounts.map { accountName(it) }, accounts.indexOfFirst { it.id == account }) { i ->
+                            WidgetPrefs.setAccount(context, id, accounts[i].id)
+                            changed()
+                        }
+                    }
                     mine.forEach { l ->
                         val on = l.href in picked
                         val toggle = {

@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Todav\n"
 "Report-Msgid-Bugs-To: https://github.com/AperteDev/todav/issues\n"
-"POT-Creation-Date: 2026-10-27 18:43+0100\n"
+"POT-Creation-Date: 2026-10-27 18:57+0100\n"
 "PO-Revision-Date: 2026-10-22 21:00+0200\n"
 "Last-Translator: \n"
 "Language-Team: Brazilian Portuguese\n"
@@ -63,7 +63,7 @@ msgid "Sync"
 msgstr "Sincronização"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:164
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:350
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:359
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:79
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:95
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:261
@@ -93,7 +93,7 @@ msgstr "Semana"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:167
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Widget.kt:73
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:255
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:264
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:253
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:420
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:551
@@ -129,7 +129,7 @@ msgid "Day"
 msgstr "Dia"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:171
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/Widget.kt:232
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Widget.kt:239
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:438
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:156
 msgid "Settings"
@@ -137,18 +137,18 @@ msgstr "Configurações"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:299
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:319
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/Widget.kt:389
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Widget.kt:396
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:73
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:212
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:215
 #: todav/linux/app/src/window.rs:1132 todav/linux/app/src/window.rs:1547
 msgid "Upcoming"
 msgstr "Próximas"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:300
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:327
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/Widget.kt:396
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Widget.kt:403
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:74
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:212
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:215
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:1002
 #: todav/linux/app/src/window.rs:1134 todav/linux/app/src/window.rs:1610
 msgid "Important"
@@ -160,7 +160,7 @@ msgid "Pinned"
 msgstr "Fixadas"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:387
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/Widget.kt:416
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Widget.kt:423
 #: todav/gnome-extension/extension.js:301 todav/linux/app/src/window.rs:60
 msgctxt "category"
 msgid "Other"
@@ -264,46 +264,46 @@ msgstr "Falha ao entrar: {error}"
 msgid "Month Planner"
 msgstr "Planejador mensal"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/Widget.kt:235
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Widget.kt:242
 #: todav/linux/app/ui/settings.blp:68
 msgid "Add"
 msgstr "Adicionar"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/Widget.kt:342
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Widget.kt:349
 #: todav/gnome-extension/extension.js:309
 msgid "All done"
 msgstr "Tudo concluído"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:105
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:114
 #: todav/linux/app/ui/shortcuts.blp:89
 msgid "Previous"
 msgstr "Anterior"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:112
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:121
 #: todav/linux/app/ui/shortcuts.blp:94
 msgid "Next"
 msgstr "Próximo"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:262
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:271
 #: todav/gnome-extension/extension.js:358
 msgid "Nothing planned this week"
 msgstr "Nada planejado nesta semana"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:284
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:293
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:839
 #: todav/linux/app/src/calendar.rs:619 todav/linux/app/src/calendar.rs:2075
 #: todav/linux/app/src/window.rs:1557
 msgid "All day"
 msgstr "Dia inteiro"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:287
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:296
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:842
 #: todav/linux/app/src/calendar.rs:620
 #, rust-format
 msgid "Until {time}"
 msgstr "Até {time}"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:351
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:360
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:80
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:96
 #: todav/gnome-extension/extension.js:351 todav/linux/app/src/calendar.rs:1990
@@ -311,68 +311,82 @@ msgstr "Até {time}"
 msgid "Tomorrow"
 msgstr "Amanhã"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:352
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:361
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:81
 #: todav/linux/app/src/dates.rs:58
 msgid "Yesterday"
 msgstr "Ontem"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:117
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:78
+msgid "Calendars shown in the app"
+msgstr "Agendas exibidas no aplicativo"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:119
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:161
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:183
 #: todav/linux/app/ui/settings.blp:9 todav/linux/app/ui/shortcuts.blp:8
 msgid "General"
 msgstr "Geral"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:119
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:121
 msgid "Background Opacity"
 msgstr "Opacidade do fundo"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:140
-msgid "Settings Button"
-msgstr "Botão de configurações"
-
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:141
-msgid "Without it, a widget's settings open from its menu on the home screen"
-msgstr "Sem ele, as configurações de um widget abrem pelo menu dele na tela inicial"
-
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:146
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:136
 msgid "Corner Radius"
 msgstr "Raio dos cantos"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:192
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:157
+msgid "Settings Button"
+msgstr "Botão de configurações"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:158
+msgid "Without it, a widget's settings open from its menu on the home screen"
+msgstr ""
+"Sem ele, as configurações de um widget abrem pelo menu dele na tela inicial"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:194
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:165
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:187
 msgid "Widgets"
 msgstr "Widgets"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:205
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:208
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:250
 #: todav/linux/app/ui/add-account.blp:121
 msgid "Account"
 msgstr "Conta"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:213
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:216
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TaskPage.kt:192
 #: todav/linux/app/ui/edit-dialog.blp:85
 msgid "List"
 msgstr "Lista"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:219
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:222
 msgid "Add Button"
 msgstr "Botão de adicionar"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:220
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:223
 msgid "Adds a task to the list shown"
 msgstr "Adiciona uma tarefa à lista exibida"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:220
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:223
 msgid "Adds an event"
 msgstr "Adiciona um evento"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:233
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:237
 #: todav/linux/app/ui/calendar.blp:117
 msgid "Calendars"
 msgstr "Agendas"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:243
+msgid "Choose Calendars"
+msgstr "Escolher agendas"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:244
+msgid "Otherwise those shown in the app"
+msgstr "Caso contrário, as exibidas no aplicativo"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:22
 #: todav/linux/app/src/main.rs:202

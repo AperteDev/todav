@@ -128,7 +128,11 @@ object WidgetPrefs {
     fun account(c: Context, id: Int) = prefs(c).getLong("$id.account", -1).takeIf { it >= 0 }
     fun setAccount(c: Context, id: Int, v: Long) = prefs(c).edit().putLong("$id.account", v).remove("$id").remove("$id.calendars").apply()
 
-    /** A calendar widget's calendars and task lists (none: all of its account's). */
+    /** Whether a calendar widget picks its own calendars (else: those shown in the app). */
+    fun own(c: Context, id: Int) = prefs(c).getBoolean("$id.own", false)
+    fun setOwn(c: Context, id: Int, v: Boolean) = prefs(c).edit().putBoolean("$id.own", v).apply()
+
+    /** A calendar widget's own calendars and task lists (none: all of its account's). */
     fun calendars(c: Context, id: Int): Set<String> = prefs(c).getStringSet("$id.calendars", null) ?: emptySet()
     fun setCalendars(c: Context, id: Int, v: Set<String>) = prefs(c).edit().putStringSet("$id.calendars", v).apply()
 
@@ -138,7 +142,7 @@ object WidgetPrefs {
 
     /** A removed widget's settings go. */
     fun forget(c: Context, id: Int) = prefs(c).edit().apply {
-        for (k in listOf("$id", "$id.account", "$id.calendars", "$id.add")) remove(k)
+        for (k in listOf("$id", "$id.account", "$id.calendars", "$id.add", "$id.own")) remove(k)
     }.apply()
 }
 

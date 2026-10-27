@@ -52,6 +52,7 @@ import dev.aperte.todav.core.dateOf
 import dev.aperte.todav.core.midnight
 import dev.aperte.todav.core.midnightOn
 import dev.aperte.todav.core.monthFirst
+import dev.aperte.todav.core.sameList
 import dev.aperte.todav.core.weekStart
 import dev.aperte.todav.ui.DAY
 import dev.aperte.todav.ui.done
@@ -76,9 +77,17 @@ class Turn : ActionCallback {
     }
 }
 
-/** A calendar widget's account and its calendars and task lists shown: those picked, else all. */
+/**
+ * A calendar widget's account and its calendars and task lists shown: those shown in the app, or
+ * with its own picked, those of its account picked (none: all).
+ */
 fun widgetCalendars(context: Context, app: TodavApp, id: Int): Pair<Long?, List<TodavList>> {
     val all = app.core.byPlace((app.core.calendars() + app.core.lists()).distinctBy { it.href })
+    // Unless the widget picks its own: those shown in the app, of every account.
+    if (!WidgetPrefs.own(context, id)) {
+        val hidden = app.core.hidden()
+        return null to all.filter { l -> hidden.none { sameList(it, l.href) } }
+    }
     val account = widgetAccount(context, app, id, all)
     val mine = all.filter { it.account == account }
     val picked = WidgetPrefs.calendars(context, id)

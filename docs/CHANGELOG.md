@@ -22,9 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Important) by category with its subtasks, the month with a dot per calendar on each day, the
   coming week's agenda, a day's hours, and a month planner with bars across the days. A task or
   an event opens in its editor, a month's or day's title in the calendar. Each has an add button
-  and settings (its account, its list or calendars, its add button), in the launcher's menu of
-  the widget and in Settings → Widgets, which also sets the background's opacity, the corners'
-  radius and a settings button on each widget.
+  and settings (its list, or calendars other than those shown in the app; its add button), in
+  the launcher's menu of the widget and in Settings → Widgets, which also sets the background's
+  opacity, the corners' radius and a settings button on each widget.
 - Android: a launcher icon of its own, the calendar page filling whatever shape the launcher gives
   icons, with a themed version; the app opens on it over the system's accent colour, light or
   dark with it.
