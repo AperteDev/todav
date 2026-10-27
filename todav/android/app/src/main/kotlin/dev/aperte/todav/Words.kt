@@ -29,6 +29,50 @@ fun fields(t: Long): LocalDateTime = LocalDateTime.ofEpochSecond(t, 0, ZoneOffse
 fun format(t: Long, pattern: String): String =
     fields(t).format(DateTimeFormatter.ofPattern(pattern, Locale.getDefault()))
 
+/** The system's 24-hour setting (MainActivity reads it). */
+@Volatile
+var hours24 = true
+
+/** A time of day as the system shows it. */
+fun time(t: Long): String = format(t, if (hours24) "HH:mm" else "h:mm a")
+
+/** An hour of the day for the week view's side ("08:00", "8 AM"). */
+fun hourLabel(h: Int): String = format(h * 3600L, if (hours24) "HH:mm" else "h a")
+
+/** A date in the locale's medium form ("27 Oct 2026"). */
+fun date(t: Long): String =
+    fields(t).format(DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM).withLocale(Locale.getDefault()))
+
+/** Labels of the reminder presets (`Todav.reminderPresets`), as the Linux app's (dates.rs). */
+fun reminderPresets(offsets: List<Long>, allDay: Boolean, event: Boolean, allDayTime: Long): List<Pair<String, Long>> {
+    if (!allDay) {
+        val labels = listOf(
+            if (event) tr("At start") else tr("At due time"),
+            tr("5 minutes before"),
+            tr("15 minutes before"),
+            tr("30 minutes before"),
+            tr("1 hour before"),
+            tr("1 day before"),
+        )
+        return labels.zip(offsets)
+    }
+    val at = String.format(Locale.ROOT, "%d:%02d", allDayTime / 3600, allDayTime / 60 % 60)
+    return listOf(
+        tr("On the day at {time}").replace("{time}", at),
+        tr("The day before at {time}").replace("{time}", at),
+    ).zip(offsets)
+}
+
+/** The units of a custom reminder, as `todav_app::dates::UNITS`. */
+fun reminderUnits() = listOf(ptr("reminder", "minutes"), ptr("reminder", "hours"), ptr("reminder", "days"), ptr("reminder", "weeks"))
+
+/** Before or after the due time; for a date alone, before the day or into it. */
+fun reminderDirections(allDay: Boolean) = if (allDay) {
+    listOf(ptr("reminder", "before the day"), ptr("reminder", "into the day"))
+} else {
+    listOf(ptr("reminder", "before"), ptr("reminder", "after"))
+}
+
 /** "Today", "Tomorrow", "Yesterday", a weekday in the week ahead, else the date; then the time. */
 fun dayLabel(t: Long, allDay: Boolean, now: Long): String {
     val day = when (dayName(t, now)) {
@@ -39,7 +83,7 @@ fun dayLabel(t: Long, allDay: Boolean, now: Long): String {
         Day.THIS_YEAR -> format(t, "d MMMM")
         Day.DATE -> format(t, "d MMMM yyyy")
     }
-    return if (allDay) day else "$day ${format(t, "HH:mm")}"
+    return if (allDay) day else "$day ${time(t)}"
 }
 
 /** A task's due date, as its row shows it. */

@@ -151,6 +151,9 @@ One Cargo workspace at the root, the app's core and front-ends under `todav/`. N
 | Linux UI | `gtk4`, `libadwaita` | The platform toolkit; D-Bus, GOA and notifications go through `gio` from the same bindings |
 | Linux secrets | `libsecret` | App passwords in the Secret Service |
 | Locale (gettext, first weekday) | `libc` (already in the tree) + glibc's own gettext | `setlocale`, `nl_langinfo`; the five gettext calls are declared in `i18n.rs`, no `gettext-rs` |
+| Android UI | AndroidX: Compose Material 3, Navigation 3, WorkManager, Glance | The platform's own libraries: screens with predictive back, the 30-minute safety-net sync, the home-screen widget |
+| Android push | — (UnifiedPush AND\_3 spoken directly, `Background.kt`) | The connector library brings Google's Tink to decrypt Web Push, which the core already does |
+| Android: the Nextcloud app's accounts | — (its Single Sign-On AIDL service, `NextcloudApp.kt`, adapted from the GPL-3 Android-SingleSignOn) | The library brings Retrofit, OkHttp, RxJava 2 and 3, Gson and AppCompat, from JitPack |
 
 Anything beyond this table needs a one-line justification in the PR.
 
@@ -386,35 +389,35 @@ A panel indicator with a read-only view of a list and a month calendar; clicking
 
 ## Android app
 
-Kotlin + Jetpack Compose on top of the core and `todav-app` via UniFFI (`todav-ffi`). Push arrives through UnifiedPush with the ntfy app as distributor; no Google services, no own foreground service.
+Kotlin + Jetpack Compose (Material 3) on top of the core and `todav-app` via UniFFI (`todav-ffi`). Push arrives through UnifiedPush (ntfy or another distributor); no Google services, no foreground service of its own. Released on Google Play and F-Droid (decided 2026-10-27).
 
-**Dependencies** (AndroidX + Compose + these three): `net.java.dev.jna:jna` (required by UniFFI), `org.unifiedpush.android:connector`, and PebbleKit (vendored AAR, see Pebble section). No Room, Retrofit, OkHttp, Hilt or WorkManager-dependent libraries; the core already has storage and HTTP.
+**Dependencies**: AndroidX only (Compose Material 3, Navigation 3, WorkManager, Glance, Browser for Custom Tabs) and JNA (required by UniFFI); see the Dependency policy table. UnifiedPush and the Nextcloud app's Single Sign-On are spoken directly instead of through their libraries. Later PebbleKit (vendored AAR, see Pebble section). No Room, Retrofit, OkHttp or Hilt; the core has storage and HTTP.
 
 **Structure**
 
 - `android/core`: Gradle library module. Its tasks, wired in through the variant API: `cargoNdk` builds `libtodav_ffi.so` for `todav.abis` (`make run` only x86\_64), `uniffiBindings` generates the Kotlin bindings from it (package `dev.aperte.todav.core`), `catalogs` compiles `po/` into `assets/locale/<language>/todav.mo`. JNA comes as an AAR; keep rules for JNA and the bindings go to the app.
-- `android/app` (`dev.aperte.todav`, minSdk 29, target 37): `TodavApp` (the `Todav` object, the service started without the ntfy listener, change and sync-state flows, accounts connected with their saved passwords), `Passwords` (the `Keyring`: AES-GCM with a key in the Android Keystore, ciphertext in preferences; backup off), `I18n` (`tr`/`ntr`/`ptr` over `Translations`, the app's own language when set: `locales_config.xml` lists `po/LINGUAS`), `Main` (the view model), `MainActivity` (sync on resume, `tick` every minute in front), `ui/`. Later: `SyncScheduler`, `PushReceiver`, `pebble/`.
+- `android/app` (`dev.aperte.todav`, minSdk 29, target 37): `TodavApp` (the `Todav` object, the service started without the ntfy listener, change and sync-state flows, accounts connected with their saved passwords or through the Nextcloud app, the reminder alarm and widgets set again after changes), `Passwords` (the `Keyring`: AES-GCM with a key in the Android Keystore, ciphertext in preferences; backup off), `I18n` (`tr`/`ntr`/`ptr` over `Translations`, the app's own language when set: `locales_config.xml` lists `po/LINGUAS`), `Model` (`Main`, the view model: the back stack, what the screens show), `Background` (UnifiedPush, `SyncWorker`, reminders and their notifications, boot and time-zone receivers), `NextcloudApp` (accounts through the Nextcloud app), `Widget` (Glance), `MainActivity` (sync on resume, `tick` every minute in front; a notification's task or day, shared text, the "New Task" shortcut), `ui/`.
 - Launcher icon: the Linux icon rendered as the adaptive icon's foreground (`app/icons.sh`), the brand's light colour behind it, the symbolic icon as the monochrome layer.
 
-**UI (Compose, Material 3)**
+**UI** (decided 2026-10-27: native Material 3, matching the Linux app's features)
 
-- Bottom navigation or a list drawer mirroring the Linux layout; task screen is a `LazyColumn` with sticky category headers; checkbox rows; swipe-to-delete with undo snackbar.
-- Quick-add bar at the bottom with a category chip row (from config.json) above the keyboard.
-- Home-screen widget (Jetpack Glance, part of AndroidX) for the pinned list: ticking an item sends a broadcast → `set_done` → `sync()`. This is the Android counterpart of the GNOME extension.
-- State: a `ViewModel` per screen reads the core on `Dispatchers.IO` and re-reads on `ChangeListener` callbacks; no in-memory duplicate of the data.
+- Tasks and Calendar are switched by buttons: a navigation bar on phones (under 600dp), a navigation rail on medium widths, both side by side on expanded ones (unfolded foldables, tablets; 840dp and up). The drawer holds Upcoming, Important and the task lists by account (long press: edit), and with the calendar shown the calendars and lists to show or hide; New List and Settings at its end.
+- Screens are Navigation 3 entries over a back stack kept in the view model (a fold or rotation keeps it): Home, a task, an event, search, settings and their pages, an account, adding an account.
+- Task list: the Linux app's groups (Pinned, then by category, as tags or not at all), subtasks under a "done/all" toggle, Completed apart; a category filter in the top bar, pull to refresh. Rows: check, title, note line, due date (red when overdue), bell, linked event, star with a priority menu, pin. Swipe right completes (or reopens), left deletes, both with Undo; tap opens the task; long press and drag moves it (above or below a row reorders, onto a row makes it a subtask, onto a category heading sets the category, as `todav_app::tasks` decides), long press alone opens its menu (Edit, Add Subtask, Pin, Make Top-Level Task, Move to List, Delete). The add button opens a bottom sheet: title, due date, category, important.
+- Task page (full screen, Save as one undo step): the Linux edit dialog's fields (title, list, category, priority, its event, note, start, due date with time, reminders as presets or a custom span), its subtasks (ticked and added at once), Delete.
+- Calendar: Month (six weeks, as many chips a day as fit, the picked day's events and tasks underneath or beside it), Week (hour grid, overlapping blocks side by side, the top row for what takes no hours, the current time) and Agenda (60 days); months and weeks change with a swipe; Today, a view menu and the add button. An item opens a details sheet as the Linux popover (an event's tasks or a task's subtasks with a field adding one; Edit, Delete); a tap on an empty hour adds an event there. The event page has the Linux event dialog's fields and asks which occurrences a change or delete is for.
+- Settings: General (style, language through the system's per-app setting, start page, notifications), Accounts (each account's page: on/off, name, connection, server status, Remove; "Sync settings with"; push status), Tasks, Calendar, About. The extension's options have no counterpart: each widget picks its list when placed.
+- Not done: dragging on the calendar (moving events, planning tasks into hours), the "To Plan" list, moving a task to another list by dragging it onto the drawer, reordering accounts.
 
 **Push and sync**
 
-1. On first launch, `UnifiedPush.registerApp(context)`; when `onNewEndpoint(endpoint)` arrives, call `client.push_register(endpoint, 86400)` on IO. On `onUnregistered`, `push_unregister()`.
-2. `onMessage(bytes)` → `client.push_decode(bytes)` → for each topic `client.sync_topic(topic)`. UnifiedPush delivers in the background, so this runs in a broadcast receiver with `goAsync()` and a short coroutine; keep it under 10 s.
-3. If the connector reports an encrypted Web Push message (UnifiedPush 3 connectors decrypt it before `onMessage`), the bytes are already plaintext; `push_decode` handles both.
-4. Safety net: `WorkManager` (part of AndroidX, acceptable) periodic `SyncWorker` every 30 min with network constraint; plus `sync()` on app foreground.
-5. Registration refresh: a `SyncWorker` run also re-registers push when `push_expires` is within 6 h.
-6. Reminders: no 30-second check as on Linux; an exact alarm (`AlarmManager`) set for `Todav::next_reminder` (`todav_app::service::next_reminder`, within a week), which then shows `due_reminders` and sets the next one; set again after each sync and change.
+1. UnifiedPush (spec AND\_3) without the connector library: `Push` registers with the installed distributor (the one saved, else the first) with a token; `PushReceiver` takes `NEW_ENDPOINT` → `push_register(endpoint, a week)`, `MESSAGE` → `push_decode` (the Web Push message as Nextcloud encrypted it, for the core's keys) → `sync_topic` for each topic, in `goAsync()` under 10 s, acknowledged with `MESSAGE_ACK`; `UNREGISTERED` → `push_unregister()`. The distributor learns the caller by shared identity (Android 14) or the `pi` pending intent; `RaiseService` is the bindable service the spec asks for.
+2. Safety net: `SyncWorker` (WorkManager) every 30 minutes on a network: sync, renew the push registration (the core skips calendars whose registration has more than a quarter of its time left), set the reminder alarm. In front: a sync on resume and `tick` every minute.
+3. Reminders: an exact alarm (`USE_EXACT_ALARM`, allowed for calendar apps; `SCHEDULE_EXACT_ALARM` on Android 12) for `next_reminder`; when it goes off, a notification for each of `due_reminders` (tasks with "Mark as Done", which leaves open subtasks as on Linux; events opening the calendar on their day), then the next alarm. Set again after changes and syncs, at boot and when the clock or zone changes; `due_reminders` runs at start too, for reminders missed while the process was gone. Notifications are asked for once an account exists (Android 13).
 
-**Account setup**: Nextcloud Login Flow v2 (`/index.php/login/v2`) in a Custom Tab yields an app password; store it in `EncryptedSharedPreferences` is deprecated, so use the Android Keystore to wrap it and keep the blob in `SharedPreferences`.
+**Accounts**: the welcome page and Settings → Add Account offer the Nextcloud app's accounts first (the GOA counterpart), then a server to sign in to (Login Flow v2 in a Custom Tab, or a login name + app password), then lists on this device only. App passwords are wrapped with an Android Keystore key, the blob in `SharedPreferences` (`EncryptedSharedPreferences` is deprecated).
 
-**Battery**: the ntfy app keeps the only persistent connection; this app wakes only on push or on the 30-min worker. Ask the user to exempt ntfy (not this app) from battery optimisation.
+**Battery**: the distributor keeps the only persistent connection; this app wakes only on push, on the 30-minute worker and for reminders. Ask the user to exempt the distributor (not this app) from battery optimisation.
 
 ## Pebble watchapp + companion
 
@@ -526,7 +529,8 @@ Deviation: no docker stack (`infra/`) for now — integration runs against the r
 - [x] `todav-app`: the Linux app's logic that is not GTK moved into a crate of its own for every front-end (settings with defaults, dates, task trees and drops, calendar items, layout and drops, accounts over a keyring trait, the background service); its unit tests moved with it
 - [x] `todav-ffi`: the core and `todav-app` exported with UniFFI (a workspace of its own, bundled SQLite), Kotlin and C# bindings generated and smoke-tested against the Linux build by `scripts/bindings.sh`, in CI too
 - [x] Android groundwork: Gradle project building the core with cargo-ndk, bindings and catalogs; the shared SDK and emulator (`sdk.sh`, Makefile, Zed tasks); welcome page (local lists, or Nextcloud by browser or app password), the drawer with Upcoming, Important and the lists by account, tasks by category with subtasks, add, tick, swipe to delete with Undo, sync on resume and every minute in front. Tried on the Android 15 emulator
-- [ ] M6 Android (push, background sync, reminders, edit, widget, settings) → M7 Pebble, then Windows
+- [x] Android, most of M6 (2026-10-27): Tasks | Calendar by a navigation bar or rail, side by side on wide screens; task page, add sheet, swipes, drag and drop, stars, pins, categories, search; month, week and agenda with details sheets and the event page; settings and accounts; UnifiedPush, the 30-minute worker, exact-alarm reminders with "Mark as Done", the widget, share target and "New Task" shortcut. Tried on the Android 15 emulator against the Test account (reminders, push status, drops, foldable widths)
+- [ ] M6 Android leftovers (see [Android app](#android-app)), push delivery through a real distributor → M7 Pebble, then Windows
 
 ## Roadmap
 

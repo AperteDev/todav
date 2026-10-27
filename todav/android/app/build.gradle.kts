@@ -54,4 +54,9 @@ dependencies {
     implementation(libs.core.ktx)
     implementation(libs.browser)
     implementation(libs.coroutines.android)
+    implementation(libs.navigation3.runtime)
+    implementation(libs.navigation3.ui)
+    implementation(libs.work.runtime)
+    implementation(libs.glance.appwidget)
+    implementation(libs.glance.material3)
 }

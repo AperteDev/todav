@@ -11,10 +11,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
-/** The wallpaper's colours where Android has them (12 and later), else the icon's blue and teal. */
+/**
+ * Light or dark as `scheme` says ("light", "dark", else the system's); the wallpaper's colours
+ * where Android has them (12 and later), else the icon's blue and teal.
+ */
 @Composable
-fun TodavTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
+fun TodavTheme(scheme: String?, content: @Composable () -> Unit) {
+    val dark = when (scheme) {
+        "light" -> false
+        "dark" -> true
+        else -> isSystemInDarkTheme()
+    }
     val context = LocalContext.current
     val colors = when {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->

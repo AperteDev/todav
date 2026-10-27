@@ -10,9 +10,12 @@ import dev.aperte.todav.core.Todav
 import java.time.ZoneId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -25,30 +28,34 @@ class TodavApp : Application() {
         private set
     lateinit var passwords: Passwords
         private set
+    lateinit var push: Push
+        private set
 
     /** Bumped on every change to the data, here or synced: screens read again. */
     val changes = MutableStateFlow(0L)
     val syncState = MutableStateFlow<SyncState>(SyncState.Idle)
     /** Items the server refused in a sync that otherwise went through. */
     val refused = MutableSharedFlow<List<Refused>>(extraBufferCapacity = 8)
-    /** The accounts are connected (their passwords restored): the first screen can show. */
+    /** The accounts are connected and the service runs: the first screen can show. */
     val ready = MutableStateFlow(false)
 
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    @OptIn(FlowPreview::class)
     override fun onCreate() {
         super.onCreate()
         I18n.load(this)
         passwords = Passwords(this)
+        push = Push(this)
         core = Todav.open(filesDir.resolve("todav").path)
         core.setLocalZone(ZoneId.systemDefault().id)
         core.subscribe(object : Listener {
             override fun changed(listHref: String, uids: List<String>) = changed()
             override fun settingsChanged() = changed()
         })
+        Reminders.channel(this)
         scope.launch {
             connectAccounts()
-            ready.value = true
             core.startService(object : ServiceShell {
                 override fun state(state: SyncState) {
                     syncState.value = state
@@ -58,15 +65,41 @@ class TodavApp : Application() {
                     refused.tryEmit(items)
                 }
             }, false)
+            ready.value = true
+            // Reminders missed while the process was gone (and the first time, the mark to count from).
+            runCatching { Reminders.show(this@TodavApp) }
+            pushSetup()
+            SyncWorker.start(this@TodavApp)
+            // The next reminder's alarm and the widgets, again after changes settle.
+            changes.debounce(1_000).collect {
+                runCatching { Reminders.schedule(this@TodavApp) }
+                TasksWidget.refresh(this@TodavApp)
+            }
         }
     }
 
     fun changed() = changes.update { it + 1 }
 
-    /** Connect the Nextcloud accounts signed in here with their saved app passwords. */
+    suspend fun awaitReady() {
+        ready.first { it }
+    }
+
+    /** Register for pushes through UnifiedPush, when a distributor is installed and some account syncs. */
+    fun pushSetup() {
+        if (core.canSync()) push.register()
+    }
+
+    /**
+     * Connect the Nextcloud accounts signed in here: with their saved app passwords, or through
+     * the Nextcloud app.
+     */
     private fun connectAccounts() {
         for (a in core.accounts()) {
-            if (a.kind != AccountKind.NEXTCLOUD || a.source.isNotEmpty()) continue
+            if (a.kind != AccountKind.NEXTCLOUD) continue
+            if (a.source.startsWith(NEXTCLOUD_APP)) {
+                runCatching { NextcloudApp.connect(this, a) }
+                continue
+            }
             val password = passwords.load(a.url, a.user) ?: continue
             runCatching { core.connect(a.id, password) }
         }
