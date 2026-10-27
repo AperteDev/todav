@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Android: a full Material app. Tasks and Calendar side by side on unfolded foldables and
+  tablets, switched by a navigation bar on phones; a task page with everything the Linux edit
+  dialog has; swipe right to complete and left to delete, both with Undo; drag tasks to reorder
+  them, make them subtasks or change their category; month, week and agenda views where events
+  and tasks move by dragging; an event editor with repeating events; "To Plan" for putting tasks
+  into hours of the week; search; settings and accounts; reminders; push through UnifiedPush; a
+  home-screen widget; "New Task" from the launcher; adding shared text as a task; keyboard
+  shortcuts.
+- Android: sign in through the Nextcloud app on the device, which keeps the credentials.
+  Lists of such an account cannot be created, renamed or recoloured from Todav, and changes
+  made elsewhere show up at the next check rather than by push.
+
 ### Fixed
 
 - On a new installation, reminders never went off.
