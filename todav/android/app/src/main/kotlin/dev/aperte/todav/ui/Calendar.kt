@@ -84,6 +84,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.aperte.todav.CalMode
 import dev.aperte.todav.Dest
 import dev.aperte.todav.Main
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.zIndex
+import dev.aperte.todav.core.Change
+import dev.aperte.todav.core.EventPatch
 import dev.aperte.todav.core.AgendaEntry
 import dev.aperte.todav.core.DayBlock
 import dev.aperte.todav.core.Due
@@ -538,6 +545,10 @@ private fun Week(model: Main, start: Long, picked: Long, scroll: androidx.compos
         items.mapIndexedNotNull { i, it -> model.core.hours(it)?.let { _ -> i to model.core.segments(it, start) } }
     }
     val inHours = timed.map { it.first }.toSet()
+    var drag by remember { mutableStateOf<Held?>(null) }
+    // A drop to apply: the item and where its start goes.
+    var moved by remember { mutableStateOf<Pair<Item, Long>?>(null) }
+    moved?.let { (item, at) -> Reschedule(model, item, at) { moved = null } }
     val now = model.core.localNow()
     val today = midnight(now)
     Column(Modifier.fillMaxSize()) {
@@ -620,14 +631,44 @@ private fun Week(model: Main, start: Long, picked: Long, scroll: androidx.compos
                             val item = items[i]
                             val color = parseColor(colors[item.list()])
                             val height = (HOUR * ((s.to - s.from).coerceAtLeast(20) / 60f)) - 1.dp
+                            val held = drag?.takeIf { it.item == i && it.day == d }
                             Box(
                                 Modifier
                                     .offset(x = w * c.column.toInt() / c.columns.toInt(), y = HOUR * (s.from / 60f))
+                                    .zIndex(if (held != null) 1f else 0f)
+                                    .graphicsLayer {
+                                        held?.let {
+                                            translationX = it.offset.x
+                                            translationY = it.offset.y
+                                            shadowElevation = 8.dp.toPx()
+                                        }
+                                    }
                                     .width(w / c.columns.toInt() - 1.dp)
                                     .height(height)
                                     .clip(RoundedCornerShape(4.dp))
                                     .background(if (item is Item.Event) color else color.copy(alpha = 0.3f))
                                     .clickable { onItem(item) }
+                                    // Held and moved: to another hour (15-minute steps) or day.
+                                    .pointerInput(item, d) {
+                                        detectDragGesturesAfterLongPress(
+                                            onDragStart = { drag = Held(i, d, Offset.Zero) },
+                                            onDrag = { change, amount ->
+                                                change.consume()
+                                                drag = drag?.let { it.copy(offset = it.offset + amount) }
+                                            },
+                                            onDragEnd = {
+                                                val h = drag ?: return@detectDragGesturesAfterLongPress
+                                                drag = null
+                                                val minutes = s.from + (h.offset.y / HOUR.toPx() * 60).toLong()
+                                                val stepped = (Math.round(minutes / 15.0) * 15).coerceIn(0, 24 * 60 - 15)
+                                                val days = Math.round(h.offset.x / w.toPx()).toLong()
+                                                if (stepped != s.from || days != 0L) {
+                                                    moved = Pair(item, start + (d + days) * DAY + stepped * 60)
+                                                }
+                                            },
+                                            onDragCancel = { drag = null },
+                                        )
+                                    }
                                     .padding(2.dp),
                             ) {
                                 Text(
@@ -648,6 +689,33 @@ private fun Week(model: Main, start: Long, picked: Long, scroll: androidx.compos
                             )
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+/** A block held in the week view: which item, on which day, and how far it was moved. */
+private data class Held(val item: Int, val day: Int, val offset: Offset)
+
+/** `item` moved to start at `at`: as the core's slot drop says; a repeating event asks which occurrences. */
+@Composable
+private fun Reschedule(model: Main, item: Item, at: Long, onDone: () -> Unit) {
+    val core = model.core
+    val change = remember(item, at) { core.slotDrop(item, at) }
+    when (change) {
+        is Change.Task -> LaunchedEffect(Unit) {
+            val t = (item as Item.Task).task
+            model.update(t.uid, change.patch)
+            onDone()
+        }
+        is Change.Event -> {
+            val e = (item as Item.Event).event
+            ScopeDialog(tr("Change Repeating Event?"), e.recurring, delete = false, onDismiss = onDone) { scope ->
+                onDone()
+                model.act {
+                    core.updateEvent(e.listHref, e.uid, e.recurrenceId, scope, EventPatch(time = change.time))
+                    model.synced()
                 }
             }
         }
