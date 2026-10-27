@@ -333,6 +333,10 @@ private fun MonthGrid(model: Main, month: Long, picked: Long, onItem: (Item) -> 
     val colors = load(changes, initial = emptyMap<String, String>()) { model.core.colors() }
     val today = midnight(model.core.localNow())
     val thisMonth = fields(month).monthValue
+    // A chip held and moved: the day under it, and the drop to apply.
+    var target by remember { mutableStateOf<Long?>(null) }
+    var moved by remember { mutableStateOf<Pair<Item, Change>?>(null) }
+    moved?.let { (item, change) -> Reschedule(model, item, change) { moved = null } }
     Column(Modifier.fillMaxSize().padding(horizontal = 4.dp)) {
         Row(Modifier.fillMaxWidth()) {
             for (d in 0 until 7) {
@@ -351,8 +355,34 @@ private fun MonthGrid(model: Main, month: Long, picked: Long, onItem: (Item) -> 
                     val at = start + (w * 7 + d) * DAY
                     val here = items.filter { onDay(it, at) }
                     DayCell(
-                        at, here, colors, at == today, at == picked, fields(at).monthValue == thisMonth,
-                        Modifier.weight(1f).fillMaxHeight(),
+                        at, here, colors, at == today, at == picked || at == target, fields(at).monthValue == thisMonth,
+                        Modifier.weight(1f).fillMaxHeight().pointerInput(at, here) {
+                            // Held on a chip and moved: to the day it is let go over.
+                            var held: Item? = null
+                            var total = Offset.Zero
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = { p ->
+                                    held = here.getOrNull(((p.y - 26.dp.toPx()) / 15.dp.toPx()).toInt())
+                                    total = Offset.Zero
+                                    target = held?.let { at }
+                                },
+                                onDrag = { change, amount ->
+                                    if (held != null) {
+                                        change.consume()
+                                        total += amount
+                                        val rows = Math.round(total.y / size.height)
+                                        val cols = Math.round(total.x / size.width)
+                                        target = at + (rows * 7L + cols) * DAY
+                                    }
+                                },
+                                onDragEnd = {
+                                    val (item, day) = held to target
+                                    target = null
+                                    if (item != null && day != null && day != at) moved = item to dev.aperte.todav.core.dayDrop(item, day, false)
+                                },
+                                onDragCancel = { target = null },
+                            )
+                        },
                     ) { model.day.value = at }
                 }
             }
@@ -570,7 +600,10 @@ private fun Week(model: Main, start: Long, picked: Long, scroll: androidx.compos
     var drag by remember { mutableStateOf<Held?>(null) }
     // A drop to apply: the item and where its start goes.
     var moved by remember { mutableStateOf<Pair<Item, Long>?>(null) }
-    moved?.let { (item, at) -> Reschedule(model, item, at) { moved = null } }
+    moved?.let { (item, at) ->
+        val change = remember(item, at) { model.core.slotDrop(item, at) }
+        Reschedule(model, item, change) { moved = null }
+    }
     val now = model.core.localNow()
     val today = midnight(now)
     Column(Modifier.fillMaxSize()) {
@@ -728,11 +761,10 @@ private fun Week(model: Main, start: Long, picked: Long, scroll: androidx.compos
 /** A block held in the week view: which item, on which day, and how far it was moved. */
 private data class Held(val item: Int, val day: Int, val offset: Offset)
 
-/** `item` moved to start at `at`: as the core's slot drop says; a repeating event asks which occurrences. */
+/** `item` moved as `change` says (the core's slot or day drop); a repeating event asks which occurrences. */
 @Composable
-private fun Reschedule(model: Main, item: Item, at: Long, onDone: () -> Unit) {
+private fun Reschedule(model: Main, item: Item, change: Change, onDone: () -> Unit) {
     val core = model.core
-    val change = remember(item, at) { core.slotDrop(item, at) }
     when (change) {
         is Change.Task -> LaunchedEffect(Unit) {
             val t = (item as Item.Task).task
