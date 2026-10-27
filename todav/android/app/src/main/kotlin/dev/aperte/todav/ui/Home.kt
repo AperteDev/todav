@@ -102,6 +102,7 @@ fun Home(model: Main) {
     val snackbar = remember { SnackbarHostState() }
     val view by model.view.collectAsStateWithLifecycle()
     val ticking by model.ticking.collectAsStateWithLifecycle()
+    val toPlan by model.toPlan.collectAsStateWithLifecycle()
     ticking?.let { SubtasksDialog(it, model::answer) }
     Messages(model, screen, snackbar)
     // Each its own: turning a phone doesn't cover its view with a page left open in the pane.
@@ -124,7 +125,8 @@ fun Home(model: Main) {
             snackbarHost = { SnackbarHost(snackbar) },
             bottomBar = { if (!wide) Switcher(view, page, menu, show, add) },
             floatingActionButton = {
-                if (wide) Box(Modifier.navigationBarsPadding()) { AddButton(addLabel(view), raised = true, onClick = add) }
+                // Not over the calendar's "To Plan" sheet, which is under this layer.
+                if (wide && !(toPlan && view == View.CALENDAR)) Box(Modifier.navigationBarsPadding()) { AddButton(addLabel(view), raised = true, onClick = add) }
             },
             contentWindowInsets = WindowInsets(0),
         ) { padding ->
@@ -142,7 +144,7 @@ fun Home(model: Main) {
                             val saved by model.sidebarWidth.collectAsStateWithLifecycle()
                             var width by remember(saved) { mutableFloatStateOf(saved) }
                             Row(Modifier.fillMaxHeight()) {
-                                Sidebar(model, screen, view, Modifier.width(width.coerceIn(200f, most).dp)) {}
+                                Sidebar(model, screen, view, Modifier.width(width.coerceIn(200f, most).dp).fillMaxHeight()) {}
                                 Edge(
                                     onDrag = { width = (width.coerceIn(200f, most) + it).coerceIn(200f, most) },
                                     onDone = { model.setSidebarWidth(width.coerceIn(200f, most)) },

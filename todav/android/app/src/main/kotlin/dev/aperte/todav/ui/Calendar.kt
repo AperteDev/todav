@@ -236,7 +236,10 @@ fun CalendarPane(model: Main) {
     val day = picked ?: midnight(now)
     var details by remember { mutableStateOf<Item?>(null) }
     var viewMenu by remember { mutableStateOf(false) }
-    var toPlan by remember { mutableStateOf(false) }
+    // In the model: the add button floating over the calendar hides meanwhile.
+    val toPlan by model.toPlan.collectAsStateWithLifecycle()
+    // Only for the views with hours.
+    LaunchedEffect(mode) { if (!mode.hours()) model.toPlan.value = false }
     // A task from "To Plan" held and dragged over the hours.
     var plan by remember { mutableStateOf<Planning?>(null) }
     val changes by model.todav.changes.collectAsStateWithLifecycle()
@@ -260,7 +263,7 @@ fun CalendarPane(model: Main) {
                     }
                     if (mode.hours()) {
                         Tip(tr("To Plan")) {
-                            IconButton(onClick = { toPlan = true }) { Icon(Icons.Outlined.Inbox, tr("To Plan")) }
+                            IconButton(onClick = { model.toPlan.value = true }) { Icon(Icons.Outlined.Inbox, tr("To Plan")) }
                         }
                     }
                     Tip(tr("Search")) {
@@ -313,11 +316,11 @@ fun CalendarPane(model: Main) {
                         // back in the sheet.
                         val slot = p.slot().takeIf { !p.overCancel() }
                         if (slot != null) {
-                            toPlan = false
+                            model.toPlan.value = false
                             model.update(p.task.uid, model.core.planAt(p.task, slot))
                         }
                     },
-                ) { toPlan = false }
+                ) { model.toPlan.value = false }
             }
             plan?.let { DragCard(it) }
         }

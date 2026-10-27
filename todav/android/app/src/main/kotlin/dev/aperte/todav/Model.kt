@@ -232,6 +232,9 @@ class Main(app: Application) : AndroidViewModel(app) {
         act { core.setWorkDays(days) }
     }
 
+    /** Whether the calendar's "To Plan" sheet is open (a task dragged from it too). */
+    val toPlan = MutableStateFlow(false)
+
     /** The day the calendar shows (local midnight), set by a reminder, an event pill or Today. */
     val day = MutableStateFlow<Long?>(null)
 
