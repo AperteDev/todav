@@ -34,7 +34,10 @@ import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.LocalCafe
+import androidx.compose.material.icons.outlined.VolunteerActivism
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PhoneAndroid
@@ -558,6 +561,27 @@ private fun About(model: Main) {
             modifier = Modifier.clickable { open("https://www.gnu.org/licenses/gpl-3.0.html") },
         )
     }
+    // As the Linux app's About → Support (`DONATIONS` in its window.rs).
+    Section(tr("Support")) {
+        listOf(
+            Triple(tr("Support on Ko-fi"), "ko-fi.com/N5E229GJPZ", Icons.Outlined.LocalCafe),
+            Triple(tr("Sponsor on GitHub"), "github.com/sponsors/SelfRef", Icons.Outlined.FavoriteBorder),
+            Triple(tr("Donate on Liberapay"), "liberapay.com/SelfRef/donate", Icons.Outlined.VolunteerActivism),
+        ).forEach { (title, url, icon) ->
+            Item(
+                headlineContent = { Text(title) },
+                supportingContent = { Text(url) },
+                leadingContent = { Icon(icon, null) },
+                modifier = Modifier.clickable { open("https://$url") },
+            )
+        }
+    }
+    Text(
+        tr("Todav is developed in my free time. If it keeps your days in order, you can support its development."),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 32.dp, end = 32.dp, top = 12.dp),
+    )
 }
 
 // --- accounts --------------------------------------------------------------------------------
