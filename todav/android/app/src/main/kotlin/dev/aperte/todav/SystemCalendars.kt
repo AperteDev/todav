@@ -95,6 +95,15 @@ object SystemCalendars {
         return out
     }
 
+    /** When event `uri` (`content://com.android.calendar/events/<id>`) starts, if it can be read. */
+    fun start(context: Context, uri: android.net.Uri): Long? {
+        if (!allowed(context)) return null
+        return runCatching {
+            context.contentResolver.query(uri, arrayOf(Events.DTSTART), null, null, null)
+                ?.use { c -> if (c.moveToFirst()) c.getLong(0) else null }
+        }.getOrNull()
+    }
+
     /** Call `onChange` whenever the system's calendars change (their accounts synced, say). */
     fun watch(context: Context, onChange: () -> Unit) {
         val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {

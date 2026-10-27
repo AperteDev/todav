@@ -7,9 +7,22 @@ use todav_app::calendar as cal;
 use todav_core::rrule::Freq;
 use todav_core::{
     Account, AccountKind, CategoryGroup, CategoryMeta, Credentials, DoneView, Due, Event,
-    EventTime, LoginFlow, PushRegistration, PushStatus, Refused, Repeat, Scope, ServerInfo, Sort,
-    SystemCalendar, SystemEvent, Task,
+    EventTime, IcsCount, LoginFlow, PushRegistration, PushStatus, Refused, Repeat, Scope,
+    ServerInfo, Sort, SystemCalendar, SystemEvent, Task,
 };
+
+#[uniffi::remote(Record)]
+pub struct IcsCount {
+    pub events: u32,
+    pub tasks: u32,
+}
+
+/// What a `todav://` link is to (`todav_app::links::Link`).
+#[derive(uniffi::Enum)]
+pub enum LinkTarget {
+    Task { uid: String },
+    Event { uid: String },
+}
 
 #[uniffi::remote(Record)]
 pub struct SystemCalendar {

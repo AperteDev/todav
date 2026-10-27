@@ -5,6 +5,12 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.provider.CalendarContract
+import dev.aperte.todav.core.LinkTarget
+import dev.aperte.todav.core.midnight
+import dev.aperte.todav.core.parseLink
+import java.time.Instant
+import java.time.ZoneId
 import android.view.KeyEvent
 import android.view.KeyboardShortcutGroup
 import android.view.KeyboardShortcutInfo
@@ -105,7 +111,14 @@ class MainActivity : ComponentActivity() {
             )
         }
         when (intent.action) {
-            Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)?.let { model.sharedText.value = it }
+            Intent.ACTION_SEND -> if (intent.type == "text/calendar") {
+                androidx.core.content.IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, android.net.Uri::class.java)
+                    ?.let(::import)
+            } else {
+                intent.getStringExtra(Intent.EXTRA_TEXT)?.let { model.sharedText.value = it }
+            }
+            Intent.ACTION_VIEW -> view(intent)
+            Intent.ACTION_INSERT -> insertEvent(intent)
             NEW_TASK -> {
                 model.show(View.TASKS)
                 model.sharedText.value = ""
@@ -116,6 +129,71 @@ class MainActivity : ComponentActivity() {
                 intent.getStringExtra("calendar"),
                 intent.getLongExtra("account", -1).takeIf { it >= 0 },
             )
+        }
+    }
+
+    /**
+     * Something to show, as the system's calendar app: a `todav://` link (its task, or its
+     * event's day), a time or an event of the system's calendar store (their day: clocks, At a
+     * Glance), an iCalendar file (to import).
+     */
+    private fun view(intent: Intent) {
+        val uri = intent.data ?: return
+        val calendar = uri.authority == CalendarContract.AUTHORITY
+        val core = (application as TodavApp).core
+        val notFound = { model.messages.tryEmit(tr("Not found: it may have been deleted") to null) }
+        when {
+            uri.scheme == "todav" -> when (val link = parseLink(uri.toString())) {
+                is LinkTarget.Task -> if (core.task(link.uid) != null) model.open(Dest.Task(link.uid)) else notFound()
+                is LinkTarget.Event -> core.event(link.uid)?.let { model.showDay(it.start) } ?: notFound()
+                null -> {}
+            }
+            calendar && uri.pathSegments.firstOrNull() == "time" ->
+                uri.lastPathSegment?.toLongOrNull()?.let { model.showDay(wall(it)) }
+            calendar && uri.pathSegments.firstOrNull() == "events" -> {
+                // A system calendar's event: its day (Todav shows the calendars turned on).
+                val allDay = intent.getBooleanExtra(CalendarContract.EXTRA_EVENT_ALL_DAY, false)
+                val begin = intent.getLongExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, -1).takeIf { it >= 0 }
+                    ?: SystemCalendars.start(this, uri)
+                model.showDay(begin?.let { wall(it, allDay) } ?: core.localNow())
+            }
+            uri.scheme == "content" || uri.scheme == "file" -> import(uri)
+        }
+    }
+
+    /** Another app's "Add to calendar": a new event with what it gave (title, time, place, notes). */
+    private fun insertEvent(intent: Intent) {
+        val allDay = intent.getBooleanExtra(CalendarContract.EXTRA_EVENT_ALL_DAY, false)
+        val time = { key: String -> intent.getLongExtra(key, -1).takeIf { it >= 0 }?.let { wall(it, allDay) } }
+        val begin = time(CalendarContract.EXTRA_EVENT_BEGIN_TIME)
+        model.showDay(begin ?: (application as TodavApp).core.localNow())
+        newEvent(model, begin?.let(::midnight))
+        val new = model.newEvent.value ?: return
+        model.newEvent.value = new.copy(
+            start = begin?.takeIf { allDay || it != midnight(it) } ?: new.start,
+            allDay = allDay,
+            end = time(CalendarContract.EXTRA_EVENT_END_TIME),
+            title = intent.getStringExtra(CalendarContract.Events.TITLE).orEmpty(),
+            location = intent.getStringExtra(CalendarContract.Events.EVENT_LOCATION).orEmpty(),
+            notes = intent.getStringExtra(CalendarContract.Events.DESCRIPTION).orEmpty(),
+        )
+    }
+
+    /** Read iCalendar file `uri`, then ask where its events and tasks go (`ImportDialog`). */
+    private fun import(uri: android.net.Uri) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val name = contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+                    ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+                    ?: uri.lastPathSegment.orEmpty()
+                val text = contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() } ?: return@launch
+                model.importing.value = name to text
+            } catch (e: Exception) {
+                model.messages.tryEmit(
+                    tr("Cannot open {name}: {error}").replace("{name}", uri.lastPathSegment.orEmpty())
+                        .replace("{error}", e.message.orEmpty()) to null,
+                )
+            }
         }
     }
 
@@ -192,4 +270,13 @@ class MainActivity : ComponentActivity() {
         const val NEW_TASK = "dev.aperte.todav.NEW_TASK"
         const val NEW_EVENT = "dev.aperte.todav.NEW_EVENT"
     }
+}
+
+/**
+ * Android's time `ms` (UTC milliseconds) as the core's: local wall-clock seconds. An all-day
+ * time is its day's midnight UTC, which is that day already.
+ */
+private fun wall(ms: Long, allDay: Boolean = false): Long {
+    val s = Math.floorDiv(ms, 1000L)
+    return if (allDay) s else s + ZoneId.systemDefault().rules.getOffset(Instant.ofEpochMilli(ms)).totalSeconds
 }

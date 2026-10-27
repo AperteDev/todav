@@ -102,6 +102,7 @@ fun TodavUi(model: Main) {
             }
         }
     }
+    if (current != null && current.accounts.isNotEmpty()) ImportDialog(model)
 }
 
 // --- welcome ----------------------------------------------------------------------------

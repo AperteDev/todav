@@ -251,6 +251,7 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null, draft: 
                 }
                 if (draft == null) {
                     Subtasks(model, task)
+                    CopyLink(model, dev.aperte.todav.core.linkTask(task.uid))
                     DeleteButton(tr("Delete Task")) { confirmDelete = true }
                 }
                 Spacer(Modifier.height(EDITOR_END))

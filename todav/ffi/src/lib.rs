@@ -12,8 +12,8 @@ use std::sync::{Arc, OnceLock};
 use todav_app::service::Service;
 use todav_core::{
     Account, AccountKind, CategoryGroup, CategoryMeta, Client, Credentials, DoneView, Event,
-    EventTime, LoginFlow, PushRegistration, PushStatus, Refused, Repeat, Scope, ServerInfo, Sort,
-    SystemCalendar, SystemEvent, Task,
+    EventTime, IcsCount, LoginFlow, PushRegistration, PushStatus, Refused, Repeat, Scope,
+    ServerInfo, Sort, SystemCalendar, SystemEvent, Task,
 };
 
 mod error;
@@ -294,6 +294,21 @@ impl Todav {
 
     pub fn edit_list(&self, href: String, name: String, color: String) -> Result<()> {
         Ok(self.c().edit_list(href, name, color)?)
+    }
+
+    /// What iCalendar text `ics` holds.
+    pub fn ics_count(&self, ics: String) -> IcsCount {
+        self.c().ics_count(ics)
+    }
+
+    /// Import iCalendar text: its events into `events_to`, its tasks into `tasks_to`.
+    pub fn import_ics(
+        &self,
+        ics: String,
+        events_to: Option<String>,
+        tasks_to: Option<String>,
+    ) -> Result<IcsCount> {
+        Ok(self.c().import_ics(ics, events_to, tasks_to)?)
     }
 
     /// The system account's calendars are these now (those turned on), read-only.
@@ -968,6 +983,28 @@ pub fn account_host(account: Account) -> String {
 #[uniffi::export]
 pub fn list_color(list: TodavList) -> String {
     todav_app::lists::color(&list)
+}
+
+/// The `todav://` link to task `uid`.
+#[uniffi::export]
+pub fn link_task(uid: String) -> String {
+    todav_app::links::task(&uid)
+}
+
+/// The `todav://` link to event `uid`.
+#[uniffi::export]
+pub fn link_event(uid: String) -> String {
+    todav_app::links::event(&uid)
+}
+
+/// What a `todav://` link is to; None for anything else.
+#[uniffi::export]
+pub fn parse_link(url: String) -> Option<types::LinkTarget> {
+    use todav_app::links::Link;
+    Some(match todav_app::links::parse(&url)? {
+        Link::Task(uid) => types::LinkTarget::Task { uid },
+        Link::Event(uid) => types::LinkTarget::Event { uid },
+    })
 }
 
 /// Nextcloud's colour presets, in its order.

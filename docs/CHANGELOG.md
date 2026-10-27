@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Linux: Todav can be the system's calendar app (Settings → Apps → Default Apps → Calendar): it
   opens iCalendar files (`.ics`), whose events and tasks go into the calendar and task list
   picked for them; an item already there is replaced.
+- Android: Todav can be the calendar other apps and the system open: at a time or an event of
+  the system's calendars (clocks, At a Glance: their day), for other apps' "Add to calendar" (a
+  new event with what they give), and for iCalendar files opened or shared (imported, as on
+  Linux). Copy Link on a task's page and in a task's or an event's details gives a `todav://`
+  link that opens it.
 - Linux: open tasks and events whose titles hold what is typed show in the Activities overview's
   search; one opens on its list or day, the app's heading searches its tasks in Todav.
 - Linux: Copy Link in a task's or an event's dialog and in their details on the calendar puts

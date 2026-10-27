@@ -61,6 +61,11 @@ sealed interface Dest {
         val start: Long,
         val allDay: Boolean = false,
         val account: Long? = null,
+        /** A new event's fields from another app's "Add to calendar"; its end, if it gave one. */
+        val title: String = "",
+        val location: String = "",
+        val notes: String = "",
+        val end: Long? = null,
     ) : Dest
     data object Search : Dest
     data object Settings : Dest
@@ -194,6 +199,8 @@ class Main(app: Application) : AndroidViewModel(app) {
 
     /** Text to add as a task (shared with Todav, or "" from the "New task" shortcut): the add sheet opens. */
     val sharedText = MutableStateFlow<String?>(null)
+    /** An iCalendar file opened or shared with Todav (its name and text), to import. */
+    val importing = MutableStateFlow<Pair<String, String>?>(null)
 
     /** An event to add, at its start: the calendar opens its editor in a sheet. */
     val newEvent = MutableStateFlow<Dest.EventEdit?>(null)

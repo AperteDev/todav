@@ -98,9 +98,9 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
             .filter { (it.writable || it.href == ev?.listHref) && (dest.account == null || it.account == dest.account) }
     }
     val duration = remember { core.eventDuration() }
-    var summary by rememberSaveable { mutableStateOf(ev?.summary ?: "") }
-    var location by rememberSaveable { mutableStateOf(ev?.location ?: "") }
-    var notes by rememberSaveable { mutableStateOf(ev?.description ?: "") }
+    var summary by rememberSaveable { mutableStateOf(ev?.summary ?: dest.title) }
+    var location by rememberSaveable { mutableStateOf(ev?.location ?: dest.location) }
+    var notes by rememberSaveable { mutableStateOf(ev?.description ?: dest.notes) }
     var calendar by rememberSaveable {
         mutableStateOf(
             ev?.listHref ?: dest.list ?: if (dest.account != null) {
@@ -114,7 +114,7 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
     var start by rememberSaveable { mutableStateOf(ev?.start ?: dest.start) }
     // An all-day event's end is the midnight after its last day; shown as that last day.
     var end by rememberSaveable {
-        mutableStateOf(ev?.end ?: if (dest.allDay) dest.start + DAY else dest.start + duration)
+        mutableStateOf(ev?.end ?: dest.end ?: if (dest.allDay) dest.start + DAY else dest.start + duration)
     }
     val rule = ev?.rule
     val plain = remember(rule) { rule?.let { plainRepeat(it) } }

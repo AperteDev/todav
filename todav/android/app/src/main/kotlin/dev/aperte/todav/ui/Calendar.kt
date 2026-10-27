@@ -186,6 +186,7 @@ import java.time.LocalDate
 import java.time.temporal.WeekFields
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Read from the core off the main thread, again whenever one of `keys` changes. */
@@ -1573,12 +1574,13 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
                         }
                     }
                     e.description?.takeIf { it.isNotBlank() }?.let { Line({ Icon(Icons.AutoMirrored.Outlined.Notes, null) }) { Text(it) } }
-                    // A read-only calendar's (shared so, or the system's) are only looked at.
-                    if (lists[e.listHref]?.writable == true) {
-                        Row(buttons, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(buttons, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // A read-only calendar's (shared so, or the system's) are only looked at.
+                        if (lists[e.listHref]?.writable == true) {
                             EditButton(edit)
                             TextButton(onClick = { askDelete = true }) { Text(tr("Delete"), color = MaterialTheme.colorScheme.error) }
                         }
+                        CopyLink(model, dev.aperte.todav.core.linkEvent(e.uid))
                     }
                     val tasks = remember(changes, e.uid) { core.eventTasks(e.uid) }
                     // Without a task list to add one to (only the system's calendars, say), none.
@@ -1610,6 +1612,7 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
                     t.description?.takeIf { it.isNotBlank() }?.let { Line({ Icon(Icons.AutoMirrored.Outlined.Notes, null) }) { Text(it) } }
                     Row(buttons, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         EditButton(edit)
+                        CopyLink(model, dev.aperte.todav.core.linkTask(t.uid))
                         dev.aperte.todav.core.unplan(t)?.let { patch ->
                             TextButton(onClick = {
                                 dismiss()
@@ -1701,6 +1704,19 @@ private fun EditButton(onClick: () -> Unit) = FilledTonalButton(onClick = onClic
     Icon(Icons.Outlined.Edit, null, Modifier.size(ButtonDefaults.IconSize))
     Spacer(Modifier.size(ButtonDefaults.IconSpacing))
     Text(tr("Edit…"))
+}
+
+/** Copy Link: the item's `todav://` link on the clipboard, to paste elsewhere. */
+@Composable
+fun CopyLink(model: Main, link: String) {
+    val clipboard = androidx.compose.ui.platform.LocalClipboard.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    TextButton(onClick = {
+        val clip = android.content.ClipData.newPlainText(tr("Link"), link)
+        scope.launch { clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(clip)) }
+        // Android 13 and later show the copied text themselves.
+        if (android.os.Build.VERSION.SDK_INT < 33) model.messages.tryEmit(tr("Link copied") to null)
+    }) { Text(tr("Copy Link")) }
 }
 
 @Composable
