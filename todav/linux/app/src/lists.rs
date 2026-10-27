@@ -284,12 +284,13 @@ thread_local! {
 
 /// Show where a drop on `owner` lands. Below it is drawn as the line above the next row when
 /// there is one under no heading of its own, so the gap between two rows has a single line (as
-/// the task rows do).
+/// the task rows do). A list box keeps its headings as children after the rows: the last row's
+/// next sibling may be one.
 pub fn mark(owner: &gtk::Widget, below: bool) {
     let next = owner.next_sibling().filter(|n| {
         below
             && n.downcast_ref::<gtk::ListBoxRow>()
-                .is_none_or(|r| r.header().is_none())
+                .is_some_and(|r| r.header().is_none())
     });
     let (w, class) = match next {
         Some(next) => (next, "drop-above"),
