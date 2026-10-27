@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -12,12 +13,13 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
+import androidx.glance.Image
+import androidx.glance.ImageProvider
 import androidx.glance.LocalSize
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidgetManager
-import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.action.actionStartActivity
@@ -201,6 +203,8 @@ class MonthWidget : TodavWidget() {
         val weeks = ceil(((next - start) / DAY) / 7.0).toInt()
         val (account, shown) = remember(changes) { widgetCalendars(context, app, widget) }
         val dots = remember(changes, offset, shown) { core.dayColors(start, weeks * 7L, shown.map { it.href }) }
+        val density = context.resources.displayMetrics.density
+        val images = remember { HashMap<List<String>, android.graphics.Bitmap>() }
         WidgetFrame(context) {
             TurnHeader(context, widget, monthTitle(first), openDay(context, first, month = true), newEvent(context, widget, account, shown, today))
             WeekdayNames(start)
@@ -214,10 +218,14 @@ class MonthWidget : TodavWidget() {
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             DayNumber(day, today, day in first until next, 28.dp, GlanceModifier.fillMaxWidth())
-                            Row(GlanceModifier.height(7.dp), verticalAlignment = Alignment.CenterVertically) {
-                                dots.getOrNull(w * 7 + d)?.forEach { c ->
-                                    WidgetMark(false, false, widgetColor(c), 7.dp)
-                                }
+                            val colors = dots.getOrNull(w * 7 + d).orEmpty()
+                            if (colors.isEmpty()) {
+                                Spacer(GlanceModifier.height(6.dp))
+                            } else {
+                                Image(
+                                    ImageProvider(dotImage(colors, density, images)), null,
+                                    GlanceModifier.height(6.dp).width((colors.size * 8 - 2).dp),
+                                )
                             }
                         }
                     }
@@ -226,6 +234,26 @@ class MonthWidget : TodavWidget() {
         }
     }
 }
+
+/**
+ * A day's dots, one per colour (6 dp, 2 dp apart), as one image: an image a dot made the month too
+ * big to send to the launcher. The same colours share an image (`cache`), sent once.
+ */
+private fun dotImage(colors: List<String>, density: Float, cache: MutableMap<List<String>, android.graphics.Bitmap>) =
+    cache.getOrPut(colors) {
+        val d = 6 * density
+        val gap = 2 * density
+        val bitmap = android.graphics.Bitmap.createBitmap(
+            Math.round(colors.size * (d + gap) - gap), Math.round(d), android.graphics.Bitmap.Config.ARGB_8888,
+        )
+        val canvas = android.graphics.Canvas(bitmap)
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+        colors.forEachIndexed { i, c ->
+            paint.color = parseColor(c).toArgb()
+            canvas.drawCircle(i * (d + gap) + d / 2, d / 2, d / 2, paint)
+        }
+        bitmap
+    }
 
 class MonthWidgetReceiver : TodavWidgetReceiver() {
     override val glanceAppWidget = MonthWidget()
@@ -470,9 +498,6 @@ private class Bar(val item: Item, val first: Int, val last: Int, val color: Stri
  * the app there.
  */
 class PlannerWidget : TodavWidget() {
-    // Laid out for its size: bars span exact widths.
-    override val sizeMode: SizeMode = SizeMode.Exact
-
     @Composable
     override fun Content(context: Context, app: TodavApp, widget: Int, changes: Long) {
         val core = app.core

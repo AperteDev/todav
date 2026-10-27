@@ -8,6 +8,23 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.unit.dp
+import dev.aperte.todav.core.colorPresets
+import dev.aperte.todav.ui.parseColor
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -160,6 +177,29 @@ fun WidgetsSettings(model: Main) {
             modifier = Modifier.clickable { setGear(!gear) },
         )
     }
+    // The system's colours, or the widgets' own: background and text for light and dark.
+    var dynamic by remember { mutableStateOf(WidgetPrefs.dynamic(context)) }
+    val setDynamic = { on: Boolean ->
+        dynamic = on
+        WidgetPrefs.setDynamic(context, on)
+        redraw()
+    }
+    Section(tr("Colors")) {
+        Item(
+            headlineContent = { Text(tr("Dynamic Colors")) },
+            supportingContent = { Text(tr("The system's colors, from the wallpaper")) },
+            trailingContent = { Switch(dynamic, setDynamic) },
+            modifier = Modifier.clickable { setDynamic(!dynamic) },
+        )
+    }
+    if (!dynamic) {
+        for ((title, mode) in listOf(tr("Light Mode") to "light", tr("Dark Mode") to "dark")) {
+            Section(title) {
+                ColorRow(tr("Background"), "bg_$mode", redraw)
+                ColorRow(tr("Text"), "text_$mode", redraw)
+            }
+        }
+    }
     // A section for each kind placed, a row for each widget of it.
     val placed = remember(changes) { WidgetKind.placed(context) }
     placed.groupBy { it.first }.forEach { (kind, widgets) ->
@@ -272,4 +312,83 @@ fun WidgetPage(app: TodavApp, id: Int, onBack: () -> Unit) {
             }
         }
     }
+}
+
+/** A widget colour (`key` of `WidgetPrefs.COLORS`), its swatch opening a dialog to change it. */
+@Composable
+private fun ColorRow(title: String, key: String, redraw: () -> Unit) {
+    val context = LocalContext.current
+    var color by remember { mutableIntStateOf(WidgetPrefs.color(context, key)) }
+    var open by remember { mutableStateOf(false) }
+    Item(
+        headlineContent = { Text(title) },
+        supportingContent = { Text(hex(color)) },
+        trailingContent = { Swatch(color, 32.dp) },
+        modifier = Modifier.clickable { open = true },
+    )
+    if (open) {
+        ColorDialog(title, color, { open = false }) {
+            open = false
+            color = it
+            WidgetPrefs.setColor(context, key, it)
+            redraw()
+        }
+    }
+}
+
+private fun hex(color: Int) = "#%06X".format(color and 0xFFFFFF)
+
+/** A round swatch of `color`, outlined so a light one shows on a light surface. */
+@Composable
+private fun Swatch(color: Int, size: androidx.compose.ui.unit.Dp, picked: Boolean = false, onClick: (() -> Unit)? = null) {
+    Box(
+        Modifier.size(size).clip(CircleShape).background(Color(color))
+            .border(if (picked) 3.dp else 1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+            .let { m -> onClick?.let { m.clickable(onClick = it) } ?: m },
+    )
+}
+
+/** Greys from white to black for backgrounds and text, then Nextcloud's colours. */
+private val NEUTRALS = listOf(
+    0xFFFFFFFF, 0xFFF8F9FF, 0xFFECEEF4, 0xFFD0D3DA, 0xFF9FA3AB, 0xFF6B7078,
+    0xFF44474E, 0xFF2B2E35, 0xFF1A1C20, 0xFF111318, 0xFF000000,
+).map { it.toInt() }
+
+/** Picking a colour: a swatch, or its hex code. */
+@Composable
+private fun ColorDialog(title: String, initial: Int, onDismiss: () -> Unit, onPick: (Int) -> Unit) {
+    val swatches = remember { NEUTRALS + colorPresets().map { parseColor(it).toArgb() } }
+    var picked by remember { mutableIntStateOf(initial) }
+    var text by remember { mutableStateOf(hex(initial)) }
+    val typed = Regex("#?[0-9A-Fa-f]{6}").matchEntire(text.trim())?.value?.removePrefix("#")?.toInt(16)?.let { it or 0xFF000000.toInt() }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    swatches.forEach { c ->
+                        Swatch(c, 36.dp, picked = c == picked) {
+                            picked = c
+                            text = hex(c)
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    text,
+                    {
+                        text = it
+                        Regex("#?[0-9A-Fa-f]{6}").matchEntire(it.trim())?.let { m ->
+                            picked = m.value.removePrefix("#").toInt(16) or 0xFF000000.toInt()
+                        }
+                    },
+                    singleLine = true,
+                    leadingIcon = { Swatch(typed ?: picked, 24.dp) },
+                    isError = typed == null,
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = { onPick(typed ?: picked) }, enabled = typed != null) { Text(tr("Save")) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("Cancel")) } },
+    )
 }

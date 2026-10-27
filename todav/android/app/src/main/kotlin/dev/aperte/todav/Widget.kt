@@ -116,6 +116,15 @@ object WidgetPrefs {
     fun gear(c: Context) = prefs(c).getBoolean("gear", false)
     fun setGear(c: Context, v: Boolean) = prefs(c).edit().putBoolean("gear", v).apply()
 
+    /** Whether the widgets take the system's colours (from the wallpaper), else `color`'s. */
+    fun dynamic(c: Context) = prefs(c).getBoolean("dynamic", true)
+    fun setDynamic(c: Context, v: Boolean) = prefs(c).edit().putBoolean("dynamic", v).apply()
+
+    /** The widgets' own colours (ARGB), by key: "bg_light", "text_light", "bg_dark", "text_dark". */
+    val COLORS = mapOf("bg_light" to 0xFFF8F9FF.toInt(), "text_light" to 0xFF1A1C20.toInt(), "bg_dark" to 0xFF111318.toInt(), "text_dark" to 0xFFE2E2E9.toInt())
+    fun color(c: Context, key: String) = prefs(c).getInt(key, COLORS.getValue(key))
+    fun setColor(c: Context, key: String, v: Int) = prefs(c).edit().putInt(key, v).apply()
+
     /** The corners' radius, in dp. */
     fun radius(c: Context) = prefs(c).getInt("radius", 24)
     fun setRadius(c: Context, v: Int) = prefs(c).edit().putInt("radius", v).apply()
@@ -175,20 +184,34 @@ fun widgetList(context: Context, app: TodavApp, id: Int, mine: List<TodavList>):
 
 /** A Glance widget of Todav's: read again on every change (and its settings') while it shows. */
 abstract class TodavWidget : GlanceAppWidget() {
-    // One layout for every size the launcher gives: each is sent whole, and a big one may not arrive.
+    // One layout for every size the launcher gives (`LocalSize` the upright one): each would be
+    // sent whole, and a big update may not arrive.
     override val sizeMode: SizeMode = SizeMode.Single
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val app = context.applicationContext as TodavApp
         app.awaitReady()
-        val widget = GlanceAppWidgetManager(context).getAppWidgetId(id)
+        val manager = GlanceAppWidgetManager(context)
+        val widget = manager.getAppWidgetId(id)
+        // Its size upright (the narrowest and tallest the launcher gives; on its side the bottom
+        // may be cut): laid out once.
+        // ponytail: one layout for both orientations; a layout each (`SizeMode.Exact`) doubles the
+        // update, too big for the launcher with the month planner.
+        val size = manager.getAppWidgetSizes(id).takeIf { it.isNotEmpty() }
+            ?.let { all -> androidx.compose.ui.unit.DpSize(all.minOf { it.width }, all.maxOf { it.height }) }
         // The app may not have opened in this process: times as the system shows them.
         hours24 = android.text.format.DateFormat.is24HourFormat(context)
         provideContent {
             val changes by app.changes.collectAsState()
             // All of it again: parts reading the widgets' settings would be skipped otherwise.
             androidx.compose.runtime.key(changes) {
-                GlanceTheme { Content(context, app, widget, changes) }
+                androidx.compose.runtime.CompositionLocalProvider(androidx.glance.LocalSize provides (size ?: androidx.glance.LocalSize.current)) {
+                    if (WidgetPrefs.dynamic(context)) {
+                        GlanceTheme { Content(context, app, widget, changes) }
+                    } else {
+                        GlanceTheme(ownColors(context)) { Content(context, app, widget, changes) }
+                    }
+                }
             }
         }
     }
@@ -197,14 +220,41 @@ abstract class TodavWidget : GlanceAppWidget() {
     abstract fun Content(context: Context, app: TodavApp, widget: Int, changes: Long)
 }
 
-/** A widget's background in the system's colours, with the opacity and corners set for all. */
+/**
+ * The widgets' theme from their own colours: text and background for light and dark, with the
+ * app's blue (as without the system's colours) for today and the add button.
+ */
+private fun ownColors(c: Context): androidx.glance.color.ColorProviders {
+    fun scheme(dark: Boolean): androidx.compose.material3.ColorScheme {
+        val bg = Color(WidgetPrefs.color(c, if (dark) "bg_dark" else "bg_light"))
+        val text = Color(WidgetPrefs.color(c, if (dark) "text_dark" else "text_light"))
+        val base = if (dark) {
+            androidx.compose.material3.darkColorScheme(
+                primary = Color(0xFF8EC4EE), onPrimary = Color(0xFF00325A),
+                primaryContainer = Color(0xFF00468A), onPrimaryContainer = Color(0xFFD5E3FF),
+            )
+        } else {
+            androidx.compose.material3.lightColorScheme(
+                primary = Color(0xFF2F6CB6), onPrimary = Color.White,
+                primaryContainer = Color(0xFFD5E3FF), onPrimaryContainer = Color(0xFF001B3C),
+            )
+        }
+        return base.copy(
+            surface = bg, background = bg, onSurface = text, onBackground = text,
+            onSurfaceVariant = text.copy(alpha = 0.7f), outline = text.copy(alpha = 0.3f),
+        )
+    }
+    return androidx.glance.material3.ColorProviders(light = scheme(false), dark = scheme(true))
+}
+
+/** A widget's background in the system's colours or its own, with the opacity and corners set for all. */
 @Composable
 fun WidgetFrame(context: Context, content: @Composable ColumnScope.() -> Unit) {
     val alpha = WidgetPrefs.opacity(context) / 100f
-    val (day, night) = if (Build.VERSION.SDK_INT >= 31) {
-        dynamicLightColorScheme(context).surface to dynamicDarkColorScheme(context).surface
-    } else {
-        Color(0xFFF8F9FF) to Color(0xFF111318)
+    val (day, night) = when {
+        !WidgetPrefs.dynamic(context) -> Color(WidgetPrefs.color(context, "bg_light")) to Color(WidgetPrefs.color(context, "bg_dark"))
+        Build.VERSION.SDK_INT >= 31 -> dynamicLightColorScheme(context).surface to dynamicDarkColorScheme(context).surface
+        else -> Color(0xFFF8F9FF) to Color(0xFF111318)
     }
     Column(
         GlanceModifier.fillMaxSize().background(ColorProvider(day.copy(alpha = alpha), night.copy(alpha = alpha)))
