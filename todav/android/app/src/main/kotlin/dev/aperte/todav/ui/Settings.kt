@@ -17,6 +17,8 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.Login
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
@@ -590,9 +592,11 @@ fun AccountPage(model: Main, id: Long) {
                 supportingContent = { Text(account.url) },
             )
             if (!signingIn) {
-                TextButton(onClick = { signingIn = true }, modifier = Modifier.padding(horizontal = 8.dp)) {
-                    Text(tr("Sign In Again"))
-                }
+                ListItem(
+                    headlineContent = { Text(tr("Sign In Again")) },
+                    leadingContent = { Icon(Icons.AutoMirrored.Outlined.Login, null) },
+                    modifier = Modifier.clickable { signingIn = true },
+                )
             } else {
                 var server by rememberSaveable { mutableStateOf(account.url) }
                 Column(Modifier.padding(16.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
@@ -617,10 +621,12 @@ fun AccountPage(model: Main, id: Long) {
             }
             if (connected) ServerStatus(model, id)
         }
-        Group("")
-        TextButton(onClick = { confirm = true }, modifier = Modifier.padding(horizontal = 8.dp)) {
-            Text(tr("Remove Account"), color = MaterialTheme.colorScheme.error)
-        }
+        HorizontalDivider(Modifier.padding(vertical = 8.dp))
+        ListItem(
+            headlineContent = { Text(tr("Remove Account"), color = MaterialTheme.colorScheme.error) },
+            leadingContent = { Icon(Icons.Outlined.Delete, null, tint = MaterialTheme.colorScheme.error) },
+            modifier = Modifier.clickable { confirm = true },
+        )
     }
     val title = tr("Remove {name}?").replace("{name}", accountName(account))
     if (confirm) {
@@ -715,5 +721,4 @@ private fun ServerStatus(model: Main, id: Long) {
         else -> tr("On: changes made elsewhere show up within seconds")
     }
     ListItem(headlineContent = { Text(tr("DAV Push")) }, supportingContent = { Text(text) })
-    HorizontalDivider()
 }
