@@ -204,6 +204,13 @@ impl Client {
     /// Rename and recolour list `href`, on the server and here.
     pub fn edit_list(&self, href: String, name: String, color: String) -> Result<()> {
         let _guard = self.sync_lock.lock().unwrap();
+        let account = store::list_account(&self.db.lock().unwrap(), &href)?;
+        if self
+            .account(account)
+            .is_some_and(|a| a.kind == AccountKind::System)
+        {
+            return Err(Error::ReadOnly); // named and coloured where they come from
+        }
         if !href.starts_with(store::LOCAL) {
             self.list_dav(&href)?.rename(&href, &name, &color)?;
         }
@@ -544,7 +551,24 @@ impl Client {
         else {
             return Err(Error::Parse("sync-token rejected twice".into()));
         };
+        self.apply(list_href, changed, removed, full, report)?;
+        self.db.lock().unwrap().execute(
+            "UPDATE lists SET sync_token = ? WHERE href = ?",
+            params![new_token, list_href],
+        )?;
+        Ok(())
+    }
 
+    /// Store what a list holds now: `changed` (href, etag, calendar data) and `removed` (hrefs);
+    /// with `full`, everything else of it is gone. Edits waiting here are kept.
+    pub(crate) fn apply(
+        &self,
+        list_href: &str,
+        changed: Vec<(String, String, String)>,
+        removed: Vec<String>,
+        full: bool,
+        report: &mut SyncReport,
+    ) -> Result<()> {
         let mut uids = Vec::new();
         let db = self.db.lock().unwrap();
         let tx = db.unchecked_transaction()?;
@@ -614,10 +638,6 @@ impl Client {
             }
             uids.push(t.uid);
         }
-        tx.execute(
-            "UPDATE lists SET sync_token = ? WHERE href = ?",
-            params![new_token, list_href],
-        )?;
         tx.commit()?;
         drop(db);
         if !uids.is_empty() {

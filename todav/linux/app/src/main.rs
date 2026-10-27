@@ -202,6 +202,7 @@ pub fn account_name(a: &Account) -> String {
         AccountKind::Local => i18n::gettext("On This Device"),
         AccountKind::Nextcloud => format!("{}@{}", a.user, todav_app::accounts::host(a)),
         AccountKind::Google => a.user.clone(),
+        AccountKind::System => i18n::gettext("System Calendars"), // Android's
     }
 }
 

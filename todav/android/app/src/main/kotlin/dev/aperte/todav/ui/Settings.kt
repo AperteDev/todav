@@ -1,6 +1,14 @@
 package dev.aperte.todav.ui
 
+import android.Manifest
 import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import dev.aperte.todav.SystemCalendars
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings as SystemSettings
@@ -349,7 +357,14 @@ private fun Accounts(model: Main) {
                 headlineContent = { Text(accountName(a)) },
                 supportingContent = { Text(accountKind(model, a)) },
                 leadingContent = {
-                    Icon(if (a.kind == AccountKind.LOCAL) Icons.Outlined.PhoneAndroid else Icons.Outlined.AccountCircle, null)
+                    Icon(
+                        when (a.kind) {
+                            AccountKind.LOCAL -> Icons.Outlined.PhoneAndroid
+                            AccountKind.SYSTEM -> Icons.Outlined.CalendarMonth
+                            else -> Icons.Outlined.AccountCircle
+                        },
+                        null,
+                    )
                 },
                 trailingContent = if (order.size > 1) {
                     {
@@ -427,6 +442,7 @@ private fun Accounts(model: Main) {
 fun accountKind(model: Main, a: dev.aperte.todav.core.Account): String = when {
     !a.enabled -> ptr("account", "Off")
     a.kind == AccountKind.LOCAL -> tr("Lists and calendars that stay on this device")
+    a.kind == AccountKind.SYSTEM -> tr("Calendars of the accounts on this device")
     !model.core.connected(a.id) -> tr("Not connected")
     else -> tr("Nextcloud server")
 }
@@ -710,6 +726,7 @@ fun AccountPage(model: Main, id: Long) {
             }
             if (connected) ServerStatus(model, id)
         }
+        if (account.kind == AccountKind.SYSTEM) SystemCalendarRows(model)
         Section(null) {
             Item(
                 headlineContent = { Text(tr("Remove Account"), color = MaterialTheme.colorScheme.error) },
@@ -725,10 +742,13 @@ fun AccountPage(model: Main, id: Long) {
             title = { Text(title) },
             text = {
                 Text(
-                    if (account.kind == AccountKind.LOCAL) {
-                        tr("Its lists and calendars, with everything in them, are deleted from this device. This cannot be undone.")
-                    } else {
-                        tr("Its lists and calendars leave this device; they stay on the server. Switch it off instead to only hide them.")
+                    when (account.kind) {
+                        AccountKind.LOCAL ->
+                            tr("Its lists and calendars, with everything in them, are deleted from this device. This cannot be undone.")
+                        AccountKind.SYSTEM ->
+                            tr("Its calendars leave Todav; they stay on this device, in the accounts they come from.")
+                        else ->
+                            tr("Its lists and calendars leave this device; they stay on the server. Switch it off instead to only hide them.")
                     },
                 )
             },
@@ -766,11 +786,67 @@ fun AccountPage(model: Main, id: Long) {
 /** Remove account `id` (`force`: without uploading its changes); the reason it could not, or null. */
 private suspend fun remove(model: Main, id: Long, force: Boolean): String? = withContext(Dispatchers.IO) {
     try {
+        // Added again, it starts with none turned on.
+        if (model.core.account(id)?.kind == AccountKind.SYSTEM) model.core.setSetting("system_calendars", "")
         model.core.removeAccount(model.todav.passwords, id, force)
         model.todav.changed()
         null
     } catch (e: Exception) {
         reason(e)
+    }
+}
+
+/** The system's calendars by account, each turned on (copied into Todav) or off; none at first. */
+@Composable
+private fun SystemCalendarRows(model: Main) {
+    val context = LocalContext.current
+    val changes by model.todav.changes.collectAsStateWithLifecycle()
+    var allowed by remember { mutableStateOf(SystemCalendars.allowed(context)) }
+    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        allowed = granted
+        if (granted) {
+            model.todav.changed()
+            model.todav.systemCalendarsChanged()
+        }
+    }
+    if (!allowed) {
+        Section(tr("Calendars")) {
+            Item(
+                headlineContent = { Text(tr("Allow Access to Calendars")) },
+                supportingContent = { Text(tr("To show the calendars of the accounts on this device")) },
+                modifier = Modifier.clickable { ask.launch(Manifest.permission.READ_CALENDAR) },
+            )
+        }
+        return
+    }
+    val calendars = load(changes, initial = null) { SystemCalendars.all(context) } ?: return
+    val on = load(changes, initial = SystemCalendars.enabled(model.core)) { SystemCalendars.enabled(model.core) }
+    if (calendars.isEmpty()) {
+        Section(tr("Calendars")) {
+            Item(
+                headlineContent = { Text(tr("No calendars on this device")) },
+                supportingContent = { Text(tr("Accounts added in the system’s settings, such as Google, bring theirs")) },
+            )
+        }
+    }
+    calendars.groupBy { it.account }.forEach { (account, cals) ->
+        Section(account.ifEmpty { tr("Calendars") }) {
+            cals.forEach { c ->
+                Item(
+                    headlineContent = { Text(c.name) },
+                    leadingContent = { Box(Modifier.size(14.dp).background(Color(c.color or 0xFF000000.toInt()), CircleShape)) },
+                    trailingContent = {
+                        Switch(c.id in on, { v ->
+                            model.act {
+                                SystemCalendars.setEnabled(model.core, c.id, v)
+                                model.todav.changed()
+                                model.todav.systemCalendarsChanged()
+                            }
+                        })
+                    },
+                )
+            }
+        }
     }
 }
 

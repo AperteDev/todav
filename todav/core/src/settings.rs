@@ -22,6 +22,8 @@ pub const DEVICE_ONLY: &[&str] = &[
     "manual_url",
     "manual_user",
     "reminded_until",
+    // The system calendars turned on (Android's calendar ids, comma-separated).
+    "system_calendars",
     // UI state: which view (tasks, calendar) and calendar layout (month, week, agenda) is open.
     "last_view",
     "calendar_mode",

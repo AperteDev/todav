@@ -8,8 +8,26 @@ use todav_core::rrule::Freq;
 use todav_core::{
     Account, AccountKind, CategoryGroup, CategoryMeta, Credentials, DoneView, Due, Event,
     EventTime, LoginFlow, PushRegistration, PushStatus, Refused, Repeat, Scope, ServerInfo, Sort,
-    Task,
+    SystemCalendar, SystemEvent, Task,
 };
+
+#[uniffi::remote(Record)]
+pub struct SystemCalendar {
+    pub href: String,
+    pub name: String,
+    pub color: String,
+}
+
+#[uniffi::remote(Record)]
+pub struct SystemEvent {
+    pub uid: String,
+    pub start: i64,
+    pub end: i64,
+    pub all_day: bool,
+    pub title: String,
+    pub description: String,
+    pub location: String,
+}
 
 // --- mirrored from the core --------------------------------------------------------
 
@@ -86,6 +104,7 @@ pub enum AccountKind {
     Nextcloud,
     Local,
     Google,
+    System,
 }
 
 #[uniffi::remote(Record)]

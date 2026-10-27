@@ -39,12 +39,15 @@ pub enum TodavError {
     },
     /// The account has edits not on the server yet and is not connected to upload them.
     NotUploaded,
+    /// The list or calendar is read-only.
+    ReadOnly,
 }
 
 impl std::fmt::Display for TodavError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             TodavError::Auth => write!(f, "authentication failed"),
+            TodavError::ReadOnly => write!(f, "read-only"),
             TodavError::Exists => write!(f, "account already added"),
             TodavError::Conflict => write!(f, "precondition failed (changed on server)"),
             TodavError::NoAccount => write!(f, "no account configured"),
@@ -69,6 +72,7 @@ impl From<todav_core::Error> for TodavError {
         let reason = e.to_string();
         match e {
             E::Auth => TodavError::Auth,
+            E::ReadOnly => TodavError::ReadOnly,
             E::Exists => TodavError::Exists,
             E::Conflict => TodavError::Conflict,
             E::NoAccount => TodavError::NoAccount,

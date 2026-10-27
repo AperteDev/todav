@@ -13,7 +13,7 @@ use todav_app::service::Service;
 use todav_core::{
     Account, AccountKind, CategoryGroup, CategoryMeta, Client, Credentials, DoneView, Event,
     EventTime, LoginFlow, PushRegistration, PushStatus, Refused, Repeat, Scope, ServerInfo, Sort,
-    Task,
+    SystemCalendar, SystemEvent, Task,
 };
 
 mod error;
@@ -294,6 +294,16 @@ impl Todav {
 
     pub fn edit_list(&self, href: String, name: String, color: String) -> Result<()> {
         Ok(self.c().edit_list(href, name, color)?)
+    }
+
+    /// The system account's calendars are these now (those turned on), read-only.
+    pub fn set_system_calendars(&self, account: i64, calendars: Vec<SystemCalendar>) -> Result<()> {
+        Ok(self.c().set_system_calendars(account, calendars)?)
+    }
+
+    /// System calendar `list_href` holds these occurrences now.
+    pub fn set_system_events(&self, list_href: String, events: Vec<SystemEvent>) -> Result<()> {
+        Ok(self.c().set_system_events(list_href, events)?)
     }
 
     /// Put lists in this order (those of one account, as a sidebar shows them).

@@ -17,6 +17,9 @@ pub enum AccountKind {
     /// its calendars can be renamed and recoloured, not created or deleted, and their order
     /// stays on this device.
     Google,
+    /// The system's calendars (Android's calendar store), one at most: read-only copies of
+    /// those the user turned on, refreshed by the front-end (`set_system_calendars`).
+    System,
 }
 
 impl AccountKind {
@@ -25,6 +28,7 @@ impl AccountKind {
             AccountKind::Nextcloud => "nextcloud",
             AccountKind::Local => "local",
             AccountKind::Google => "google",
+            AccountKind::System => "system",
         }
     }
 }
@@ -53,6 +57,7 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Account> {
         kind: match r.get::<_, String>(1)?.as_str() {
             "local" => AccountKind::Local,
             "google" => AccountKind::Google,
+            "system" => AccountKind::System,
             _ => AccountKind::Nextcloud,
         },
         name: r.get(2)?,
@@ -91,7 +96,7 @@ impl Client {
     }
 
     /// A new account; returns its id. Refuses (`Error::Exists`) a Nextcloud account already
-    /// here (same server and user) and a second local one.
+    /// here (same server and user) and a second local or system one.
     pub fn add_account(
         &self,
         kind: AccountKind,
@@ -103,7 +108,7 @@ impl Client {
         let db = self.db.lock().unwrap();
         let same: bool = db.query_row(
             "SELECT EXISTS (SELECT 1 FROM accounts WHERE kind = ?1
-               AND (kind = 'local' OR (url = ?2 AND user = ?3)))",
+               AND (kind IN ('local', 'system') OR (url = ?2 AND user = ?3)))",
             params![kind.as_str(), url, user],
             |r| r.get(0),
         )?;

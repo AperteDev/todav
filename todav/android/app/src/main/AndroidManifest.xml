@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- The system's calendars, shown read-only when turned on in Settings → Accounts. -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
     <!-- Reminders at their minute: a calendar app may use exact alarms (Android 13 and later);
          Android 12 asks the user for them instead. -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />

@@ -10,6 +10,7 @@ pub mod rrule;
 mod settings;
 pub mod store;
 mod sync;
+mod system;
 pub mod tz;
 mod undo;
 
@@ -29,6 +30,7 @@ pub use login::{Credentials, LoginFlow, login_flow_poll, login_flow_start, passw
 pub use push::{PushRegistration, PushStatus, ntfy_check};
 pub use settings::DEVICE_ONLY;
 pub use sync::{Refused, SyncReport};
+pub use system::{SystemCalendar, SystemEvent};
 
 /// A calendar collection: a task list, a calendar of events, or both (Nextcloud's "Personal").
 #[derive(Debug, Clone, PartialEq)]
@@ -252,6 +254,7 @@ impl Client {
         time: EventTime,
         reminders: Vec<i64>,
     ) -> Result<String> {
+        self.writable(&list_href)?;
         let uid = new_uid();
         let t = ical::fmt_utc(now());
         let mut cal = Calendar::parse(&format!(
@@ -286,6 +289,7 @@ impl Client {
         scope: Scope,
         patch: EventPatch,
     ) -> Result<()> {
+        self.writable(&list_href)?;
         {
             let db = self.db.lock().unwrap();
             let raw = store::raw(&db, Kind::Event, &list_href, &uid)?
@@ -320,6 +324,7 @@ impl Client {
         recurrence_id: Option<i64>,
         scope: Scope,
     ) -> Result<()> {
+        self.writable(&list_href)?;
         {
             let db = self.db.lock().unwrap();
             let raw = store::raw(&db, Kind::Event, &list_href, &uid)?
@@ -349,6 +354,8 @@ impl Client {
         if from == to {
             return Ok(());
         }
+        self.writable(&from)?;
+        self.writable(&to)?;
         {
             let db = self.db.lock().unwrap();
             let raw = store::raw(&db, Kind::Event, &from, &uid)?
@@ -842,6 +849,8 @@ fn set_done(cal: &mut Calendar, done: bool, t: i64) {
 #[derive(Debug)]
 pub enum Error {
     Auth,
+    /// The list or calendar is read-only.
+    ReadOnly,
     /// The account is here already.
     Exists,
     Conflict,
@@ -857,6 +866,7 @@ impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Error::Auth => write!(f, "authentication failed"),
+            Error::ReadOnly => write!(f, "read-only"),
             Error::Exists => write!(f, "account already added"),
             Error::Conflict => write!(f, "precondition failed (changed on server)"),
             Error::NoAccount => write!(f, "no account configured"),

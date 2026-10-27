@@ -593,7 +593,7 @@ fn connect_reorder(row: &adw::ActionRow, id: i64, title: &str) {
 
 fn account_icon(a: &Account) -> &'static str {
     match a.kind {
-        AccountKind::Local => "computer-symbolic",
+        AccountKind::Local | AccountKind::System => "computer-symbolic",
         AccountKind::Nextcloud if a.source.is_empty() => "network-server-symbolic",
         AccountKind::Nextcloud | AccountKind::Google => "goa-panel-symbolic",
     }
@@ -604,6 +604,7 @@ fn account_state(a: &Account) -> String {
     match a.kind {
         _ if !a.enabled => pgettext("account", "Off"),
         AccountKind::Local => gettext("Lists and calendars that stay on this computer"),
+        AccountKind::System => gettext("Calendars of the accounts on this device"),
         _ if !core().connected(a.id) => gettext("Not connected"),
         AccountKind::Google => gettext("Google Calendar"),
         AccountKind::Nextcloud if !a.source.is_empty() => gettext("GNOME Online Accounts"),
@@ -898,6 +899,9 @@ async fn remove_account(dialog: adw::PreferencesDialog, id: i64) {
         AccountKind::Nextcloud | AccountKind::Google => gettext(
             "Its lists and calendars leave this device; they stay on the server. Switch it \
              off instead to only hide them.",
+        ),
+        AccountKind::System => gettext(
+            "Its calendars leave Todav; they stay on this device, in the accounts they come from.",
         ),
     };
     let ask = |heading: String, body: String, yes: String| {

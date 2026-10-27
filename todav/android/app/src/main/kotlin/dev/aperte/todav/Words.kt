@@ -20,6 +20,7 @@ import java.util.Locale
 fun accountName(a: Account): String = when {
     a.name.isNotEmpty() -> a.name
     a.kind == AccountKind.LOCAL -> tr("On This Device")
+    a.kind == AccountKind.SYSTEM -> tr("System Calendars")
     else -> "${a.user}@${accountHost(a)}"
 }
 
@@ -101,6 +102,7 @@ fun sectionTitle(s: Section): String = when (s) {
 /** Why a core call failed, for a message. */
 fun reason(e: Throwable): String = when (e) {
     is TodavException.Auth -> tr("Wrong login name or password")
+    is TodavException.ReadOnly -> tr("This calendar is read-only")
     is TodavException.Exists -> tr("This account is already added")
     is TodavException.NotFound -> e.reason
     is TodavException.Http -> "HTTP ${e.code}: ${e.reason}"

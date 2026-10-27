@@ -1573,9 +1573,12 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
                         }
                     }
                     e.description?.takeIf { it.isNotBlank() }?.let { Line({ Icon(Icons.AutoMirrored.Outlined.Notes, null) }) { Text(it) } }
-                    Row(buttons, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        EditButton(edit)
-                        TextButton(onClick = { askDelete = true }) { Text(tr("Delete"), color = MaterialTheme.colorScheme.error) }
+                    // A read-only calendar's (shared so, or the system's) are only looked at.
+                    if (lists[e.listHref]?.writable == true) {
+                        Row(buttons, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            EditButton(edit)
+                            TextButton(onClick = { askDelete = true }) { Text(tr("Delete"), color = MaterialTheme.colorScheme.error) }
+                        }
                     }
                     val tasks = remember(changes, e.uid) { core.eventTasks(e.uid) }
                     SectionTitle(tr("Tasks"))

@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -41,6 +42,13 @@ class TodavApp : Application() {
 
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    /** The system's calendars changed, or which are turned on: copied again once that settles. */
+    private val systemChanged = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+    fun systemCalendarsChanged() {
+        systemChanged.tryEmit(Unit)
+    }
+
     @OptIn(FlowPreview::class)
     override fun onCreate() {
         super.onCreate()
@@ -54,6 +62,16 @@ class TodavApp : Application() {
             override fun settingsChanged() = changed()
         })
         Reminders.channel(this)
+        scope.launch {
+            // Watched once reading them is allowed (watching needs it too).
+            var watching = false
+            systemChanged.onStart { emit(Unit) }.debounce(500).collect {
+                if (!watching && SystemCalendars.allowed(this@TodavApp)) {
+                    watching = runCatching { SystemCalendars.watch(this@TodavApp, ::systemCalendarsChanged) }.isSuccess
+                }
+                runCatching { SystemCalendars.import(this@TodavApp, core) }
+            }
+        }
         scope.launch {
             connectAccounts()
             core.startService(object : ServiceShell {

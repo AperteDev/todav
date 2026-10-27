@@ -1,5 +1,6 @@
 package dev.aperte.todav.ui
 
+import android.Manifest
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -25,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Password
@@ -68,6 +70,7 @@ import dev.aperte.todav.NextcloudApp
 import dev.aperte.todav.Dest
 import dev.aperte.todav.Main
 import dev.aperte.todav.SignIn
+import dev.aperte.todav.core.AccountKind
 import dev.aperte.todav.tr
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -137,6 +140,17 @@ fun AccountChoice(model: Main, welcome: Boolean) {
             model.signInWithBrowser(url, connect, user)
         }
     }
+    // The system's calendars: allowed to read them, the account comes, and its page to turn them on.
+    val readCalendars = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            runCatching { model.core.addAccount(AccountKind.SYSTEM, "", "", "") }.onSuccess { id ->
+                model.todav.changed()
+                model.todav.systemCalendarsChanged()
+                model.back()
+                model.open(Dest.Account(id))
+            }
+        }
+    }
     val entered = server
     if (entered == null) {
         Text(tr("Tasks and calendar synced with your Nextcloud, or kept on this device"))
@@ -156,6 +170,13 @@ fun AccountChoice(model: Main, welcome: Boolean) {
                     model.useLocally()
                     if (!welcome) model.back()
                 }
+            }
+            if (!welcome && model.core.accounts().none { it.kind == AccountKind.SYSTEM }) {
+                Choice(
+                    tr("System Calendars"),
+                    tr("Calendars of the accounts on this device, such as Google, shown read-only"),
+                    Icons.Outlined.CalendarMonth,
+                ) { readCalendars.launch(Manifest.permission.READ_CALENDAR) }
             }
         }
         if (welcome) {

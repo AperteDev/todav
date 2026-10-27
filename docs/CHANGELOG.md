@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   this device. Google keeps no task lists, and calendars are added and deleted in Google
   Calendar. Only Nextcloud is fully supported, as adding one says; one whose sign-in gave no
   access to the calendars is not added, with what to do instead.
+- Android: System Calendars in Settings → Accounts → Add Account shows the calendars of the
+  device's own accounts (Google, Exchange, DAVx⁵…), read-only. None is shown at first; each is
+  turned on in the account's page, and changes to them show up at once.
+- A read-only calendar's events can no longer be changed, rather than the server refusing the
+  change later; on Android their details no longer offer Edit and Delete.
 - Android: a full Material 3 Expressive app. Tasks and Calendar switched by a navigation bar on
   phones and a rail on wider screens, whose menu button shows the lists and calendars: a page
   of its own on phones, a sidebar that can be hidden and resized on unfolded foldables and tablets; a task page with everything the Linux edit

@@ -35,6 +35,10 @@ Smaller items:
 - Move a task to another list by dragging it onto the sidebar (Move to List in its menu does it
   now).
 - Drop the material3 pin in `gradle/libs.versions.toml` once the Compose BOM ships 1.5.
+- System calendars (`SystemCalendars.kt`, read-only now): editing their events, written back to
+  Android's calendar store (whole events with their repeat rules, not the occurrences copied
+  now); occurrences outside two years back and three ahead, read when browsed there. Test with
+  a Google account on a real phone (the emulator's image has no Google Play services).
 
 ## Distribution
 
