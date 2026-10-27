@@ -185,7 +185,15 @@ pub fn reorderable(row: &gtk::ListBoxRow, l: &List, siblings: Vec<String>) {
     drag.set_actions(gdk::DragAction::MOVE);
     let value = l.href.to_variant().to_value();
     drag.set_content(Some(&gdk::ContentProvider::for_value(&value)));
-    let (r, name, href) = (row.clone(), l.display_name.clone(), l.href.clone());
+    // Its list box shows where the row lands, not the highlight a task dropped on a row gets;
+    // kept from now, as the drop makes the rows anew, maybe before the drag ends.
+    let rows = row.parent();
+    let (r, name, href, b) = (
+        row.clone(),
+        l.display_name.clone(),
+        l.href.clone(),
+        rows.clone(),
+    );
     drag.connect_drag_begin(move |_, drag| {
         DRAGGED.replace(Some(href.clone()));
         // The list's name on a card; the row stays in place, faded.
@@ -195,11 +203,17 @@ pub fn reorderable(row: &gtk::ListBoxRow, l: &List, siblings: Vec<String>) {
             icon.set_child(Some(&card));
         }
         r.add_css_class("dragged");
+        if let Some(b) = &b {
+            b.add_css_class("reordering");
+        }
     });
     let r = row.clone();
     drag.connect_drag_end(move |_, _, _| {
         DRAGGED.take();
         r.remove_css_class("dragged");
+        if let Some(b) = &rows {
+            b.remove_css_class("reordering");
+        }
         clear_mark();
     });
     row.add_controller(drag);

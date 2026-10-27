@@ -40,7 +40,7 @@ button.tag.event { min-height: 0; padding: 2px 10px; font-weight: normal; }
 :drop(active) { box-shadow: none; outline: none; }
 button.drop-hint { outline: 2px solid @accent_bg_color; outline-offset: -2px; }
 button.drop-hint:drop(active) { background: alpha(@accent_bg_color, 0.2); }
-row.cat-drop:drop(active) { outline: 2px solid @accent_bg_color; outline-offset: -2px; background: alpha(@accent_bg_color, 0.2); }
+list:not(.reordering) > row.cat-drop:drop(active) { outline: 2px solid @accent_bg_color; outline-offset: -2px; background: alpha(@accent_bg_color, 0.2); }
 row.dragged { opacity: 0.4; }
 banner.warning { --banner-color: var(--warning-bg-color); }
 .drag-card { margin: 8px; padding: 12px 18px; border-radius: 12px; background: @card_bg_color; color: @card_fg_color; box-shadow: 0 2px 8px alpha(black, 0.25); }
