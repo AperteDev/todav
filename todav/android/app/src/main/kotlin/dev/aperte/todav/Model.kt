@@ -1,5 +1,6 @@
 package dev.aperte.todav
 
+import android.app.ActivityManager
 import android.app.Application
 import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
@@ -41,6 +42,11 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+/** The app is in front (an activity of it shown), not behind the browser, say. */
+private fun inFront(): Boolean = ActivityManager.RunningAppProcessInfo()
+    .also { ActivityManager.getMyMemoryState(it) }
+    .importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
 
 /** The pages above the lists, by the key `last_list` keeps for them (as the Linux app). */
 const val UPCOMING = "upcoming"
@@ -563,13 +569,19 @@ class Main(app: Application) : AndroidViewModel(app) {
             val url = if (user.isEmpty()) flow.loginUrl else flow.loginUrl + "?user=" + java.net.URLEncoder.encode(user, "UTF-8")
             signIn.value = SignIn.Browser(url)
             // Nextcloud keeps a login flow for 20 minutes.
+            var failures = 0
             repeat(20 * 60 / 2) {
                 delay(2000)
                 val credentials = try {
-                    loginFlowPoll(flow)
+                    loginFlowPoll(flow).also { failures = 0 }
                 } catch (e: Exception) {
-                    signIn.value = SignIn.Failed(tr("Login failed: {error}").replace("{error}", reason(e)))
-                    return@launch
+                    // Behind the browser the app has no network (Android cuts off apps in the
+                    // background); only failing in front, again and again, is the answer.
+                    if (inFront() && ++failures >= 3) {
+                        signIn.value = SignIn.Failed(tr("Login failed: {error}").replace("{error}", reason(e)))
+                        return@launch
+                    }
+                    null
                 }
                 if (credentials != null) {
                     then(credentials.server, credentials.loginName, credentials.appPassword)

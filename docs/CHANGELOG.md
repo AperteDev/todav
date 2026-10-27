@@ -87,6 +87,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Android: signing in with the browser no longer fails with "Login failed" when Android cuts off
+  Todav's network while the browser is in front.
 - On a new installation, reminders never went off.
 - The calendar no longer highlights the first day of a month or week moved to with the arrows
   as if it had been picked.
