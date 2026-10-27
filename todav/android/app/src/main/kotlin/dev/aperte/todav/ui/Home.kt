@@ -184,7 +184,8 @@ private fun Panes(model: Main, screen: Screen, view: View, modifier: Modifier) {
 private fun addLabel(view: View) = if (view == View.TASKS) tr("Add Task") else tr("New Event")
 
 /** What the menu button shows: the task lists or the calendars. */
-private fun menuLabel(view: View) = if (view == View.TASKS) tr("Task lists") else tr("Calendars")
+/** The menu button's name, the same with either view: task lists and calendars are both lists. */
+private fun menuLabel() = tr("Lists")
 
 /**
  * The sidebar's menu button (selected while its page is shown), Tasks and Calendar, and the add
@@ -197,7 +198,7 @@ private fun Switcher(view: View, page: Boolean, onMenu: () -> Unit, onShow: (Vie
             selected = page,
             onClick = onMenu,
             icon = { Icon(Icons.Default.Menu, null) },
-            label = { Text(menuLabel(view)) },
+            label = { Text(menuLabel()) },
         )
         NavigationBarItem(
             selected = !page && view == View.TASKS,
@@ -220,8 +221,8 @@ private fun Switcher(view: View, page: Boolean, onMenu: () -> Unit, onShow: (Vie
 private fun Rail(view: View, pane: Boolean, onMenu: () -> Unit, onShow: (View) -> Unit) {
     NavigationRail(
         header = {
-            Tip(menuLabel(view)) {
-                IconToggleButton(checked = pane, onCheckedChange = { onMenu() }) { Icon(Icons.Default.Menu, menuLabel(view)) }
+            Tip(menuLabel()) {
+                IconToggleButton(checked = pane, onCheckedChange = { onMenu() }) { Icon(Icons.Default.Menu, menuLabel()) }
             }
         },
     ) {
