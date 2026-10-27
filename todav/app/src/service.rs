@@ -42,6 +42,8 @@ pub struct Service {
     errors: Mutex<Option<HashMap<i64, String>>>,
     /// The ntfy server the push listener was started for.
     push_url: Mutex<String>,
+    /// Started with the push listener (`start(listen)`); else pushes come through the platform.
+    listens: std::sync::atomic::AtomicBool,
     /// What the push listener last failed with; cleared by its next success.
     push_error: Mutex<Option<String>>,
     /// Minutes `tick` has counted.
@@ -57,6 +59,7 @@ impl Service {
             state: Mutex::new(State::Idle),
             errors: Mutex::new(None),
             push_url: Mutex::new(String::new()),
+            listens: std::sync::atomic::AtomicBool::new(false),
             push_error: Mutex::new(None),
             ticks: AtomicU32::new(0),
         });
@@ -78,6 +81,7 @@ impl Service {
             self.sync_now();
             return false;
         }
+        self.listens.store(listen, Ordering::Relaxed);
         let (tx, rx) = channel::<()>();
         let _ = self.worker.set(tx);
         let me = self.clone();
@@ -198,10 +202,13 @@ impl Service {
         });
     }
 
-    /// Synced settings arrived: a new ntfy server is listened to at once.
+    /// Synced settings arrived: a new ntfy server is listened to at once (by a service that
+    /// listens; on Android pushes come through UnifiedPush, whose registration a listener's
+    /// would replace).
     fn settings_changed(self: &Arc<Self>) {
         let ntfy = self.client.setting("ntfy_url".into()).unwrap_or_default();
-        if self.running() && ntfy != *self.push_url.lock().unwrap() {
+        let listens = self.listens.load(Ordering::Relaxed);
+        if self.running() && listens && ntfy != *self.push_url.lock().unwrap() {
             self.restart_push();
         }
     }
@@ -368,6 +375,26 @@ mod tests {
         c.update_task(task.uid, patch).unwrap();
         assert_eq!(due_reminders(&c).0.len(), 1);
         assert!(due_reminders(&c).0.is_empty());
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    struct NoShell;
+
+    impl Shell for NoShell {
+        fn state(&self, _: State) {}
+        fn refused(&self, _: Vec<todav_core::Refused>) {}
+    }
+
+    #[test]
+    fn a_service_without_the_listener_does_not_start_it_for_synced_settings() {
+        let dir = std::env::temp_dir().join(format!("todav-app-listen-{}", std::process::id()));
+        let c = Arc::new(Client::open(dir.to_string_lossy().into()).unwrap());
+        let s = Service::new(c.clone(), Box::new(NoShell));
+        s.start(false);
+        c.set_setting("ntfy_url".into(), "https://ntfy.example".into())
+            .unwrap();
+        s.settings_changed();
+        assert!(s.push_url.lock().unwrap().is_empty());
         let _ = std::fs::remove_dir_all(dir);
     }
 }
