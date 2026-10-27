@@ -84,6 +84,7 @@ button.block.task { padding-left: 4px; }
 .block.task { border-left: 3px solid alpha(currentColor, 0.5); }
 /* Opaque, so the block it is resized or moved from does not show through it. */
 .drop-preview { border-radius: 6px; padding: 2px 6px; font-size: smaller; font-feature-settings: 'tnum'; background: color-mix(in srgb, @accent_bg_color 25%, @window_bg_color); box-shadow: inset 0 0 0 1px @accent_bg_color; }
+.view-menu button { font-weight: normal; }
 .drag-card { margin: 8px; padding: 8px 14px; border-radius: 10px; background: @card_bg_color; color: @card_fg_color; box-shadow: 0 2px 8px alpha(black, 0.25); }
 ";
 
@@ -100,19 +101,25 @@ struct Cal {
     search: gtk::SearchBar,
     /// The search, `folded`: while set, matching events show instead of the views.
     query: RefCell<String>,
-    mode: adw::ToggleGroup,
+    mode: Cell<Mode>,
+    /// The view menus, in the header and in the bottom bar of a narrow window.
+    view_buttons: [gtk::MenuButton; 2],
     views: gtk::Stack,
     weekdays: gtk::Box,
     month: gtk::Grid,
     agenda: gtk::Box,
     plan_heading: gtk::ToggleButton,
     plan: gtk::ListBox,
+    /// The Day view's week, a row of the month grid.
+    week_strip: gtk::Box,
     week_head: gtk::Box,
     week_all_day: gtk::Box,
     week_scroll: gtk::ScrolledWindow,
     week_grid: gtk::Overlay,
     week_lines: gtk::DrawingArea,
     hours: gtk::Box,
+    /// The days the hours show, a column each (midnights).
+    days: RefCell<Vec<i64>>,
     /// The week grid's blocks, where they go and what they show.
     blocks: RefCell<Vec<(gtk::Widget, week::Geo, Item)>>,
     /// Week-grid slot a dragged task would land in: (day of the week, minute of the day).
@@ -168,10 +175,10 @@ pub fn build(views: &adw::ViewStack) {
         bin.add_breakpoint(bp.clone());
         bp
     };
-    let (mode, bar, sync): (adw::ToggleGroup, gtk::ActionBar, gtk::Button) =
-        (get(&b, "mode"), get(&b, "mode_bar"), get(&b, "sync"));
+    let (view, bar, sync): (gtk::MenuButton, gtk::ActionBar, gtk::Button) =
+        (get(&b, "view"), get(&b, "mode_bar"), get(&b, "sync"));
     let to_bar = |bp: &adw::Breakpoint| {
-        bp.add_setter(&mode, "visible", Some(&false.to_value()));
+        bp.add_setter(&view, "visible", Some(&false.to_value()));
         bp.add_setter(&bar, "revealed", Some(&true.to_value()));
         bp.add_setter(&sync, "visible", Some(&false.to_value()));
     };
@@ -203,19 +210,25 @@ pub fn build(views: &adw::ViewStack) {
         sync_state: get(&b, "sync_state"),
         search: get(&b, "search"),
         query: RefCell::new(String::new()),
-        mode: get(&b, "mode"),
+        mode: Cell::new(Mode::from_name(&at_start(
+            "start_calendar_view",
+            "calendar_mode",
+        ))),
+        view_buttons: [view, get(&b, "view_narrow")],
         views: get(&b, "views"),
         weekdays: get(&b, "weekdays"),
         month: get(&b, "month"),
         agenda: get(&b, "agenda"),
         plan_heading: get(&b, "plan_heading"),
         plan: get(&b, "plan"),
+        week_strip: get(&b, "week_strip"),
         week_head: get(&b, "week_head"),
         week_all_day: get(&b, "week_all_day"),
         week_scroll: get(&b, "week_scroll"),
         week_grid: get(&b, "week_grid"),
         week_lines: get(&b, "week_lines"),
         hours: get(&b, "hours"),
+        days: RefCell::new(Vec::new()),
         blocks: RefCell::new(Vec::new()),
         hover: Cell::new(None),
         preview: gtk::Label::builder()
@@ -255,32 +268,16 @@ pub fn build(views: &adw::ViewStack) {
             section(&c, events).get(row.index() as usize).cloned()
         });
     }
-    // The Month / Week / Agenda choice in the bottom bar, when it is there.
-    let narrow: adw::ToggleGroup = get(&b, "mode_narrow");
-    c.mode
-        .bind_property("active-name", &narrow, "active-name")
-        .bidirectional()
-        .sync_create()
-        .build();
+    for b in &c.view_buttons {
+        b.set_create_popup_func(|b| b.set_popover(Some(&view_menu(b))));
+    }
+    label_views(&c);
     // Shrinking keeps the views, as on the Tasks page; the sidebar is a Back away.
     c.split.set_show_content(true);
     c.split.connect_collapsed_notify(|s| {
         if s.is_collapsed() {
             s.set_show_content(true);
         }
-    });
-    let mode = at_start("start_calendar_view", "calendar_mode");
-    c.mode.set_active_name(Some(match mode.as_str() {
-        "week" | "agenda" => mode.as_str(),
-        _ => "month",
-    }));
-    c.mode.connect_active_name_notify(|m| {
-        let name = m.active_name().map(|n| n.to_string()).unwrap_or_default();
-        let _ = core().set_setting("calendar_mode".into(), name);
-        if let Some(c) = cal() {
-            c.search.set_search_mode(false);
-        }
-        refresh();
     });
     // Typing on the page searches the events; going to a day, a view or a period ends it.
     let query: gtk::SearchEntry = get(&b, "query");
@@ -307,8 +304,8 @@ pub fn build(views: &adw::ViewStack) {
         gio::ActionEntry::builder("view")
             .parameter_type(Some(glib::VariantTy::STRING))
             .activate(|_: &gio::SimpleActionGroup, _, view| {
-                if let (Some(c), Some(v)) = (cal(), view.and_then(|v| v.str())) {
-                    c.mode.set_active_name(Some(v));
+                if let Some(v) = view.and_then(|v| v.str()) {
+                    set_mode(Mode::from_name(v));
                 }
             })
             .build(),
@@ -342,19 +339,226 @@ fn at_start(choice: &str, last: &str) -> String {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 enum Mode {
     Month,
     Week,
+    /// The week's days the user picked (`prefs::work_days`).
+    WorkWeek,
+    /// Three days from the selected one.
+    ThreeDays,
+    /// The selected day, under its week from the month grid.
+    Day,
     Agenda,
 }
 
-fn mode(c: &Cal) -> Mode {
-    match c.mode.active_name().as_deref() {
-        Some("week") => Mode::Week,
-        Some("agenda") => Mode::Agenda,
-        _ => Mode::Month,
+impl Mode {
+    /// In the menu's order.
+    const ALL: [Mode; 6] = [
+        Mode::Month,
+        Mode::Week,
+        Mode::WorkWeek,
+        Mode::ThreeDays,
+        Mode::Day,
+        Mode::Agenda,
+    ];
+
+    /// As stored in `calendar_mode` and `start_calendar_view`, and the `cal.view` action's target.
+    fn name(self) -> &'static str {
+        match self {
+            Mode::Month => "month",
+            Mode::Week => "week",
+            Mode::WorkWeek => "work_week",
+            Mode::ThreeDays => "three_days",
+            Mode::Day => "day",
+            Mode::Agenda => "agenda",
+        }
     }
+
+    fn from_name(name: &str) -> Mode {
+        Mode::ALL
+            .into_iter()
+            .find(|m| m.name() == name)
+            .unwrap_or(Mode::Month)
+    }
+
+    fn label(self) -> String {
+        match self {
+            Mode::Month => gettext("Month"),
+            Mode::Week => gettext("Week"),
+            Mode::WorkWeek => gettext("Work Week"),
+            Mode::ThreeDays => gettext("3 Days"),
+            Mode::Day => gettext("Day"),
+            Mode::Agenda => gettext("Agenda"),
+        }
+    }
+
+    /// Its Ctrl+number shortcut: the first three as before there were more views.
+    fn key(self) -> u32 {
+        match self {
+            Mode::Month => 1,
+            Mode::Week => 2,
+            Mode::Agenda => 3,
+            Mode::WorkWeek => 4,
+            Mode::ThreeDays => 5,
+            Mode::Day => 6,
+        }
+    }
+}
+
+fn mode(c: &Cal) -> Mode {
+    c.mode.get()
+}
+
+fn set_mode(m: Mode) {
+    let Some(c) = cal() else { return };
+    c.mode.set(m);
+    let _ = core().set_setting("calendar_mode".into(), m.name().into());
+    label_views(&c);
+    c.search.set_search_mode(false);
+    refresh();
+}
+
+fn label_views(c: &Cal) {
+    for b in &c.view_buttons {
+        b.set_label(&c.mode.get().label());
+    }
+}
+
+/// The views to pick from, the current one checked, their shortcuts beside them; Work Week has a
+/// button choosing its days.
+fn view_menu(button: &gtk::MenuButton) -> gtk::Popover {
+    let list = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    let pop = gtk::Popover::builder().child(&list).build();
+    pop.add_css_class("view-menu");
+    let current = cal().map(|c| c.mode.get());
+    // As wide as each other, so the shortcuts line up beside Work Week's button.
+    let same = gtk::SizeGroup::new(gtk::SizeGroupMode::Horizontal);
+    for m in Mode::ALL {
+        let row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+        row.append(
+            &gtk::Label::builder()
+                .label(m.label())
+                .xalign(0.0)
+                .hexpand(true)
+                .build(),
+        );
+        if let Some((key, mods)) = gtk::accelerator_parse(format!("<Control>{}", m.key())) {
+            let accel = gtk::Label::new(Some(&gtk::accelerator_get_label(key, mods)));
+            accel.add_css_class("dim-label");
+            row.append(&accel);
+        }
+        let check = gtk::Image::from_icon_name("object-select-symbolic");
+        check.set_opacity(if current == Some(m) { 1.0 } else { 0.0 });
+        row.append(&check);
+        // Not expanding as its label does: the size group sets its width.
+        let pick = gtk::Button::builder().child(&row).hexpand(false).build();
+        pick.add_css_class("flat");
+        same.add_widget(&pick);
+        let p = pop.downgrade();
+        pick.connect_clicked(move |_| {
+            if let Some(p) = p.upgrade() {
+                p.popdown();
+            }
+            set_mode(m);
+        });
+        let line = gtk::Box::new(gtk::Orientation::Horizontal, 2);
+        line.append(&pick);
+        if m == Mode::WorkWeek {
+            let days = gtk::Button::builder()
+                .icon_name("emblem-system-symbolic")
+                .tooltip_text(gettext("Work Week Days"))
+                .build();
+            days.add_css_class("flat");
+            let (p, button) = (pop.downgrade(), button.downgrade());
+            days.connect_clicked(move |_| {
+                if let Some(p) = p.upgrade() {
+                    p.popdown();
+                }
+                if let Some(b) = button.upgrade() {
+                    work_days_dialog(&b, || {});
+                }
+            });
+            line.append(&days);
+        }
+        list.append(&line);
+    }
+    pop
+}
+
+/// Midnight of a day that is `weekday` (0 = Sunday): to name it.
+fn a_day(weekday: i64) -> i64 {
+    // 1970-01-04 was a Sunday.
+    (3 + weekday) * DAY
+}
+
+/// The Work Week view's days, shortly: "Mon, Tue, Wed, Thu, Fri".
+pub fn work_days_text() -> String {
+    let first = crate::i18n::first_weekday();
+    let days = prefs::work_days(core());
+    (0..7)
+        .map(|d| (first + d) % 7)
+        .filter(|d| days.contains(d))
+        .map(|d| fmt(a_day(d), "%a"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// Pick the Work Week view's days, one to six, over `parent`; `changed` runs after each change.
+pub fn work_days_dialog(parent: &impl IsA<gtk::Widget>, changed: impl Fn() + 'static) {
+    let dialog = adw::AlertDialog::new(
+        Some(&gettext("Work Week Days")),
+        Some(&gettext("The days the Work Week view shows: one to six.")),
+    );
+    dialog.add_response("close", &gettext("Close"));
+    let list = gtk::ListBox::builder()
+        .selection_mode(gtk::SelectionMode::None)
+        .build();
+    list.add_css_class("boxed-list");
+    let first = crate::i18n::first_weekday();
+    let rows: Vec<(i64, adw::SwitchRow)> = (0..7)
+        .map(|d| {
+            let day = (first + d) % 7;
+            let row = adw::SwitchRow::builder()
+                .title(capitalized(&fmt(a_day(day), "%A")))
+                .build();
+            list.append(&row);
+            (day, row)
+        })
+        .collect();
+    let rows = Rc::new(rows);
+    // The last day left can't be turned off, nor a seventh on.
+    let limit = {
+        let rows = rows.clone();
+        move || {
+            let on = rows.iter().filter(|(_, r)| r.is_active()).count();
+            for (_, r) in rows.iter() {
+                r.set_sensitive(if r.is_active() { on > 1 } else { on < 6 });
+            }
+        }
+    };
+    let days = prefs::work_days(core());
+    for (day, row) in rows.iter() {
+        row.set_active(days.contains(day));
+    }
+    limit();
+    let changed = Rc::new(changed);
+    for (_, row) in rows.iter() {
+        let (rows, limit, changed) = (rows.clone(), limit.clone(), changed.clone());
+        row.connect_active_notify(move |_| {
+            let on: Vec<i64> = rows
+                .iter()
+                .filter(|(_, r)| r.is_active())
+                .map(|(d, _)| *d)
+                .collect();
+            prefs::set_work_days(core(), &on);
+            limit();
+            changed();
+            refresh();
+        });
+    }
+    dialog.set_extra_child(Some(&list));
+    dialog.present(Some(parent));
 }
 
 /// Move to the day `f` picks from the current one.
@@ -385,7 +589,9 @@ fn step(by: i64) {
                 visit(|_| dates::midnight(&f), true);
             }
         }
-        Mode::Week => visit(|a| a + by * 7 * DAY, true),
+        Mode::Week | Mode::WorkWeek => visit(|a| a + by * 7 * DAY, true),
+        // Any days next to each other: a day at a time, the first shown being the one picked.
+        Mode::ThreeDays | Mode::Day => visit(|a| a + by * DAY, false),
         Mode::Agenda => visit(|a| a + by * AGENDA_STEP * DAY, true),
     }
 }
@@ -496,14 +702,14 @@ pub fn refresh() {
             c.views.set_visible_child_name("month");
             render_month(&c)
         }
-        Mode::Week => {
-            c.views.set_visible_child_name("week");
-            week::render(&c)
-        }
         Mode::Agenda => {
             c.views.set_visible_child_name("agenda");
             render_agenda(&c);
             0
+        }
+        _ => {
+            c.views.set_visible_child_name("week");
+            week::render(&c)
         }
     };
     render_plan(&c, until);
@@ -920,55 +1126,60 @@ fn render_month(c: &Rc<Cal>) -> i64 {
         c.month.remove(&child);
     }
     let all = items(start, end);
-    let (today, month) = (today(), d.month());
-    let cell = |day: i64| {
-        let cell = gtk::Box::new(gtk::Orientation::Vertical, 2);
-        cell.add_css_class("day");
-        if dates::fields(day).month() != month {
-            cell.add_css_class("other");
-        }
-        if day == today {
-            cell.add_css_class("today");
-        }
-        if day == anchor && !c.browsed.get() {
-            cell.add_css_class("selected");
-        }
-        let num = gtk::Label::builder()
-            .label(fmt(day, "%-d"))
-            .halign(gtk::Align::End)
-            .build();
-        num.add_css_class("num");
-        cell.append(&num);
-        // Clicking a day selects it, a double click or a long press adds an event that day;
-        // what is dropped on it moves there.
-        let click = gtk::GestureClick::new();
-        click.connect_released(move |_, n, _, _| {
-            if n == 1 {
-                select_in_month(day);
-            }
-        });
-        cell.add_controller(click);
-        new_event_on(&cell, move |_, _, _| {
-            Some(EventTime {
-                start: day,
-                end: day + DAY,
-                all_day: true,
-            })
-        });
-        day_drop(&cell, day, false);
-        flash_if(c, &cell, day);
-        cell
-    };
+    let month = d.month();
     for w in 0..6 {
         let from = start + w * 7 * DAY;
+        let week: Vec<i64> = (0..7).map(|d| from + d * DAY).collect();
         let here: Vec<&Item> = all
             .iter()
-            .filter(|i| (0..7).any(|d| on_day(i, from + d * DAY)))
+            .filter(|i| week.iter().any(|&d| on_day(i, d)))
             .collect();
-        let row = days::row(c, from, &here, CHIPS, false, cell);
+        let row = days::row(c, &week, &here, CHIPS, false, |day| {
+            day_cell(c, day, dates::fields(day).month() != month, select_in_month)
+        });
         c.month.attach(&row, 0, w as i32, 1, 1);
     }
     end
+}
+
+/// A day of the month grid: its number (dimmer when `other`, from another month), today and the
+/// selected day marked. Clicking it calls `select`, a double click or a long press adds an
+/// event that day; what is dropped on it moves there.
+fn day_cell(c: &Rc<Cal>, day: i64, other: bool, select: fn(i64)) -> gtk::Box {
+    let cell = gtk::Box::new(gtk::Orientation::Vertical, 2);
+    cell.add_css_class("day");
+    if other {
+        cell.add_css_class("other");
+    }
+    if day == today() {
+        cell.add_css_class("today");
+    }
+    if day == c.anchor.get() && !c.browsed.get() {
+        cell.add_css_class("selected");
+    }
+    let num = gtk::Label::builder()
+        .label(fmt(day, "%-d"))
+        .halign(gtk::Align::End)
+        .build();
+    num.add_css_class("num");
+    cell.append(&num);
+    let click = gtk::GestureClick::new();
+    click.connect_released(move |_, n, _, _| {
+        if n == 1 {
+            select(day);
+        }
+    });
+    cell.add_controller(click);
+    new_event_on(&cell, move |_, _, _| {
+        Some(EventTime {
+            start: day,
+            end: day + DAY,
+            all_day: true,
+        })
+    });
+    day_drop(&cell, day, false);
+    flash_if(c, &cell, day);
+    cell
 }
 
 /// Select a day of the month grid. In the month shown only the highlight moves: a rebuilt

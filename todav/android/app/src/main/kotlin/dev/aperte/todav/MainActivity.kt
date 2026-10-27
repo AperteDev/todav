@@ -121,7 +121,7 @@ class MainActivity : ComponentActivity() {
                     model.pick(dev.aperte.todav.core.midnight(model.core.localNow()))
                     true
                 }
-                KeyEvent.KEYCODE_1, KeyEvent.KEYCODE_2, KeyEvent.KEYCODE_3 -> {
+                in KeyEvent.KEYCODE_1..KeyEvent.KEYCODE_6 -> {
                     model.setMode(CalMode.entries[event.keyCode - KeyEvent.KEYCODE_1])
                     model.show(View.CALENDAR)
                     true
@@ -147,6 +147,9 @@ class MainActivity : ComponentActivity() {
                 info(tr("Month"), KeyEvent.KEYCODE_1),
                 info(tr("Week"), KeyEvent.KEYCODE_2),
                 info(tr("Agenda"), KeyEvent.KEYCODE_3),
+                info(tr("Work Week"), KeyEvent.KEYCODE_4),
+                info(tr("3 Days"), KeyEvent.KEYCODE_5),
+                info(tr("Day"), KeyEvent.KEYCODE_6),
                 info(tr("Settings"), KeyEvent.KEYCODE_COMMA),
             ),
         )

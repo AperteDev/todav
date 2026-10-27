@@ -256,7 +256,18 @@ Adw.PreferencesDialog dialog {
 
       Adw.ComboRow start_calendar_view {
         title: _("View at start");
-        model: Gtk.StringList { strings [_("Last used"), _("Month"), _("Week"), _("Agenda")] };
+        model: Gtk.StringList { strings [_("Last used"), _("Month"), _("Week"), _("Work Week"), _("3 Days"), _("Day"), _("Agenda")] };
+      }
+
+      // Its subtitle names the days (set in code); it opens their choice.
+      Adw.ActionRow work_days {
+        title: _("Work week days");
+        activatable: true;
+
+        [suffix]
+        Gtk.Image {
+          icon-name: "go-next-symbolic";
+        }
       }
 
       Adw.SwitchRow mini_dots {

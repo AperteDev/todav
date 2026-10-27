@@ -555,9 +555,18 @@ private fun ReminderRows(model: Main) {
 private fun CalendarSettings(model: Main) {
     Section(tr("Views")) {
         ChoiceRow(
-            model, tr("View at start"), "start_calendar_view", listOf("last", "month", "week", "agenda"),
-            listOf(tr("Last used"), tr("Month"), tr("Week"), tr("Agenda")),
+            model, tr("View at start"), "start_calendar_view",
+            listOf("last", "month", "week", "work_week", "three_days", "day", "agenda"),
+            listOf(tr("Last used"), tr("Month"), tr("Week"), tr("Work Week"), tr("3 Days"), tr("Day"), tr("Agenda")),
         )
+        val days by model.workDays.collectAsStateWithLifecycle()
+        var pick by remember { mutableStateOf(false) }
+        Item(
+            headlineContent = { Text(tr("Work week days")) },
+            supportingContent = { Text(workDaysText(days)) },
+            modifier = Modifier.clickable { pick = true },
+        )
+        if (pick) WorkDaysDialog(model) { pick = false }
     }
     Section(tr("Events")) {
         DurationRow(model, tr("Default duration"), tr("When an event is added at a time, or an all-day one gets a time"), "event_duration")

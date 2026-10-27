@@ -48,6 +48,24 @@ Adw.NavigationSplitView split {
       action: "action(cal.view)";
       arguments: "'agenda'";
     }
+
+    Gtk.Shortcut {
+      trigger: "<Control>4";
+      action: "action(cal.view)";
+      arguments: "'work_week'";
+    }
+
+    Gtk.Shortcut {
+      trigger: "<Control>5";
+      action: "action(cal.view)";
+      arguments: "'three_days'";
+    }
+
+    Gtk.Shortcut {
+      trigger: "<Control>6";
+      action: "action(cal.view)";
+      arguments: "'day'";
+    }
   }
 
   sidebar: Adw.NavigationPage {
@@ -291,25 +309,11 @@ Adw.NavigationSplitView split {
           }
         }
 
+        // Month, Week, Work Week, 3 Days, Day or Agenda; its label and menu are set in code.
         [end]
-        Adw.ToggleGroup mode {
-          Adw.Toggle {
-            name: "month";
-            icon-name: "view-grid-symbolic";
-            tooltip: _("Month (Ctrl+1)");
-          }
-
-          Adw.Toggle {
-            name: "week";
-            icon-name: "view-column-symbolic";
-            tooltip: _("Week (Ctrl+2)");
-          }
-
-          Adw.Toggle {
-            name: "agenda";
-            icon-name: "view-list-symbolic";
-            tooltip: _("Agenda (Ctrl+3)");
-          }
+        Gtk.MenuButton view {
+          always-show-arrow: true;
+          tooltip-text: _("View");
         }
       }
 
@@ -349,24 +353,10 @@ Adw.NavigationSplitView split {
         revealed: false;
 
         [center]
-        Adw.ToggleGroup mode_narrow {
-          Adw.Toggle {
-            name: "month";
-            icon-name: "view-grid-symbolic";
-            tooltip: _("Month (Ctrl+1)");
-          }
-
-          Adw.Toggle {
-            name: "week";
-            icon-name: "view-column-symbolic";
-            tooltip: _("Week (Ctrl+2)");
-          }
-
-          Adw.Toggle {
-            name: "agenda";
-            icon-name: "view-list-symbolic";
-            tooltip: _("Agenda (Ctrl+3)");
-          }
+        Gtk.MenuButton view_narrow {
+          always-show-arrow: true;
+          direction: up;
+          tooltip-text: _("View");
         }
       }
 
@@ -406,11 +396,20 @@ Adw.NavigationSplitView split {
         Gtk.StackPage {
           name: "week";
 
-          // Day names, then all-day items, then the hours; each row has the hour gutter on
-          // the left, so the columns line up.
+          // The hours of a week, some of its days, three days or one day. Day names, then
+          // all-day items, then the hours; each row has the hour gutter on the left, so the
+          // columns line up. One day has its week from the month grid above instead of its name.
           child: Gtk.Box {
             orientation: vertical;
             styles ["week"]
+
+            Gtk.Box week_strip {
+              orientation: vertical;
+              margin-start: 6;
+              margin-end: 6;
+              margin-bottom: 6;
+              styles ["month"]
+            }
 
             Gtk.Box week_head {
               styles ["weekdays"]

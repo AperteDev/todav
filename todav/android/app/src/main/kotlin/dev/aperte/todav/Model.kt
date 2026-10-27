@@ -64,8 +64,17 @@ sealed interface Dest {
     data object AddAccount : Dest
 }
 
-/** The calendar's views, as the Linux app's `calendar_mode` names them. */
-enum class CalMode { MONTH, WEEK, AGENDA }
+/**
+ * The calendar's views, as the Linux app's `calendar_mode` names them; Ctrl+1 to 6 in this order
+ * (the first three as before there were more), `MENU` in the menu's.
+ */
+enum class CalMode {
+    MONTH, WEEK, AGENDA, WORK_WEEK, THREE_DAYS, DAY;
+
+    companion object {
+        val MENU = listOf(MONTH, WEEK, WORK_WEEK, THREE_DAYS, DAY, AGENDA)
+    }
+}
 
 /** Tasks or Calendar, switched by the navigation bar (both shown on wide screens). */
 enum class View { TASKS, CALENDAR }
@@ -202,6 +211,14 @@ class Main(app: Application) : AndroidViewModel(app) {
     fun setMode(m: CalMode) {
         calMode.value = m
         act { core.setSetting("calendar_mode", m.name.lowercase()) }
+    }
+
+    /** The weekdays the Work Week view shows (0 Sunday). */
+    val workDays = MutableStateFlow(listOf(1L, 2L, 3L, 4L, 5L))
+
+    fun setWorkDays(days: List<Long>) {
+        workDays.value = days
+        act { core.setWorkDays(days) }
     }
 
     /** A task from "To Plan" waiting for an hour in the week view to be planned into. */
@@ -565,6 +582,7 @@ class Main(app: Application) : AndroidViewModel(app) {
                     if (it == "last") core.setting("calendar_mode") else it
                 }
                 calMode.value = CalMode.entries.firstOrNull { it.name.lowercase() == m } ?: CalMode.MONTH
+                workDays.value = core.workDays()
             }
         }
     }

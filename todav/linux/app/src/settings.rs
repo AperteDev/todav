@@ -194,8 +194,26 @@ pub fn present(parent: &adw::ApplicationWindow, page: Option<&str>) -> adw::Pref
     connect_choice(
         &b,
         "start_calendar_view",
-        &["last", "month", "week", "agenda"],
+        &[
+            "last",
+            "month",
+            "week",
+            "work_week",
+            "three_days",
+            "day",
+            "agenda",
+        ],
     );
+    let work: adw::ActionRow = get(&b, "work_days");
+    work.set_subtitle(&crate::calendar::work_days_text());
+    work.connect_activated(|row| {
+        let r = row.downgrade();
+        crate::calendar::work_days_dialog(row, move || {
+            if let Some(r) = r.upgrade() {
+                r.set_subtitle(&crate::calendar::work_days_text());
+            }
+        });
+    });
     connect_choice(&b, "category_view", &["group", "tags", "none"]);
     connect_choice(&b, "done_tasks", &["group", "in_place", "last"]);
     connect_choice(&b, "done_subtasks", &["show", "hide", "last"]);

@@ -25,7 +25,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PageSize
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,11 +38,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.CalendarViewDay
 import androidx.compose.material.icons.outlined.CalendarViewMonth
 import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.CalendarViewWeek
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Today
 import androidx.compose.material.icons.outlined.ViewAgenda
+import androidx.compose.material.icons.outlined.ViewColumn
+import androidx.compose.material.icons.outlined.ViewWeek
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
@@ -59,7 +65,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -72,6 +80,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.scrollable
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
@@ -104,6 +119,7 @@ import dev.aperte.todav.core.TextValue
 import dev.aperte.todav.core.Time
 import dev.aperte.todav.core.TodavTask
 import dev.aperte.todav.core.columns
+import dev.aperte.todav.core.daysOfWeek
 import dev.aperte.todav.core.midnight
 import dev.aperte.todav.core.monthFirst
 import dev.aperte.todav.core.onDay
@@ -177,8 +193,11 @@ fun CalendarPane(model: Main, addButton: Boolean) {
     var details by remember { mutableStateOf<Item?>(null) }
     var viewMenu by remember { mutableStateOf(false) }
     var toPlan by remember { mutableStateOf(false) }
+    var workDays by remember { mutableStateOf(false) }
     val planning by model.planning.collectAsStateWithLifecycle()
     val changes by model.todav.changes.collectAsStateWithLifecycle()
+    // Changed on another device and synced.
+    LaunchedEffect(changes) { model.workDays.value = withContext(Dispatchers.IO) { model.core.workDays() } }
     // Each list's colour, once for all pages: a page coming into view has them at once.
     val colors = load(changes, initial = emptyMap<String, String>()) { model.core.colors() }
     val title = when (mode) {
@@ -200,7 +219,7 @@ fun CalendarPane(model: Main, addButton: Boolean) {
                             Icon(Icons.Outlined.Today, tr("Today"))
                         }
                     }
-                    if (mode == CalMode.WEEK) {
+                    if (mode.hours()) {
                         Tip(tr("To Plan")) {
                             IconButton(onClick = { toPlan = true }) { Icon(Icons.Outlined.Inbox, tr("To Plan")) }
                         }
@@ -213,11 +232,24 @@ fun CalendarPane(model: Main, addButton: Boolean) {
                             IconButton(onClick = { viewMenu = true }) { Icon(modeIcon(mode), tr("View")) }
                         }
                         DropdownMenu(expanded = viewMenu, onDismissRequest = { viewMenu = false }) {
-                            for (m in CalMode.entries) {
+                            for (m in CalMode.MENU) {
                                 DropdownMenuItem(
                                     text = { Text(modeName(m)) },
                                     leadingIcon = { Icon(modeIcon(m), null) },
-                                    trailingIcon = { if (m == mode) Icon(Icons.Default.Check, null) },
+                                    trailingIcon = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            if (m == mode) Icon(Icons.Default.Check, null)
+                                            // Work Week's days are picked right beside it.
+                                            if (m == CalMode.WORK_WEEK) {
+                                                Tip(tr("Work Week Days")) {
+                                                    IconButton(onClick = {
+                                                        viewMenu = false
+                                                        workDays = true
+                                                    }) { Icon(Icons.Outlined.Settings, tr("Work Week Days")) }
+                                                }
+                                            }
+                                        }
+                                    },
                                     onClick = {
                                         viewMenu = false
                                         model.setMode(m)
@@ -232,7 +264,7 @@ fun CalendarPane(model: Main, addButton: Boolean) {
         floatingActionButton = { if (addButton) AddButton(tr("New Event"), inBar = false) { newEvent(model) } },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
-            planning?.takeIf { mode == CalMode.WEEK }?.let { t ->
+            planning?.takeIf { mode.hours() }?.let { t ->
                 Row(
                     Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.secondaryContainer).padding(start = 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -248,14 +280,72 @@ fun CalendarPane(model: Main, addButton: Boolean) {
             Box(Modifier.fillMaxSize()) {
                 when (mode) {
                     CalMode.MONTH -> MonthView(model, day, colors) { details = it }
-                    CalMode.WEEK -> WeekView(model, day, colors) { details = it }
+                    CalMode.WEEK -> WeekView(model, day, colors, work = false) { details = it }
+                    CalMode.WORK_WEEK -> WeekView(model, day, colors, work = true) { details = it }
+                    CalMode.THREE_DAYS -> DaysView(model, day, colors, 3) { details = it }
+                    CalMode.DAY -> DaysView(model, day, colors, 1) { details = it }
                     CalMode.AGENDA -> AgendaView(model, day) { details = it }
                 }
             }
         }
     }
     details?.let { ItemSheet(model, it) { details = null } }
-    if (toPlan) ToPlanSheet(model, weekStart(day, firstWeekday()) + 7 * DAY, colors) { toPlan = false }
+    if (toPlan) {
+        // Due by the end of what is shown.
+        val until = when (mode) {
+            CalMode.THREE_DAYS -> day + 3 * DAY
+            CalMode.DAY -> day + DAY
+            else -> weekStart(day, firstWeekday()) + 7 * DAY
+        }
+        ToPlanSheet(model, until, colors) { toPlan = false }
+    }
+    if (workDays) WorkDaysDialog(model) { workDays = false }
+}
+
+/** Whether the view shows hours (a week, some days or one). */
+private fun CalMode.hours() = this != CalMode.MONTH && this != CalMode.AGENDA
+
+/** A weekday's name (0 Sunday), `pattern` "EEEE" whole, "EEE" short. */
+private fun weekdayName(weekday: Long, pattern: String) =
+    // 1970-01-04 was a Sunday.
+    format((3 + weekday) * DAY, pattern).replaceFirstChar { it.titlecase() }
+
+/** The Work Week view's days, shortly: "Mon, Tue, Wed, Thu, Fri". */
+fun workDaysText(days: List<Long>): String {
+    val first = firstWeekday()
+    return (0 until 7L).map { (first + it) % 7 }.filter { it in days }.joinToString(", ") { weekdayName(it, "EEE") }
+}
+
+/** Pick the Work Week view's days, one to six. */
+@Composable
+fun WorkDaysDialog(model: Main, onDismiss: () -> Unit) {
+    val days by model.workDays.collectAsStateWithLifecycle()
+    val first = firstWeekday()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(tr("Work Week Days")) },
+        text = {
+            Column {
+                Text(tr("The days the Work Week view shows: one to six."), Modifier.padding(bottom = 8.dp))
+                for (i in 0 until 7L) {
+                    val d = (first + i) % 7
+                    val on = d in days
+                    // The last day left can't be turned off, nor a seventh on.
+                    val enabled = if (on) days.size > 1 else days.size < 6
+                    Row(
+                        Modifier.fillMaxWidth().toggleable(on, enabled, Role.Checkbox) {
+                            model.setWorkDays(if (on) days - d else (days + d).sorted())
+                        },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(on, null, enabled = enabled)
+                        Text(weekdayName(d, "EEEE"), Modifier.padding(start = 8.dp))
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(tr("Close")) } },
+    )
 }
 
 /** A new event on the day the calendar shows (the add button, the shortcut). */
@@ -273,12 +363,18 @@ private fun newStart(model: Main, day: Long): Long {
 private fun modeName(m: CalMode) = when (m) {
     CalMode.MONTH -> tr("Month")
     CalMode.WEEK -> tr("Week")
+    CalMode.WORK_WEEK -> tr("Work Week")
+    CalMode.THREE_DAYS -> tr("3 Days")
+    CalMode.DAY -> tr("Day")
     CalMode.AGENDA -> tr("Agenda")
 }
 
 private fun modeIcon(m: CalMode) = when (m) {
     CalMode.MONTH -> Icons.Outlined.CalendarViewMonth
     CalMode.WEEK -> Icons.Outlined.CalendarViewWeek
+    CalMode.WORK_WEEK -> Icons.Outlined.ViewWeek
+    CalMode.THREE_DAYS -> Icons.Outlined.ViewColumn
+    CalMode.DAY -> Icons.Outlined.CalendarViewDay
     CalMode.AGENDA -> Icons.Outlined.ViewAgenda
 }
 
@@ -361,17 +457,7 @@ private fun MonthGrid(model: Main, month: Long, picked: Long?, colors: Map<Strin
     var moved by remember { mutableStateOf<Pair<Item, Change>?>(null) }
     moved?.let { (item, change) -> Reschedule(model, item, change) { moved = null } }
     Column(Modifier.fillMaxSize().padding(horizontal = 4.dp)) {
-        Row(Modifier.fillMaxWidth()) {
-            for (d in 0 until 7) {
-                Text(
-                    format(start + d * DAY, "EEEEE"),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.weight(1f).padding(vertical = 4.dp),
-                )
-            }
-        }
+        WeekdayNames(start)
         for (w in 0 until 6) {
             Row(Modifier.fillMaxWidth().weight(1f)) {
                 for (d in 0 until 7) {
@@ -411,6 +497,44 @@ private fun MonthGrid(model: Main, month: Long, picked: Long?, colors: Map<Strin
             }
         }
     }
+}
+
+/** The first letters of the weekdays of the week from `start`, over the month grid's columns. */
+@Composable
+private fun WeekdayNames(start: Long) {
+    Row(Modifier.fillMaxWidth()) {
+        for (d in 0 until 7) {
+            Text(
+                format(start + d * DAY, "EEEEE"),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f).padding(vertical = 4.dp),
+            )
+        }
+    }
+}
+
+/** The Day view's week, a row of the month grid: the day shown picked, a tap shows another. */
+@Composable
+private fun WeekStrip(model: Main, day: Long, colors: Map<String, String>) {
+    val changes by model.todav.changes.collectAsStateWithLifecycle()
+    val start = weekStart(day, firstWeekday())
+    val days = load(changes, start, initial = List(7) { emptyList<Item>() }) {
+        val items = model.core.items(start, start + 7 * DAY)
+        List(7) { n -> items.filter { onDay(it, start + n * DAY) } }
+    }
+    val today = midnight(model.core.localNow())
+    Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp).padding(bottom = 4.dp)) {
+        WeekdayNames(start)
+        Row(Modifier.fillMaxWidth().height(76.dp)) {
+            for (d in 0 until 7) {
+                val at = start + d * DAY
+                DayCell(at, days[d], colors, at == today, at == day, true, Modifier.weight(1f).fillMaxHeight()) { model.pick(at) }
+            }
+        }
+    }
+    HorizontalDivider()
 }
 
 @Composable
@@ -579,16 +703,25 @@ private fun AgendaRow(model: Main, e: AgendaEntry, onItem: (Item) -> Unit) {
 
 private val HOUR: Dp = 48.dp
 
+/** Width of the hour labels; height of the day names over the hours. */
+private val GUTTER: Dp = 40.dp
+private val HEAD: Dp = 52.dp
+
 /**
- * The week holding `day`: an hour grid with the timed events and planned tasks (overlapping
- * ones side by side), what takes no hours in a row above it, and a line at the current time.
- * Tap an empty hour to add an event there; swipe for other weeks.
+ * The week holding `day`, or its work days (`work`): an hour grid with the timed events and
+ * planned tasks (overlapping ones side by side), what takes no hours in a row above it, and a
+ * line at the current time. Tap an empty hour to add an event there; swipe for other weeks.
  */
 @Composable
-private fun WeekView(model: Main, day: Long, colors: Map<String, String>, onItem: (Item) -> Unit) {
+private fun WeekView(model: Main, day: Long, colors: Map<String, String>, work: Boolean, onItem: (Item) -> Unit) {
     val browsed by model.browsed.collectAsStateWithLifecycle()
+    val workDays by model.workDays.collectAsStateWithLifecycle()
     val first = firstWeekday()
     val base = remember { weekStart(day, first) }
+    // The columns, days from the week's start: the same in every week.
+    val cols = remember(work, workDays, base) {
+        if (work) daysOfWeek(base, first, workDays).map { ((it - base) / DAY).toInt() } else (0 until 7).toList()
+    }
     val pager = rememberPagerState(initialPage = MIDDLE + ((weekStart(day, first) - base) / (7 * DAY)).toInt()) { PAGES }
     LaunchedEffect(day) {
         val target = MIDDLE + ((weekStart(day, first) - base) / (7 * DAY)).toInt()
@@ -610,8 +743,91 @@ private fun WeekView(model: Main, day: Long, colors: Map<String, String>, onItem
     LaunchedEffect(Unit) { scroll.scrollTo((HOUR.value * 7.5f * 2.6f).toInt()) }
     // The weeks either side are made ready beforehand, so a swipe finds them filled in.
     HorizontalPager(pager, Modifier.fillMaxSize(), beyondViewportPageCount = 1, key = { it }) { page ->
-        Week(model, base + (page - MIDDLE) * 7 * DAY, day.takeIf { it != browsed }, colors, scroll, onItem)
+        Week(model, base + (page - MIDDLE) * 7 * DAY, cols, day.takeIf { it != browsed }, colors, scroll, onItem)
     }
+}
+
+/**
+ * `count` days from `day` (three, or one under its week from the month grid), their hours as the
+ * week's. Swiped, they move a day at a time, any days next to each other; the first shown is the
+ * day picked.
+ */
+@Composable
+private fun DaysView(model: Main, day: Long, colors: Map<String, String>, count: Int, onItem: (Item) -> Unit) {
+    // A page a day, `count` of them on the screen.
+    val base = remember { day }
+    val pager = rememberPagerState(initialPage = MIDDLE + ((day - base) / DAY).toInt()) { PAGES }
+    LaunchedEffect(day) {
+        val target = MIDDLE + ((day - base) / DAY).toInt()
+        if (pager.currentPage != target) pager.scrollToPage(target)
+    }
+    LaunchedEffect(pager) {
+        snapshotFlow { pager.settledPage }.collect { page ->
+            val first = base + (page - MIDDLE) * DAY
+            if (first != (model.day.value ?: day)) model.pick(first)
+        }
+    }
+    val scroll = rememberScrollState()
+    LaunchedEffect(Unit) { scroll.scrollTo((HOUR.value * 7.5f * 2.6f).toInt()) }
+    // The row above the hours is as tall on every day shown, so their hours line up: as the
+    // fullest of them needs.
+    val tops = remember { mutableStateMapOf<Int, Int>() }
+    val shown by remember { derivedStateOf { pager.layoutInfo.visiblePagesInfo.map { it.index } } }
+    val top = topHeight(shown.maxOfOrNull { tops[it] ?: 0 } ?: 0)
+    Column(Modifier.fillMaxSize()) {
+        if (count == 1) WeekStrip(model, day, colors)
+        Row(Modifier.fillMaxSize()) {
+            // The hour labels stay put while the days move.
+            Column(Modifier.width(GUTTER).fillMaxHeight()) {
+                Spacer(Modifier.height((if (count > 1) HEAD else 0.dp) + top + 1.dp))
+                Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
+                    for (h in 0 until 24) Box(Modifier.height(HOUR)) { HourLabel(h) }
+                }
+            }
+            BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
+                HorizontalPager(
+                    pager,
+                    Modifier.fillMaxSize(),
+                    pageSize = PageSize.Fixed(maxWidth / count),
+                    beyondViewportPageCount = 1,
+                    key = { it },
+                ) { page ->
+                    Week(
+                        model, base + (page - MIDDLE) * DAY, listOf(0), null, colors, scroll, onItem,
+                        header = count > 1, top = top, onTop = { tops[page] = it },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * A day page's hours scrolled with `state` as `verticalScroll` would, but clipped only above and
+ * below, so a held block can be drawn over the next days' pages. How far it goes is set by the
+ * hour labels' `verticalScroll` on the same state.
+ */
+private fun Modifier.hoursScroll(state: androidx.compose.foundation.ScrollState) = this
+    .drawWithContent { clipRect(left = -size.width * 8, right = size.width * 9) { this@drawWithContent.drawContent() } }
+    .scrollable(state, Orientation.Vertical, reverseDirection = true)
+    .layout { measurable, constraints ->
+        val p = measurable.measure(constraints.copy(maxHeight = Constraints.Infinity))
+        layout(p.width, constraints.maxHeight) { p.place(0, -state.value) }
+    }
+
+/** Height of the row above the hours holding `n` chips a day, scrolling past six. */
+private fun topHeight(n: Int): Dp = if (n == 0) 0.dp else (n * 14 + 2).dp.coerceAtMost(96.dp)
+
+/** Hour `h`'s label, at the line starting it (none at midnight). */
+@Composable
+private fun HourLabel(h: Int) {
+    Text(
+        if (h == 0) "" else hourLabel(h),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.width(GUTTER).offset(y = (-7).dp).padding(end = 4.dp),
+        textAlign = TextAlign.End,
+    )
 }
 
 /** A block in the week's hours: the item's index, its piece on that day, and its column there. */
@@ -620,32 +836,48 @@ private class Block(val item: Int, val piece: dev.aperte.todav.core.Segment, val
 /** A week's items, each day's blocks in the hours, and what is on each day without hours. */
 private class WeekItems(val items: List<Item>, val blocks: List<List<Block>>, val top: List<List<Item>>)
 
+/**
+ * The hours of the days `cols` (days from `start`, at most a week on), a column each. With
+ * `top`, the row above the hours is that tall, and `onTop` learns how many chips a day it holds
+ * at most; without the gutter, the day names are `HEAD` tall: the caller lines the hour labels
+ * up with that.
+ */
 @Composable
 private fun Week(
     model: Main,
     start: Long,
+    cols: List<Int>,
     picked: Long?,
     colors: Map<String, String>,
     scroll: androidx.compose.foundation.ScrollState,
     onItem: (Item) -> Unit,
+    header: Boolean = true,
+    top: Dp? = null,
+    onTop: ((Int) -> Unit)? = null,
 ) {
     val changes by model.todav.changes.collectAsStateWithLifecycle()
+    // The hour labels: here, or beside all the days (`top` given).
+    val gutter = top == null
+    val inset = if (gutter) GUTTER else 0.dp
     // All read and laid out at once off the main thread: `hours`, `segments`, `columns` and `onDay`
     // call into the core, too slow for every frame of a drag.
-    val week = load(changes, start, initial = WeekItems(emptyList(), List(7) { emptyList() }, List(7) { emptyList() })) {
-        val items = model.core.items(start, start + 7 * DAY)
+    val none = WeekItems(emptyList(), cols.map { emptyList() }, cols.map { emptyList() })
+    val week = load(changes, start, cols, initial = none) {
+        val items = model.core.items(start, start + (cols.last() + 1) * DAY)
         // Each item's pieces in the hours (None: in the row above them).
         val timed = items.mapIndexedNotNull { i, it -> model.core.hours(it)?.let { _ -> i to model.core.segments(it, start) } }
         val inHours = timed.map { it.first }.toSet()
         val untimed = items.filterIndexed { i, _ -> i !in inHours }
-        val blocks = List(7) { d ->
+        val blocks = cols.map { d ->
             val pieces = timed.flatMap { (i, segs) -> segs.filter { it.day == d.toLong() }.map { i to it } }
-            val cols = columns(pieces.mapIndexed { n, (_, s) -> DayBlock(n.toUInt(), s.from, s.to) }).associateBy { it.index.toInt() }
-            pieces.mapIndexedNotNull { n, (i, s) -> cols[n]?.let { Block(i, s, it) } }
+            val laid = columns(pieces.mapIndexed { n, (_, s) -> DayBlock(n.toUInt(), s.from, s.to) }).associateBy { it.index.toInt() }
+            pieces.mapIndexedNotNull { n, (i, s) -> laid[n]?.let { Block(i, s, it) } }
         }
-        WeekItems(items, blocks, List(7) { d -> untimed.filter { onDay(it, start + d * DAY) } })
+        WeekItems(items, blocks, cols.map { d -> untimed.filter { onDay(it, start + d * DAY) } })
     }
     val items = week.items
+    val fullest = week.top.maxOfOrNull { it.size } ?: 0
+    LaunchedEffect(fullest) { onTop?.invoke(fullest) }
     var drag by remember { mutableStateOf<Held?>(null) }
     // A drop to apply: the item and where its start goes.
     var moved by remember { mutableStateOf<Pair<Item, Long>?>(null) }
@@ -655,13 +887,14 @@ private fun Week(
     }
     val now = model.core.localNow()
     val today = midnight(now)
-    Column(Modifier.fillMaxSize()) {
-        // Day names and dates.
-        Row(Modifier.fillMaxWidth().padding(start = 40.dp)) {
-            for (d in 0 until 7) {
+    // Held, a block may be moved over the next days' pages: drawn over them.
+    Column(Modifier.fillMaxSize().zIndex(if (drag != null) 1f else 0f)) {
+        // Day names and dates; in a week, a tap picks the day.
+        if (header) Row(Modifier.fillMaxWidth().then(if (gutter) Modifier else Modifier.height(HEAD)).padding(start = inset)) {
+            for (d in cols) {
                 val at = start + d * DAY
                 Column(
-                    Modifier.weight(1f).clickable { model.pick(at) }.padding(vertical = 4.dp),
+                    Modifier.weight(1f).then(if (gutter) Modifier.clickable { model.pick(at) } else Modifier).padding(vertical = 4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(format(at, "EEE"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -686,11 +919,14 @@ private fun Week(
             }
         }
         // What takes no hours: all-day events and tasks due on a date.
-        if (week.top.any { it.isNotEmpty() }) {
-            Row(Modifier.fillMaxWidth().padding(start = 40.dp).heightIn(max = 96.dp).verticalScroll(rememberScrollState())) {
-                for (d in 0 until 7) {
+        if (if (top != null) top > 0.dp else fullest > 0) {
+            Row(
+                Modifier.fillMaxWidth().padding(start = inset).then(if (top != null) Modifier.height(top) else Modifier.heightIn(max = 96.dp))
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                for (n in cols.indices) {
                     Column(Modifier.weight(1f).padding(1.dp), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        week.top[d].forEach { item ->
+                        week.top.getOrElse(n) { emptyList() }.forEach { item ->
                             Box(Modifier.clickable { onItem(item) }) { Chip(item, colors) }
                         }
                     }
@@ -698,20 +934,14 @@ private fun Week(
             }
         }
         HorizontalDivider()
-        Box(Modifier.fillMaxSize().verticalScroll(scroll)) {
+        Box(Modifier.fillMaxSize().then(if (gutter) Modifier.verticalScroll(scroll) else Modifier.hoursScroll(scroll))) {
             val line = MaterialTheme.colorScheme.outlineVariant
             val surface = MaterialTheme.colorScheme.surface
             Column {
                 for (h in 0 until 24) {
                     Row(Modifier.height(HOUR)) {
-                        Text(
-                            if (h == 0) "" else hourLabel(h),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.width(40.dp).offset(y = (-7).dp).padding(end = 4.dp),
-                            textAlign = TextAlign.End,
-                        )
-                        for (d in 0 until 7) {
+                        if (gutter) HourLabel(h)
+                        for (d in cols) {
                             val at = start + d * DAY + h * 3600
                             Box(
                                 Modifier.weight(1f).fillMaxHeight().border(0.25.dp, line)
@@ -730,11 +960,11 @@ private fun Week(
                 }
             }
             // The blocks, day by day.
-            Row(Modifier.padding(start = 40.dp).height(HOUR * 24)) {
-                for (d in 0 until 7) {
+            Row(Modifier.padding(start = inset).height(HOUR * 24)) {
+                cols.forEachIndexed { n, d ->
                     BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
                         val w = maxWidth
-                        week.blocks[d].forEach { b ->
+                        week.blocks.getOrElse(n) { emptyList() }.forEach { b ->
                             val (i, s, c) = Triple(b.item, b.piece, b.column)
                             val item = items[i]
                             val color = parseColor(colors[item.list()])
@@ -758,7 +988,7 @@ private fun Week(
                                     .background(if (item is Item.Event) color else color.copy(alpha = 0.3f).compositeOver(surface))
                                     .clickable { onItem(item) }
                                     // Held and moved: to another hour (15-minute steps) or day.
-                                    .pointerInput(item, d) {
+                                    .pointerInput(item, start, cols, n) {
                                         detectDragGesturesAfterLongPress(
                                             onDragStart = { drag = Held(i, d, Offset.Zero) },
                                             onDrag = { change, amount ->
@@ -770,9 +1000,12 @@ private fun Week(
                                                 drag = null
                                                 val minutes = s.from + (h.offset.y / HOUR.toPx() * 60).toLong()
                                                 val stepped = (Math.round(minutes / 15.0) * 15).coerceIn(0, 24 * 60 - 15)
-                                                val days = Math.round(h.offset.x / w.toPx()).toLong()
-                                                if (stepped != s.from || days != 0L) {
-                                                    moved = Pair(item, start + (d + days) * DAY + stepped * 60)
+                                                // Columns over: a shown day, or past the last, the
+                                                // days next to it.
+                                                val over = Math.round(h.offset.x / w.toPx())
+                                                val to = cols.getOrNull(n + over) ?: (d + over)
+                                                if (stepped != s.from || to != d) {
+                                                    moved = Pair(item, start + to * DAY + stepped * 60)
                                                 }
                                             },
                                             onDragCancel = { drag = null },

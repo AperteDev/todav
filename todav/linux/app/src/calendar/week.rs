@@ -1,6 +1,7 @@
-//! The week view: seven columns of hours with events and planned tasks as blocks, all-day items
-//! above. Blocks are children of an overlay, placed by `Geo`, as is the drop preview; the drawing
-//! area under them draws the hour lines and the current time.
+//! The hours of the Week, Work Week, 3 Days and Day views: a column of hours a day with events and
+//! planned tasks as blocks, all-day items above. Blocks are children of an overlay, placed by
+//! `Geo`, as is the drop preview; the drawing area under them draws the hour lines and the
+//! current time.
 
 use super::*;
 
@@ -11,8 +12,8 @@ const GUTTER: i32 = 56;
 /// Minutes a dropped task snaps to.
 const SNAP: i64 = 15;
 
-/// Where a block goes: day of the week (0 = the week's first day), minutes into the day, and its column among
-/// the blocks it overlaps.
+/// Where a block goes: the day's column (0 = the first day shown), minutes into the day, and its
+/// column among the blocks it overlaps.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct Geo {
     day: i64,
@@ -23,8 +24,29 @@ pub(super) struct Geo {
 }
 
 /// Width of one day column in an overlay `width` wide.
-fn col_width(width: i32) -> f64 {
-    (width - GUTTER).max(7) as f64 / 7.0
+fn col_width(c: &Cal, width: i32) -> f64 {
+    let n = c.days.borrow().len().max(1);
+    (width - GUTTER).max(n as i32) as f64 / n as f64
+}
+
+/// Midnight of the day in column `col`.
+fn day_at(c: &Cal, col: i64) -> Option<i64> {
+    c.days.borrow().get(usize::try_from(col).ok()?).copied()
+}
+
+/// The days the mode shows around the anchor.
+fn shown(c: &Cal) -> Vec<i64> {
+    let a = c.anchor.get();
+    match mode(c) {
+        Mode::WorkWeek => todav_app::dates::days_of_week(
+            a,
+            crate::i18n::first_weekday(),
+            &prefs::work_days(core()),
+        ),
+        Mode::ThreeDays => (0..3).map(|d| a + d * DAY).collect(),
+        Mode::Day => vec![a],
+        _ => (0..7).map(|d| week_start(a) + d * DAY).collect(),
+    }
 }
 
 pub(super) fn setup(c: &Rc<Cal>) {
@@ -54,7 +76,7 @@ pub(super) fn setup(c: &Rc<Cal>) {
             let c = weak.upgrade()?;
             if child == c.preview.upcast_ref::<gtk::Widget>() {
                 let (day, from, to) = c.span.get()?;
-                let colw = col_width(overlay.width());
+                let colw = col_width(&c, overlay.width());
                 let h = ((to - from) as f64 / 60.0 * HOUR).max(24.0);
                 return Some(gdk::Rectangle::new(
                     (GUTTER as f64 + colw * day as f64) as i32 + 2,
@@ -65,7 +87,7 @@ pub(super) fn setup(c: &Rc<Cal>) {
             }
             let blocks = c.blocks.borrow();
             let (_, g, _) = blocks.iter().find(|(w, _, _)| w == child)?;
-            let (x, y, w, h) = rect(overlay.width(), g);
+            let (x, y, w, h) = rect(&c, overlay.width(), g);
             Some(gdk::Rectangle::new(x as i32, y as i32, w as i32, h as i32))
         });
 
@@ -75,9 +97,10 @@ pub(super) fn setup(c: &Rc<Cal>) {
         |_| true,
         |i| {
             let Some(c) = cal() else { return };
-            if let Some((day, minute)) = c.hover.take() {
-                let at = week_start(c.anchor.get()) + day * DAY + minute * 60;
-                apply(i, calendar::slot_drop(core(), i, at));
+            if let Some((day, minute)) = c.hover.take()
+                && let Some(day) = day_at(&c, day)
+            {
+                apply(i, calendar::slot_drop(core(), i, day + minute * 60));
             }
             show_preview(&c, None);
         },
@@ -85,7 +108,7 @@ pub(super) fn setup(c: &Rc<Cal>) {
     // A double click or a long press on a free hour adds an event there.
     new_event_on(&c.week_grid, |c, x, y| {
         let (day, minute) = slot(c, x, y)?;
-        let at = week_start(c.anchor.get()) + day * DAY + minute / 30 * 30 * 60;
+        let at = day_at(c, day)? + minute / 30 * 30 * 60;
         Some(EventTime {
             start: at,
             end: at + prefs::event_duration(core()),
@@ -129,9 +152,9 @@ pub(super) fn setup(c: &Rc<Cal>) {
 
 /// The (day, minute) slot under a point of the grid.
 fn slot(c: &Cal, x: f64, y: f64) -> Option<(i64, i64)> {
-    let colw = col_width(c.week_grid.width());
+    let colw = col_width(c, c.week_grid.width());
     let day = ((x - GUTTER as f64) / colw).floor() as i64;
-    if !(0..7).contains(&day) {
+    if !(0..c.days.borrow().len() as i64).contains(&day) {
         return None;
     }
     let minute = (y / HOUR * 60.0) as i64 / SNAP * SNAP;
@@ -214,7 +237,7 @@ fn resizing(c: &Rc<Cal>) {
         let Some((day, from, to)) = span.filter(|s| (s.1, s.2) != (geo.from, geo.to)) else {
             return;
         };
-        let day = week_start(c.anchor.get()) + day * DAY;
+        let Some(day) = day_at(&c, day) else { return };
         let (from, to) = (day + from * 60, day + to * 60);
         apply(&i, calendar::resize(&i, from, to, top));
     });
@@ -235,10 +258,9 @@ fn resizing(c: &Rc<Cal>) {
 /// an item's real start or end (not where a longer one crosses midnight) of one we may change.
 fn edge_at(c: &Cal, x: f64, y: f64) -> Option<(Item, Geo, bool)> {
     let width = c.week_grid.width();
-    let week = week_start(c.anchor.get());
     let blocks = c.blocks.borrow();
     blocks.iter().find_map(|(_, g, i)| {
-        let (bx, by, bw, bh) = rect(width, g);
+        let (bx, by, bw, bh) = rect(c, width, g);
         if x < bx || x > bx + bw || y < by || y > by + bh {
             return None;
         }
@@ -251,7 +273,7 @@ fn edge_at(c: &Cal, x: f64, y: f64) -> Option<(Item, Geo, bool)> {
             return None;
         };
         let (from, to) = calendar::span(core(), i)?;
-        let day = week + g.day * DAY;
+        let day = day_at(c, g.day)?;
         let real = if top {
             from == day + g.from * 60
         } else {
@@ -266,8 +288,8 @@ fn edge_at(c: &Cal, x: f64, y: f64) -> Option<(Item, Geo, bool)> {
 }
 
 /// Where `g`'s block goes in an overlay `width` wide: x, y, width, height.
-fn rect(width: i32, g: &Geo) -> (f64, f64, f64, f64) {
-    let colw = col_width(width);
+fn rect(c: &Cal, width: i32, g: &Geo) -> (f64, f64, f64, f64) {
+    let colw = col_width(c, width);
     let x = GUTTER as f64 + colw * g.day as f64 + colw * g.col as f64 / g.cols as f64;
     let y = g.from as f64 / 60.0 * HOUR;
     let h = ((g.to - g.from) as f64 / 60.0 * HOUR).max(24.0);
@@ -282,11 +304,11 @@ fn rect(width: i32, g: &Geo) -> (f64, f64, f64, f64) {
 fn draw(c: &Cal, area: &gtk::DrawingArea, cr: &gtk::cairo::Context, w: i32, h: i32) {
     let fg = area.color();
     let (r, g, b) = (fg.red() as f64, fg.green() as f64, fg.blue() as f64);
-    let colw = col_width(w + GUTTER);
-    let start = week_start(c.anchor.get());
+    let colw = col_width(c, w + GUTTER);
+    let n = c.days.borrow().len();
     // Today's column.
-    let today_col = (today() - start) / DAY;
-    if (0..7).contains(&today_col) {
+    let today_col = c.days.borrow().iter().position(|&d| d == today());
+    if let Some(today_col) = today_col {
         cr.set_source_rgba(r, g, b, 0.04);
         cr.rectangle(colw * today_col as f64, 0.0, colw, h as f64);
         let _ = cr.fill();
@@ -305,14 +327,14 @@ fn draw(c: &Cal, area: &gtk::DrawingArea, cr: &gtk::cairo::Context, w: i32, h: i
         let _ = cr.stroke();
     }
     cr.set_source_rgba(r, g, b, 0.12);
-    for d in 0..7 {
+    for d in 0..n {
         let x = (colw * d as f64).floor() + 0.5;
         cr.move_to(x, 0.0);
         cr.line_to(x, h as f64);
         let _ = cr.stroke();
     }
     // Now.
-    if (0..7).contains(&today_col) {
+    if let Some(today_col) = today_col {
         let now = core().local_now();
         let y = (now - today()) as f64 / 3600.0 * HOUR;
         let x = colw * today_col as f64;
@@ -326,30 +348,35 @@ fn draw(c: &Cal, area: &gtk::DrawingArea, cr: &gtk::cairo::Context, w: i32, h: i
     }
 }
 
-/// Draws the week holding the anchor; returns its end.
+/// Draws the days the mode shows around the anchor; returns the end of the last.
 pub(super) fn render(c: &Rc<Cal>) -> i64 {
-    let start = week_start(c.anchor.get());
-    let end = start + 7 * DAY;
-    let last = end - DAY;
-    let title = if fmt(start, "%m") == fmt(last, "%m") {
+    let days = shown(c);
+    *c.days.borrow_mut() = days.clone();
+    let (start, last) = (days[0], days[days.len() - 1]);
+    let end = last + DAY;
+    let title = if start == last {
+        capitalized(&fmt(start, "%A %-d %B %Y"))
+    } else if fmt(start, "%m") == fmt(last, "%m") {
         format!("{} – {}", fmt(start, "%-d"), fmt(last, "%-d %OB %Y"))
     } else {
         format!("{} – {}", fmt(start, "%-d %b"), fmt(last, "%-d %b %Y"))
     };
     c.title.set_title(&title);
     c.title.set_subtitle("");
+    strip(c, mode(c) == Mode::Day);
 
-    // Day names, then the all-day row, both after a gutter as wide as the hour labels.
+    // Day names (but for one day: its week above has them), then the all-day row, both after a
+    // gutter as wide as the hour labels.
     clear(&c.week_head);
     clear(&c.week_all_day);
+    c.week_head.set_visible(days.len() > 1);
     let gutter = || gtk::Box::builder().width_request(GUTTER).build();
     c.week_head.append(&gutter());
     c.week_all_day.append(&gutter());
     let head = gtk::Box::builder().homogeneous(true).hexpand(true).build();
     c.week_head.append(&head);
     let items = items(start, end);
-    for d in 0..7 {
-        let day = start + d * DAY;
+    for &day in &days {
         let name = gtk::Label::new(Some(&fmt(day, "%a %-d")));
         if day == today() {
             name.add_css_class("today");
@@ -362,7 +389,7 @@ pub(super) fn render(c: &Rc<Cal>) -> i64 {
         .iter()
         .filter(|i| calendar::segments(core(), i, start).is_empty())
         .collect();
-    let row = days::row(c, start, &all_day, usize::MAX, true, |day| {
+    let row = days::row(c, &days, &all_day, usize::MAX, true, |day| {
         let cell = gtk::Box::new(gtk::Orientation::Vertical, 0);
         cell.add_css_class("all-day-cell");
         day_drop(&cell, day, true);
@@ -377,7 +404,9 @@ pub(super) fn render(c: &Rc<Cal>) -> i64 {
         c.week_grid.remove_overlay(&w);
     }
     let mut placed = Vec::new();
-    for d in 0..7 {
+    for (col, &day) in days.iter().enumerate() {
+        // Segments count days from the first shown; a work week may skip some.
+        let d = (day - start) / DAY;
         let segs: Vec<(usize, i64, i64, i64)> = items
             .iter()
             .enumerate()
@@ -385,7 +414,7 @@ pub(super) fn render(c: &Rc<Cal>) -> i64 {
                 calendar::segments(core(), i, start)
                     .into_iter()
                     .filter(move |s| s.0 == d)
-                    .map(move |(_, a, b)| (n, a, b, d))
+                    .map(move |(_, a, b)| (n, a, b, col as i64))
             })
             .collect();
         let laid = calendar::columns(
@@ -425,6 +454,30 @@ pub(super) fn render(c: &Rc<Cal>) -> i64 {
         glib::idle_add_local_once(move || adj.set_value(hour as f64 * HOUR));
     }
     end
+}
+
+/// The Day view's week above the hours, `shown` or emptied: its row of the month grid, the day
+/// selected; clicking another day goes there.
+fn strip(c: &Rc<Cal>, shown: bool) {
+    clear(&c.week_strip);
+    c.week_strip.set_visible(shown);
+    if !shown {
+        return;
+    }
+    let start = week_start(c.anchor.get());
+    let week: Vec<i64> = (0..7).map(|d| start + d * DAY).collect();
+    let names = gtk::Box::builder().homogeneous(true).build();
+    names.add_css_class("weekdays");
+    for &day in &week {
+        names.append(&gtk::Label::new(Some(&fmt(day, "%a"))));
+    }
+    c.week_strip.append(&names);
+    let all = items(start, start + 7 * DAY);
+    let here: Vec<&Item> = all.iter().collect();
+    let row = days::row(c, &week, &here, CHIPS, false, |day| {
+        day_cell(c, day, false, |day| go(|_| day))
+    });
+    c.week_strip.append(&row);
 }
 
 /// An event (opens its details) or a planned task (tick, open, drag elsewhere) in the hours.

@@ -8,24 +8,21 @@ use super::*;
 /// ponytail: fixed; measure a chip if a large text scale makes them taller.
 const LANE: i32 = 24;
 
-/// The week from `start`: a `cell` per day (its background: number, clicks, drops) and `items`
-/// on top, in at most `max` lanes. Dropped on an item, something goes to that item's day, as
-/// `day_drop` with `all_day`.
+/// The `week`'s days (up to seven midnights, in order: a week or some of its days): a `cell` per
+/// day (its background: number, clicks, drops) and `items` on top, in at most `max` lanes.
+/// Dropped on an item, something goes to that item's day, as `day_drop` with `all_day`.
 pub(super) fn row(
     c: &Rc<Cal>,
-    start: i64,
+    week: &[i64],
     items: &[&Item],
     max: usize,
     all_day: bool,
     cell: impl Fn(i64) -> gtk::Box,
 ) -> gtk::Overlay {
+    let n = week.len();
     let days: Vec<Vec<usize>> = items
         .iter()
-        .map(|i| {
-            (0..7)
-                .filter(|&d| on_day(i, start + d as i64 * DAY))
-                .collect()
-        })
+        .map(|i| (0..n).filter(|&d| on_day(i, week[d])).collect())
         .collect();
     let (pieces, more) = calendar::lanes(&days, max);
     let lanes = pieces
@@ -38,8 +35,8 @@ pub(super) fn row(
     // Each cell ends with room for the lanes; the first one's tells where they start.
     let base = gtk::Box::builder().homogeneous(true).build();
     let mut top = None;
-    for d in 0..7 {
-        let cell = cell(start + d * DAY);
+    for &day in week {
+        let cell = cell(day);
         let room = gtk::Box::builder()
             .height_request(lanes as i32 * LANE)
             .build();
@@ -54,8 +51,8 @@ pub(super) fn row(
     let mut placed: Vec<(gtk::Widget, usize, usize, usize, bool, bool)> = Vec::new();
     for p in &pieces {
         let i = items[p.item];
-        let goes_on = |d: i64| on_day(i, start + d * DAY);
-        let (left, right) = (goes_on(p.from as i64 - 1), goes_on(p.to as i64 + 1));
+        // On the day before or after, shown or not.
+        let (left, right) = (on_day(i, week[p.from] - DAY), on_day(i, week[p.to] + DAY));
         let w = chip(c, i);
         if left {
             w.add_css_class("from-before");
@@ -68,13 +65,13 @@ pub(super) fn row(
     }
     for (d, hidden) in more.iter().enumerate().filter(|(_, m)| !m.is_empty()) {
         let rest = hidden.iter().map(|&n| items[n].clone()).collect();
-        let w = more_button(c, start + d as i64 * DAY, rest).upcast::<gtk::Widget>();
+        let w = more_button(c, week[d], rest).upcast::<gtk::Widget>();
         overlay.add_overlay(&w);
         placed.push((w, max - 1, d, d, false, false));
     }
     overlay.connect_get_child_position(move |o, w| {
         let &(_, lane, from, to, left, right) = placed.iter().find(|p| &p.0 == w)?;
-        let col = o.width() as f64 / 7.0;
+        let col = o.width() as f64 / n as f64;
         let y = top.compute_bounds(o)?.y() as i32 + lane as i32 * LANE;
         // Ends that go on reach the cell's edge, to meet the next piece.
         let x0 = (from as f64 * col) as i32 + if left { 0 } else { 3 };
@@ -84,15 +81,15 @@ pub(super) fn row(
 
     // Dropped on an item rather than a cell: the day under the pointer.
     let column = Rc::new(Cell::new(0));
-    let col = column.clone();
+    let (col, week) = (column.clone(), week.to_vec());
     let drop = item_drop(
         &overlay,
         |_| true,
-        move |i| drop_on_day(i, start + col.get() * DAY, all_day),
+        move |i| drop_on_day(i, week[col.get()], all_day),
     );
     drop.connect_motion(move |t, x, _| {
         let width = t.widget().map_or(1, |w| w.width().max(1));
-        column.set(((x * 7.0 / width as f64) as i64).clamp(0, 6));
+        column.set(((x * n as f64 / width as f64) as usize).min(n - 1));
         gdk::DragAction::MOVE
     });
     overlay
