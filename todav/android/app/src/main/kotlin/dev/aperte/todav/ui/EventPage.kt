@@ -149,9 +149,10 @@ fun EventPage(model: Main, dest: Dest.EventEdit) {
         repeat = if (repeatChanged) RepeatValue(newRepeat) else null,
     )
     val moved = ev != null && calendar != ev.listHref
-    val nothing = with(patch) {
-        summary == null && location == null && description == null && time == null && reminders == null && repeat == null
-    }
+    // Named through `patch`: in a `with(patch)` the page's own `summary`, `location` and
+    // `reminders` would be read instead, and an untouched event would count as changed.
+    val nothing = patch.summary == null && patch.location == null && patch.description == null &&
+        patch.time == null && patch.reminders == null && patch.repeat == null
     val changed = if (ev == null) summary.isNotBlank() else !nothing || moved
 
     fun save() {
