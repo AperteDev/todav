@@ -86,7 +86,14 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalFocusManager
+import dev.aperte.todav.core.TodavList
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
@@ -1217,9 +1224,9 @@ private fun PlanRow(t: TodavTask, colors: Map<String, String>, now: Long, onClic
 // --- details ---------------------------------------------------------------------------------
 
 /**
- * An event or a task on the calendar, as the Linux app's details popover: when, where, the
- * calendar, notes, its tasks (an event's) or subtasks (a task's) with a field adding one; Edit and
- * Delete.
+ * An event or a task, as the Linux app's details popover: its title (edited in place), when,
+ * where, its calendar or list, notes, Edit and Delete, then its tasks (an event's) or subtasks (a
+ * task's) with a field adding one. Opened half way; pulled all the way up, it opens the edit page.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1228,20 +1235,39 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
     val now = core.localNow()
     val changes by model.todav.changes.collectAsStateWithLifecycle()
     var askDelete by remember { mutableStateOf(false) }
-    val lists = load(initial = emptyMap<String, String>()) { (core.calendars() + core.lists()).associate { it.href to it.displayName } }
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    // A repeating event's new title, waiting for which occurrences it is for.
+    var renamed by remember { mutableStateOf<String?>(null) }
+    val lists = load(initial = emptyMap<String, TodavList>()) { (core.calendars() + core.lists()).associateBy { it.href } }
+    val colors = load(changes, initial = emptyMap<String, String>()) { core.colors() }
+    val edit = {
+        onDismiss()
+        when (item) {
+            is Item.Event -> item.event.let { e -> model.open(Dest.EventEdit(e.listHref, e.uid, e.recurrenceId, e.start, e.allDay)) }
+            is Item.Task -> model.open(Dest.Task(item.task.uid))
+        }
+    }
+    val sheet = rememberModalBottomSheetState()
+    // While a field is typed in, the sheet goes up to show it over the keyboard, not to the edit page.
+    var typing by remember { mutableStateOf(false) }
+    LaunchedEffect(typing) { if (typing) sheet.expand() }
+    LaunchedEffect(sheet) {
+        snapshotFlow { sheet.currentValue }.collect { if (it == SheetValue.Expanded && !typing) edit() }
+    }
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet) {
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp).imePadding()
+            // As tall as the screen, so it opens half way and can be pulled up.
+            Modifier.fillMaxSize().padding(horizontal = 24.dp).padding(bottom = 24.dp).imePadding()
+                .onFocusChanged { typing = it.hasFocus }
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             when (item) {
                 is Item.Event -> {
                     val e = item.event
-                    Text(e.summary, style = MaterialTheme.typography.headlineSmall)
+                    TitleField(e.summary, editable = lists[e.listHref]?.writable == true) { renamed = it }
                     Text(eventWhen(e, now), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     e.location?.takeIf { it.isNotBlank() }?.let { Text(it) }
-                    Text(lists[e.listHref] ?: "", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    ListLine(colors[e.listHref], lists[e.listHref]?.displayName ?: "")
                     if (e.reminders.isNotEmpty()) {
                         Text(
                             ntr("{n} reminder", "{n} reminders", e.reminders.size.toLong()).replace("{n}", "${e.reminders.size}"),
@@ -1249,6 +1275,10 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
                         )
                     }
                     e.description?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = edit) { Text(tr("Edit…")) }
+                        TextButton(onClick = { askDelete = true }) { Text(tr("Delete"), color = MaterialTheme.colorScheme.error) }
+                    }
                     val tasks = remember(changes, e.uid) { core.eventTasks(e.uid) }
                     SectionTitle(tr("Tasks"))
                     tasks.forEach { t -> CheckRow(model, t) }
@@ -1259,31 +1289,19 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
                             model.add(list, text, patch = TaskPatch(due = DueValue(Due(e.start, e.allDay)), event = TextValue(e.uid)))
                         }
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = {
-                            onDismiss()
-                            model.open(Dest.EventEdit(e.listHref, e.uid, e.recurrenceId, e.start, e.allDay))
-                        }) { Text(tr("Edit…")) }
-                        TextButton(onClick = { askDelete = true }) { Text(tr("Delete"), color = MaterialTheme.colorScheme.error) }
-                    }
                 }
                 is Item.Task -> {
                     val t = remember(changes) { core.task(item.task.uid) } ?: item.task
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(t.done, { model.setDone(t, it) })
-                        Text(
-                            t.summary,
-                            style = MaterialTheme.typography.headlineSmall,
-                            textDecoration = if (t.done) TextDecoration.LineThrough else null,
-                        )
+                        TitleField(t.summary, done = t.done) { model.update(t.uid, TaskPatch(summary = it)) }
                     }
-                    val w = taskWhen(t)
-                    Text(dayLabel(w.at, w.allDay, now), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(
-                        listOfNotNull(lists[t.listHref], t.category).joinToString(" · "),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
+                    // Its slot or due date, if any (from the task list it may have none).
+                    if (t.start != null || t.due != null) {
+                        val w = taskWhen(t)
+                        Text(dayLabel(w.at, w.allDay, now), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    ListLine(colors[t.listHref], listOfNotNull(lists[t.listHref]?.displayName, t.category).joinToString(" · "))
                     if (priorityColor(t.priority) != null) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             StarIcon(t.priority)
@@ -1292,15 +1310,8 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
                         }
                     }
                     t.description?.takeIf { it.isNotBlank() }?.let { Text(it) }
-                    val subs = remember(changes, t.uid) { core.subtasks(t.uid, false) + core.subtasks(t.uid, true) }
-                    SectionTitle(tr("Subtasks"))
-                    subs.forEach { s -> CheckRow(model, s) }
-                    if (!t.done) AddLine(tr("Add Subtask")) { text -> model.add(t.listHref, text, t.uid, t.category) }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = {
-                            onDismiss()
-                            model.open(Dest.Task(t.uid))
-                        }) { Text(tr("Edit…")) }
+                        OutlinedButton(onClick = edit) { Text(tr("Edit…")) }
                         dev.aperte.todav.core.unplan(t)?.let { patch ->
                             TextButton(onClick = {
                                 onDismiss()
@@ -1312,7 +1323,22 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
                             model.delete(t)
                         }) { Text(tr("Delete"), color = MaterialTheme.colorScheme.error) }
                     }
+                    val subs = remember(changes, t.uid) { core.subtasks(t.uid, false) + core.subtasks(t.uid, true) }
+                    SectionTitle(tr("Subtasks"))
+                    subs.forEach { s -> CheckRow(model, s) }
+                    if (!t.done) AddLine(tr("Add Subtask")) { text -> model.add(t.listHref, text, t.uid, t.category) }
                 }
+            }
+        }
+    }
+    if (renamed != null && item is Item.Event) {
+        val e = item.event
+        ScopeDialog(tr("Change Repeating Event?"), e.recurring, delete = false, onDismiss = { renamed = null }) { scope ->
+            val name = renamed ?: return@ScopeDialog
+            renamed = null
+            model.act {
+                core.updateEvent(e.listHref, e.uid, e.recurrenceId, scope, EventPatch(summary = name))
+                model.synced()
             }
         }
     }
@@ -1327,6 +1353,51 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
                 model.messages.tryEmit(tr("“{title}” deleted").replace("{title}", e.summary) to core.lastChange())
             }
         }
+    }
+}
+
+/**
+ * A details sheet's title, `editable` in place: a tap puts the cursor in it, Done or leaving it
+ * gives `onRename` the new title (not an empty or unchanged one).
+ */
+@Composable
+private fun TitleField(title: String, editable: Boolean = true, done: Boolean = false, onRename: (String) -> Unit) {
+    var text by remember(title) { mutableStateOf(title) }
+    var focused by remember { mutableStateOf(false) }
+    val focus = LocalFocusManager.current
+    val save = {
+        val t = text.trim()
+        if (t.isNotEmpty() && t != title) onRename(t) else text = title
+    }
+    val style = MaterialTheme.typography.headlineSmall.copy(
+        color = MaterialTheme.colorScheme.onSurface,
+        textDecoration = if (done) TextDecoration.LineThrough else null,
+    )
+    BasicTextField(
+        text,
+        { v ->
+            // One line of text, however long: Enter ends the edit.
+            text = v.replace("\n", "")
+            if ('\n' in v) focus.clearFocus()
+        },
+        Modifier.fillMaxWidth().onFocusChanged {
+            if (focused && !it.isFocused) save()
+            focused = it.isFocused
+        },
+        enabled = editable,
+        textStyle = style,
+        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = { focus.clearFocus() }),
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+    )
+}
+
+/** Which calendar or list an item is in: its colour and name, as the Linux popover shows it. */
+@Composable
+private fun ListLine(color: String?, name: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(Modifier.size(12.dp).background(parseColor(color), CircleShape))
+        Text(name, style = MaterialTheme.typography.bodyMedium)
     }
 }
 

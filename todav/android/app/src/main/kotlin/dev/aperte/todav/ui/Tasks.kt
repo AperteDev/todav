@@ -97,6 +97,7 @@ import dev.aperte.todav.core.DueValue
 import dev.aperte.todav.core.PriorityValue
 import dev.aperte.todav.core.SyncState
 import dev.aperte.todav.core.TaskPatch
+import dev.aperte.todav.core.Item
 import dev.aperte.todav.core.TodavTask
 import dev.aperte.todav.core.overdue
 import dev.aperte.todav.date
@@ -309,6 +310,9 @@ private data class Target(val key: String, val row: TaskRow?, val group: dev.ape
 @Composable
 private fun TaskList(model: Main, screen: Screen, state: LazyListState, padding: PaddingValues, onAddSubtask: (TodavTask) -> Unit) {
     var showCompleted by rememberSaveable { mutableStateOf(false) }
+    // The task tapped: its details sheet, as the calendar's (pulled up, its page).
+    var details by remember { mutableStateOf<TodavTask?>(null) }
+    details?.let { ItemSheet(model, Item.Task(it)) { details = null } }
     if (screen.groups.isEmpty() && screen.completed.isEmpty()) {
         Empty(screen, padding)
         return
@@ -505,7 +509,7 @@ private fun TaskList(model: Main, screen: Screen, state: LazyListState, padding:
             }
             items(group.rows, key = { "${group.title}:${it.task.uid}" }, contentType = { "task" }) { row ->
                 val key = "${group.title}:${row.task.uid}"
-                TaskItem(model, screen, row, key, drag, target, shift(drag, key), state, menuFor == key, { menuFor = null }, onAddSubtask)
+                TaskItem(model, screen, row, key, drag, target, shift(drag, key), state, menuFor == key, { menuFor = null }, onAddSubtask) { details = it }
             }
         }
         if (screen.completed.isNotEmpty()) {
@@ -527,7 +531,7 @@ private fun TaskList(model: Main, screen: Screen, state: LazyListState, padding:
             if (showCompleted) {
                 items(screen.completed, key = { "done:${it.task.uid}" }, contentType = { "task" }) { row ->
                     val key = "done:${row.task.uid}"
-                    TaskItem(model, screen, row, key, drag, target, shift(drag, key), state, menuFor == key, { menuFor = null }, onAddSubtask)
+                    TaskItem(model, screen, row, key, drag, target, shift(drag, key), state, menuFor == key, { menuFor = null }, onAddSubtask) { details = it }
                 }
             }
         }
@@ -598,6 +602,7 @@ private fun TaskItem(
     menu: Boolean,
     onMenuClosed: () -> Unit,
     onAddSubtask: (TodavTask) -> Unit,
+    onOpen: (TodavTask) -> Unit,
 ) {
     val task = row.task
     val haptics = LocalHapticFeedback.current
@@ -655,7 +660,7 @@ private fun TaskItem(
         Row(
             Modifier.fillMaxWidth()
                 .background(if (mode == 0) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface)
-                .clickable { model.open(Dest.Task(task.uid)) }
+                .clickable { onOpen(task) }
                 .padding(start = (8 + 24 * row.depth).dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
