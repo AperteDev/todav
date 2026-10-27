@@ -27,221 +27,228 @@ Adw.ApplicationWindow window {
             icon-name: "checkbox-checked-symbolic";
 
             // The same sidebar width as the Calendar page, so switching does not move it.
-            child: Adw.NavigationSplitView split {
+            child: Adw.OverlaySplitView split {
               min-sidebar-width: 300;
               max-sidebar-width: 340;
 
-              sidebar: Adw.NavigationPage {
-                title: "Todav";
+              sidebar: Adw.ToolbarView {
+                [top]
+                Adw.HeaderBar {
+                  title-widget: Adw.InlineViewSwitcher {
+                    stack: views;
+                  };
 
-                child: Adw.ToolbarView {
-                  [top]
-                  Adw.HeaderBar {
-                    title-widget: Adw.InlineViewSwitcher {
-                      stack: views;
-                    };
-
-                    [end]
-                    Gtk.MenuButton {
-                      icon-name: "open-menu-symbolic";
-                      menu-model: main_menu;
-                    }
+                  [end]
+                  Gtk.MenuButton {
+                    icon-name: "open-menu-symbolic";
+                    menu-model: main_menu;
                   }
+                }
 
-                  content: Gtk.ScrolledWindow {
-                    vexpand: true;
+                content: Gtk.ScrolledWindow {
+                  vexpand: true;
 
-                    Gtk.Box {
-                      orientation: vertical;
+                  Gtk.Box {
+                    orientation: vertical;
 
-                      Gtk.ListBox sidebar {
-                        styles ["navigation-sidebar"]
+                    Gtk.ListBox sidebar {
+                      styles ["navigation-sidebar"]
+                    }
+
+                    Gtk.Button {
+                      action-name: "win.new-list";
+                      margin-start: 6;
+                      margin-end: 6;
+                      styles ["flat"]
+
+                      Adw.ButtonContent {
+                        icon-name: "list-add-symbolic";
+                        label: _("New List");
+                        halign: start;
                       }
+                    }
 
-                      Gtk.Button {
-                        action-name: "win.new-list";
+                    // Filled per list; hidden when the list has no categories.
+                    Gtk.Box cat_section {
+                      orientation: vertical;
+                      visible: false;
+                      margin-top: 6;
+
+                      Gtk.ToggleButton cat_toggle {
+                        active: true;
                         margin-start: 6;
                         margin-end: 6;
-                        styles ["flat"]
-
-                        Adw.ButtonContent {
-                          icon-name: "list-add-symbolic";
-                          label: _("New List");
-                          halign: start;
-                        }
-                      }
-
-                      // Filled per list; hidden when the list has no categories.
-                      Gtk.Box cat_section {
-                        orientation: vertical;
-                        visible: false;
-                        margin-top: 6;
-
-                        Gtk.ToggleButton cat_toggle {
-                          active: true;
-                          margin-start: 6;
-                          margin-end: 6;
-                          styles ["flat", "cat-toggle"]
-
-                          Gtk.Box {
-                            spacing: 6;
-
-                            Gtk.Label {
-                              label: _("Categories");
-                              xalign: 0;
-                              hexpand: true;
-                              styles ["heading"]
-                            }
-
-                            Gtk.Image {
-                              icon-name: "pan-down-symbolic";
-                            }
-                          }
-                        }
-
-                        Gtk.Revealer {
-                          reveal-child: bind cat_toggle.active;
-
-                          Gtk.ListBox cat_list {
-                            styles ["navigation-sidebar"]
-                          }
-                        }
-                      }
-                    }
-                  };
-                };
-              };
-
-              content: Adw.NavigationPage {
-                title: _("Tasks");
-
-                child: Adw.ToolbarView {
-                  [top]
-                  Adw.HeaderBar {
-                    title-widget: Adw.WindowTitle title {};
-
-                    // The icon, or a spinner while syncing.
-                    [end]
-                    Gtk.Button {
-                      tooltip-text: _("Sync (F5)");
-                      action-name: "app.sync";
-                      styles ["image-button"]
-
-                      Gtk.Stack sync_state {
-                        transition-type: crossfade;
-
-                        Gtk.StackPage {
-                          name: "idle";
-                          child: Gtk.Image {
-                            icon-name: "view-refresh-symbolic";
-                          };
-                        }
-
-                        Gtk.StackPage {
-                          name: "syncing";
-                          child: Adw.Spinner {};
-                        }
-                      }
-                    }
-
-                    [end]
-                    Gtk.ToggleButton task_search_button {
-                      icon-name: "system-search-symbolic";
-                      tooltip-text: _("Search (Ctrl+F)");
-
-                      Gtk.ShortcutController {
-                        scope: managed;
-
-                        Gtk.Shortcut {
-                          trigger: "<Control>f";
-                          action: "activate";
-                        }
-                      }
-                    }
-                  }
-
-                  // A newer version installed, and accounts that are not connected (src/window.rs
-                  // `update_banners`).
-                  [top]
-                  Adw.Banner update_banner {
-                    button-label: _("Restart");
-                    action-name: "app.restart";
-                  }
-
-                  [top]
-                  Adw.Banner banner {
-                    button-label: _("Sign In");
-                    action-name: "win.fix-account";
-                  }
-
-                  // Typing on the page opens it too (its key capture widget is set in code).
-                  [top]
-                  Gtk.SearchBar task_search {
-                    search-mode-enabled: bind task_search_button.active bidirectional;
-
-                    Adw.Clamp {
-                      maximum-size: 720;
-                      hexpand: true;
-
-                      Gtk.SearchEntry task_query {
-                        placeholder-text: _("Search tasks");
-                        hexpand: true;
-                      }
-                    }
-                  }
-
-                  content: Gtk.ScrolledWindow {
-                    vexpand: true;
-
-                    Adw.Clamp {
-                      maximum-size: 720;
-
-                      Gtk.Box {
-                        orientation: vertical;
-                        spacing: 18;
-                        margin-top: 12;
-                        margin-bottom: 24;
-                        margin-start: 12;
-                        margin-end: 12;
+                        styles ["flat", "cat-toggle"]
 
                         Gtk.Box {
                           spacing: 6;
 
-                          Gtk.Entry entry {
-                            placeholder-text: _("Add a task");
+                          Gtk.Label {
+                            label: _("Categories");
+                            xalign: 0;
                             hexpand: true;
+                            styles ["heading"]
                           }
 
-                          // The same as Enter, for touchscreens; only with something typed.
-                          Gtk.Button add_task {
-                            icon-name: "list-add-symbolic";
-                            tooltip-text: _("Add Task");
-                            sensitive: false;
-                          }
-
-                          Gtk.DropDown cat {
-                            tooltip-text: _("Category (Ctrl+K)");
-                            model: Gtk.StringList cats { strings [_("No category")] };
-
-                            // Ctrl+K opens the category picker from anywhere in the window.
-                            Gtk.ShortcutController {
-                              scope: global;
-
-                              Gtk.Shortcut {
-                                trigger: "<Control>k";
-                                action: "activate";
-                              }
-                            }
+                          Gtk.Image {
+                            icon-name: "pan-down-symbolic";
                           }
                         }
+                      }
 
-                        Gtk.Box groups {
-                          orientation: vertical;
-                          spacing: 18;
+                      Gtk.Revealer {
+                        reveal-child: bind cat_toggle.active;
+
+                        Gtk.ListBox cat_list {
+                          styles ["navigation-sidebar"]
                         }
                       }
                     }
-                  };
+                  }
+                };
+              };
+
+              content: Adw.ToolbarView {
+                [top]
+                Adw.HeaderBar {
+                  title-widget: Adw.WindowTitle title {};
+
+                  [start]
+                  Gtk.ToggleButton {
+                    icon-name: "sidebar-show-symbolic";
+                    tooltip-text: _("Toggle Sidebar (F9)");
+                    active: bind split.show-sidebar bidirectional;
+                  }
+
+                  // The sidebar's switcher, while the sidebar is hidden (src/window.rs
+                  // `sidebar_switcher`).
+                  [start]
+                  Adw.InlineViewSwitcher task_switcher {
+                    stack: views;
+                    display-mode: icons;
+                  }
+
+                  // The icon, or a spinner while syncing.
+                  [end]
+                  Gtk.Button {
+                    tooltip-text: _("Sync (F5)");
+                    action-name: "app.sync";
+                    styles ["image-button"]
+
+                    Gtk.Stack sync_state {
+                      transition-type: crossfade;
+
+                      Gtk.StackPage {
+                        name: "idle";
+                        child: Gtk.Image {
+                          icon-name: "view-refresh-symbolic";
+                        };
+                      }
+
+                      Gtk.StackPage {
+                        name: "syncing";
+                        child: Adw.Spinner {};
+                      }
+                    }
+                  }
+
+                  [end]
+                  Gtk.ToggleButton task_search_button {
+                    icon-name: "system-search-symbolic";
+                    tooltip-text: _("Search (Ctrl+F)");
+
+                    Gtk.ShortcutController {
+                      scope: managed;
+
+                      Gtk.Shortcut {
+                        trigger: "<Control>f";
+                        action: "activate";
+                      }
+                    }
+                  }
+                }
+
+                // A newer version installed, and accounts that are not connected (src/window.rs
+                // `update_banners`).
+                [top]
+                Adw.Banner update_banner {
+                  button-label: _("Restart");
+                  action-name: "app.restart";
+                }
+
+                [top]
+                Adw.Banner banner {
+                  button-label: _("Sign In");
+                  action-name: "win.fix-account";
+                }
+
+                // Typing on the page opens it too (its key capture widget is set in code).
+                [top]
+                Gtk.SearchBar task_search {
+                  search-mode-enabled: bind task_search_button.active bidirectional;
+
+                  Adw.Clamp {
+                    maximum-size: 720;
+                    hexpand: true;
+
+                    Gtk.SearchEntry task_query {
+                      placeholder-text: _("Search tasks");
+                      hexpand: true;
+                    }
+                  }
+                }
+
+                content: Gtk.ScrolledWindow {
+                  vexpand: true;
+
+                  Adw.Clamp {
+                    maximum-size: 720;
+
+                    Gtk.Box {
+                      orientation: vertical;
+                      spacing: 18;
+                      margin-top: 12;
+                      margin-bottom: 24;
+                      margin-start: 12;
+                      margin-end: 12;
+
+                      Gtk.Box {
+                        spacing: 6;
+
+                        Gtk.Entry entry {
+                          placeholder-text: _("Add a task");
+                          hexpand: true;
+                        }
+
+                        // The same as Enter, for touchscreens; only with something typed.
+                        Gtk.Button add_task {
+                          icon-name: "list-add-symbolic";
+                          tooltip-text: _("Add Task");
+                          sensitive: false;
+                        }
+
+                        Gtk.DropDown cat {
+                          tooltip-text: _("Category (Ctrl+K)");
+                          model: Gtk.StringList cats { strings [_("No category")] };
+
+                          // Ctrl+K opens the category picker from anywhere in the window.
+                          Gtk.ShortcutController {
+                            scope: global;
+
+                            Gtk.Shortcut {
+                              trigger: "<Control>k";
+                              action: "activate";
+                            }
+                          }
+                        }
+                      }
+
+                      Gtk.Box groups {
+                        orientation: vertical;
+                        spacing: 18;
+                      }
+                    }
+                  }
                 };
               };
             };

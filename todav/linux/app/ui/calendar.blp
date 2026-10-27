@@ -3,7 +3,7 @@ using Adw 1;
 
 // The Calendar page: a mini month and the calendars beside the Month / Week / Agenda views.
 // Its breakpoints are set in code.
-Adw.NavigationSplitView split {
+Adw.OverlaySplitView split {
   min-sidebar-width: 300;
   max-sidebar-width: 340;
 
@@ -68,141 +68,53 @@ Adw.NavigationSplitView split {
     }
   }
 
-  sidebar: Adw.NavigationPage {
-    title: _("Calendar");
+  sidebar: Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {
+      // Its stack (the window's Tasks / Calendar views) is set in code.
+      title-widget: Adw.InlineViewSwitcher switcher {};
 
-    child: Adw.ToolbarView {
-      [top]
-      Adw.HeaderBar {
-        // Its stack (the window's Tasks / Calendar views) is set in code.
-        title-widget: Adw.InlineViewSwitcher switcher {};
-
-        [end]
-        Gtk.MenuButton {
-          icon-name: "open-menu-symbolic";
-          menu-model: main_menu;
-        }
+      [end]
+      Gtk.MenuButton {
+        icon-name: "open-menu-symbolic";
+        menu-model: main_menu;
       }
+    }
 
-      content: Gtk.ScrolledWindow {
-        vexpand: true;
-        hscrollbar-policy: never;
+    content: Gtk.ScrolledWindow {
+      vexpand: true;
+      hscrollbar-policy: never;
 
-        Gtk.Box {
+      Gtk.Box {
+        orientation: vertical;
+        spacing: 6;
+
+        // Filled in code (src/calendar/mini.rs).
+        Gtk.Box mini {
           orientation: vertical;
-          spacing: 6;
+          margin-start: 12;
+          margin-end: 12;
+          margin-top: 6;
+          styles ["card", "mini"]
+        }
 
-          // Filled in code (src/calendar/mini.rs).
-          Gtk.Box mini {
-            orientation: vertical;
-            margin-start: 12;
-            margin-end: 12;
-            margin-top: 6;
-            styles ["card", "mini"]
-          }
+        // Each section folds under its heading, as the Tasks page's categories do; "+" adds
+        // one.
+        Gtk.Box {
+          spacing: 2;
+          margin-start: 6;
+          margin-end: 6;
 
-          // Each section folds under its heading, as the Tasks page's categories do; "+" adds
-          // one.
-          Gtk.Box {
-            spacing: 2;
-            margin-start: 6;
-            margin-end: 6;
-
-            Gtk.ToggleButton calendars_toggle {
-              active: true;
-              hexpand: true;
-              styles ["flat", "cat-toggle"]
-
-              Gtk.Box {
-                spacing: 6;
-
-                Gtk.Label {
-                  label: _("Calendars");
-                  xalign: 0;
-                  hexpand: true;
-                  styles ["heading"]
-                }
-
-                Gtk.Image {
-                  icon-name: "pan-down-symbolic";
-                }
-              }
-            }
-
-            Gtk.Button {
-              icon-name: "list-add-symbolic";
-              tooltip-text: _("New Calendar");
-              action-name: "win.new-calendar";
-              styles ["flat"]
-            }
-          }
-
-          Gtk.Revealer {
-            reveal-child: bind calendars_toggle.active;
-
-            // A row per calendar: colour, name, shown or not.
-            Gtk.ListBox calendars {
-              selection-mode: none;
-              styles ["navigation-sidebar"]
-            }
-          }
-
-          Gtk.Box task_head {
-            spacing: 2;
-            margin-start: 6;
-            margin-end: 6;
-
-            Gtk.ToggleButton task_heading {
-              active: true;
-              hexpand: true;
-              styles ["flat", "cat-toggle"]
-
-              Gtk.Box {
-                spacing: 6;
-
-                Gtk.Label {
-                  label: _("Task lists");
-                  xalign: 0;
-                  hexpand: true;
-                  styles ["heading"]
-                }
-
-                Gtk.Image {
-                  icon-name: "pan-down-symbolic";
-                }
-              }
-            }
-
-            Gtk.Button {
-              icon-name: "list-add-symbolic";
-              tooltip-text: _("New List");
-              action-name: "win.new-list";
-              styles ["flat"]
-            }
-          }
-
-          Gtk.Revealer {
-            reveal-child: bind task_heading.active;
-
-            // The same for lists holding only tasks (their dated tasks are on the calendar).
-            Gtk.ListBox task_lists {
-              selection-mode: none;
-              styles ["navigation-sidebar"]
-            }
-          }
-
-          Gtk.ToggleButton plan_heading {
+          Gtk.ToggleButton calendars_toggle {
             active: true;
-            margin-start: 6;
-            margin-end: 6;
-            tooltip-text: _("Drag a task onto a day or an hour");
+            hexpand: true;
             styles ["flat", "cat-toggle"]
 
             Gtk.Box {
               spacing: 6;
 
               Gtk.Label {
-                label: _("To Plan");
+                label: _("Calendars");
                 xalign: 0;
                 hexpand: true;
                 styles ["heading"]
@@ -214,253 +126,346 @@ Adw.NavigationSplitView split {
             }
           }
 
-          Gtk.Revealer {
-            reveal-child: bind plan_heading.active;
+          Gtk.Button {
+            icon-name: "list-add-symbolic";
+            tooltip-text: _("New Calendar");
+            action-name: "win.new-calendar";
+            styles ["flat"]
+          }
+        }
 
-            // Open tasks without a time slot: due by a date (by the end of the shown range,
-            // overdue included), then undated. Dropping a planned task here takes it out of
-            // its slot.
-            Gtk.ListBox plan {
-              selection-mode: none;
-              margin-bottom: 12;
-              styles ["navigation-sidebar"]
+        Gtk.Revealer {
+          reveal-child: bind calendars_toggle.active;
+
+          // A row per calendar: colour, name, shown or not.
+          Gtk.ListBox calendars {
+            selection-mode: none;
+            styles ["navigation-sidebar"]
+          }
+        }
+
+        Gtk.Box task_head {
+          spacing: 2;
+          margin-start: 6;
+          margin-end: 6;
+
+          Gtk.ToggleButton task_heading {
+            active: true;
+            hexpand: true;
+            styles ["flat", "cat-toggle"]
+
+            Gtk.Box {
+              spacing: 6;
+
+              Gtk.Label {
+                label: _("Task lists");
+                xalign: 0;
+                hexpand: true;
+                styles ["heading"]
+              }
+
+              Gtk.Image {
+                icon-name: "pan-down-symbolic";
+              }
+            }
+          }
+
+          Gtk.Button {
+            icon-name: "list-add-symbolic";
+            tooltip-text: _("New List");
+            action-name: "win.new-list";
+            styles ["flat"]
+          }
+        }
+
+        Gtk.Revealer {
+          reveal-child: bind task_heading.active;
+
+          // The same for lists holding only tasks (their dated tasks are on the calendar).
+          Gtk.ListBox task_lists {
+            selection-mode: none;
+            styles ["navigation-sidebar"]
+          }
+        }
+
+        Gtk.ToggleButton plan_heading {
+          active: true;
+          margin-start: 6;
+          margin-end: 6;
+          tooltip-text: _("Drag a task onto a day or an hour");
+          styles ["flat", "cat-toggle"]
+
+          Gtk.Box {
+            spacing: 6;
+
+            Gtk.Label {
+              label: _("To Plan");
+              xalign: 0;
+              hexpand: true;
+              styles ["heading"]
+            }
+
+            Gtk.Image {
+              icon-name: "pan-down-symbolic";
             }
           }
         }
-      };
+
+        Gtk.Revealer {
+          reveal-child: bind plan_heading.active;
+
+          // Open tasks without a time slot: due by a date (by the end of the shown range,
+          // overdue included), then undated. Dropping a planned task here takes it out of
+          // its slot.
+          Gtk.ListBox plan {
+            selection-mode: none;
+            margin-bottom: 12;
+            styles ["navigation-sidebar"]
+          }
+        }
+      }
     };
   };
 
-  content: Adw.NavigationPage {
-    title: _("Calendar");
+  content: Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {
+      title-widget: Adw.WindowTitle title {};
 
-    child: Adw.ToolbarView {
-      [top]
-      Adw.HeaderBar {
-        title-widget: Adw.WindowTitle title {};
+      [start]
+      Gtk.ToggleButton {
+        icon-name: "sidebar-show-symbolic";
+        tooltip-text: _("Toggle Sidebar (F9)");
+        active: bind split.show-sidebar bidirectional;
+      }
 
-        [start]
-        Gtk.Box {
-          styles ["linked"]
+      // The sidebar's switcher, while the sidebar is hidden (its stack is set in code).
+      [start]
+      Adw.InlineViewSwitcher content_switcher {
+        display-mode: icons;
+      }
 
-          Gtk.Button {
-            icon-name: "go-previous-symbolic";
-            tooltip-text: _("Previous (Alt+←)");
-            action-name: "cal.previous";
-          }
+      [start]
+      Gtk.Box {
+        styles ["linked"]
 
-          Gtk.Button {
-            icon-name: "calendar-go-today-symbolic";
-            tooltip-text: _("Today (Ctrl+T)");
-            action-name: "cal.today";
-          }
-
-          Gtk.Button {
-            icon-name: "go-next-symbolic";
-            tooltip-text: _("Next (Alt+→)");
-            action-name: "cal.next";
-          }
-        }
-
-        [start]
         Gtk.Button {
-          icon-name: "list-add-symbolic";
-          tooltip-text: _("New Event (Ctrl+N)");
-          action-name: "cal.new-event";
-          styles ["suggested-action"]
+          icon-name: "go-previous-symbolic";
+          tooltip-text: _("Previous (Alt+←)");
+          action-name: "cal.previous";
         }
 
-        // The icon, or a spinner while syncing.
-        [end]
-        Gtk.Button sync {
-          tooltip-text: _("Sync (F5)");
-          action-name: "app.sync";
-          styles ["image-button"]
+        Gtk.Button {
+          icon-name: "calendar-go-today-symbolic";
+          tooltip-text: _("Today (Ctrl+T)");
+          action-name: "cal.today";
+        }
 
-          Gtk.Stack sync_state {
-            transition-type: crossfade;
+        Gtk.Button {
+          icon-name: "go-next-symbolic";
+          tooltip-text: _("Next (Alt+→)");
+          action-name: "cal.next";
+        }
+      }
 
-            Gtk.StackPage {
-              name: "idle";
-              child: Gtk.Image {
-                icon-name: "view-refresh-symbolic";
-              };
-            }
+      [start]
+      Gtk.Button {
+        icon-name: "list-add-symbolic";
+        tooltip-text: _("New Event (Ctrl+N)");
+        action-name: "cal.new-event";
+        styles ["suggested-action"]
+      }
 
-            Gtk.StackPage {
-              name: "syncing";
-              child: Adw.Spinner {};
-            }
+      // The icon, or a spinner while syncing.
+      [end]
+      Gtk.Button sync {
+        tooltip-text: _("Sync (F5)");
+        action-name: "app.sync";
+        styles ["image-button"]
+
+        Gtk.Stack sync_state {
+          transition-type: crossfade;
+
+          Gtk.StackPage {
+            name: "idle";
+            child: Gtk.Image {
+              icon-name: "view-refresh-symbolic";
+            };
+          }
+
+          Gtk.StackPage {
+            name: "syncing";
+            child: Adw.Spinner {};
           }
         }
+      }
 
-        [end]
-        Gtk.ToggleButton search_button {
-          icon-name: "system-search-symbolic";
-          tooltip-text: _("Search (Ctrl+F)");
+      [end]
+      Gtk.ToggleButton search_button {
+        icon-name: "system-search-symbolic";
+        tooltip-text: _("Search (Ctrl+F)");
 
-          Gtk.ShortcutController {
-            scope: managed;
+        Gtk.ShortcutController {
+          scope: managed;
 
-            Gtk.Shortcut {
-              trigger: "<Control>f";
-              action: "activate";
-            }
+          Gtk.Shortcut {
+            trigger: "<Control>f";
+            action: "activate";
           }
         }
-
-        // Month, Week, Work Week, 3 Days, Day or Agenda; its label and menu are set in code.
-        [end]
-        Gtk.MenuButton view {
-          always-show-arrow: true;
-          tooltip-text: _("View");
-        }
       }
 
-      // As the Tasks page's (src/window.rs `update_banners`).
-      [top]
-      Adw.Banner update_banner {
-        button-label: _("Restart");
-        action-name: "app.restart";
+      // Month, Week, Work Week, 3 Days, Day or Agenda; its label and menu are set in code.
+      [end]
+      Gtk.MenuButton view {
+        always-show-arrow: true;
+        tooltip-text: _("View");
       }
+    }
 
-      [top]
-      Adw.Banner banner {
-        button-label: _("Sign In");
-        action-name: "win.fix-account";
-      }
+    // As the Tasks page's (src/window.rs `update_banners`).
+    [top]
+    Adw.Banner update_banner {
+      button-label: _("Restart");
+      action-name: "app.restart";
+    }
 
-      // Typing on the page opens it too (its key capture widget is set in code). Results show
-      // in the agenda's place.
-      [top]
-      Gtk.SearchBar search {
-        search-mode-enabled: bind search_button.active bidirectional;
+    [top]
+    Adw.Banner banner {
+      button-label: _("Sign In");
+      action-name: "win.fix-account";
+    }
 
-        Adw.Clamp {
-          maximum-size: 720;
+    // Typing on the page opens it too (its key capture widget is set in code). Results show
+    // in the agenda's place.
+    [top]
+    Gtk.SearchBar search {
+      search-mode-enabled: bind search_button.active bidirectional;
+
+      Adw.Clamp {
+        maximum-size: 720;
+        hexpand: true;
+
+        Gtk.SearchEntry query {
+          placeholder-text: _("Search events");
           hexpand: true;
+        }
+      }
+    }
 
-          Gtk.SearchEntry query {
-            placeholder-text: _("Search events");
-            hexpand: true;
+    // The same choice at the bottom when the window is narrow (the header has no room).
+    [bottom]
+    Gtk.ActionBar mode_bar {
+      revealed: false;
+
+      [center]
+      Gtk.MenuButton view_narrow {
+        always-show-arrow: true;
+        direction: up;
+        tooltip-text: _("View");
+      }
+    }
+
+    content: Gtk.Stack views {
+      transition-type: crossfade;
+
+      Gtk.StackPage {
+        name: "month";
+
+        // Weekday names over six rows of seven days, filled in code.
+        child: Gtk.Box {
+          orientation: vertical;
+          margin-start: 6;
+          margin-end: 6;
+          margin-bottom: 6;
+          styles ["month"]
+
+          Gtk.Box weekdays {
+            homogeneous: true;
+            styles ["weekdays"]
           }
-        }
+
+          // Scrolls when the window is too short for six rows.
+          Gtk.ScrolledWindow {
+            vexpand: true;
+            hscrollbar-policy: never;
+
+            Gtk.Grid month {
+              row-homogeneous: true;
+              column-homogeneous: true;
+              vexpand: true;
+            }
+          }
+        };
       }
 
-      // The same choice at the bottom when the window is narrow (the header has no room).
-      [bottom]
-      Gtk.ActionBar mode_bar {
-        revealed: false;
+      Gtk.StackPage {
+        name: "week";
 
-        [center]
-        Gtk.MenuButton view_narrow {
-          always-show-arrow: true;
-          direction: up;
-          tooltip-text: _("View");
-        }
-      }
+        // The hours of a week, some of its days, three days or one day. Day names, then
+        // all-day items, then the hours; each row has the hour gutter on the left, so the
+        // columns line up. One day has its week from the month grid above instead of its name.
+        child: Gtk.Box {
+          orientation: vertical;
+          styles ["week"]
 
-      content: Gtk.Stack views {
-        transition-type: crossfade;
-
-        Gtk.StackPage {
-          name: "month";
-
-          // Weekday names over six rows of seven days, filled in code.
-          child: Gtk.Box {
+          Gtk.Box week_strip {
             orientation: vertical;
             margin-start: 6;
             margin-end: 6;
             margin-bottom: 6;
             styles ["month"]
+          }
 
-            Gtk.Box weekdays {
-              homogeneous: true;
-              styles ["weekdays"]
-            }
+          Gtk.Box week_head {
+            styles ["weekdays"]
+          }
 
-            // Scrolls when the window is too short for six rows.
-            Gtk.ScrolledWindow {
-              vexpand: true;
-              hscrollbar-policy: never;
+          Gtk.Box week_all_day {
+            styles ["all-day-row"]
+          }
 
-              Gtk.Grid month {
-                row-homogeneous: true;
-                column-homogeneous: true;
-                vexpand: true;
-              }
-            }
-          };
-        }
-
-        Gtk.StackPage {
-          name: "week";
-
-          // The hours of a week, some of its days, three days or one day. Day names, then
-          // all-day items, then the hours; each row has the hour gutter on the left, so the
-          // columns line up. One day has its week from the month grid above instead of its name.
-          child: Gtk.Box {
-            orientation: vertical;
-            styles ["week"]
-
-            Gtk.Box week_strip {
-              orientation: vertical;
-              margin-start: 6;
-              margin-end: 6;
-              margin-bottom: 6;
-              styles ["month"]
-            }
-
-            Gtk.Box week_head {
-              styles ["weekdays"]
-            }
-
-            Gtk.Box week_all_day {
-              styles ["all-day-row"]
-            }
-
-            Gtk.ScrolledWindow week_scroll {
-              vexpand: true;
-              hscrollbar-policy: never;
-
-              // Blocks are overlay children, placed in code.
-              Gtk.Overlay week_grid {
-                child: Gtk.Box {
-                  Gtk.Box hours {
-                    orientation: vertical;
-                    styles ["hours"]
-                  }
-
-                  Gtk.DrawingArea week_lines {
-                    hexpand: true;
-                  }
-                };
-              }
-            }
-          };
-        }
-
-        Gtk.StackPage {
-          name: "agenda";
-
-          child: Gtk.ScrolledWindow {
+          Gtk.ScrolledWindow week_scroll {
             vexpand: true;
+            hscrollbar-policy: never;
 
-            Adw.Clamp {
-              maximum-size: 720;
+            // Blocks are overlay children, placed in code.
+            Gtk.Overlay week_grid {
+              child: Gtk.Box {
+                Gtk.Box hours {
+                  orientation: vertical;
+                  styles ["hours"]
+                }
 
-              Gtk.Box agenda {
-                orientation: vertical;
-                spacing: 18;
-                margin-top: 12;
-                margin-bottom: 24;
-                margin-start: 12;
-                margin-end: 12;
-              }
+                Gtk.DrawingArea week_lines {
+                  hexpand: true;
+                }
+              };
             }
-          };
-        }
-      };
+          }
+        };
+      }
+
+      Gtk.StackPage {
+        name: "agenda";
+
+        child: Gtk.ScrolledWindow {
+          vexpand: true;
+
+          Adw.Clamp {
+            maximum-size: 720;
+
+            Gtk.Box agenda {
+              orientation: vertical;
+              spacing: 18;
+              margin-top: 12;
+              margin-bottom: 24;
+              margin-start: 12;
+              margin-end: 12;
+            }
+          }
+        };
+      }
     };
   };
 }

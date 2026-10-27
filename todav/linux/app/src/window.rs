@@ -89,7 +89,7 @@ struct Ui {
     window: adw::ApplicationWindow,
     toasts: adw::ToastOverlay,
     stack: gtk::Stack,
-    split: adw::NavigationSplitView,
+    split: adw::OverlaySplitView,
     sidebar: gtk::ListBox,
     /// The search, `folded`: while set, the page shows matching tasks of every list.
     query: RefCell<String>,
@@ -248,6 +248,7 @@ pub fn setup_actions(app: &adw::Application) {
     app.set_accels_for_action("win.undo", &["<Control>z"]);
     app.set_accels_for_action("win.page::tasks", &["<Alt>1"]);
     app.set_accels_for_action("win.page::calendar", &["<Alt>2"]);
+    app.set_accels_for_action("win.toggle-sidebar", &["F9"]);
 }
 
 /// Turns About's Details page into Support: a note and the donation links instead of the
@@ -458,7 +459,7 @@ pub fn show_list(href: &str) {
     if let Some(ui) = ui() {
         *ui.current.borrow_mut() = Some(href.to_string());
         refresh_lists(&ui);
-        ui.split.set_show_content(true);
+        show_content(&ui.split);
     }
 }
 
@@ -696,8 +697,30 @@ fn build(app: &adw::Application) -> Rc<Ui> {
     connect(&ui, &b);
     let views = get(&b, "views");
     connect_search(&ui, &get(&b, "task_search"), &get(&b, "task_query"), &views);
-    crate::calendar::build(&views);
+    crate::calendar::build(&views, &ui.split);
     ui
+}
+
+/// The page's content after picking something in its sidebar: an overlaid (collapsed) sidebar
+/// closes.
+pub fn show_content(split: &adw::OverlaySplitView) {
+    if split.is_collapsed() {
+        split.set_show_sidebar(false);
+    }
+}
+
+/// A page's sidebar holds the Tasks / Calendar switcher; `switcher`, in the content's header, stands
+/// in for it while the sidebar is hidden on a wide window (collapsed, the sidebar is a toggle away).
+pub fn sidebar_switcher(split: &adw::OverlaySplitView, switcher: &adw::InlineViewSwitcher) {
+    let update = {
+        let switcher = switcher.clone();
+        move |s: &adw::OverlaySplitView| {
+            switcher.set_visible(!s.shows_sidebar() && !s.is_collapsed())
+        }
+    };
+    update(split);
+    split.connect_show_sidebar_notify(update.clone());
+    split.connect_collapsed_notify(update);
 }
 
 /// Typing on the Tasks page searches the tasks of every list (GNOME's type to search).
@@ -774,12 +797,7 @@ pub fn edit_task(t: &Task) {
 }
 
 fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
-    // Shrinking keeps the task list, as the Calendar page keeps its views.
-    ui.split.connect_collapsed_notify(|s| {
-        if s.is_collapsed() {
-            s.set_show_content(true);
-        }
-    });
+    sidebar_switcher(&ui.split, &get(b, "task_switcher"));
     let weak = Rc::downgrade(ui);
     ui.sidebar.connect_row_selected(move |_, row| {
         let (Some(ui), Some(row)) = (weak.upgrade(), row) else {
@@ -791,8 +809,11 @@ fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
             let _ = core().set_setting("last_list".into(), href.unwrap_or_default());
             refresh_tasks(&ui);
         }
-        ui.split.set_show_content(true);
     });
+    // Picked, even the list already shown.
+    let split = ui.split.clone();
+    ui.sidebar
+        .connect_row_activated(move |_, _| show_content(&split));
     crate::lists::setup(&ui.window);
     let weak = Rc::downgrade(ui);
     crate::lists::context_menu(&ui.sidebar, move |row| {
@@ -817,7 +838,7 @@ fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
             list.unselect_all();
         }
         *ui.filter.borrow_mut() = (!again).then_some(pick);
-        ui.split.set_show_content(true);
+        show_content(&ui.split);
         glib::idle_add_local_once(move || refresh_tasks(&ui));
     });
 
@@ -917,6 +938,11 @@ fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
         }
     });
     ui.window.add_action(&page);
+    // Both pages' sidebars, bound together (src/calendar.rs).
+    let toggle = gio::SimpleAction::new("toggle-sidebar", None);
+    let split = ui.split.clone();
+    toggle.connect_activate(move |_, _| split.set_show_sidebar(!split.shows_sidebar()));
+    ui.window.add_action(&toggle);
     // Ctrl+N on the Tasks page goes to the entry adding tasks (the Calendar page's opens a new
     // event).
     let keys = gtk::ShortcutController::new();

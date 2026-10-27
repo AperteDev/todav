@@ -135,7 +135,7 @@ fn render(c: &Rc<Cal>) {
         }
         b.connect_clicked(move |_| {
             if let Some(c) = cal() {
-                c.split.set_show_content(true); // narrow window: from the sidebar to the views
+                crate::window::show_content(&c.split); // narrow window: the sidebar closes
             }
             go(|_| day);
         });

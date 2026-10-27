@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from a menu.
 - Calendar: an event's or a task's title can be changed right in its details popover: click it,
   type, press Enter.
+- Linux: the sidebar can be hidden with the button at the start of the header or F9; in a
+  narrow window it opens over the content instead of in place of it.
 
 ### Fixed
 

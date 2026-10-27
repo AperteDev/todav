@@ -91,7 +91,7 @@ button.block.task { padding-left: 4px; }
 struct Cal {
     /// The window's Tasks / Calendar stack.
     stack: adw::ViewStack,
-    split: adw::NavigationSplitView,
+    split: adw::OverlaySplitView,
     mini: mini::Mini,
     calendars: gtk::ListBox,
     task_head: gtk::Box,
@@ -157,11 +157,17 @@ fn today() -> i64 {
     todav_app::dates::midnight(core().local_now())
 }
 
-/// Add the Calendar page to the window's view stack.
-pub fn build(views: &adw::ViewStack) {
+/// Add the Calendar page to the window's view stack, its sidebar shown and hidden with the Tasks
+/// page's (`tasks`).
+pub fn build(views: &adw::ViewStack, tasks: &adw::OverlaySplitView) {
     let b = view!("calendar");
     crate::window::add_banner(get(&b, "banner"), get(&b, "update_banner"));
-    let split: adw::NavigationSplitView = get(&b, "split");
+    let split: adw::OverlaySplitView = get(&b, "split");
+    tasks
+        .bind_property("show-sidebar", &split, "show-sidebar")
+        .bidirectional()
+        .sync_create()
+        .build();
     // Its own breakpoints, the narrowest last (the last matching one wins): tight, the view
     // switcher moves to a bar at the bottom and the sync button goes (F5 still syncs); narrow,
     // one pane at a time, with the Tasks page.
@@ -189,6 +195,9 @@ pub fn build(views: &adw::ViewStack) {
     let page = views.add_titled(&bin, Some("calendar"), &gettext("Calendar"));
     page.set_icon_name(Some("x-office-calendar-symbolic"));
     get::<adw::InlineViewSwitcher>(&b, "switcher").set_stack(Some(views));
+    let content_switcher: adw::InlineViewSwitcher = get(&b, "content_switcher");
+    content_switcher.set_stack(Some(views));
+    crate::window::sidebar_switcher(&split, &content_switcher);
 
     let display = split.display();
     let css = gtk::CssProvider::new();
@@ -272,13 +281,6 @@ pub fn build(views: &adw::ViewStack) {
         b.set_create_popup_func(|b| b.set_popover(Some(&view_menu())));
     }
     label_views(&c);
-    // Shrinking keeps the views, as on the Tasks page; the sidebar is a Back away.
-    c.split.set_show_content(true);
-    c.split.connect_collapsed_notify(|s| {
-        if s.is_collapsed() {
-            s.set_show_content(true);
-        }
-    });
     // Typing on the page searches the events; going to a day, a view or a period ends it.
     let query: gtk::SearchEntry = get(&b, "query");
     crate::window::search_bar(&c.search, &query, views, "calendar");
@@ -633,7 +635,7 @@ pub fn agenda(days: i64) -> Vec<(i64, String, String, String, bool, bool)> {
 pub fn show_day(t: i64) {
     let Some(c) = cal() else { return };
     c.stack.set_visible_child_name("calendar");
-    c.split.set_show_content(true);
+    crate::window::show_content(&c.split);
     let day = t - t.rem_euclid(DAY);
     c.anchor.set(day);
     c.browsed.set(false);
