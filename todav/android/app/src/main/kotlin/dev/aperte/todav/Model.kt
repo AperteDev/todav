@@ -216,6 +216,14 @@ class Main(app: Application) : AndroidViewModel(app) {
     /** The weekdays the Work Week view shows (0 Sunday). */
     val workDays = MutableStateFlow(listOf(1L, 2L, 3L, 4L, 5L))
 
+    /** The sidebar pane's width on wide screens, in dp, as last dragged here. */
+    val sidebarWidth = MutableStateFlow(256f)
+
+    fun setSidebarWidth(dp: Float) {
+        sidebarWidth.value = dp
+        act { core.setSetting("sidebar_width", "${dp.toInt()}") }
+    }
+
     fun setWorkDays(days: List<Long>) {
         workDays.value = days
         act { core.setWorkDays(days) }
@@ -583,6 +591,7 @@ class Main(app: Application) : AndroidViewModel(app) {
                 }
                 calMode.value = CalMode.entries.firstOrNull { it.name.lowercase() == m } ?: CalMode.MONTH
                 workDays.value = core.workDays()
+                core.setting("sidebar_width")?.toFloatOrNull()?.let { sidebarWidth.value = it }
             }
         }
     }

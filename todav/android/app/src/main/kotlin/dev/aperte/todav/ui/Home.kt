@@ -7,6 +7,9 @@ import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
@@ -60,12 +63,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -105,6 +110,7 @@ fun Home(model: Main) {
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 600.dp
+        val room = maxWidth.value
         val sidebar = if (wide) pane else page
         val menu = { if (wide) pane = !pane else page = !page }
         val show = { v: View ->
@@ -131,9 +137,16 @@ fun Home(model: Main) {
                             enter = expandHorizontally(expandFrom = Alignment.Start),
                             exit = shrinkHorizontally(shrinkTowards = Alignment.Start),
                         ) {
+                            // Dragged by its edge, from 200 dp up to what leaves the view 320 dp.
+                            val most = (room - 80 - 320).coerceIn(200f, 400f)
+                            val saved by model.sidebarWidth.collectAsStateWithLifecycle()
+                            var width by remember(saved) { mutableFloatStateOf(saved) }
                             Row(Modifier.fillMaxHeight()) {
-                                Sidebar(model, screen, view, Modifier.width(300.dp)) {}
-                                VerticalDivider()
+                                Sidebar(model, screen, view, Modifier.width(width.coerceIn(200f, most).dp)) {}
+                                Edge(
+                                    onDrag = { width = (width.coerceIn(200f, most) + it).coerceIn(200f, most) },
+                                    onDone = { model.setSidebarWidth(width.coerceIn(200f, most)) },
+                                )
                             }
                         }
                     }
@@ -282,6 +295,28 @@ private fun SubtasksDialog(t: Ticking, onAnswer: (Boolean?) -> Unit) {
             }
         },
     )
+}
+
+/**
+ * The sidebar pane's edge, in its colour, with the line beside the view: a handle in its middle
+ * drags it wider or narrower (`onDrag` by dp), `onDone` when let go.
+ */
+@Composable
+private fun Edge(onDrag: (Float) -> Unit, onDone: () -> Unit) {
+    val density = LocalDensity.current
+    Row(Modifier.fillMaxHeight().background(MaterialTheme.colorScheme.surfaceContainerLow)) {
+        Box(
+            Modifier.width(12.dp).fillMaxHeight().draggable(
+                rememberDraggableState { px -> onDrag(with(density) { px.toDp().value }) },
+                Orientation.Horizontal,
+                onDragStopped = { onDone() },
+            ),
+            Alignment.Center,
+        ) {
+            Box(Modifier.size(4.dp, 32.dp).background(MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), CircleShape))
+        }
+        VerticalDivider()
+    }
 }
 
 /**

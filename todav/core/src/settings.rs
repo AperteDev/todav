@@ -27,6 +27,8 @@ pub const DEVICE_ONLY: &[&str] = &[
     "calendar_mode",
     "window_size",
     "window_maximized",
+    // Android's sidebar pane, as wide as the screen allows.
+    "sidebar_width",
 ];
 
 /// key → (value, unix time of the last change)
