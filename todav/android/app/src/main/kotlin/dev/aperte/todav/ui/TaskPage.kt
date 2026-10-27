@@ -81,16 +81,17 @@ import dev.aperte.todav.tr
  * A task's page: what the Linux app's edit dialog has (title, list, category, priority, event,
  * note, start, due date, reminders), its subtasks, and Delete. The fields are saved together
  * with Save (one undo step); subtasks change at once. In a details sheet (`sheet`), Cancel goes
- * back to the details, Save and Delete close it.
+ * back to the details, Save and Delete close it. With a `draft` (a task not added yet, from the
+ * add sheet pulled up), Save adds it; it has no subtasks or Delete yet.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null) {
+fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null, draft: TodavTask? = null) {
     val cancel = { sheet?.collapse() ?: model.back() }
     val done = { sheet?.close() ?: model.back() }
     // Read again on every change, for its subtasks and a sync that changed it.
     val changes by model.todav.changes.collectAsStateWithLifecycle()
-    val task = remember(changes) { model.core.task(uid) }
+    val task = draft ?: remember(changes) { model.core.task(uid) }
     if (task == null) {
         LaunchedEffect(Unit) { done() }
         return
@@ -118,6 +119,23 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null) {
         (due != null && dueAllDay != task.dueAllDay) || event != task.eventUid || reminders.toList() != task.reminders
 
     fun save() {
+        if (draft != null) {
+            model.add(
+                list,
+                summary,
+                draft.parentUid,
+                category.trim().ifEmpty { null },
+                TaskPatch(
+                    description = note.takeIf { it.isNotBlank() },
+                    priority = priority?.let { PriorityValue(it) },
+                    start = start?.let { DueValue(Due(it, startAllDay)) },
+                    due = due?.let { DueValue(Due(it, dueAllDay)) },
+                    reminders = reminders.toList().takeIf { it.isNotEmpty() },
+                ),
+            )
+            done()
+            return
+        }
         val patch = TaskPatch(
             summary = summary.trim().takeIf { it.isNotEmpty() && it != task.summary },
             description = note.takeIf { it != (task.description ?: "") },
@@ -143,7 +161,7 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(tr("Edit Task")) },
+                title = { Text(if (draft != null) tr("New Task") else tr("Edit Task")) },
                 windowInsets = if (sheet != null) WindowInsets(0) else TopAppBarDefaults.windowInsets,
                 colors = if (sheet != null) TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent) else TopAppBarDefaults.topAppBarColors(),
             )
@@ -238,8 +256,10 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null) {
                 if (due != null) {
                     Reminders(model, reminders, dueAllDay, event = false)
                 }
-                Subtasks(model, task)
-                DeleteButton(tr("Delete Task")) { confirmDelete = true }
+                if (draft == null) {
+                    Subtasks(model, task)
+                    DeleteButton(tr("Delete Task")) { confirmDelete = true }
+                }
                 Spacer(Modifier.height(EDITOR_END))
             }
         }

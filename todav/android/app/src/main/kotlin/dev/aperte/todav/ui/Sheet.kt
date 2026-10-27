@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.statusBars
@@ -76,9 +77,9 @@ class DetailsSheetState internal constructor(
         scope.launch { drag.animateTo(Rest.Full) }
     }
 
-    /** Back down to the details. */
+    /** Back down to the details, or gone where there are none. */
     fun collapse() {
-        scope.launch { drag.animateTo(Rest.Details) }
+        scope.launch { drag.animateTo(if (drag.anchors.hasPositionFor(Rest.Details)) Rest.Details else Rest.Hidden) }
     }
 
     /** Down and gone. */
@@ -92,13 +93,14 @@ class DetailsSheetState internal constructor(
  * scrolling past most of the screen), or, pulled all the way up or by `expand`, at full height
  * with `full` in their place, the one fading into the other as it goes: an item's details growing
  * into its editor. Back or the dimmed screen close it; from full height Back goes to the details.
+ * Without `details` (a new item's editor) it opens at full height and goes from there.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailsSheet(
     onDismiss: () -> Unit,
     full: @Composable (DetailsSheetState) -> Unit,
-    details: @Composable (DetailsSheetState) -> Unit,
+    details: (@Composable (DetailsSheetState) -> Unit)? = null,
 ) {
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
@@ -131,28 +133,34 @@ fun DetailsSheet(
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val height = constraints.maxHeight.toFloat()
             val top = WindowInsets.statusBars.getTop(density).toFloat()
-            val ime = WindowInsets.ime.getBottom(density).toFloat()
+            // Above the keyboard; the details make room for the navigation bar themselves.
+            val ime = (WindowInsets.ime.getBottom(density) - WindowInsets.navigationBars.getBottom(density)).coerceAtLeast(0).toFloat()
             var handle by remember { mutableFloatStateOf(0f) }
             var body by remember { mutableFloatStateOf(0f) }
             LaunchedEffect(height, top, ime, handle, body) {
-                if (body == 0f) return@LaunchedEffect
+                if (details != null && body == 0f) return@LaunchedEffect
                 // Below a sixth of the screen from the top at most, so there is room to pull it up.
                 val rest = (height - handle - body - ime).coerceAtLeast(top + height / 6)
                 val first = drag.anchors.size == 0
                 drag.updateAnchors(
                     DraggableAnchors {
                         Rest.Hidden at height
-                        Rest.Details at rest
+                        if (details != null) Rest.Details at rest
                         Rest.Full at top
                     },
                     if (first) Rest.Hidden else drag.targetValue,
                 )
-                if (first) drag.animateTo(Rest.Details)
+                if (first) drag.animateTo(if (details != null) Rest.Details else Rest.Full)
             }
             val offset = drag.offset.takeIf { !it.isNaN() } ?: height
-            val rest = drag.anchors.positionOf(Rest.Details)
+            // Where it shows its first content: the details, or else full height.
+            val rest = if (details == null) top else drag.anchors.positionOf(Rest.Details)
             // 0 at the details or below, 1 at full height.
-            val up = if (rest.isNaN()) 0f else ((rest - offset) / (rest - top)).coerceIn(0f, 1f)
+            val up = when {
+                details == null -> 1f
+                rest.isNaN() -> 0f
+                else -> ((rest - offset) / (rest - top)).coerceIn(0f, 1f)
+            }
             val shown = if (rest.isNaN()) 0f else ((height - offset) / (height - rest)).coerceIn(0f, 1f)
             Box(
                 Modifier.fillMaxSize().graphicsLayer { alpha = shown }.background(Color.Black.copy(alpha = 0.32f))
@@ -171,7 +179,7 @@ fun DetailsSheet(
                         BottomSheetDefaults.DragHandle()
                     }
                     Box(Modifier.weight(1f)) {
-                        if (up < 1f) {
+                        if (details != null && up < 1f) {
                             Box(
                                 Modifier.graphicsLayer { alpha = 1 - up }.verticalScroll(rememberScrollState())
                                     .onSizeChanged { body = it.height.toFloat() }.navigationBarsPadding(),

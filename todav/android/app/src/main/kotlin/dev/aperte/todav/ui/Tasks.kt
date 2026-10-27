@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -61,7 +60,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SwipeToDismissBox
@@ -76,8 +74,6 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.SheetValue
-import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -856,14 +852,12 @@ fun MoveDialog(model: Main, task: TodavTask, onDismiss: () -> Unit) {
 
 /**
  * Adding a task (or a subtask of `parent`): its title, and chips for a due date, a category
- * and a priority, as Google Tasks' sheet.
+ * and a priority, as Google Tasks' sheet. Pulled up, it becomes the task page with what was
+ * entered, for everything else.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddSheet(model: Main, list: String, parent: TodavTask?, category: String?, initial: String = "", onDismiss: () -> Unit) {
-    // Open from the start rather than sliding up: it rises with the keyboard, in one movement
-    // instead of the keyboard and then the sheet.
-    val sheet = rememberBottomSheetState(initialValue = SheetValue.Expanded, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))
     var text by rememberSaveable { mutableStateOf(initial) }
     var due by rememberSaveable { mutableStateOf<Long?>(null) }
     var cat by rememberSaveable { mutableStateOf(category) }
@@ -872,20 +866,36 @@ fun AddSheet(model: Main, list: String, parent: TodavTask?, category: String?, i
     var pickCategory by remember { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
     val categories = remember(list) { model.core.categories(list).map { it.name } }
-    val add = {
-        if (text.isNotBlank()) {
-            val patch = TaskPatch(
-                due = due?.let { DueValue(Due(it, true)) },
-                priority = priority?.let { PriorityValue(it) },
-                reminders = due?.let { listOf(model.core.defaultReminder(true)) },
-            )
-            model.add(list, text, parent?.uid, cat, patch.takeIf { due != null || priority != null })
-            text = ""
-            onDismiss()
+    DetailsSheet(
+        onDismiss,
+        full = { sheet ->
+            // What the sheet has as it is pulled up.
+            val draft = remember {
+                TodavTask(
+                    uid = "", listHref = list, summary = text.trim(), description = null, status = "NEEDS-ACTION",
+                    done = false, completedAt = null, category = cat, parentUid = parent?.uid, priority = priority,
+                    due = due, dueAllDay = true, reminders = due?.let { listOf(model.core.defaultReminder(true)) } ?: emptyList(),
+                    sortOrder = null, created = null, lastModified = null, start = null, startAllDay = false,
+                    eventUid = null, syncError = null, pinned = false,
+                )
+            }
+            TaskPage(model, "", sheet, draft)
+        },
+    ) { sheet ->
+        val add = {
+            if (text.isNotBlank()) {
+                val patch = TaskPatch(
+                    due = due?.let { DueValue(Due(it, true)) },
+                    priority = priority?.let { PriorityValue(it) },
+                    reminders = due?.let { listOf(model.core.defaultReminder(true)) },
+                )
+                model.add(list, text, parent?.uid, cat, patch.takeIf { due != null || priority != null })
+                text = ""
+                sheet.close()
+            }
         }
-    }
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet) {
-        Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 16.dp).imePadding()) {
+        LaunchedEffect(Unit) { focus.requestFocus() }
+        Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 16.dp)) {
             parent?.let {
                 Text(
                     tr("Subtask of “{title}”").replace("{title}", it.summary),
@@ -945,7 +955,6 @@ fun AddSheet(model: Main, list: String, parent: TodavTask?, category: String?, i
             }
         }
     }
-    LaunchedEffect(Unit) { focus.requestFocus() }
     if (pickDate) {
         val state = rememberDatePickerState(initialSelectedDateMillis = System.currentTimeMillis())
         DatePickerDialog(

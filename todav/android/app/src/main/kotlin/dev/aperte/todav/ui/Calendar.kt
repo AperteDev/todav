@@ -285,6 +285,13 @@ fun CalendarPane(model: Main) {
         }
     }
     details?.let { ItemSheet(model, it) { details = null } }
+    val adding by model.newEvent.collectAsStateWithLifecycle()
+    adding?.let { dest ->
+        // Keyed, so another new event gets a sheet of its own.
+        androidx.compose.runtime.key(dest) {
+            DetailsSheet({ model.newEvent.value = null }, full = { EventPage(model, dest, it) })
+        }
+    }
     if (toPlan) {
         // Due by the end of what is shown.
         val until = when (mode) {
@@ -345,7 +352,7 @@ fun WorkDaysDialog(model: Main, onDismiss: () -> Unit) {
 /** A new event on the day the calendar shows (the add button, the shortcut). */
 fun newEvent(model: Main) {
     val day = model.day.value ?: midnight(model.core.localNow())
-    model.open(Dest.EventEdit(null, null, null, newStart(model, day), false))
+    model.newEvent.value = Dest.EventEdit(null, null, null, newStart(model, day), false)
 }
 
 /** A new event's start: the next full hour on `day` when it is today, else 9:00 there. */
@@ -1049,7 +1056,7 @@ private fun Week(
                                     .clickable {
                                         val t = model.planning.value
                                         if (t == null) {
-                                            model.open(Dest.EventEdit(null, null, null, at, false))
+                                            model.newEvent.value = Dest.EventEdit(null, null, null, at, false)
                                         } else {
                                             model.planning.value = null
                                             model.update(t.uid, model.core.planAt(t, at))

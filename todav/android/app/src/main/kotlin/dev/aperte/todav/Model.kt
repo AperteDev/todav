@@ -180,6 +180,9 @@ class Main(app: Application) : AndroidViewModel(app) {
     /** Text to add as a task (shared with Todav, or "" from the "New task" shortcut): the add sheet opens. */
     val sharedText = MutableStateFlow<String?>(null)
 
+    /** An event to add, at its start: the calendar opens its editor in a sheet. */
+    val newEvent = MutableStateFlow<Dest.EventEdit?>(null)
+
     // A read failing keeps what was shown: an exception would end the flow for good.
     val screen: StateFlow<Screen?> = combine(todav.ready, todav.changes, selected, expanded, filter) { ready, _, key, open, f ->
         if (ready) runCatching { load(key, open, f) }.onFailure { Log.w("Todav", "load", it) }.getOrNull() else null
