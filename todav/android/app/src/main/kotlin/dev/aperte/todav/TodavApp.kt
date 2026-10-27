@@ -89,17 +89,10 @@ class TodavApp : Application() {
         if (core.canSync()) push.register()
     }
 
-    /**
-     * Connect the Nextcloud accounts signed in here: with their saved app passwords, or through
-     * the Nextcloud app.
-     */
+    /** Connect the Nextcloud accounts signed in here with their saved app passwords. */
     private fun connectAccounts() {
         for (a in core.accounts()) {
-            if (a.kind != AccountKind.NEXTCLOUD) continue
-            if (a.source.startsWith(NEXTCLOUD_APP)) {
-                runCatching { NextcloudApp.connect(this, a) }
-                continue
-            }
+            if (a.kind != AccountKind.NEXTCLOUD || a.source.isNotEmpty()) continue
             val password = passwords.load(a.url, a.user) ?: continue
             runCatching { core.connect(a.id, password) }
         }

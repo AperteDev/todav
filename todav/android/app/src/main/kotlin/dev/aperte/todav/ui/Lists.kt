@@ -60,7 +60,6 @@ fun ListDialog(model: Main, href: String?, events: Boolean, onDismiss: () -> Uni
     var calendar by rememberSaveable { mutableStateOf(list?.holdsEvents ?: events) }
     var place by rememberSaveable { mutableStateOf(places.firstOrNull()) }
     var confirm by remember { mutableStateOf(false) }
-    val managed = list == null || core.canManageLists(list.account)
     val title = when {
         list != null && list.holdsEvents -> tr("Edit Calendar")
         list != null -> tr("Edit List")
@@ -72,13 +71,6 @@ fun ListDialog(model: Main, href: String?, events: Boolean, onDismiss: () -> Uni
         title = { Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (!managed) {
-                    Text(
-                        tr("Lists of an account signed in through the Nextcloud app cannot be changed here; change them in Nextcloud."),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
                 if (list == null) {
                     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                         listOf(false, true).forEachIndexed { i, ev ->
@@ -96,7 +88,6 @@ fun ListDialog(model: Main, href: String?, events: Boolean, onDismiss: () -> Uni
                     { name = it },
                     label = { Text(tr("Name")) },
                     singleLine = true,
-                    enabled = managed,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -114,14 +105,14 @@ fun ListDialog(model: Main, href: String?, events: Boolean, onDismiss: () -> Uni
                         Box(
                             Modifier.size(36.dp).background(parseColor(c), CircleShape)
                                 .border(if (selected) 3.dp else 0.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                                .clickable(enabled = managed) { color = c },
+                                .clickable { color = c },
                             Alignment.Center,
                         ) {
                             if (selected) Icon(Icons.Default.Check, null, tint = Color.White)
                         }
                     }
                 }
-                if (list != null && managed && list.writable) {
+                if (list != null && list.writable) {
                     TextButton(onClick = { confirm = true }) {
                         Text(
                             if (list.holdsEvents) tr("Delete Calendar") else tr("Delete List"),
@@ -133,7 +124,7 @@ fun ListDialog(model: Main, href: String?, events: Boolean, onDismiss: () -> Uni
         },
         confirmButton = {
             TextButton(
-                enabled = managed && name.isNotBlank() && (list != null || place != null),
+                enabled = name.isNotBlank() && (list != null || place != null),
                 onClick = {
                     onDismiss()
                     model.act {

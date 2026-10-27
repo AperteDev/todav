@@ -1,6 +1,8 @@
 package dev.aperte.todav.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,7 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
-import dev.aperte.todav.NextcloudAppChoice
+import dev.aperte.todav.NextcloudApp
 import dev.aperte.todav.Dest
 import dev.aperte.todav.Main
 import dev.aperte.todav.SignIn
@@ -107,11 +109,26 @@ private fun Welcome(model: Main) {
  */
 @Composable
 fun AccountChoice(model: Main, welcome: Boolean) {
+    val context = LocalContext.current
     var server by rememberSaveable { mutableStateOf<String?>(null) }
+    var login by rememberSaveable { mutableStateOf("") }
+    val connect = { s: String, l: String, p: String -> model.connect(s, l, p) }
+    // An account of the Nextcloud app: its server and login name, then the browser at once.
+    val pick = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        NextcloudApp.server(r.data)?.let { (url, user) ->
+            server = url
+            login = user
+            model.signInWithBrowser(url, connect, user)
+        }
+    }
     val entered = server
     if (entered == null) {
         Text(tr("Tasks and calendar synced with your Nextcloud, or kept on this device"))
-        NextcloudAppChoice(model)
+        if (remember { NextcloudApp.installed(context) }) {
+            Choice(tr("Account of the Nextcloud App"), tr("Sign in to the server of an account the Nextcloud app on this device has")) {
+                pick.launch(NextcloudApp.chooser(context))
+            }
+        }
         Choice(tr("Nextcloud Server"), tr("Sign in to your Nextcloud; Todav gets an app password of its own")) {
             server = ""
         }
@@ -132,8 +149,9 @@ fun AccountChoice(model: Main, welcome: Boolean) {
         BackHandler {
             model.cancelSignIn()
             server = null
+            login = ""
         }
-        SignInForm(model, entered, { server = it }) { s, l, p -> model.connect(s, l, p) }
+        SignInForm(model, entered, { server = it }, login, connect)
     }
 }
 
@@ -153,6 +171,8 @@ fun SignInForm(
     model: Main,
     server: String,
     onServer: (String) -> Unit,
+    /** The login name to fill in (from the Nextcloud app, or the account signing in again). */
+    login: String,
     onDone: (String, String, String) -> Unit,
 ) {
     val state by model.signIn.collectAsStateWithLifecycle()
@@ -169,7 +189,7 @@ fun SignInForm(
         label = { Text(tr("Nextcloud server")) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
-        keyboardActions = KeyboardActions(onGo = { model.signInWithBrowser(server, onDone) }),
+        keyboardActions = KeyboardActions(onGo = { model.signInWithBrowser(server, onDone, login) }),
         modifier = Modifier.fillMaxWidth(),
     )
     when (s) {
@@ -183,7 +203,7 @@ fun SignInForm(
         }
         else -> {
             if (s is SignIn.Failed) Text(s.message, color = MaterialTheme.colorScheme.error)
-            Button(onClick = { model.signInWithBrowser(server, onDone) }, Modifier.fillMaxWidth()) {
+            Button(onClick = { model.signInWithBrowser(server, onDone, login) }, Modifier.fillMaxWidth()) {
                 Text(tr("Sign In with Browser"))
             }
             OutlinedButton(onClick = { password = true }, Modifier.fillMaxWidth()) {
@@ -191,15 +211,15 @@ fun SignInForm(
             }
         }
     }
-    if (password) PasswordDialog(onDismiss = { password = false }) { login, secret ->
+    if (password) PasswordDialog(login, onDismiss = { password = false }) { name, secret ->
         password = false
-        model.signInWithPassword(server, login, secret, onDone)
+        model.signInWithPassword(server, name, secret, onDone)
     }
 }
 
 @Composable
-private fun PasswordDialog(onDismiss: () -> Unit, onConnect: (String, String) -> Unit) {
-    var login by rememberSaveable { mutableStateOf("") }
+private fun PasswordDialog(initial: String, onDismiss: () -> Unit, onConnect: (String, String) -> Unit) {
+    var login by rememberSaveable { mutableStateOf(initial) }
     var secret by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,

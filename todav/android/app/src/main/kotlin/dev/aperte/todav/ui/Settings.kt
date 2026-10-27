@@ -59,8 +59,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.aperte.todav.NEXTCLOUD_APP
-import dev.aperte.todav.NextcloudAppReconnect
 import dev.aperte.todav.Dest
 import dev.aperte.todav.Main
 import dev.aperte.todav.SignIn
@@ -378,7 +376,6 @@ fun accountKind(model: Main, a: dev.aperte.todav.core.Account): String = when {
     !a.enabled -> ptr("account", "Off")
     a.kind == AccountKind.LOCAL -> tr("Lists and calendars that stay on this device")
     !model.core.connected(a.id) -> tr("Not connected")
-    a.source.startsWith(NEXTCLOUD_APP) -> tr("Nextcloud app")
     else -> tr("Nextcloud server")
 }
 
@@ -586,25 +583,20 @@ fun AccountPage(model: Main, id: Long) {
         if (account.kind == AccountKind.NEXTCLOUD) {
             Group(tr("Connection"))
             val connected = core.connected(id)
-            val viaApp = account.source.startsWith(NEXTCLOUD_APP)
             ListItem(
                 headlineContent = {
                     Text(if (connected) tr("Signed in as {name}").replace("{name}", account.user) else tr("Not connected"))
                 },
-                supportingContent = {
-                    Text(if (viaApp) "${account.url} · ${tr("Nextcloud app")}" else account.url)
-                },
+                supportingContent = { Text(account.url) },
             )
-            if (viaApp) {
-                NextcloudAppReconnect(model, account)
-            } else if (!signingIn) {
+            if (!signingIn) {
                 TextButton(onClick = { signingIn = true }, modifier = Modifier.padding(horizontal = 8.dp)) {
                     Text(tr("Sign In Again"))
                 }
             } else {
                 var server by rememberSaveable { mutableStateOf(account.url) }
                 Column(Modifier.padding(16.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
-                    SignInForm(model, server, { server = it }) { url, user, password ->
+                    SignInForm(model, server, { server = it }, account.user) { url, user, password ->
                         if (user != account.user) {
                             model.signIn.value = SignIn.Failed(
                                 tr("Signed in as {name}: add that as another account").replace("{name}", user),
@@ -623,7 +615,7 @@ fun AccountPage(model: Main, id: Long) {
                     }
                 }
             }
-            if (connected) ServerStatus(model, id, viaApp)
+            if (connected) ServerStatus(model, id)
         }
         Group("")
         TextButton(onClick = { confirm = true }, modifier = Modifier.padding(horizontal = 8.dp)) {
@@ -678,10 +670,7 @@ fun AccountPage(model: Main, id: Long) {
 /** Remove account `id` (`force`: without uploading its changes); the reason it could not, or null. */
 private suspend fun remove(model: Main, id: Long, force: Boolean): String? = withContext(Dispatchers.IO) {
     try {
-        val a = model.core.account(id)
         model.core.removeAccount(model.todav.passwords, id, force)
-        // The Nextcloud app's token for it is Todav's to forget.
-        if (a != null && a.source.startsWith(NEXTCLOUD_APP)) model.todav.passwords.clear(a.url, a.user)
         model.todav.changed()
         null
     } catch (e: Exception) {
@@ -691,7 +680,7 @@ private suspend fun remove(model: Main, id: Long, force: Boolean): String? = wit
 
 /** The server as `status.php` describes it, the last sync and push, as the Linux app's. */
 @Composable
-private fun ServerStatus(model: Main, id: Long, viaApp: Boolean) {
+private fun ServerStatus(model: Main, id: Long) {
     val core = model.core
     val sync by model.syncState.collectAsStateWithLifecycle()
     Group(tr("Server Status"))
@@ -719,7 +708,6 @@ private fun ServerStatus(model: Main, id: Long, viaApp: Boolean) {
     val push = remember(sync) { core.pushStatus(id) }
     val distributor = remember { model.todav.push.distributor() }
     val text = when {
-        viaApp -> tr("Not available through the Nextcloud app, so changes made elsewhere show up at the next check (every minute while Todav is open)")
         push.calendars == 0u -> tr("Checked at the next sync")
         push.supported == 0u -> tr("Not available on this server, so changes made elsewhere show up at the next check. Install the DAV Push app on Nextcloud to see them within seconds")
         distributor == null -> tr("Available on this server. Install a UnifiedPush distributor such as ntfy to see changes made elsewhere within seconds")

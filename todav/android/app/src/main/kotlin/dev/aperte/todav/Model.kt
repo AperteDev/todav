@@ -472,7 +472,7 @@ class Main(app: Application) : AndroidViewModel(app) {
     }
 
     /** Sign in with the browser (Login Flow v2): `SignIn.Browser` asks the UI to open it. */
-    fun signInWithBrowser(server: String, then: (String, String, String) -> Unit = ::connect) {
+    fun signInWithBrowser(server: String, then: (String, String, String) -> Unit = ::connect, user: String = "") {
         if (server.isBlank()) {
             signIn.value = SignIn.Failed(tr("Enter the Nextcloud server first"))
             return
@@ -486,7 +486,9 @@ class Main(app: Application) : AndroidViewModel(app) {
                 signIn.value = SignIn.Failed(tr("Cannot start login: {error}").replace("{error}", reason(e)))
                 return@launch
             }
-            signIn.value = SignIn.Browser(flow.loginUrl)
+            // Nextcloud fills in a login name passed along (`user`) on its login page.
+            val url = if (user.isEmpty()) flow.loginUrl else flow.loginUrl + "?user=" + java.net.URLEncoder.encode(user, "UTF-8")
+            signIn.value = SignIn.Browser(url)
             // Nextcloud keeps a login flow for 20 minutes.
             repeat(20 * 60 / 2) {
                 delay(2000)
@@ -526,32 +528,6 @@ class Main(app: Application) : AndroidViewModel(app) {
     fun cancelSignIn() {
         polling?.cancel()
         signIn.value = SignIn.Idle
-    }
-
-    /** An account of the Nextcloud app, granted to Todav: its requests go through the app. */
-    fun addNextcloudApp(g: NextcloudApp.Granted) = viewModelScope.launch(Dispatchers.IO) {
-        try {
-            val first = core.accounts().isEmpty()
-            val error = todav.passwords.store(g.server, g.user, g.token)
-            if (error != null) throw IllegalStateException(error)
-            val account = dev.aperte.todav.core.Account(0, AccountKind.NEXTCLOUD, "", g.server, g.user, NEXTCLOUD_APP + g.name, true)
-            val client = NextcloudApp.client(todav, account) ?: return@launch
-            core.addNextcloudApp(g.server, g.user, NEXTCLOUD_APP + g.name, client, first && core.settingsAccount() == null)
-            core.accountAdded(false)
-            todav.changed()
-            todav.pushSetup()
-            if (!first) launch(Dispatchers.Main) { back() }
-        } catch (e: Exception) {
-            messages.tryEmit(reason(e) to null)
-        }
-    }
-
-    /** The Nextcloud app granted access again (a new token) for `account`. */
-    fun reconnectNextcloudApp(account: Account, g: NextcloudApp.Granted) = act {
-        todav.passwords.store(account.url, account.user, g.token)
-        NextcloudApp.connect(todav, account)
-        core.syncNow()
-        todav.changed()
     }
 
     /** Add the account; on the welcome page settings sync through it (`settings`). */

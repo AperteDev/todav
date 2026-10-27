@@ -17,9 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   into hours of the week; search; settings and accounts; reminders; push through UnifiedPush; a
   home-screen widget; "New Task" from the launcher; adding shared text as a task; keyboard
   shortcuts.
-- Android: sign in through the Nextcloud app on the device, which keeps the credentials.
-  Lists of such an account cannot be created, renamed or recoloured from Todav, and changes
-  made elsewhere show up at the next check rather than by push.
+- Android: an account of the Nextcloud app on the device fills in the server and login name
+  of a sign-in.
 
 ### Fixed
 
