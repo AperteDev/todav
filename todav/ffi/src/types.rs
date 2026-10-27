@@ -234,6 +234,17 @@ pub enum SubtaskCompletion {
 pub type SubtaskCompletion = todav_app::prefs::SubtaskCompletion;
 
 #[uniffi::remote(Enum)]
+pub enum SwipeAction {
+    Off,
+    Complete,
+    Star,
+    Pin,
+    Delete,
+}
+/// What swiping a task right or left does.
+pub type SwipeAction = todav_app::prefs::SwipeAction;
+
+#[uniffi::remote(Enum)]
 pub enum SidebarPage {
     Upcoming,
     Important,

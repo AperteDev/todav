@@ -671,6 +671,11 @@ impl Todav {
         todav_app::prefs::subtask_completion(self.c())
     }
 
+    /// What swiping a task to the right (`right`) or to the left does.
+    pub fn swipe(&self, right: bool) -> SwipeAction {
+        todav_app::prefs::swipe(self.c(), right)
+    }
+
     /// Whether a click on a task's title edits it in place (mouse and touchpad only).
     pub fn inline_edit(&self) -> bool {
         todav_app::prefs::inline_edit(self.c())

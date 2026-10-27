@@ -105,6 +105,9 @@ import dev.aperte.todav.UPCOMING
 import dev.aperte.todav.core.Due
 import dev.aperte.todav.core.DueValue
 import dev.aperte.todav.core.PriorityValue
+import dev.aperte.todav.core.SwipeAction
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarOutline
 import dev.aperte.todav.core.SyncState
 import dev.aperte.todav.core.TaskPatch
 import dev.aperte.todav.core.Item
@@ -568,8 +571,8 @@ fun Heading(title: String) {
 
 /**
  * A task: its check, title, note or list, due date and star. Tapped it opens; held, its menu (the
- * list moves it when dragged on); swiped right it is completed (or reopened), left deleted (with
- * Undo).
+ * list moves it when dragged on); swiped right or left, what Settings say for that way (completed
+ * or reopened, starred, pinned, deleted with Undo), or not swiped at all (the default).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -599,8 +602,12 @@ private fun TaskItem(
     val depth = target?.takeIf { dragged }?.let { t -> t.row?.let { it.depth + (if (t.mode == 0) 1 else 0) - row.depth } } ?: 0
     val dx by animateFloatAsState(depth * 24f, label = "depth")
     val dismiss = rememberSwipeToDismissBoxState()
+    // Each way it is swiped as Settings say, if this task can take that: pinning only top-level ones.
+    val usable = { a: SwipeAction -> a != SwipeAction.OFF && (a != SwipeAction.PIN || pinnable(screen, task, row.depth)) }
     SwipeToDismissBox(
         state = dismiss,
+        enableDismissFromStartToEnd = usable(screen.swipeRight),
+        enableDismissFromEndToStart = usable(screen.swipeLeft),
         gesturesEnabled = drag == null,
         modifier = Modifier
             .zIndex(if (dragged) 1f else 0f)
@@ -615,30 +622,27 @@ private fun TaskItem(
                 }
             },
         onDismiss = {
-            when (it) {
-                SwipeToDismissBoxValue.EndToStart -> model.delete(task)
-                SwipeToDismissBoxValue.StartToEnd -> {
+            val action = when (it) {
+                SwipeToDismissBoxValue.StartToEnd -> screen.swipeRight
+                SwipeToDismissBoxValue.EndToStart -> screen.swipeLeft
+                SwipeToDismissBoxValue.Settled -> SwipeAction.OFF
+            }
+            when (action) {
+                SwipeAction.COMPLETE -> {
                     haptics.performHapticFeedback(HapticFeedbackType.ToggleOn)
                     model.setDone(task, !task.done)
-                    scope.launch { dismiss.reset() }
                 }
-                SwipeToDismissBoxValue.Settled -> {}
+                SwipeAction.STAR -> model.update(task.uid, TaskPatch(priority = PriorityValue(if (priorityColor(task.priority) == null) 1 else null)))
+                SwipeAction.PIN -> model.update(task.uid, TaskPatch(pinned = !task.pinned))
+                SwipeAction.DELETE -> model.delete(task)
+                SwipeAction.OFF -> {}
             }
+            // Deleted, it goes (Undo brings it back); else it slides back into place.
+            if (action != SwipeAction.DELETE) scope.launch { dismiss.reset() }
         },
         backgroundContent = {
             val start = dismiss.dismissDirection == SwipeToDismissBoxValue.StartToEnd
-            Box(
-                Modifier.fillMaxSize()
-                    .background(if (start) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer)
-                    .padding(horizontal = 24.dp),
-                if (start) Alignment.CenterStart else Alignment.CenterEnd,
-            ) {
-                if (start) {
-                    Icon(Icons.Default.Check, if (task.done) tr("Reopen") else tr("Complete"), tint = MaterialTheme.colorScheme.onPrimaryContainer)
-                } else {
-                    Icon(Icons.Default.Delete, tr("Delete"), tint = MaterialTheme.colorScheme.onErrorContainer)
-                }
-            }
+            SwipeBackground(if (start) screen.swipeRight else screen.swipeLeft, task, start)
         },
     ) {
         Row(
@@ -734,6 +738,32 @@ private fun Meta(model: Main, task: TodavTask, row: TaskRow, now: Long) {
             Icon(Icons.AutoMirrored.Outlined.Label, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.secondary)
             Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary, maxLines = 1)
         }
+    }
+}
+
+/** Under a task swiped (to the right: `start`), what letting go does: its colour and icon. */
+@Composable
+private fun SwipeBackground(action: SwipeAction, task: TodavTask, start: Boolean) {
+    val colors = MaterialTheme.colorScheme
+    val (container, content) = when (action) {
+        SwipeAction.COMPLETE -> colors.primaryContainer to colors.onPrimaryContainer
+        SwipeAction.STAR -> colors.tertiaryContainer to colors.onTertiaryContainer
+        SwipeAction.PIN -> colors.secondaryContainer to colors.onSecondaryContainer
+        SwipeAction.DELETE -> colors.errorContainer to colors.onErrorContainer
+        SwipeAction.OFF -> colors.surface to colors.onSurface
+    }
+    Box(
+        Modifier.fillMaxSize().background(container).padding(horizontal = 24.dp),
+        if (start) Alignment.CenterStart else Alignment.CenterEnd,
+    ) {
+        val icon = when (action) {
+            SwipeAction.COMPLETE -> Icons.Default.Check
+            SwipeAction.STAR -> if (priorityColor(task.priority) == null) Icons.Filled.Star else Icons.Outlined.StarOutline
+            SwipeAction.PIN -> if (task.pinned) Icons.Outlined.PushPin else Icons.Filled.PushPin
+            SwipeAction.DELETE -> Icons.Default.Delete
+            SwipeAction.OFF -> null
+        }
+        icon?.let { Icon(it, null, tint = content) }
     }
 }
 

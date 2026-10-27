@@ -10,6 +10,7 @@ import dev.aperte.todav.core.AccountKind
 import dev.aperte.todav.core.Changes
 import dev.aperte.todav.core.LoginFlow
 import dev.aperte.todav.core.SidebarPage
+import dev.aperte.todav.core.SwipeAction
 import dev.aperte.todav.core.Slot
 import dev.aperte.todav.core.Starter
 import dev.aperte.todav.core.SubtaskCompletion
@@ -138,6 +139,9 @@ data class Screen(
     val filter: String?,
     val stars: Boolean,
     val pins: Boolean,
+    /** What swiping a task right and left does. */
+    val swipeRight: SwipeAction,
+    val swipeLeft: SwipeAction,
 )
 
 /** A task being completed (`done`) or reopened, with the subtasks that would stay behind. */
@@ -277,6 +281,8 @@ class Main(app: Application) : AndroidViewModel(app) {
         val headings = listHeadings(lists)
         val stars = core.stars()
         val pins = core.pins()
+        val swipeRight = core.swipe(true)
+        val swipeLeft = core.swipe(false)
         val places = pages.map {
             when (it.page) {
                 SidebarPage.UPCOMING -> Place(UPCOMING, tr("Upcoming"), it.count.toInt(), null, null)
@@ -293,7 +299,7 @@ class Main(app: Application) : AndroidViewModel(app) {
         val listNames = lists.associate { it.href to it.displayName }
         fun screen(list: TodavList?, title: String, open: Int, groups: List<Group>, done: List<Row> = emptyList(),
                    categories: List<String> = emptyList(), filter: String? = null) =
-            Screen(accounts, places, current, list, title, open, groups, done, now, categories, filter, stars, pins)
+            Screen(accounts, places, current, list, title, open, groups, done, now, categories, filter, stars, pins, swipeRight, swipeLeft)
         return when (current) {
             UPCOMING -> {
                 val tasks = core.upcoming()

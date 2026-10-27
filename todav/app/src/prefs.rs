@@ -99,6 +99,39 @@ pub fn pins(c: &Client) -> bool {
     on(c, "show_pins")
 }
 
+/// What swiping a task does on a touchscreen, right (`swipe_right`) or left (`swipe_left`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SwipeAction {
+    /// Nothing: the task does not move that way. The default.
+    Off,
+    /// Completes it, or reopens a completed one.
+    Complete,
+    /// Stars it (high priority), or takes the star away.
+    Star,
+    /// Pins it, or unpins it (a top-level task, with pins shown).
+    Pin,
+    Delete,
+}
+
+/// Stored values of the swipe choices, in the order the front-ends offer them.
+pub const SWIPES: [(&str, SwipeAction); 5] = [
+    ("off", SwipeAction::Off),
+    ("complete", SwipeAction::Complete),
+    ("star", SwipeAction::Star),
+    ("pin", SwipeAction::Pin),
+    ("delete", SwipeAction::Delete),
+];
+
+/// What swiping a task to the right (`right`) or to the left does.
+pub fn swipe(c: &Client, right: bool) -> SwipeAction {
+    let key = if right { "swipe_right" } else { "swipe_left" };
+    let v = c.setting(key.into()).unwrap_or_default();
+    SWIPES
+        .iter()
+        .find(|(s, _)| *s == v)
+        .map_or(SwipeAction::Off, |(_, a)| *a)
+}
+
 /// Whether the calendar's small month marks days with dots (`mini_dots`).
 pub fn mini_dots(c: &Client) -> bool {
     on(c, "mini_dots")

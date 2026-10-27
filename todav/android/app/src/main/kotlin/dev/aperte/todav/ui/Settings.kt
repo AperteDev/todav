@@ -424,6 +424,13 @@ private fun TaskSettings(model: Main) {
         SwitchRow(model, tr("Stars"), "show_stars", tr("A star with each task’s priority, and the Important page"))
         SwitchRow(model, tr("Pins"), "show_pins", tr("Pin tasks to the top of their list"))
     }
+    Section(tr("Swipe Actions")) {
+        // As `todav_app::prefs::SWIPES`.
+        val values = listOf("off", "complete", "star", "pin", "delete")
+        val names = listOf(ptr("swipe", "Off"), tr("Complete"), tr("Star"), tr("Pin"), tr("Delete"))
+        ChoiceRow(model, tr("Swipe right"), "swipe_right", values, names)
+        ChoiceRow(model, tr("Swipe left"), "swipe_left", values, names)
+    }
     Section(tr("Subtasks")) {
         OrderRows(model, "sub", tr("Sort"), tr("Add new subtasks"))
         ChoiceRow(
