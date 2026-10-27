@@ -174,7 +174,7 @@ fun EventPage(model: Main, dest: Dest.EventEdit) {
             return
         }
         val apply = { scope: Scope ->
-            model.together {
+            model.together(tr("“{title}” saved").replace("{title}", summary.trim().ifEmpty { ev.summary })) {
                 if (!nothing) core.updateEvent(ev.listHref, ev.uid, ev.recurrenceId, scope, patch)
                 if (moved) core.moveEvent(ev.listHref, ev.uid, list)
             }

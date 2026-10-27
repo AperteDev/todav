@@ -5,6 +5,10 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.KeyEvent
+import android.view.KeyboardShortcutGroup
+import android.view.KeyboardShortcutInfo
+import android.view.Menu
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -93,6 +97,62 @@ class MainActivity : ComponentActivity() {
                 model.sharedText.value = ""
             }
         }
+    }
+
+    /**
+     * The Linux app's keyboard shortcuts, for a hardware keyboard (tablets, foldables, ChromeOS):
+     * search, undo, sync, new task or event, the views; Ctrl+, settings.
+     */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN && (event.isCtrlPressed || event.keyCode == KeyEvent.KEYCODE_F5)) {
+            val calendar = model.view.value == View.CALENDAR
+            val handled = when (event.keyCode) {
+                KeyEvent.KEYCODE_F -> model.open(Dest.Search).let { true }
+                KeyEvent.KEYCODE_Z -> model.undo(null).let { true }
+                KeyEvent.KEYCODE_R, KeyEvent.KEYCODE_F5 -> model.sync().let { true }
+                KeyEvent.KEYCODE_COMMA -> model.open(Dest.Settings).let { true }
+                KeyEvent.KEYCODE_N -> {
+                    if (calendar) {
+                        val now = model.core.localNow()
+                        model.open(Dest.EventEdit(null, null, null, now - Math.floorMod(now, 3600L) + 3600))
+                    } else {
+                        model.sharedText.value = ""
+                    }
+                    true
+                }
+                KeyEvent.KEYCODE_T -> {
+                    model.day.value = dev.aperte.todav.core.midnight(model.core.localNow())
+                    true
+                }
+                KeyEvent.KEYCODE_1, KeyEvent.KEYCODE_2, KeyEvent.KEYCODE_3 -> {
+                    model.setMode(CalMode.entries[event.keyCode - KeyEvent.KEYCODE_1])
+                    model.show(View.CALENDAR)
+                    true
+                }
+                else -> false
+            }
+            if (handled) return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    override fun onProvideKeyboardShortcuts(data: MutableList<KeyboardShortcutGroup>, menu: Menu?, deviceId: Int) {
+        val ctrl = KeyEvent.META_CTRL_ON
+        val info = { label: String, key: Int -> KeyboardShortcutInfo(label, key, ctrl) }
+        data += KeyboardShortcutGroup(
+            "Todav",
+            listOf(
+                info(tr("Search"), KeyEvent.KEYCODE_F),
+                info(tr("Undo"), KeyEvent.KEYCODE_Z),
+                info(tr("Sync"), KeyEvent.KEYCODE_R),
+                info(tr("New Task"), KeyEvent.KEYCODE_N),
+                info(tr("Today"), KeyEvent.KEYCODE_T),
+                info(tr("Month"), KeyEvent.KEYCODE_1),
+                info(tr("Week"), KeyEvent.KEYCODE_2),
+                info(tr("Agenda"), KeyEvent.KEYCODE_3),
+                info(tr("Settings"), KeyEvent.KEYCODE_COMMA),
+            ),
+        )
     }
 
     private var asked = false

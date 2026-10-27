@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Todav\n"
 "Report-Msgid-Bugs-To: https://github.com/AperteDev/todav/issues\n"
-"POT-Creation-Date: 2026-10-27 02:24+0100\n"
+"POT-Creation-Date: 2026-10-27 02:27+0100\n"
 "PO-Revision-Date: 2026-10-22 21:00+0200\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
@@ -29,10 +29,73 @@ msgstr "Recordatorios"
 msgid "Mark as Done"
 msgstr "Marcar como hecha"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:48
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:52
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:148
 #: todav/linux/app/ui/shortcuts.blp:60
 msgid "New Task"
 msgstr "Tarea nueva"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:145
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:198
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:149
+#: todav/linux/app/src/calendar.rs:1749 todav/linux/app/src/window.rs:1611
+#: todav/linux/app/ui/shortcuts.blp:11
+msgid "Search"
+msgstr "Buscar"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:146
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:186
+#: todav/linux/app/src/window.rs:2552 todav/linux/app/ui/shortcuts.blp:16
+msgid "Undo"
+msgstr "Deshacer"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:147
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:309
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:665
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:156
+#: todav/linux/app/ui/account.blp:75 todav/linux/app/ui/settings.blp:97
+#: todav/linux/app/ui/shortcuts.blp:21
+msgid "Sync"
+msgstr "Sincronizar"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:149
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:79
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:95
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:193
+#: todav/gnome-extension/extension.js:351 todav/linux/app/src/calendar.rs:1726
+#: todav/linux/app/src/dates.rs:56 todav/linux/app/src/dates.rs:74
+#: todav/linux/app/ui/shortcuts.blp:79
+msgid "Today"
+msgstr "Hoy"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:150
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:258
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:447
+#: todav/linux/app/ui/settings.blp:259 todav/linux/app/ui/shortcuts.blp:94
+msgid "Month"
+msgstr "Mes"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:151
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:259
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:447
+#: todav/linux/app/ui/settings.blp:259 todav/linux/app/ui/shortcuts.blp:99
+msgid "Week"
+msgstr "Semana"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:152
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:181
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:260
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:447
+#: todav/linux/app/src/calendar.rs:1687 todav/linux/app/ui/settings.blp:259
+#: todav/linux/app/ui/settings.blp:338 todav/linux/app/ui/shortcuts.blp:104
+msgid "Agenda"
+msgstr "Agenda"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:153
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:306
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:121
+msgid "Settings"
+msgstr "Ajustes"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:245
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:265
@@ -164,7 +227,9 @@ msgstr "La aplicación de Nextcloud no responde"
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/NextcloudApp.kt:209
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/NextcloudApp.kt:211
 msgid "The Nextcloud app no longer lets Todav use this account; sign in again"
-msgstr "La aplicación de Nextcloud ya no deja que Todav use esta cuenta; vuelve a iniciar sesión"
+msgstr ""
+"La aplicación de Nextcloud ya no deja que Todav use esta cuenta; vuelve a "
+"iniciar sesión"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/NextcloudApp.kt:210
 msgid "The account is no longer in the Nextcloud app"
@@ -181,7 +246,9 @@ msgstr "Aplicación de Nextcloud"
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/NextcloudApp.kt:251
 msgid ""
 "Use an account of the Nextcloud app on this device; it signs in for Todav"
-msgstr "Usa una cuenta de la aplicación de Nextcloud de este dispositivo; ella inicia la sesión de Todav"
+msgstr ""
+"Usa una cuenta de la aplicación de Nextcloud de este dispositivo; ella "
+"inicia la sesión de Todav"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/NextcloudApp.kt:270
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:549
@@ -307,15 +374,6 @@ msgctxt "reminder"
 msgid "before"
 msgstr "antes"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:79
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:95
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:193
-#: todav/gnome-extension/extension.js:351 todav/linux/app/src/calendar.rs:1726
-#: todav/linux/app/src/dates.rs:56 todav/linux/app/src/dates.rs:74
-#: todav/linux/app/ui/shortcuts.blp:79
-msgid "Today"
-msgstr "Hoy"
-
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:80
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:96
 #: todav/gnome-extension/extension.js:351 todav/linux/app/src/calendar.rs:1727
@@ -362,20 +420,13 @@ msgstr "No se pueden subir primero los cambios pendientes: {error}"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:114
 msgid "Not possible for an account signed in through the Nextcloud app"
-msgstr "No es posible con una cuenta conectada mediante la aplicación de Nextcloud"
+msgstr ""
+"No es posible con una cuenta conectada mediante la aplicación de Nextcloud"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:116
 #: todav/linux/app/src/main.rs:267
 msgid "It has changes not uploaded yet: sign in again to upload them"
 msgstr "Tiene cambios sin subir: vuelva a iniciar sesión para subirlos"
-
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:181
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:260
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:447
-#: todav/linux/app/src/calendar.rs:1687 todav/linux/app/ui/settings.blp:259
-#: todav/linux/app/ui/settings.blp:338 todav/linux/app/ui/shortcuts.blp:104
-msgid "Agenda"
-msgstr "Agenda"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:189
 #: todav/linux/app/ui/calendar.blp:102
@@ -387,13 +438,6 @@ msgstr "Calendarios"
 #: todav/linux/app/ui/calendar.blp:187
 msgid "To Plan"
 msgstr "Por planificar"
-
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:198
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:149
-#: todav/linux/app/src/calendar.rs:1749 todav/linux/app/src/window.rs:1611
-#: todav/linux/app/ui/shortcuts.blp:11
-msgid "Search"
-msgstr "Buscar"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:200
 msgid "View"
@@ -439,18 +483,6 @@ msgstr "Toca una hora para planificar «{title}»"
 #: todav/linux/app/ui/password-login.blp:19
 msgid "Cancel"
 msgstr "Cancelar"
-
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:258
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:447
-#: todav/linux/app/ui/settings.blp:259 todav/linux/app/ui/shortcuts.blp:94
-msgid "Month"
-msgstr "Mes"
-
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:259
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:447
-#: todav/linux/app/ui/settings.blp:259 todav/linux/app/ui/shortcuts.blp:99
-msgid "Week"
-msgstr "Semana"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:444
 msgid "Nothing on this day"
@@ -647,6 +679,11 @@ msgid_plural "years"
 msgstr[0] "año"
 msgstr[1] "años"
 
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/EventPage.kt:177
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TaskPage.kt:124
+msgid "“{title}” saved"
+msgstr "«{title}» guardado"
+
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/EventPage.kt:191
 #: todav/linux/app/ui/event-dialog.blp:7
 msgid "Event"
@@ -762,11 +799,6 @@ msgstr "Descartar"
 msgid "Keep Editing"
 msgstr "Seguir editando"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:186
-#: todav/linux/app/src/window.rs:2552 todav/linux/app/ui/shortcuts.blp:16
-msgid "Undo"
-msgstr "Deshacer"
-
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:193
 #: todav/linux/app/src/window.rs:562
 #, rust-format
@@ -823,11 +855,6 @@ msgstr "Solo esta tarea"
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:299
 msgid "New List…"
 msgstr "Nueva lista…"
-
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:306
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:121
-msgid "Settings"
-msgstr "Ajustes"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:65
 #: todav/linux/app/src/lists.rs:276
@@ -1112,14 +1139,6 @@ msgstr "Notificaciones de recordatorios, en los ajustes del sistema"
 #: todav/linux/app/ui/settings.blp:63
 msgid "Add Account"
 msgstr "Añadir cuenta"
-
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:309
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:665
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:156
-#: todav/linux/app/ui/account.blp:75 todav/linux/app/ui/settings.blp:97
-#: todav/linux/app/ui/shortcuts.blp:21
-msgid "Sync"
-msgstr "Sincronizar"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:312
 #: todav/linux/app/ui/settings.blp:101
@@ -1517,7 +1536,10 @@ msgstr "Aún no sincronizado"
 msgid ""
 "Not available through the Nextcloud app, so changes made elsewhere show up "
 "at the next check (every minute while Todav is open)"
-msgstr "No disponible a través de la aplicación de Nextcloud, así que los cambios hechos en otro lugar aparecen en la siguiente comprobación (cada minuto mientras Todav está abierto)"
+msgstr ""
+"No disponible a través de la aplicación de Nextcloud, así que los cambios "
+"hechos en otro lugar aparecen en la siguiente comprobación (cada minuto "
+"mientras Todav está abierto)"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:670
 #: todav/linux/app/src/settings.rs:370

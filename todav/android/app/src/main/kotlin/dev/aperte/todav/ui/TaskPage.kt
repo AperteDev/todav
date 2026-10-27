@@ -121,7 +121,7 @@ fun TaskPage(model: Main, uid: String) {
             event = TextValue(event).takeIf { event != task.eventUid },
         )
         val to = list.takeIf { it != task.listHref }
-        model.together {
+        model.together(tr("“{title}” saved").replace("{title}", summary.trim())) {
             core.updateTask(uid, patch)
             if (to != null) core.moveTask(uid, to)
         }
