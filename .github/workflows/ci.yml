@@ -108,10 +108,17 @@ jobs:
       # Debug APK for both ABIs: the core, its bindings and catalogs, the app.
       - run: ./gradlew --console=plain assembleDebug
         working-directory: todav/android
+      # Named for the release, which publishes it until the stores take over (no signing key yet).
+      - name: Name the APK
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          mkdir -p target
+          mv todav/android/app/build/outputs/apk/debug/app-debug.apk "target/todav-$version.apk"
       - uses: actions/upload-artifact@v7
         with:
           name: todav-android
-          path: todav/android/app/build/outputs/apk/debug/*.apk
+          path: target/todav-*.apk
+          if-no-files-found: error
 
   flatpak:
     name: Flatpak

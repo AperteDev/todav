@@ -41,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Liberapay links, as About on Linux.
 - Android: an account of the Nextcloud app on the device fills in the server and login name
   of a sign-in.
+- Android: each release has an APK, a test build until Google Play and F-Droid: uninstall the
+  previous one before installing the next.
 - Calendar: Work Week, 3 Days and Day views. Work Week shows the days picked in Preferences
   (Monday to Friday at first); 3 Days moves a day at a time; Day shows its
   week above the hours. Ctrl+4, Ctrl+5 and Ctrl+6 open them. On Linux the views are now picked
