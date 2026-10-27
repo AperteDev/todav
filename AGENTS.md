@@ -117,7 +117,7 @@
   sdk.sh adds the Android targets), `cargo-ndk`, `android-tools` (adb: the SDK's adb is a link to
   it, as two adb versions drop the emulator), `jdk21-openjdk` (Gradle runs on JDK 21 through
   `JAVA_HOME`), `gettext`, `unzip`; `/dev/kvm` writable.
-- The emulator is the `todav` AVD on `emulator-5580`, next to Noogle's (5554 and up): a foldable,
+- The emulator is the `apps` AVD on `emulator-5580`, next to Noogle's (5554 and up): a foldable,
   the Pixel 9 Pro Fold profile with the Honor Magic V5's screens, so one AVD tries both layouts.
   Open: 2172×2352 px, 827 dp wide (the navigation rail and the sidebar pane); `make fold`: its
   cover screen, 1060×2376 px, 404 dp wide (a phone: the navigation bar); `make unfold` opens it.

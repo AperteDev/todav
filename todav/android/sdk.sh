@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The Android SDK and emulator for building and trying the app. Arch Linux; safe to re-run.
 #
-#     ./sdk.sh setup     # check the tools, install the SDK packages, create the `todav` AVD
+#     ./sdk.sh setup     # check the tools, install the SDK packages, create the `apps` AVD
 #     ./sdk.sh start     # start the emulator unless it runs, wait until it has booted
 #     ./sdk.sh stop      # stop it
 #     ./sdk.sh wipe      # stop it and start again with its data wiped
@@ -30,7 +30,7 @@ platform="$(prop platform)"
 image="$(prop image)"
 packages=("platforms;$platform" "build-tools;$(prop buildTools)" "ndk;$(prop ndk)" platform-tools
 	emulator "$image")
-avd=todav
+avd=apps
 port=5580
 sdk="${ANDROID_HOME:-$HOME/Android/Sdk}"
 log="$here/../../target/android/emulator.log"

@@ -10,7 +10,7 @@ APP = dev.aperte.todav
 
 .PHONY: setup emulator stop wipe fold unfold build release run logs uninstall
 
-# SDK, NDK, emulator and the `todav` AVD in ~/Android/Sdk.
+# SDK, NDK, emulator and the `apps` AVD in ~/Android/Sdk.
 setup:
 	./sdk.sh setup
 
