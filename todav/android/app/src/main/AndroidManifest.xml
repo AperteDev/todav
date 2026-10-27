@@ -116,6 +116,17 @@
         <receiver
             android:name=".ReminderReceiver"
             android:exported="false" />
+        <!-- The Quick Settings tile "New Task" (its label in the app's language once shown). -->
+        <service
+            android:name=".AddTaskTile"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_task"
+            android:label="New Task"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
         <!-- The widgets. Their labels are the widget picker's, which cannot use gettext. -->
         <receiver
             android:name=".TasksWidgetReceiver"

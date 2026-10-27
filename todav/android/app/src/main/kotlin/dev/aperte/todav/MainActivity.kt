@@ -52,15 +52,20 @@ class MainActivity : ComponentActivity() {
             TodavTheme(scheme) { TodavUi(model) }
         }
         if (savedInstanceState == null) handle(intent)
-        // The launcher icon's "New Task", in the app's language (a resource label could not use gettext).
+        // The launcher icon's "New Task" and "New Event", in the app's language (a resource label
+        // could not use gettext).
+        val shortcut = { id: String, label: String, icon: Int, action: String ->
+            androidx.core.content.pm.ShortcutInfoCompat.Builder(this, id)
+                .setShortLabel(label)
+                .setIcon(androidx.core.graphics.drawable.IconCompat.createWithResource(this, icon))
+                .setIntent(Intent(this, MainActivity::class.java).setAction(action))
+                .build()
+        }
         androidx.core.content.pm.ShortcutManagerCompat.setDynamicShortcuts(
             this,
             listOf(
-                androidx.core.content.pm.ShortcutInfoCompat.Builder(this, "new_task")
-                    .setShortLabel(tr("New Task"))
-                    .setIcon(androidx.core.graphics.drawable.IconCompat.createWithResource(this, R.drawable.ic_shortcut_add))
-                    .setIntent(Intent(this, MainActivity::class.java).setAction(NEW_TASK))
-                    .build(),
+                shortcut("new_task", tr("New Task"), R.drawable.ic_shortcut_add, NEW_TASK),
+                shortcut("new_event", tr("New Event"), R.drawable.ic_shortcut_event, NEW_EVENT),
             ),
         )
 
@@ -124,7 +129,7 @@ class MainActivity : ComponentActivity() {
                 model.sharedText.value = ""
             }
             NEW_EVENT -> newEvent(
-                model,
+                model.also { it.show(View.CALENDAR) },
                 intent.getLongExtra("day", 0).takeIf { intent.hasExtra("day") },
                 intent.getStringExtra("calendar"),
                 intent.getLongExtra("account", -1).takeIf { it >= 0 },

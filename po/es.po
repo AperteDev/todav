@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Todav\n"
 "Report-Msgid-Bugs-To: https://github.com/AperteDev/todav/issues\n"
-"POT-Creation-Date: 2026-10-27 22:21+0100\n"
+"POT-Creation-Date: 2026-10-27 22:24+0100\n"
 "PO-Revision-Date: 2026-10-22 21:00+0200\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
@@ -17,37 +17,52 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/Background.kt:207
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/AddTaskTile.kt:14
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:67
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:246
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TaskPage.kt:170
+#: todav/linux/app/ui/shortcuts.blp:65
+msgid "New Task"
+msgstr "Tarea nueva"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Background.kt:213
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:501
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TaskPage.kt:302
 #: todav/linux/app/ui/settings.blp:182
 msgid "Reminders"
 msgstr "Recordatorios"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/Background.kt:260
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Background.kt:290
+msgid "Snooze"
+msgstr "Posponer"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/Background.kt:311
 #: todav/linux/app/src/main.rs:453
 msgid "Mark as Done"
 msgstr "Marcar como hecha"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:60
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:241
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TaskPage.kt:170
-#: todav/linux/app/ui/shortcuts.blp:65
-msgid "New Task"
-msgstr "Tarea nueva"
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:68
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/EventPage.kt:175
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/EventPage.kt:226
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:196
+#: todav/linux/app/src/calendar/dialog.rs:88
+#: todav/linux/app/src/calendar/dialog.rs:386
+#: todav/linux/app/ui/shortcuts.blp:79
+msgid "New Event"
+msgstr "Evento nuevo"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:144
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:149
 #: todav/linux/app/src/open.rs:54
 msgid "Not found: it may have been deleted"
 msgstr "No encontrado: puede que se haya eliminado"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:193
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:198
 #: todav/linux/app/src/open.rs:30
 #, rust-format
 msgid "Cannot open {name}: {error}"
 msgstr "No se puede abrir {name}: {error}"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:238
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:243
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:273
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:274
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:191
@@ -57,13 +72,13 @@ msgstr "No se puede abrir {name}: {error}"
 msgid "Search"
 msgstr "Buscar"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:239
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:244
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:261
 #: todav/linux/app/src/window.rs:2630 todav/linux/app/ui/shortcuts.blp:16
 msgid "Undo"
 msgstr "Deshacer"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:240
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:245
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:427
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:888
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:257
@@ -73,7 +88,7 @@ msgstr "Deshacer"
 msgid "Sync"
 msgstr "Sincronizar"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:242
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:247
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:393
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:80
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:96
@@ -85,7 +100,7 @@ msgstr "Sincronizar"
 msgid "Today"
 msgstr "Hoy"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:243
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:248
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Widget.kt:72
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:417
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:567
@@ -94,7 +109,7 @@ msgstr "Hoy"
 msgid "Month"
 msgstr "Mes"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:244
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:249
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:418
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:567
 #: todav/linux/app/src/calendar.rs:396 todav/linux/app/ui/settings.blp:259
@@ -102,7 +117,7 @@ msgstr "Mes"
 msgid "Week"
 msgstr "Semana"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:245
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:250
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Widget.kt:73
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:298
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:255
@@ -114,7 +129,7 @@ msgstr "Semana"
 msgid "Agenda"
 msgstr "Agenda"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:246
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:251
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:419
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:567
 #: todav/linux/app/src/calendar.rs:397 todav/linux/app/ui/settings.blp:259
@@ -122,7 +137,7 @@ msgstr "Agenda"
 msgid "Work Week"
 msgstr "Semana laboral"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:247
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:252
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:420
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:567
 #: todav/linux/app/src/calendar.rs:398 todav/linux/app/ui/settings.blp:259
@@ -130,7 +145,7 @@ msgstr "Semana laboral"
 msgid "3 Days"
 msgstr "3 días"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:248
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:253
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Widget.kt:74
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:421
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:567
@@ -139,7 +154,7 @@ msgstr "3 días"
 msgid "Day"
 msgstr "Día"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:249
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:254
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Widget.kt:310
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:446
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:164
@@ -863,15 +878,6 @@ msgid "year"
 msgid_plural "years"
 msgstr[0] "año"
 msgstr[1] "años"
-
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/EventPage.kt:175
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/EventPage.kt:226
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:196
-#: todav/linux/app/src/calendar/dialog.rs:88
-#: todav/linux/app/src/calendar/dialog.rs:386
-#: todav/linux/app/ui/shortcuts.blp:79
-msgid "New Event"
-msgstr "Evento nuevo"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/EventPage.kt:191
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TaskPage.kt:149

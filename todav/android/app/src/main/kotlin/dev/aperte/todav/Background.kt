@@ -200,6 +200,12 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
 object Reminders {
     const val CHANNEL = "reminders"
     const val DONE = "dev.aperte.todav.DONE"
+    const val SNOOZE = "dev.aperte.todav.SNOOZE"
+    const val SNOOZED = "dev.aperte.todav.SNOOZED"
+
+    // ponytail: a fixed delay, and an alarm that a reboot forgets; a choice of delays, kept
+    // snoozes, if they turn out to be wanted.
+    private const val SNOOZE_SECONDS = 600L
 
     fun channel(context: Context) {
         val m = context.getSystemService(NotificationManager::class.java)
@@ -243,6 +249,51 @@ object Reminders {
         for (e in due.events) m.notify((e.uid + e.start).hashCode(), event(app, e, now))
     }
 
+    /**
+     * Snooze: notification `intent`'s reminder gone, and back in ten minutes, the item as it is
+     * then (its task or event left as they are).
+     */
+    fun snooze(context: Context, intent: Intent) {
+        val id = intent.getIntExtra("id", 0)
+        NotificationManagerCompat.from(context).cancel(id)
+        val again = PendingIntent.getBroadcast(
+            context, id, Intent(intent).setAction(SNOOZED),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val alarms = context.getSystemService(AlarmManager::class.java)
+        val at = System.currentTimeMillis() + SNOOZE_SECONDS * 1000
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarms.canScheduleExactAlarms()) {
+            alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, again)
+        } else {
+            alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, again)
+        }
+    }
+
+    /** A snoozed reminder again, unless its task is done or its event gone meanwhile. */
+    fun again(app: TodavApp, intent: Intent) {
+        val id = intent.getIntExtra("id", 0)
+        val now = app.core.localNow()
+        val m = NotificationManagerCompat.from(app)
+        intent.getStringExtra("task")?.let { uid ->
+            app.core.task(uid)?.takeIf { !it.done }?.let { m.notify(id, task(app, it, now)) }
+        }
+        intent.getStringExtra("event")?.let { uid ->
+            val start = intent.getLongExtra("start", 0)
+            app.core.events(start - 86_400, start + 86_400)
+                .firstOrNull { it.uid == uid && it.start == start }
+                ?.let { m.notify(id, event(app, it, now)) }
+        }
+    }
+
+    private fun snoozeAction(app: TodavApp, id: Int, f: Intent.() -> Unit) = NotificationCompat.Action(
+        0,
+        tr("Snooze"),
+        PendingIntent.getBroadcast(
+            app, id, Intent(app, ReminderReceiver::class.java).setAction(SNOOZE).putExtra("id", id).apply(f),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        ),
+    )
+
     private fun open(app: TodavApp, request: Int, f: Intent.() -> Unit): PendingIntent = PendingIntent.getActivity(
         app, request, Intent(app, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP).apply(f),
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
@@ -263,6 +314,7 @@ object Reminders {
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             ),
         )
+        .addAction(snoozeAction(app, t.uid.hashCode()) { putExtra("task", t.uid) })
         .build()
 
     private fun event(app: TodavApp, e: Event, now: Long) = NotificationCompat.Builder(app, CHANNEL)
@@ -272,12 +324,17 @@ object Reminders {
         .setCategory(NotificationCompat.CATEGORY_EVENT)
         .setAutoCancel(true)
         .setContentIntent(open(app, (e.uid + e.start).hashCode()) { putExtra("day", e.start) })
+        .addAction(snoozeAction(app, (e.uid + e.start).hashCode()) { putExtra("event", e.uid).putExtra("start", e.start) })
         .build()
 }
 
-/** The alarm going off, and "Mark as Done" on a reminder. */
+/** The alarm going off, and "Mark as Done" and "Snooze" on a reminder. */
 class ReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        when (intent.action) {
+            Reminders.SNOOZE -> return Reminders.snooze(context, intent)
+            Reminders.SNOOZED -> return background(context) { Reminders.again(it, intent) }
+        }
         if (intent.action == Reminders.DONE) {
             val uid = intent.getStringExtra("task") ?: return
             NotificationManagerCompat.from(context).cancel(uid.hashCode())

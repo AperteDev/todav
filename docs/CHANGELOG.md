@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   new event with what they give), and for iCalendar files opened or shared (imported, as on
   Linux). Copy Link on a task's page and in a task's or an event's details gives a `todav://`
   link that opens it.
+- Android: "New Event" next to "New Task" on the launcher icon, a Quick Settings tile for a new
+  task, and Snooze on reminders (back in ten minutes).
 - Linux: open tasks and events whose titles hold what is typed show in the Activities overview's
   search; one opens on its list or day, the app's heading searches its tasks in Todav.
 - Linux: Copy Link in a task's or an event's dialog and in their details on the calendar puts
