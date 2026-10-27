@@ -15,6 +15,7 @@ import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
 import androidx.glance.Image
 import androidx.glance.ImageProvider
+import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
@@ -62,6 +63,7 @@ import dev.aperte.todav.ui.firstWeekday
 import dev.aperte.todav.ui.list
 import dev.aperte.todav.ui.parseColor
 import dev.aperte.todav.ui.title
+import dev.aperte.todav.ui.weekend
 import kotlin.math.ceil
 import kotlin.math.floor
 
@@ -143,7 +145,10 @@ private fun WeekdayNames(start: Long) {
             Text(
                 format(start + i * DAY, "EEE"),
                 maxLines = 1,
-                style = TextStyle(fontSize = 12.sp, textAlign = TextAlign.Center, color = GlanceTheme.colors.onSurfaceVariant),
+                style = TextStyle(
+                    fontSize = 12.sp, textAlign = TextAlign.Center,
+                    color = if (weekend(start + i * DAY)) weekendColor(LocalContext.current, variant = true) else GlanceTheme.colors.onSurfaceVariant,
+                ),
                 modifier = GlanceModifier.defaultWeight(),
             )
         }
@@ -167,6 +172,7 @@ private fun DayNumber(day: Long, today: Long, inMonth: Boolean, size: Dp, modifi
                 fontWeight = if (now) FontWeight.Bold else FontWeight.Normal,
                 color = when {
                     now -> GlanceTheme.colors.onPrimary
+                    weekend(day) -> weekendColor(LocalContext.current, variant = false, dim = !inMonth)
                     inMonth -> GlanceTheme.colors.onSurface
                     else -> GlanceTheme.colors.outline
                 },

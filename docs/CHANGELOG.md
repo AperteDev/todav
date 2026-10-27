@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the launcher's menu of the widget and in Settings → Widgets, which also sets their colours (the
   system's, or a background and a text colour for light and dark), the background's opacity, the
   corners' radius and a settings button on each widget.
+- Android: Saturdays and Sundays tinted red a little in the calendar's day names and numbers, and
+  in the month widgets'.
 - Android: a launcher icon of its own, the calendar page filling whatever shape the launcher gives
   icons, with a themed version; the app opens on it over the system's accent colour, light or
   dark with it.

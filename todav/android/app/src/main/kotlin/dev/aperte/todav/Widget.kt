@@ -247,6 +247,27 @@ private fun ownColors(c: Context): androidx.glance.color.ColorProviders {
     return androidx.glance.material3.ColorProviders(light = scheme(false), dark = scheme(true))
 }
 
+/**
+ * A Saturday's or Sunday's name or number in a widget: its text colour tinted red a little, for
+ * light and dark, as the app tints them; `variant`: the secondary text's (the weekdays' names),
+ * `dim`: faded (a day of another month).
+ */
+fun weekendColor(c: Context, variant: Boolean, dim: Boolean = false): androidx.glance.unit.ColorProvider {
+    val (light, dark) = when {
+        !WidgetPrefs.dynamic(c) -> {
+            val a = if (variant) 0.7f else 1f
+            Color(WidgetPrefs.color(c, "text_light")).copy(alpha = a) to Color(WidgetPrefs.color(c, "text_dark")).copy(alpha = a)
+        }
+        Build.VERSION.SDK_INT >= 31 -> {
+            val (l, d) = dynamicLightColorScheme(c) to dynamicDarkColorScheme(c)
+            if (variant) l.onSurfaceVariant to d.onSurfaceVariant else l.onSurface to d.onSurface
+        }
+        else -> Color(0xFF1A1C20) to Color(0xFFE2E2E9)
+    }
+    fun tint(text: Color, red: Color) = androidx.compose.ui.graphics.lerp(text, red, 0.45f).let { if (dim) it.copy(alpha = 0.6f) else it }
+    return ColorProvider(tint(light, Color(0xFFBA1A1A)), tint(dark, Color(0xFFFFB4AB)))
+}
+
 /** A widget's background in the system's colours or its own, with the opacity and corners set for all. */
 @Composable
 fun WidgetFrame(context: Context, content: @Composable ColumnScope.() -> Unit) {

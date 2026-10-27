@@ -100,6 +100,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
@@ -567,6 +568,13 @@ private fun MonthGrid(model: Main, month: Long, picked: Long?, colors: Map<Strin
     }
 }
 
+/** Whether `t` falls on a Saturday or a Sunday. */
+fun weekend(t: Long) = fields(t).dayOfWeek.value >= 6
+
+/** `color` for a day's name or number: on a Saturday or a Sunday tinted red a little. */
+@Composable
+fun dayColor(t: Long, color: Color): Color = if (weekend(t)) lerp(color, MaterialTheme.colorScheme.error, 0.45f) else color
+
 /** The first letters of the weekdays of the week from `start`, over the month grid's columns. */
 @Composable
 private fun WeekdayNames(start: Long) {
@@ -575,7 +583,7 @@ private fun WeekdayNames(start: Long) {
             Text(
                 format(start + d * DAY, "EEEEE"),
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = dayColor(start + d * DAY, MaterialTheme.colorScheme.onSurfaceVariant),
                 textAlign = TextAlign.Center,
                 modifier = Modifier.weight(1f).padding(vertical = 4.dp),
             )
@@ -645,8 +653,8 @@ private fun DayCell(
                 style = MaterialTheme.typography.labelMedium,
                 color = when {
                     today -> MaterialTheme.colorScheme.onPrimary
-                    inMonth -> MaterialTheme.colorScheme.onSurface
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    inMonth -> dayColor(day, MaterialTheme.colorScheme.onSurface)
+                    else -> dayColor(day, MaterialTheme.colorScheme.onSurfaceVariant).copy(alpha = 0.6f)
                 },
             )
         }
@@ -1098,7 +1106,7 @@ private fun Week(
                     Modifier.weight(1f).then(if (gutter) Modifier.clickable { model.pick(at) } else Modifier).padding(vertical = 4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text(format(at, "EEE"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(format(at, "EEE"), style = MaterialTheme.typography.labelSmall, color = dayColor(at, MaterialTheme.colorScheme.onSurfaceVariant))
                     Box(
                         Modifier.size(28.dp).background(
                             when {
@@ -1113,7 +1121,7 @@ private fun Week(
                         Text(
                             "${fields(at).dayOfMonth}",
                             style = MaterialTheme.typography.titleSmall,
-                            color = if (at == today) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                            color = if (at == today) MaterialTheme.colorScheme.onPrimary else dayColor(at, MaterialTheme.colorScheme.onSurface),
                         )
                     }
                 }
