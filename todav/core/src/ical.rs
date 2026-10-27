@@ -522,6 +522,59 @@ fn fold_into(out: &mut String, line: &str) {
     out.push_str("\r\n");
 }
 
+/// The objects of an iCalendar file (an invitation, an export of many): one per UID, its VEVENTs or
+/// its VTODO, each with the file's VTIMEZONEs. One without a UID gets one from `new_uid`.
+pub fn split(text: &str, new_uid: impl Fn() -> String) -> Vec<Calendar> {
+    let Some(all) = Calendar::parse(text) else {
+        return Vec::new();
+    };
+    let kind = |r: &(usize, usize)| all.lines[r.0].value.to_ascii_uppercase();
+    let ranges = all.ranges();
+    let zones: Vec<Line> = ranges
+        .iter()
+        .filter(|r| kind(r) == "VTIMEZONE")
+        .flat_map(|&(b, e)| all.lines[b..=e].to_vec())
+        .collect();
+    let mut objects: Vec<(String, Vec<Line>)> = Vec::new();
+    for r in ranges
+        .iter()
+        .filter(|r| kind(r) == "VEVENT" || kind(r) == "VTODO")
+    {
+        let mut lines = all.lines[r.0..=r.1].to_vec();
+        let comp = Comp {
+            kind: "",
+            lines: &lines[1..lines.len() - 1],
+        };
+        let uid = match comp.text("UID") {
+            Some(uid) => uid,
+            None => {
+                let uid = new_uid();
+                lines.insert(1, Line::parse(&format!("UID:{uid}")));
+                uid
+            }
+        };
+        match objects.iter_mut().find(|(u, _)| *u == uid) {
+            Some((_, o)) => o.extend(lines),
+            None => objects.push((uid, lines)),
+        }
+    }
+    objects
+        .into_iter()
+        .filter_map(|(_, comps)| {
+            let mut lines = vec![
+                Line::parse("BEGIN:VCALENDAR"),
+                Line::parse("VERSION:2.0"),
+                Line::parse("PRODID:-//Todav//EN"),
+            ];
+            lines.extend(zones.iter().cloned());
+            lines.extend(comps);
+            lines.push(Line::parse("END:VCALENDAR"));
+            let cal = Calendar { lines };
+            cal.main_range().map(|_| cal)
+        })
+        .collect()
+}
+
 pub fn escape(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {

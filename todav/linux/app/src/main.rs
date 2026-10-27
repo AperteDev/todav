@@ -7,6 +7,7 @@ mod dbus;
 mod goa;
 mod i18n;
 mod lists;
+mod open;
 mod reminders;
 mod settings;
 mod update;
@@ -514,7 +515,7 @@ fn main() -> glib::ExitCode {
             } else {
                 // A restart after an update starts the new version before this one has quit.
                 gio::ApplicationFlags::ALLOW_REPLACEMENT
-            },
+            } | gio::ApplicationFlags::HANDLES_OPEN,
         )
         .build();
     app.connect_startup(|app| {
@@ -533,6 +534,7 @@ fn main() -> glib::ExitCode {
         update::watch(app.upcast_ref());
     });
     app.connect_activate(|app| window::present(app.upcast_ref()));
+    app.connect_open(|app, files, _| open::open(app.upcast_ref(), files));
     let code = app.run();
     update::exec_if_restarting();
     code

@@ -1,11 +1,12 @@
 [Desktop Entry]
 Name=Todav
 Comment=Tasks and calendar kept in your Nextcloud
-Exec=todav-linux
+Exec=todav-linux %U
 Icon=dev.aperte.Todav
 Terminal=false
 Type=Application
 Categories=Office;ProjectManagement;
 Keywords=todo;tasks;calendar;events;caldav;nextcloud;
+MimeType=text/calendar;
 DBusActivatable=true
 StartupNotify=true

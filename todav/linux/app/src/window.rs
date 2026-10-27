@@ -450,6 +450,11 @@ pub fn refresh() {
     }
 }
 
+/// The main window, once built.
+pub fn window() -> Option<adw::ApplicationWindow> {
+    ui().map(|ui| ui.window.clone())
+}
+
 pub fn toast(msg: &str) {
     if let Some(ui) = ui() {
         ui.toasts.add_toast(note(msg));

@@ -24,6 +24,9 @@
     <name translate="no">Aperte</name>
   </developer>
   <launchable type="desktop-id">dev.aperte.Todav.desktop</launchable>
+  <provides>
+    <mediatype>text/calendar</mediatype>
+  </provides>
   <translation type="gettext">todav</translation>
   <url type="homepage">https://github.com/AperteDev/todav</url>
   <url type="bugtracker">https://github.com/AperteDev/todav/issues</url>

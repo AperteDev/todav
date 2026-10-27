@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Linux: Todav can be the system's calendar app (Settings → Apps → Default Apps → Calendar): it
+  opens iCalendar files (`.ics`), whose events and tasks go into the calendar and task list
+  picked for them; an item already there is replaced.
 - Linux: Google calendars, through a Google account in GNOME Online Accounts: their events
   show, sync and can be edited, and the calendars renamed and recoloured; their order stays on
   this device. Google keeps no task lists, and calendars are added and deleted in Google
