@@ -46,16 +46,14 @@ pub fn when(t: &Task) -> (i64, bool) {
     }
 }
 
-/// Events and dated tasks in `[from, to)` in the collections shown, all-day ones first, then
-/// by time.
-pub fn items(c: &Client, from: i64, to: i64) -> Vec<Item> {
+/// Events and dated tasks in `[from, to)` in `lists` (None: the collections shown in the app; a
+/// widget picks its own), all-day ones first, then by time.
+pub fn items(c: &Client, from: i64, to: i64, lists: Option<&[String]>) -> Vec<Item> {
     let hidden = prefs::hidden(c);
+    let keep = |l: &str| lists.map_or(!hidden.contains(l), |ls| ls.iter().any(|x| x == l));
     let events = c.events(from, to).into_iter().map(Item::Event);
     let tasks = c.scheduled(from, to).into_iter().map(Item::Task);
-    let mut out: Vec<Item> = events
-        .chain(tasks)
-        .filter(|i| !hidden.contains(i.list()))
-        .collect();
+    let mut out: Vec<Item> = events.chain(tasks).filter(|i| keep(i.list())).collect();
     out.sort_by_key(Item::key);
     out
 }
@@ -89,10 +87,10 @@ pub fn colors(c: &Client) -> HashMap<String, String> {
         .collect()
 }
 
-/// The colours of `day_lists` for each of `days` days from `from`.
-pub fn day_colors(c: &Client, from: i64, days: i64) -> Vec<Vec<String>> {
+/// The colours of `day_lists` for each of `days` days from `from`, in `lists` (as `items`).
+pub fn day_colors(c: &Client, from: i64, days: i64, lists: Option<&[String]>) -> Vec<Vec<String>> {
     let colors = colors(c);
-    let all = items(c, from, from + days * DAY);
+    let all = items(c, from, from + days * DAY, lists);
     (0..days)
         .map(|n| {
             day_lists(&all, from + n * DAY)
@@ -125,10 +123,10 @@ pub struct Entry {
     pub color: String,
 }
 
-/// What is on each of `days` days from `from`, as the agenda lists it.
-pub fn agenda(c: &Client, from: i64, days: i64) -> Vec<Entry> {
+/// What is on each of `days` days from `from`, as the agenda lists it, in `lists` (as `items`).
+pub fn agenda(c: &Client, from: i64, days: i64, lists: Option<&[String]>) -> Vec<Entry> {
     let colors = colors(c);
-    let all = items(c, from, from + days * DAY);
+    let all = items(c, from, from + days * DAY, lists);
     let mut out = Vec::new();
     for day in (0..days).map(|n| from + n * DAY) {
         for i in all.iter().filter(|i| on_day(i, day)) {

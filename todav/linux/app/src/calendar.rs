@@ -612,7 +612,7 @@ fn new_event() -> Option<adw::EntryRow> {
 /// For the extension's agenda: what is on each of `days` days from today, as the Agenda view
 /// lists it: (day, time, title, colour, is a task, done).
 pub fn agenda(days: i64) -> Vec<(i64, String, String, String, bool, bool)> {
-    calendar::agenda(core(), today(), days)
+    calendar::agenda(core(), today(), days, None)
         .into_iter()
         .map(|e| {
             let time = match e.time {
@@ -1072,7 +1072,7 @@ fn list_name(c: &Cal, list: &str) -> String {
 
 /// Visible events and dated tasks in `[from, to)`.
 fn items(from: i64, to: i64) -> Vec<Item> {
-    calendar::items(core(), from, to)
+    calendar::items(core(), from, to, None)
 }
 
 fn fmt(t: i64, f: &str) -> String {

@@ -565,9 +565,9 @@ impl Todav {
         Ok(self.c().move_event(from, uid, to)?)
     }
 
-    /// Events and dated tasks in `[from, to)` in the collections shown.
-    pub fn items(&self, from: i64, to: i64) -> Vec<Item> {
-        let items = todav_app::calendar::items(self.c(), from, to);
+    /// Events and dated tasks in `[from, to)` in `lists` (None: the collections shown).
+    pub fn items(&self, from: i64, to: i64, lists: Option<Vec<String>>) -> Vec<Item> {
+        let items = todav_app::calendar::items(self.c(), from, to, lists.as_deref());
         items.into_iter().map(Into::into).collect()
     }
 
@@ -577,14 +577,14 @@ impl Todav {
     }
 
     /// For each of `days` days from `from`, the colours of the collections with something on it
-    /// (three at most).
-    pub fn day_colors(&self, from: i64, days: i64) -> Vec<Vec<String>> {
-        todav_app::calendar::day_colors(self.c(), from, days)
+    /// (three at most), in `lists` (None: the collections shown).
+    pub fn day_colors(&self, from: i64, days: i64, lists: Option<Vec<String>>) -> Vec<Vec<String>> {
+        todav_app::calendar::day_colors(self.c(), from, days, lists.as_deref())
     }
 
-    /// What is on each of `days` days from `from`.
-    pub fn agenda(&self, from: i64, days: i64) -> Vec<AgendaEntry> {
-        let entries = todav_app::calendar::agenda(self.c(), from, days);
+    /// What is on each of `days` days from `from`, in `lists` (None: the collections shown).
+    pub fn agenda(&self, from: i64, days: i64, lists: Option<Vec<String>>) -> Vec<AgendaEntry> {
+        let entries = todav_app::calendar::agenda(self.c(), from, days, lists.as_deref());
         entries.into_iter().map(Into::into).collect()
     }
 

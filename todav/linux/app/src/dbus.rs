@@ -154,7 +154,7 @@ fn call(method: &str, params: &glib::Variant) -> Result<Option<glib::Variant>, S
         // with something on it: the month's dots.
         "GetDays" => {
             let (from, days) = params.get::<(i64, u32)>().ok_or_else(bad)?;
-            let days = todav_app::calendar::day_colors(c, from, i64::from(days.min(42)));
+            let days = todav_app::calendar::day_colors(c, from, i64::from(days.min(42)), None);
             Some((days,).to_variant())
         }
         // (day as local midnight for ShowDay, time, title, colour, is a task, done) for each

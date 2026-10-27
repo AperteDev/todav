@@ -495,7 +495,7 @@ private fun MonthGrid(model: Main, month: Long, picked: Long?, colors: Map<Strin
     val start = weekStart(month, firstWeekday())
     // What is on each of the 42 days, sorted out off the main thread: `onDay` is a call into the core.
     val days = load(changes, start, initial = List(42) { emptyList<Item>() }) {
-        val items = model.core.items(start, start + 42 * DAY)
+        val items = model.core.items(start, start + 42 * DAY, null)
         List(42) { n -> items.filter { onDay(it, start + n * DAY) } }
     }
     val today = midnight(model.core.localNow())
@@ -586,7 +586,7 @@ private fun WeekStrip(model: Main, day: Long, colors: Map<String, String>) {
     val changes by model.todav.changes.collectAsStateWithLifecycle()
     val start = weekStart(day, firstWeekday())
     val days = load(changes, start, initial = List(7) { emptyList<Item>() }) {
-        val items = model.core.items(start, start + 7 * DAY)
+        val items = model.core.items(start, start + 7 * DAY, null)
         List(7) { n -> items.filter { onDay(it, start + n * DAY) } }
     }
     val today = midnight(model.core.localNow())
@@ -773,7 +773,7 @@ private fun DayItems(day: Long, now: Long, at: Offset, items: List<Item>, colors
 @Composable
 private fun DayList(model: Main, day: Long, onItem: (Item) -> Unit, modifier: Modifier) {
     val changes by model.todav.changes.collectAsStateWithLifecycle()
-    val entries = load(changes, day, initial = emptyList<AgendaEntry>()) { model.core.agenda(day, 1) }
+    val entries = load(changes, day, initial = emptyList<AgendaEntry>()) { model.core.agenda(day, 1, null) }
     val now = model.core.localNow()
     LazyColumn(modifier.fillMaxWidth(), contentPadding = PaddingValues(bottom = 88.dp)) {
         item { Heading(dayLabel(day, true, now).replaceFirstChar { it.titlecase() }) }
@@ -799,7 +799,7 @@ private fun DayList(model: Main, day: Long, onItem: (Item) -> Unit, modifier: Mo
 @Composable
 private fun AgendaView(model: Main, day: Long, onItem: (Item) -> Unit) {
     val changes by model.todav.changes.collectAsStateWithLifecycle()
-    val entries = load(changes, day, initial = emptyList<AgendaEntry>()) { model.core.agenda(day, 60) }
+    val entries = load(changes, day, initial = emptyList<AgendaEntry>()) { model.core.agenda(day, 60, null) }
     val now = model.core.localNow()
     val state = rememberLazyListState()
     LaunchedEffect(day) { state.scrollToItem(0) }
@@ -1041,7 +1041,7 @@ private fun Week(
     // call into the core, too slow for every frame of a drag.
     val none = WeekItems(emptyList(), cols.map { emptyList() }, cols.map { emptyList() })
     val week = load(changes, start, cols, initial = none) {
-        val items = model.core.items(start, start + (cols.last() + 1) * DAY)
+        val items = model.core.items(start, start + (cols.last() + 1) * DAY, null)
         // Each item's pieces in the hours (None: in the row above them).
         val timed = items.mapIndexedNotNull { i, it -> model.core.hours(it)?.let { _ -> i to model.core.segments(it, start) } }
         val inHours = timed.map { it.first }.toSet()
