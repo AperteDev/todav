@@ -37,7 +37,7 @@
   treats them as errors), and links in it must answer automated requests (Ko-fi's does not).
 - CI (`.github/workflows/ci.yml`) runs on every push: `cargo fmt --check`, clippy with
   warnings as errors and the unit tests on Fedora (GNOME 51), the bindings
-  (`scripts/bindings.sh`), plus the packages: the Flatpak
+  (`scripts/bindings.sh`), the Android debug APK (`assembleDebug`, both ABIs), plus the packages: the Flatpak
   bundle, a tarball of the system-wide tree (`make -C todav/linux stage`, built on the oldest
   supported GNOME, now Fedora 43), the `.deb` made from it on Ubuntu 26.04 (`scripts/deb.sh`)
   and the extension zip. Run the checks before committing.

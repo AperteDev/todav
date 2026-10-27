@@ -74,6 +74,45 @@ jobs:
       # The bindings generated and run against the library built for Linux.
       - run: scripts/bindings.sh
 
+  android:
+    name: Android
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set the release version
+        if: env.VERSION != ''
+        run: python3 scripts/release.py "$VERSION" > /dev/null
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android, x86_64-linux-android
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: todav/ffi
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      # The SDK packages gradle.properties names (the runner has the SDK's command-line tools),
+      # cargo-ndk, and msgfmt for the catalogs.
+      - name: Install the SDK packages, cargo-ndk and gettext
+        working-directory: todav/android
+        run: |
+          prop() { sed -n "s/^$1=//p" gradle.properties; }
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;$(prop todav.platform)" "build-tools;$(prop todav.buildTools)" \
+            "ndk;$(prop todav.ndk)" platform-tools
+          cargo install cargo-ndk --locked
+          sudo apt-get install -y --no-install-recommends gettext
+      - uses: gradle/actions/setup-gradle@v6
+      # Debug APK for both ABIs: the core, its bindings and catalogs, the app.
+      - run: ./gradlew --console=plain assembleDebug
+        working-directory: todav/android
+      - uses: actions/upload-artifact@v7
+        with:
+          name: todav-android
+          path: todav/android/app/build/outputs/apk/debug/*.apk
+
   flatpak:
     name: Flatpak
     runs-on: ubuntu-24.04

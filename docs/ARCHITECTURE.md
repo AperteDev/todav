@@ -135,7 +135,7 @@ One Cargo workspace at the root, the app's core and front-ends under `todav/`. N
 - Bindings: `scripts/bindings.sh` (see [Platforms](#platforms)); needs Gradle with a JDK 17 and the .NET 8 SDK for the smoke tests.
 - Windows (planned): .NET and the Windows App SDK (WinUI 3), `cargo build --target x86_64-pc-windows-msvc` (and `aarch64`) in `todav/ffi`; `uniffi-bindgen-cs` for the C# bindings. Builds and runs only on Windows: a Windows machine or VM for development, a `windows-latest` runner in CI.
 - Pebble (planned): the open-source Pebble SDK toolchain (`pebble build`), pinned version in `pebble/README.md`.
-- CI (GitHub Actions, `.github/workflows/`): fmt, clippy, unit tests, the bindings (`scripts/bindings.sh`), the Flatpak bundle and the extension zip on every push; releases by the manual Release workflow (see [Progress](#progress)). Later the Android debug build and Pebble build. No signing in CI.
+- CI (GitHub Actions, `.github/workflows/`): fmt, clippy, unit tests, the bindings (`scripts/bindings.sh`), the Flatpak bundle and the extension zip and the Android debug APK on every push; releases by the manual Release workflow (see [Progress](#progress)). Later the Pebble build. No signing in CI.
 
 **Dependency policy** (keep it short)
 
