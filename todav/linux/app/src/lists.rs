@@ -271,6 +271,7 @@ pub fn reorderable(row: &gtk::ListBoxRow, l: &List, siblings: Vec<String>) {
         true
     });
     row.add_controller(drop);
+    row.add_css_class("reorderable");
 }
 
 thread_local! {
