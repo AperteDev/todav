@@ -816,7 +816,7 @@ fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
         .connect_row_activated(move |_, _| show_content(&split));
     crate::lists::setup(&ui.window);
     let weak = Rc::downgrade(ui);
-    crate::lists::context_menu(&ui.sidebar, move |row| {
+    crate::lists::context_menu(&ui.sidebar, "win.edit-list", move |row| {
         let ui = weak.upgrade()?;
         let href = ui.hrefs.borrow().get(row.index() as usize).cloned();
         href.filter(|h| !PAGES.contains(&h.as_str()))
@@ -943,6 +943,17 @@ fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
     let split = ui.split.clone();
     toggle.connect_activate(move |_, _| split.set_show_sidebar(!split.shows_sidebar()));
     ui.window.add_action(&toggle);
+    // The edit dialog of the task with that UID (a row's context menu, as "To Plan"'s).
+    let edit = gio::SimpleAction::new("edit-task", Some(glib::VariantTy::STRING));
+    edit.connect_activate(|_, uid| {
+        if let Some(t) = uid
+            .and_then(|u| u.str())
+            .and_then(|u| core().task(u.to_string()))
+        {
+            edit_task(&t);
+        }
+    });
+    ui.window.add_action(&edit);
     // Ctrl+N on the Tasks page goes to the entry adding tasks (the Calendar page's opens a new
     // event).
     let keys = gtk::ShortcutController::new();

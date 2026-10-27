@@ -117,22 +117,24 @@ pub fn setup(window: &adw::ApplicationWindow) {
     window.add_action(&edit);
 }
 
-/// Right-click or a long press on a row of `rows` offers to edit the list `href_at` gives
-/// for it (None: a row that is no list).
+/// Right-click or a long press on a row of `rows` offers to edit what `target_at` gives for it
+/// (None: a row with nothing to edit), with `action` (a list's "win.edit-list", a task's
+/// "win.edit-task").
 pub fn context_menu(
     rows: &gtk::ListBox,
-    href_at: impl Fn(&gtk::ListBoxRow) -> Option<String> + 'static,
+    action: &'static str,
+    target_at: impl Fn(&gtk::ListBoxRow) -> Option<String> + 'static,
 ) {
     let r = rows.clone();
     let show = Rc::new(move |x: f64, y: f64| {
         let Some(row) = r.row_at_y(y as i32) else {
             return false;
         };
-        let Some(href) = href_at(&row) else {
+        let Some(target) = target_at(&row) else {
             return false;
         };
         let m = gio::Menu::new();
-        let action = gio::Action::print_detailed_name("win.edit-list", Some(&href.to_variant()));
+        let action = gio::Action::print_detailed_name(action, Some(&target.to_variant()));
         m.append(Some(&gettext("Edit…")), Some(&action));
         // On the row (a list box takes no other children), gone once closed.
         let menu = gtk::PopoverMenu::from_model(Some(&m));

@@ -113,6 +113,8 @@ struct Cal {
     agenda: gtk::Box,
     plan_heading: gtk::ToggleButton,
     plan: gtk::ListBox,
+    /// The UIDs of the tasks in `plan`, by row.
+    plan_uids: RefCell<Vec<String>>,
     /// The Day view's week, a row of the month grid.
     week_strip: gtk::Box,
     week_head: gtk::Box,
@@ -233,6 +235,7 @@ pub fn build(views: &adw::ViewStack, tasks: &adw::OverlaySplitView) {
         agenda: get(&b, "agenda"),
         plan_heading: get(&b, "plan_heading"),
         plan: get(&b, "plan"),
+        plan_uids: RefCell::new(Vec::new()),
         week_strip: get(&b, "week_strip"),
         week_head: get(&b, "week_head"),
         week_all_day: get(&b, "week_all_day"),
@@ -275,7 +278,7 @@ pub fn build(views: &adw::ViewStack, tasks: &adw::OverlaySplitView) {
                 glib::idle_add_local_once(refresh);
             }
         });
-        crate::lists::context_menu(list, move |row| {
+        crate::lists::context_menu(list, "win.edit-list", move |row| {
             let c = cal()?;
             section(&c, events).get(row.index() as usize).cloned()
         });
@@ -715,6 +718,7 @@ fn render_plan(c: &Rc<Cal>, until: i64) {
     c.plan.set_visible(until != 0);
     // ponytail: capped; a search or a list picker if the cut matters.
     let shown: Vec<&Task> = tasks.iter().take(40).collect();
+    *c.plan_uids.borrow_mut() = shown.iter().map(|t| t.uid.clone()).collect();
     // Two groups: due by a date (they come first), then without one.
     let dated: Vec<bool> = shown.iter().map(|t| t.due.is_some()).collect();
     c.plan.set_header_func(move |row, _| {
@@ -930,6 +934,10 @@ fn plan_drop(c: &Rc<Cal>) {
     // A click does nothing but say how: they are planned by dragging.
     c.plan.connect_row_activated(|_, _| {
         crate::window::toast(&gettext("Drag a task onto the calendar to plan it"))
+    });
+    // Right-click or a long press: Edit…, its edit dialog.
+    crate::lists::context_menu(&c.plan, "win.edit-task", |row| {
+        cal()?.plan_uids.borrow().get(row.index() as usize).cloned()
     });
     // Only planned tasks: one dragged out of the list does not light it up.
     let accepts = |i: &Item| matches!(i, Item::Task(t) if planned(t));
