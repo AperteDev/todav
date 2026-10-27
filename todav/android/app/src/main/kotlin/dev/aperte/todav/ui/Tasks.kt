@@ -27,7 +27,11 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.CalendarToday
@@ -691,12 +695,23 @@ private fun TaskItem(
                     Icon(if (row.expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, tr("Subtasks"))
                 }
             }
-            if (screen.pins && task.pinned && row.depth == 0) {
-                Icon(Icons.Default.PushPin, tr("Pinned"), Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+            // Its priority shows; it is set in the options.
+            if (screen.stars && priorityColor(task.priority) != null) {
+                Box(Modifier.size(18.dp)) { StarIcon(task.priority) }
             }
-            if (screen.stars) Star(model, task)
+            if (pinnable(screen, task, row.depth)) Pin(model, task)
+            // The options, also opened by a long press on the row.
+            var options by remember { mutableStateOf(false) }
+            Box {
+                Tip(tr("More Options")) {
+                    IconButton(onClick = { options = true }) { Icon(Icons.Default.MoreVert, tr("More Options")) }
+                }
+                RowMenu(model, screen, task, row.depth, menu || options, {
+                    options = false
+                    onMenuClosed()
+                }, { onAddSubtask(task) }) { moving = true }
+            }
         }
-        RowMenu(model, screen, task, row.depth, menu, onMenuClosed, { onAddSubtask(task) }) { moving = true }
     }
     HorizontalDivider(Modifier.padding(start = (56 + 24 * row.depth).dp))
     if (moving) MoveDialog(model, task) { moving = false }
@@ -743,28 +758,28 @@ private fun Meta(model: Main, task: TodavTask, row: TaskRow, now: Long) {
     }
 }
 
-/** The star in a task's priority colour; its menu sets the level, as the edit page does. */
+/** Top-level rows of a list can be pinned, as on Linux (with pins shown). */
+private fun pinnable(screen: Screen, task: TodavTask, depth: Int) = screen.pins && depth == 0 && task.parentUid == null
+
+/** A row's pin, accented while pinned (in the Pinned group): a tap pins or unpins it. */
 @Composable
-private fun Star(model: Main, task: TodavTask) {
-    var open by remember { mutableStateOf(false) }
-    Box {
-        IconButton(onClick = { open = true }) { StarIcon(task.priority) }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            PRIORITIES.reversed().forEach { p ->
-                DropdownMenuItem(
-                    text = { Text(priorityName(p)) },
-                    leadingIcon = { StarIcon(p) },
-                    trailingIcon = { if (priorityIndex(p) == priorityIndex(task.priority)) Icon(Icons.Default.Check, null) },
-                    onClick = {
-                        open = false
-                        model.update(task.uid, TaskPatch(priority = PriorityValue(p)))
-                    },
-                )
-            }
+private fun Pin(model: Main, task: TodavTask) {
+    val label = if (task.pinned) tr("Unpin") else tr("Pin")
+    Tip(label) {
+        IconToggleButton(task.pinned, { model.update(task.uid, TaskPatch(pinned = it)) }) {
+            Icon(
+                if (task.pinned) Icons.Default.PushPin else Icons.Outlined.PushPin,
+                label,
+                tint = if (task.pinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
 
+/**
+ * A row's options: its priority as a row of stars (the current one marked), then Edit, Add
+ * Subtask, Pin, Make Top-Level Task, Move to List and Delete.
+ */
 @Composable
 private fun RowMenu(
     model: Main,
@@ -777,6 +792,29 @@ private fun RowMenu(
     onMove: () -> Unit,
 ) {
     DropdownMenu(expanded = open, onDismissRequest = onClose) {
+        if (screen.stars) {
+            Text(
+                tr("Priority"),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 16.dp, top = 4.dp),
+            )
+            Row(Modifier.padding(horizontal = 8.dp)) {
+                PRIORITIES.forEach { p ->
+                    Tip(priorityName(p)) {
+                        IconToggleButton(
+                            priorityIndex(p) == priorityIndex(task.priority),
+                            {
+                                onClose()
+                                model.update(task.uid, TaskPatch(priority = PriorityValue(p)))
+                            },
+                            colors = IconButtonDefaults.iconToggleButtonColors(checkedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest),
+                        ) { StarIcon(p) }
+                    }
+                }
+            }
+            HorizontalDivider(Modifier.padding(vertical = 4.dp))
+        }
         DropdownMenuItem(text = { Text(tr("Edit…")) }, onClick = {
             onClose()
             model.open(Dest.Task(task.uid))
@@ -787,7 +825,7 @@ private fun RowMenu(
                 onAddSubtask()
             })
         }
-        if (screen.pins && depth == 0 && task.parentUid == null) {
+        if (pinnable(screen, task, depth)) {
             DropdownMenuItem(text = { Text(if (task.pinned) tr("Unpin") else tr("Pin")) }, onClick = {
                 onClose()
                 model.update(task.uid, TaskPatch(pinned = !task.pinned))
