@@ -67,7 +67,7 @@ import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.MediumFlexibleTopAppBar
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
@@ -155,17 +155,18 @@ fun TasksPane(model: Main, screen: Screen) {
     var addingTo by remember { mutableStateOf<TodavTask?>(null) }
     var pulling by remember { mutableStateOf(false) }
     LaunchedEffect(sync) { if (sync != SyncState.Syncing) pulling = false }
-    val bar = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    // One row, the title and its count beside the buttons: tinted once the list scrolls under it.
+    val bar = TopAppBarDefaults.pinnedScrollBehavior()
     val pull = rememberPullToRefreshState()
     val list = rememberLazyListState()
-    // Pull to refresh only from a gesture that starts with the list at its top and the bar
-    // expanded: one scrolling up from further down stops there, its rest opening the bar.
+    // Pull to refresh only from a gesture that starts with the list at its top: one scrolling up
+    // from further down stops there.
     var fromTop by remember { mutableStateOf(true) }
 
     Scaffold(
         modifier = Modifier.nestedScroll(bar.nestedScrollConnection),
         topBar = {
-            MediumFlexibleTopAppBar(
+            TopAppBar(
                 title = { Text(screen.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 subtitle = { Text(ntr("{n} open", "{n} open", screen.open.toLong()).replace("{n}", "${screen.open}")) },
                 scrollBehavior = bar,
@@ -191,7 +192,7 @@ fun TasksPane(model: Main, screen: Screen) {
             modifier = Modifier.fillMaxSize().pointerInput(Unit) {
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                    fromTop = !list.canScrollBackward && bar.state.collapsedFraction == 0f
+                    fromTop = !list.canScrollBackward
                 }
             },
             state = pull,
