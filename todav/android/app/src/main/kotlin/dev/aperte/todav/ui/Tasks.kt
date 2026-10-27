@@ -162,8 +162,8 @@ fun TasksPane(model: Main, screen: Screen) {
     val bar = TopAppBarDefaults.pinnedScrollBehavior()
     val pull = rememberPullToRefreshState()
     val list = rememberLazyListState()
-    // Pull to refresh only from a gesture that starts with the list at its top: one scrolling up
-    // from further down stops there.
+    // Pull to refresh only from a gesture that starts with the list at its top and pulls straight
+    // down: one that scrolled the list on its way (down, then back up to the top) stops there.
     var fromTop by remember { mutableStateOf(true) }
 
     Scaffold(
@@ -210,6 +210,10 @@ fun TasksPane(model: Main, screen: Screen) {
         }
     }
     val shown = screen.list
+                    do {
+                        val e = awaitPointerEvent(PointerEventPass.Initial)
+                        if (list.canScrollBackward) fromTop = false
+                    } while (e.changes.any { it.pressed })
     // Shared text, or a new task (the add button, the shortcut): into the list shown, in the
     // category it is filtered to, else the first list.
     val shared by model.sharedText.collectAsStateWithLifecycle()
