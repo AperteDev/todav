@@ -770,6 +770,9 @@ fn render_plan(c: &Rc<Cal>, until: i64) {
             .build();
         none.add_css_class("dim-label");
         c.plan.append(&none);
+        if let Some(row) = none.parent().and_downcast::<gtk::ListBoxRow>() {
+            row.set_activatable(false);
+        }
     }
 }
 
@@ -924,6 +927,10 @@ fn unplan(t: &Task) {
 
 fn plan_drop(c: &Rc<Cal>) {
     c.plan.add_css_class("plan");
+    // A click does nothing but say how: they are planned by dragging.
+    c.plan.connect_row_activated(|_, _| {
+        crate::window::toast(&gettext("Drag a task onto the calendar to plan it"))
+    });
     // Only planned tasks: one dragged out of the list does not light it up.
     let accepts = |i: &Item| matches!(i, Item::Task(t) if planned(t));
     item_drop(&c.plan, accepts, |i| {

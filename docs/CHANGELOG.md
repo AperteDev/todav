@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Calendar: clicking a task in "To Plan" says how to plan it: drag it onto the calendar.
 - Calendar: in the agenda, as in the GNOME extension, a task is a ring in its list's colour, with
   a tick when done, and an event a dot; a task is ticked in its details, not in the agenda.
 

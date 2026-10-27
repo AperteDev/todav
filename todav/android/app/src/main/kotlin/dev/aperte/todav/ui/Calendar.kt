@@ -65,8 +65,27 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.platform.LocalHapticFeedback
+import kotlin.math.roundToInt
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -218,7 +237,8 @@ fun CalendarPane(model: Main) {
     var details by remember { mutableStateOf<Item?>(null) }
     var viewMenu by remember { mutableStateOf(false) }
     var toPlan by remember { mutableStateOf(false) }
-    val planning by model.planning.collectAsStateWithLifecycle()
+    // A task from "To Plan" held and dragged over the hours.
+    var plan by remember { mutableStateOf<Planning?>(null) }
     val changes by model.todav.changes.collectAsStateWithLifecycle()
     // Changed on another device and synced.
     LaunchedEffect(changes) { model.workDays.value = withContext(Dispatchers.IO) { model.core.workDays() } }
@@ -262,21 +282,8 @@ fun CalendarPane(model: Main) {
             )
         },
     ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize()) {
-            planning?.takeIf { mode.hours() }?.let { t ->
-                Row(
-                    Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.secondaryContainer).padding(start = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        tr("Tap an hour to plan “{title}”").replace("{title}", t.summary),
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.weight(1f),
-                    )
-                    TextButton(onClick = { model.planning.value = null }) { Text(tr("Cancel")) }
-                }
-            }
-            Box(Modifier.fillMaxSize()) {
+        Box(Modifier.padding(padding).fillMaxSize()) {
+            CompositionLocalProvider(LocalPlanning provides plan) {
                 when (mode) {
                     CalMode.MONTH -> MonthView(model, day, colors) { details = it }
                     CalMode.WEEK -> WeekView(model, day, colors, work = false) { details = it }
@@ -286,6 +293,33 @@ fun CalendarPane(model: Main) {
                     CalMode.AGENDA -> AgendaView(model, day) { details = it }
                 }
             }
+            plan?.let { CancelTarget(it, Modifier.align(Alignment.TopCenter)) }
+            // Over the views, under the top bar: drawn in this window, so a task held in it
+            // goes on being dragged over the hours once it hides.
+            if (toPlan) {
+                // Due by the end of what is shown.
+                val until = when (mode) {
+                    CalMode.THREE_DAYS -> day + 3 * DAY
+                    CalMode.DAY -> day + DAY
+                    else -> weekStart(day, firstWeekday()) + 7 * DAY
+                }
+                ToPlanSheet(
+                    model, until, colors, plan,
+                    onHold = { plan = it },
+                    onDrop = {
+                        val p = plan ?: return@ToPlanSheet
+                        plan = null
+                        // Onto an hour: planned there. Onto the cancel target or anywhere else:
+                        // back in the sheet.
+                        val slot = p.slot().takeIf { !p.overCancel() }
+                        if (slot != null) {
+                            toPlan = false
+                            model.update(p.task.uid, model.core.planAt(p.task, slot))
+                        }
+                    },
+                ) { toPlan = false }
+            }
+            plan?.let { DragCard(it) }
         }
     }
     details?.let { ItemSheet(model, it) { details = null } }
@@ -295,15 +329,6 @@ fun CalendarPane(model: Main) {
         androidx.compose.runtime.key(dest) {
             DetailsSheet({ model.newEvent.value = null }, full = { EventPage(model, dest, it) })
         }
-    }
-    if (toPlan) {
-        // Due by the end of what is shown.
-        val until = when (mode) {
-            CalMode.THREE_DAYS -> day + 3 * DAY
-            CalMode.DAY -> day + DAY
-            else -> weekStart(day, firstWeekday()) + 7 * DAY
-        }
-        ToPlanSheet(model, until, colors) { toPlan = false }
     }
 }
 
@@ -1006,6 +1031,33 @@ private fun Week(
     }
     val now = model.core.localNow()
     val today = midnight(now)
+    // A task from "To Plan" dragged over: the slot under the finger, if in these hours (the
+    // hours seen, and the hours scrolled with their contents).
+    val plan = LocalPlanning.current
+    val density = LocalDensity.current
+    val hours = remember { arrayOfNulls<LayoutCoordinates>(2) }
+    val slotAt = { w: Offset ->
+        val seen = hours[0]?.takeIf { it.isAttached }
+        val all = hours[1]?.takeIf { it.isAttached }
+        if (seen == null || all == null || !seen.boundsInWindow().contains(w)) {
+            null
+        } else {
+            val p = all.windowToLocal(w)
+            val left = with(density) { inset.toPx() }
+            val n = ((p.x - left) / ((all.size.width - left) / cols.size)).toInt()
+            val minutes = (p.y / with(density) { HOUR.toPx() } * 60).toLong()
+            if (p.x < left || n !in cols.indices) null else start + cols[n] * DAY + (minutes / 15 * 15).coerceIn(0, 24 * 60 - 15) * 60
+        }
+    }
+    if (plan != null) {
+        val key = remember { Any() }
+        val find by rememberUpdatedState(slotAt)
+        DisposableEffect(plan) {
+            plan.targets[key] = { find(it) }
+            onDispose { plan.targets.remove(key) }
+        }
+    }
+    val duration = remember(plan) { if (plan != null) model.core.taskDuration() else 0L }
     // Held, a block may be moved over the next days' pages: drawn over them.
     Column(Modifier.fillMaxSize().zIndex(if (drag != null) 1f else 0f)) {
         // Day names and dates; in a week, a tap picks the day.
@@ -1047,9 +1099,12 @@ private fun Week(
             }
         }
         HorizontalDivider()
-        Box(Modifier.fillMaxSize().then(if (gutter) Modifier.verticalScroll(scroll) else Modifier.hoursScroll(scroll))) {
+        Box(
+            Modifier.fillMaxSize().onGloballyPositioned { hours[0] = it }
+                .then(if (gutter) Modifier.verticalScroll(scroll) else Modifier.hoursScroll(scroll)),
+        ) {
             val surface = MaterialTheme.colorScheme.surface
-            Column {
+            Column(Modifier.onGloballyPositioned { hours[1] = it }) {
                 for (h in 0 until 24) {
                     Row(Modifier.height(HOUR)) {
                         if (gutter) HourLabel(h)
@@ -1057,15 +1112,7 @@ private fun Week(
                             val at = start + d * DAY + h * 3600
                             Box(
                                 Modifier.weight(1f).fillMaxHeight().gridLines(left = true)
-                                    .clickable {
-                                        val t = model.planning.value
-                                        if (t == null) {
-                                            model.newEvent.value = Dest.EventEdit(null, null, null, at, false)
-                                        } else {
-                                            model.planning.value = null
-                                            model.update(t.uid, model.core.planAt(t, at))
-                                        }
-                                    },
+                                    .clickable { model.newEvent.value = Dest.EventEdit(null, null, null, at, false) },
                             )
                         }
                     }
@@ -1135,6 +1182,7 @@ private fun Week(
                                 )
                             }
                         }
+                        plan?.let { PlanPreview(it, start + d * DAY, slotAt, parseColor(colors[it.task.listHref]), duration) }
                         // The current time.
                         if (start + d * DAY == today) {
                             Box(
@@ -1176,12 +1224,118 @@ private fun Reschedule(model: Main, item: Item, change: Change, onDone: () -> Un
 }
 
 /**
+ * A task from "To Plan" held and dragged, as on Linux: where the finger is (window
+ * coordinates), the hours shown that could take it, and the target cancelling it.
+ */
+class Planning(val task: TodavTask, at: Offset) {
+    var at by mutableStateOf(at)
+
+    /** The hours of each day page shown: the slot under a point, if theirs. */
+    val targets = mutableMapOf<Any, (Offset) -> Long?>()
+
+    /** Where the cancel target is, in the window. */
+    var cancel: Rect? = null
+
+    /** The slot it would be planned into, dropped now. */
+    fun slot(): Long? = targets.values.firstNotNullOfOrNull { it(at) }
+
+    /** Whether it is over the cancel target; reads `at` first, so a composable asking follows the finger. */
+    fun overCancel(): Boolean {
+        val p = at
+        return cancel?.contains(p) == true
+    }
+}
+
+val LocalPlanning = compositionLocalOf<Planning?> { null }
+
+/** Where a task from "To Plan" goes once dropped at `slot`, if it is on `day`: a block as it would be. */
+@Composable
+private fun PlanPreview(plan: Planning, day: Long, slotAt: (Offset) -> Long?, color: Color, duration: Long) {
+    val slot = slotAt(plan.at)?.takeIf { it - day in 0 until DAY } ?: return
+    val shape = RoundedCornerShape(4.dp)
+    Box(
+        Modifier.offset(y = HOUR * ((slot - day) / 3600f)).zIndex(2f).fillMaxWidth()
+            .height(HOUR * (duration / 3600f) - 1.dp)
+            .clip(shape).background(color.copy(alpha = 0.3f).compositeOver(MaterialTheme.colorScheme.surface))
+            .border(2.dp, color, shape).padding(4.dp),
+    ) {
+        Text(plan.task.summary, fontSize = 10.sp, lineHeight = 12.sp, overflow = TextOverflow.Clip)
+    }
+}
+
+/** Over the top of the calendar while a task is dragged: dropped on it, nothing is planned. */
+@Composable
+private fun CancelTarget(plan: Planning, modifier: Modifier) {
+    val over = plan.overCancel()
+    val grow by animateFloatAsState(if (over) 1.1f else 1f, label = "cancel")
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        modifier.padding(top = 12.dp).graphicsLayer {
+            scaleX = grow
+            scaleY = grow
+        }.onGloballyPositioned { plan.cancel = it.boundsInWindow() },
+        shape = CircleShape,
+        color = if (over) colors.error else colors.errorContainer,
+        contentColor = if (over) colors.onError else colors.onErrorContainer,
+        shadowElevation = 6.dp,
+    ) {
+        Row(
+            Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(Icons.Default.Close, null)
+            Text(tr("Drop here to cancel"), style = MaterialTheme.typography.labelLarge)
+        }
+    }
+}
+
+/** The dragged task's title above the finger, where no hour shows where it would go. */
+@Composable
+private fun DragCard(plan: Planning) {
+    val box = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    Box(Modifier.fillMaxSize().onGloballyPositioned { box[0] = it }) {
+        // Read first, so this follows the finger from the start.
+        val at = plan.at
+        val c = box[0]?.takeIf { it.isAttached }
+        if (c != null && plan.slot() == null) {
+            val p = c.windowToLocal(at)
+            Surface(
+                Modifier.offset { IntOffset(p.x.roundToInt() - 24.dp.roundToPx(), p.y.roundToInt() - 72.dp.roundToPx()) }
+                    .widthIn(max = 240.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                shadowElevation = 8.dp,
+            ) {
+                Text(
+                    plan.task.summary,
+                    Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+/**
  * "To Plan": open tasks without a time slot, undated or due by `until` (the end of the week
- * shown), as the Linux calendar's sidebar list. One picked waits for an hour to be tapped.
+ * shown), as the Linux calendar's sidebar list. A task is held and dragged onto an hour (`onHold`
+ * a [Planning], `onDrop` when let go): the sheet hides meanwhile, comes back if it was not
+ * planned. A tap says so. A sheet of this window rather than a dialog: a drag can't leave a
+ * dialog's window for the calendar's.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ToPlanSheet(model: Main, until: Long, colors: Map<String, String>, onDismiss: () -> Unit) {
+private fun ToPlanSheet(
+    model: Main,
+    until: Long,
+    colors: Map<String, String>,
+    plan: Planning?,
+    onHold: (Planning) -> Unit,
+    onDrop: () -> Unit,
+    onDismiss: () -> Unit,
+) {
     val changes by model.todav.changes.collectAsStateWithLifecycle()
     // Shown once read: a sheet whose list fills in after it opens jumps from full height to half.
     // Hidden lists' tasks are left out, as on the calendar.
@@ -1194,43 +1348,105 @@ private fun ToPlanSheet(model: Main, until: Long, colors: Map<String, String>, o
     val groups = tasks.partition { it.due != null }.toList()
         .zip(listOf(ptr("to plan", "Due"), tr("No date")))
         .filter { it.first.isNotEmpty() }
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Text(tr("To Plan"), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 24.dp))
-        if (tasks.isEmpty()) {
-            Text(tr("Nothing to plan"), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(24.dp))
-        }
-        LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
-            groups.forEach { (group, title) ->
-                item(key = title) {
-                    Text(
-                        title,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 24.dp, top = 16.dp, bottom = 4.dp),
-                    )
+    val hidden = plan != null
+    // Slides in, and out before it goes.
+    val shown = remember { MutableTransitionState(false) }
+    LaunchedEffect(Unit) { shown.targetState = true }
+    LaunchedEffect(shown.isIdle) { if (shown.isIdle && !shown.currentState && !shown.targetState) onDismiss() }
+    val close = { shown.targetState = false }
+    BackHandler(enabled = !hidden) { close() }
+    var pull by remember { mutableFloatStateOf(0f) }
+    val density = LocalDensity.current
+    val hint = tr("Hold a task and drag it onto the calendar")
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val height = maxHeight
+        AnimatedVisibility(shown, enter = fadeIn(), exit = fadeOut()) {
+            Box(Modifier.fillMaxSize().graphicsLayer { alpha = if (hidden) 0f else 1f }) {
+                Box(
+                    Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.32f))
+                        .pointerInput(hidden) { if (!hidden) detectTapGestures { close() } },
+                )
+                Surface(
+                    Modifier.align(Alignment.BottomCenter).animateEnterExit(enter = slideInVertically { it }, exit = slideOutVertically { it })
+                        .offset { IntOffset(0, pull.roundToInt().coerceAtLeast(0)) }
+                        .widthIn(max = CONTENT_WIDTH).fillMaxWidth().heightIn(max = height * 0.7f),
+                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                ) {
+                    Column {
+                        // The handle and the title: pulled down, the sheet goes.
+                        Column(
+                            Modifier.fillMaxWidth().draggable(
+                                rememberDraggableState { pull += it },
+                                Orientation.Vertical,
+                                onDragStopped = { if (pull > with(density) { 96.dp.toPx() }) close() else pull = 0f },
+                            ),
+                        ) {
+                            Box(Modifier.fillMaxWidth(), Alignment.Center) { BottomSheetDefaults.DragHandle() }
+                            Text(tr("To Plan"), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 32.dp))
+                        }
+                        if (tasks.isEmpty()) {
+                            Text(tr("Nothing to plan"), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(32.dp))
+                        }
+                        LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp)) {
+                            groups.forEach { (group, title) ->
+                                item(key = title) { SectionTitle(title) }
+                                items(group, key = { it.uid }) { t ->
+                                    PlanRow(t, colors, now, onTap = { model.messages.tryEmit(hint to null) }, onHold = onHold, onDrop = onDrop)
+                                }
+                            }
+                        }
+                    }
                 }
-                items(group, key = { it.uid }) { t -> PlanRow(t, colors, now) { model.planning.value = t; onDismiss() } }
             }
         }
     }
 }
 
-/** A task in "To Plan": its list's colour, its title and the day it is due (red when overdue). */
+/**
+ * A task in "To Plan": its list's colour, its title and the day it is due (red when overdue).
+ * Held, it is dragged (`onHold`, then its [Planning] follows the finger) until let go (`onDrop`).
+ */
 @Composable
-private fun PlanRow(t: TodavTask, colors: Map<String, String>, now: Long, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 24.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+private fun PlanRow(t: TodavTask, colors: Map<String, String>, now: Long, onTap: () -> Unit, onHold: (Planning) -> Unit, onDrop: () -> Unit) {
+    val place = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    val haptics = LocalHapticFeedback.current
+    Line(
+        { ColorMark(colors[t.listHref]) },
+        Modifier.onGloballyPositioned { place[0] = it }.clickable(onClick = onTap)
+            .pointerInput(t.uid) {
+                var held: Planning? = null
+                val window = { p: Offset -> place[0]?.localToWindow(p) ?: p }
+                detectDragGesturesAfterLongPress(
+                    onDragStart = { p ->
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        held = Planning(t, window(p)).also(onHold)
+                    },
+                    onDrag = { change, _ ->
+                        change.consume()
+                        held?.at = window(change.position)
+                    },
+                    onDragEnd = {
+                        held = null
+                        onDrop()
+                    },
+                    onDragCancel = {
+                        held = null
+                        onDrop()
+                    },
+                )
+            }
+            .padding(vertical = 12.dp),
     ) {
-        Box(Modifier.size(10.dp).background(parseColor(colors[t.listHref]), CircleShape))
-        Text(t.summary, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-        t.due?.let {
-            Text(
-                format(it, "d MMM"),
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (dev.aperte.todav.core.overdue(t, now)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(t.summary, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            t.due?.let {
+                Text(
+                    format(it, "d MMM"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (dev.aperte.todav.core.overdue(t, now)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

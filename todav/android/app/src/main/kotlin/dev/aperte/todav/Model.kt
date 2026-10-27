@@ -232,9 +232,6 @@ class Main(app: Application) : AndroidViewModel(app) {
         act { core.setWorkDays(days) }
     }
 
-    /** A task from "To Plan" waiting for an hour in the week view to be planned into. */
-    val planning = MutableStateFlow<TodavTask?>(null)
-
     /** The day the calendar shows (local midnight), set by a reminder, an event pill or Today. */
     val day = MutableStateFlow<Long?>(null)
 
