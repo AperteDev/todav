@@ -1,17 +1,56 @@
 package dev.aperte.todav.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.exclude
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.DropdownMenuGroup
+import androidx.compose.material3.DropdownMenuPopup
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.MenuDefaults
+import androidx.compose.material3.SelectableDropdownMenuItem
 import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TimePickerDialog
+import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.ToggleButtonDefaults
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,8 +60,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarOutline
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenuItem
@@ -36,7 +73,6 @@ import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -130,9 +166,217 @@ fun StarIcon(priority: Long?) {
     }
 }
 
+/** Rows in one rounded container, under `title` if any: as Android's own settings group them. */
+@Composable
+fun Section(title: String?, content: @Composable ColumnScope.() -> Unit) {
+    if (title != null) {
+        Text(
+            title,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 32.dp, top = 24.dp, bottom = 8.dp),
+        )
+    } else {
+        Spacer(Modifier.height(16.dp))
+    }
+    Group(Modifier.padding(horizontal = 16.dp), content)
+}
+
+/** Rows as one block: each a box of its own, the block's round corners at its ends. */
+@Composable
+fun Group(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) = Column(
+    modifier.clip(RoundedCornerShape(24.dp)),
+    verticalArrangement = Arrangement.spacedBy(2.dp),
+    content = content,
+)
+
+private val ITEM_SHAPE = RoundedCornerShape(4.dp)
+
+/** A row of a [Group]. */
+@Composable
+fun Item(
+    headlineContent: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    overlineContent: @Composable (() -> Unit)? = null,
+    supportingContent: @Composable (() -> Unit)? = null,
+    leadingContent: @Composable (() -> Unit)? = null,
+    trailingContent: @Composable (() -> Unit)? = null,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
+) {
+    ListItem(
+        modifier = Modifier.clip(ITEM_SHAPE).then(modifier),
+        leadingContent = leadingContent,
+        trailingContent = trailingContent,
+        overlineContent = overlineContent,
+        supportingContent = supportingContent,
+        shapes = ListItemDefaults.shapes(shape = ITEM_SHAPE),
+        colors = ListItemDefaults.segmentedColors(containerColor = containerColor),
+        content = headlineContent,
+    )
+}
+
 /**
- * A date and maybe a time of day (local wall-clock seconds, as the core's), or none: chips that
- * open Material's date and time pickers, and a button clearing it.
+ * A text field as a row of a [Group]: `label` over what is typed (or `placeholder` in it while
+ * empty), `icon` before it.
+ */
+@Composable
+fun FieldItem(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String?,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    placeholder: String? = null,
+    trailing: @Composable (() -> Unit)? = null,
+    textStyle: TextStyle = LocalTextStyle.current,
+    singleLine: Boolean = false,
+    minLines: Int = 1,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
+) = TextField(
+    value = value,
+    onValueChange = onValueChange,
+    modifier = modifier.fillMaxWidth(),
+    textStyle = textStyle,
+    label = label?.let { { Text(it) } },
+    placeholder = placeholder?.let { { Text(it) } },
+    // In line with an [Item]'s icon, a little further in.
+    leadingIcon = icon?.let { { Icon(it, null, Modifier.offset(x = 4.dp)) } },
+    trailingIcon = trailing,
+    visualTransformation = visualTransformation,
+    keyboardOptions = keyboardOptions,
+    keyboardActions = keyboardActions,
+    singleLine = singleLine,
+    minLines = minLines,
+    shape = ITEM_SHAPE,
+    colors = TextFieldDefaults.colors(
+        focusedContainerColor = containerColor,
+        unfocusedContainerColor = containerColor,
+        disabledContainerColor = containerColor,
+        focusedIndicatorColor = Color.Transparent,
+        unfocusedIndicatorColor = Color.Transparent,
+        disabledIndicatorColor = Color.Transparent,
+    ),
+)
+
+/**
+ * A choice as a row of a [Group]: `label` over the option picked (`selected` of `options`), a
+ * menu of them to pick another. `mark` draws an option's mark (its colour) before it, else `icon`.
+ */
+@Composable
+fun ChoiceItem(
+    label: String?,
+    options: List<String>,
+    selected: Int,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    mark: (@Composable (Int) -> Unit)? = null,
+    trailing: @Composable () -> Unit = { Icon(Icons.Default.ArrowDropDown, null) },
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
+    onSelect: (Int) -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    Box(modifier) {
+        Item(
+            headlineContent = { Text(options.getOrElse(selected) { "" }) },
+            overlineContent = label?.let { { Text(it) } },
+            leadingContent = mark?.let { { it(selected) } } ?: icon?.let { { Icon(it, null) } },
+            trailingContent = trailing,
+            containerColor = containerColor,
+            modifier = Modifier.clickable { open = true },
+        )
+        PickMenu(open, { open = false }, options, selected, mark, onSelect)
+    }
+}
+
+/** A list's or calendar's colour as a dot, in an icon's room. */
+@Composable
+fun ColorMark(color: String?) = Box(Modifier.size(24.dp), Alignment.Center) {
+    Box(Modifier.size(12.dp).background(parseColor(color), CircleShape))
+}
+
+/**
+ * A menu of `options` to pick one, `selected` (if any) marked with a check, or with its `mark`
+ * where options have one: picking closes it and gives `onPick` the index.
+ */
+@Composable
+fun PickMenu(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    options: List<String>,
+    selected: Int,
+    mark: (@Composable (Int) -> Unit)? = null,
+    onPick: (Int) -> Unit,
+) = DropdownMenuPopup(expanded, onDismiss) {
+    DropdownMenuGroup(MenuDefaults.groupShapes(), Modifier.verticalScroll(rememberScrollState())) {
+        options.forEachIndexed { i, o ->
+            SelectableDropdownMenuItem(
+                selected = i == selected,
+                onClick = {
+                    onDismiss()
+                    onPick(i)
+                },
+                text = { Text(o) },
+                shapes = MenuDefaults.itemShape(i, options.size),
+                leadingIcon = mark?.let { { it(i) } },
+                selectedLeadingIcon = mark?.let { { it(i) } } ?: { Icon(Icons.Default.Check, null) },
+            )
+        }
+    }
+}
+
+/** One of `options` picked with connected toggle buttons sharing the room. */
+@Composable
+fun Connected(options: List<String>, selected: Int, modifier: Modifier = Modifier, onSelect: (Int) -> Unit) = Row(
+    modifier,
+    horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+) {
+    options.forEachIndexed { i, o ->
+        ToggleButton(
+            checked = i == selected,
+            onCheckedChange = { onSelect(i) },
+            shapes = when (i) {
+                0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+            },
+            // Seen on a row's own colour too.
+            colors = ToggleButtonDefaults.colors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            ),
+            contentPadding = PaddingValues(horizontal = 8.dp),
+            modifier = Modifier.weight(1f).semantics { role = Role.RadioButton },
+        ) { Text(o, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+    }
+}
+
+/** Material's time picker in its dialog at `clock` (seconds into the day); `extra`: buttons before Cancel. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TimeDialog(title: String, clock: Long, onDismiss: () -> Unit, extra: @Composable () -> Unit = {}, onPick: (Long) -> Unit) {
+    val state = rememberTimePickerState((clock / 3600).toInt(), (clock / 60 % 60).toInt(), hours24)
+    TimePickerDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        confirmButton = {
+            TextButton(onClick = {
+                onDismiss()
+                onPick(state.hour * 3600L + state.minute * 60L)
+            }) { Text(tr("OK")) }
+        },
+        dismissButton = {
+            extra()
+            TextButton(onClick = onDismiss) { Text(tr("Cancel")) }
+        },
+    ) { TimePicker(state) }
+}
+
+/**
+ * A date and maybe a time of day (local wall-clock seconds, as the core's), or none, as a row of
+ * a [Group]: tapped, Material's date picker; a button for the time, one clearing it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -150,31 +394,26 @@ fun DateTimeField(
 ) {
     var pickDate by remember { mutableStateOf(false) }
     var pickTime by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth()) {
-        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AssistChip(
-                onClick = { pickDate = true },
-                label = { Text(if (at == null) tr("Set Date") else date(at)) },
-                leadingIcon = { Icon(icon, null) },
-            )
-            if (at != null && !dateOnly) {
-                AssistChip(
-                    onClick = { pickTime = true },
-                    label = { Text(if (allDay) tr("Add Time") else time(at)) },
-                )
-                if (!allDay && clearable) {
-                    IconButton(onClick = { onChange(at - Math.floorMod(at, DAY), true) }) {
-                        Icon(Icons.Default.Close, tr("Remove Time"))
+    Item(
+        overlineContent = { Text(label) },
+        headlineContent = { Text(if (at == null) tr("Set Date") else date(at)) },
+        leadingContent = { Icon(icon, null) },
+        trailingContent = if (at == null) null else {
+            {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (!dateOnly) {
+                        FilledTonalButton(onClick = { pickTime = true }) { Text(if (allDay) tr("Add Time") else time(at)) }
+                    }
+                    if (clearable) {
+                        Tip(tr("Clear")) {
+                            IconButton(onClick = { onChange(null, true) }) { Icon(Icons.Default.Close, tr("Clear")) }
+                        }
                     }
                 }
             }
-            if (at != null && clearable) {
-                Row(Modifier.weight(1f)) {}
-                TextButton(onClick = { onChange(null, true) }) { Text(tr("Clear")) }
-            }
-        }
-    }
+        },
+        modifier = Modifier.clickable { pickDate = true },
+    )
     if (pickDate) {
         val state = rememberDatePickerState(initialSelectedDateMillis = (at ?: (System.currentTimeMillis() / 1000)) * 1000)
         DatePickerDialog(
@@ -194,80 +433,53 @@ fun DateTimeField(
         ) { DatePicker(state) }
     }
     if (pickTime && at != null) {
-        val clock = if (allDay) defaultTime else Math.floorMod(at, DAY)
-        val state = rememberTimePickerState((clock / 3600).toInt(), (clock / 60 % 60).toInt(), hours24)
-        AlertDialog(
-            onDismissRequest = { pickTime = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    pickTime = false
-                    onChange(at - Math.floorMod(at, DAY) + state.hour * 3600L + state.minute * 60L, false)
-                }) { Text(tr("OK")) }
+        val day = at - Math.floorMod(at, DAY)
+        TimeDialog(
+            label,
+            if (allDay) defaultTime else Math.floorMod(at, DAY),
+            onDismiss = { pickTime = false },
+            extra = {
+                if (!allDay && clearable) {
+                    TextButton(onClick = {
+                        pickTime = false
+                        onChange(day, true)
+                    }) { Text(tr("Remove Time")) }
+                }
             },
-            dismissButton = { TextButton(onClick = { pickTime = false }) { Text(tr("Cancel")) } },
-            text = { TimePicker(state) },
-        )
+        ) { onChange(day + it, false) }
     }
 }
 
-/** A read-only dropdown field: `options` by label, `selected` the index shown. */
+/** A text field with suggestions it may also take a new value besides (categories), as a row of a [Group]. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChoiceField(
-    label: String,
-    options: List<String>,
-    selected: Int,
-    modifier: Modifier = Modifier.fillMaxWidth(),
-    enabled: Boolean = true,
-    onSelect: (Int) -> Unit,
-) {
-    var open by remember { mutableStateOf(false) }
-    ExposedDropdownMenuBox(expanded = open, onExpandedChange = { if (enabled) open = it }, modifier = modifier) {
-        OutlinedTextField(
-            value = options.getOrElse(selected) { "" },
-            onValueChange = {},
-            readOnly = true,
-            enabled = enabled,
-            singleLine = true,
-            label = { Text(label) },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(open) },
-            modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled),
-        )
-        ExposedDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            options.forEachIndexed { i, o ->
-                DropdownMenuItem(text = { Text(o) }, onClick = {
-                    open = false
-                    onSelect(i)
-                })
-            }
-        }
-    }
-}
-
-/** A text field with suggestions it may also take a new value besides (categories). */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SuggestField(label: String, value: String, suggestions: List<String>, onChange: (String) -> Unit) {
+fun SuggestField(label: String, value: String, suggestions: List<String>, icon: ImageVector, onChange: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
     val shown = suggestions.filter { it.contains(value, ignoreCase = true) && it != value }
     ExposedDropdownMenuBox(expanded = open && shown.isNotEmpty(), onExpandedChange = { open = it }) {
-        OutlinedTextField(
-            value = value,
-            onValueChange = {
+        FieldItem(
+            value,
+            {
                 onChange(it)
                 open = true
             },
+            label,
+            Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
+            icon = icon,
             singleLine = true,
-            label = { Text(label) },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(open) },
-            modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
+            trailing = { ExposedDropdownMenuDefaults.TrailingIcon(open) },
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
         )
         ExposedDropdownMenu(expanded = open && shown.isNotEmpty(), onDismissRequest = { open = false }) {
-            shown.forEach { s ->
-                DropdownMenuItem(text = { Text(s) }, onClick = {
-                    open = false
-                    onChange(s)
-                })
+            shown.forEachIndexed { i, s ->
+                DropdownMenuItem(
+                    onClick = {
+                        open = false
+                        onChange(s)
+                    },
+                    text = { Text(s) },
+                    shape = MenuDefaults.itemShape(i, shown.size).shape,
+                )
             }
         }
     }
@@ -336,6 +548,29 @@ fun EditorButtons(canSave: Boolean, onCancel: () -> Unit, onSave: () -> Unit) {
             ) { Icon(Icons.Default.Check, tr("Save")) }
         }
     }
+}
+
+/** A row of a [Group] adding one more of what is above it. */
+@Composable
+fun AddItem(label: String, onClick: () -> Unit) = Item(
+    headlineContent = { Text(label, color = MaterialTheme.colorScheme.primary) },
+    leadingContent = { Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.primary) },
+    modifier = Modifier.clickable(onClick = onClick),
+)
+
+/** An editor's last button, deleting what it edits. */
+@Composable
+fun DeleteButton(label: String, onClick: () -> Unit) = FilledTonalButton(
+    onClick = onClick,
+    colors = ButtonDefaults.filledTonalButtonColors(
+        containerColor = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+    ),
+    modifier = Modifier.fillMaxWidth().padding(16.dp).padding(top = 8.dp).height(56.dp),
+) {
+    Icon(Icons.Outlined.Delete, null)
+    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+    Text(label)
 }
 
 /** Room at the end of an editor's fields, so `EditorButtons` don't cover the last one. */

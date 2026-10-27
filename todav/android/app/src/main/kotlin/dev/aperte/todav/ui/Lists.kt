@@ -14,12 +14,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -72,31 +69,27 @@ fun ListDialog(model: Main, href: String?, events: Boolean, onDismiss: () -> Uni
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (list == null) {
-                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                        listOf(false, true).forEachIndexed { i, ev ->
-                            SegmentedButton(
-                                selected = calendar == ev,
-                                onClick = { calendar = ev },
-                                shape = SegmentedButtonDefaults.itemShape(i, 2),
-                                label = { Text(if (ev) tr("Calendar") else tr("Task List")) },
-                            )
-                        }
+                    Connected(listOf(tr("Task List"), tr("Calendar")), if (calendar) 1 else 0, Modifier.fillMaxWidth()) {
+                        calendar = it == 1
                     }
                 }
-                OutlinedTextField(
-                    name,
-                    { name = it },
-                    label = { Text(tr("Name")) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                if (list == null && places.size > 1) {
-                    ChoiceField(
-                        tr("Save to"),
-                        places.map { accounts[it]?.let(::accountName) ?: "" },
-                        places.indexOf(place).coerceAtLeast(0),
-                    ) { place = places[it] }
+                Group {
+                    FieldItem(
+                        name,
+                        { name = it },
+                        tr("Name"),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    )
+                    if (list == null && places.size > 1) {
+                        ChoiceItem(
+                            tr("Save to"),
+                            places.map { accounts[it]?.let(::accountName) ?: "" },
+                            places.indexOf(place).coerceAtLeast(0),
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        ) { place = places[it] }
+                    }
                 }
                 Text(tr("Color"), style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -123,7 +116,7 @@ fun ListDialog(model: Main, href: String?, events: Boolean, onDismiss: () -> Uni
             }
         },
         confirmButton = {
-            TextButton(
+            Button(
                 enabled = name.isNotBlank() && (list != null || place != null),
                 onClick = {
                     onDismiss()

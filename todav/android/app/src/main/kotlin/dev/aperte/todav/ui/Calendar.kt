@@ -46,16 +46,17 @@ import androidx.compose.material.icons.outlined.ViewColumn
 import androidx.compose.material.icons.outlined.ViewWeek
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.EventRepeat
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -245,19 +246,13 @@ fun CalendarPane(model: Main) {
                         Tip(tr("View")) {
                             IconButton(onClick = { viewMenu = true }) { Icon(modeIcon(mode), tr("View")) }
                         }
-                        DropdownMenu(expanded = viewMenu, onDismissRequest = { viewMenu = false }) {
-                            for (m in CalMode.MENU) {
-                                DropdownMenuItem(
-                                    text = { Text(modeName(m)) },
-                                    leadingIcon = { Icon(modeIcon(m), null) },
-                                    trailingIcon = { if (m == mode) Icon(Icons.Default.Check, null) },
-                                    onClick = {
-                                        viewMenu = false
-                                        model.setMode(m)
-                                    },
-                                )
-                            }
-                        }
+                        PickMenu(
+                            viewMenu,
+                            { viewMenu = false },
+                            CalMode.MENU.map(::modeName),
+                            CalMode.MENU.indexOf(mode),
+                            mark = { Icon(modeIcon(CalMode.MENU[it]), null) },
+                        ) { model.setMode(CalMode.MENU[it]) }
                     }
                 },
             )
@@ -1277,7 +1272,7 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
                     }
                     e.description?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = edit) { Text(tr("Edit…")) }
+                        EditButton(edit)
                         TextButton(onClick = { askDelete = true }) { Text(tr("Delete"), color = MaterialTheme.colorScheme.error) }
                     }
                     val tasks = remember(changes, e.uid) { core.eventTasks(e.uid) }
@@ -1312,7 +1307,7 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
                     }
                     t.description?.takeIf { it.isNotBlank() }?.let { Text(it) }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = edit) { Text(tr("Edit…")) }
+                        EditButton(edit)
                         dev.aperte.todav.core.unplan(t)?.let { patch ->
                             TextButton(onClick = {
                                 dismiss()
@@ -1413,21 +1408,33 @@ private fun CheckRow(model: Main, t: TodavTask) {
     }
 }
 
+/** A details sheet's Edit…, opening the sheet as the editor. */
+@Composable
+private fun EditButton(onClick: () -> Unit) = FilledTonalButton(onClick = onClick) {
+    Icon(Icons.Outlined.Edit, null, Modifier.size(ButtonDefaults.IconSize))
+    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+    Text(tr("Edit…"))
+}
+
 @Composable
 private fun AddLine(placeholder: String, onAdd: (String) -> Unit) {
     var text by rememberSaveable { mutableStateOf("") }
-    OutlinedTextField(
-        text,
-        { text = it },
-        placeholder = { Text(placeholder) },
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
-        keyboardActions = KeyboardActions(onDone = {
-            if (text.isNotBlank()) onAdd(text.trim())
-            text = ""
-        }),
-        modifier = Modifier.fillMaxWidth(),
-    )
+    Group {
+        FieldItem(
+            text,
+            { text = it },
+            null,
+            icon = Icons.Default.Add,
+            placeholder = placeholder,
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = {
+                if (text.isNotBlank()) onAdd(text.trim())
+                text = ""
+            }),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        )
+    }
 }
 
 /**
@@ -1452,13 +1459,25 @@ fun ScopeDialog(title: String, recurring: Boolean, delete: Boolean, onDismiss: (
     val color = if (delete) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
     AlertDialog(
         onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Outlined.EventRepeat, null) },
         title = { Text(title) },
         text = {
-            Column {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(tr("The event repeats."))
-                TextButton(onClick = { then(Scope.THIS) }) { Text(tr("Only This Event"), color = color) }
-                TextButton(onClick = { then(Scope.FOLLOWING) }) { Text(tr("This and Following"), color = color) }
-                TextButton(onClick = { then(Scope.ALL) }) { Text(tr("All Events"), color = color) }
+                Group {
+                    listOf(
+                        Scope.THIS to tr("Only This Event"),
+                        Scope.FOLLOWING to tr("This and Following"),
+                        Scope.ALL to tr("All Events"),
+                    ).forEach { (scope, label) ->
+                        // This package's row, not the core's Item imported here.
+                        dev.aperte.todav.ui.Item(
+                            headlineContent = { Text(label, color = color) },
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            modifier = Modifier.clickable { then(scope) },
+                        )
+                    }
+                }
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(tr("Cancel")) } },

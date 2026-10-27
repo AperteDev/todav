@@ -1,9 +1,8 @@
 package dev.aperte.todav.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -13,17 +12,18 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.automirrored.outlined.Notes
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.EventRepeat
+import androidx.compose.material.icons.outlined.Pin
+import androidx.compose.material.icons.outlined.Place
+import androidx.compose.material.icons.outlined.Repeat
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Title
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -32,7 +32,6 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.graphics.Color
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -60,6 +59,7 @@ import dev.aperte.todav.core.Freq
 import dev.aperte.todav.core.Repeat
 import dev.aperte.todav.core.RepeatValue
 import dev.aperte.todav.core.Scope
+import dev.aperte.todav.core.listColor
 import dev.aperte.todav.core.plainRepeat
 import dev.aperte.todav.ntr
 import dev.aperte.todav.ptr
@@ -196,6 +196,19 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
         if (ev.recurring && !nothing && !repeatChanged && !moved) askScope = apply else apply(Scope.ALL)
     }
 
+    fun setAllDay(on: Boolean) {
+        allDay = on
+        if (on) {
+            start -= Math.floorMod(start, DAY)
+            end = maxOf(end - Math.floorMod(end, DAY) + DAY, start + DAY)
+        } else {
+            start = start - Math.floorMod(start, DAY) + 9 * 3600
+            end = start + duration
+        }
+        reminders.clear()
+        reminders.add(core.defaultReminder(on))
+    }
+
     BackHandler(enabled = changed) { discard = true }
     sheet?.let { LaunchedEffect(changed) { it.locked = changed } }
     Scaffold(
@@ -214,97 +227,87 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
             Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Column(
-                Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
+            Column(Modifier.widthIn(max = 640.dp).fillMaxWidth()) {
                 if (calendars.isEmpty()) {
-                    Text(tr("No calendar to save to"), color = MaterialTheme.colorScheme.error)
+                    Text(
+                        tr("No calendar to save to"),
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(horizontal = 32.dp).padding(top = 16.dp),
+                    )
                 }
-                OutlinedTextField(
-                    summary,
-                    { summary = it },
-                    label = { Text(tr("Title")) },
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(location, { location = it }, label = { Text(tr("Location")) }, modifier = Modifier.fillMaxWidth())
-                ChoiceField(
-                    tr("Calendar"),
-                    calendars.map { it.displayName },
-                    calendars.indexOfFirst { it.href == calendar },
-                ) { calendar = calendars[it].href }
-                ListItem(
-                    headlineContent = { Text(tr("All Day")) },
-                    trailingContent = {
-                        Switch(allDay, { on ->
-                            allDay = on
-                            if (on) {
-                                start -= Math.floorMod(start, DAY)
-                                end = maxOf(end - Math.floorMod(end, DAY) + DAY, start + DAY)
-                            } else {
-                                start = start - Math.floorMod(start, DAY) + 9 * 3600
-                                end = start + duration
-                            }
-                            reminders.clear()
-                            reminders.add(core.defaultReminder(on))
-                        })
-                    },
-                )
-                DateTimeField(tr("Starts"), start, allDay, Icons.Outlined.Event, { t, _ ->
-                    if (t != null) {
-                        // The end moves along, keeping the length.
-                        end += t - start
-                        start = t
-                    }
-                }, clearable = false)
-                DateTimeField(
-                    tr("Ends"),
-                    if (allDay) end - DAY else end,
-                    allDay,
-                    Icons.Outlined.CalendarToday,
-                    { t, _ -> if (t != null) end = if (allDay) maxOf(t + DAY, start + DAY) else maxOf(t, start) },
-                    clearable = false,
-                )
-                ChoiceField(
-                    tr("Repeat"),
-                    listOf(tr("Does Not Repeat"), tr("Daily"), tr("Weekly"), tr("Monthly"), tr("Yearly")) +
-                        if (custom) listOf(ptr("repeat", "Custom")) else emptyList(),
-                    repeat,
-                ) { repeat = it }
-                if (repeat in 1..4) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlinedTextField(
+                Section(null) {
+                    FieldItem(
+                        summary,
+                        { summary = it },
+                        tr("Title"),
+                        icon = Icons.Outlined.Title,
+                        textStyle = MaterialTheme.typography.titleLarge,
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                    )
+                    FieldItem(location, { location = it }, tr("Location"), icon = Icons.Outlined.Place)
+                    ChoiceItem(
+                        tr("Calendar"),
+                        calendars.map { it.displayName },
+                        calendars.indexOfFirst { it.href == calendar },
+                        mark = { ColorMark(calendars.getOrNull(it)?.let(::listColor)) },
+                    ) { calendar = calendars[it].href }
+                }
+                Section(null) {
+                    Item(
+                        headlineContent = { Text(tr("All Day")) },
+                        leadingContent = { Icon(Icons.Outlined.Schedule, null) },
+                        trailingContent = { Switch(allDay, ::setAllDay) },
+                        modifier = Modifier.clickable { setAllDay(!allDay) },
+                    )
+                    DateTimeField(tr("Starts"), start, allDay, Icons.Outlined.Event, { t, _ ->
+                        if (t != null) {
+                            // The end moves along, keeping the length.
+                            end += t - start
+                            start = t
+                        }
+                    }, clearable = false)
+                    DateTimeField(
+                        tr("Ends"),
+                        if (allDay) end - DAY else end,
+                        allDay,
+                        Icons.Outlined.CalendarToday,
+                        { t, _ -> if (t != null) end = if (allDay) maxOf(t + DAY, start + DAY) else maxOf(t, start) },
+                        clearable = false,
+                    )
+                }
+                Section(null) {
+                    ChoiceItem(
+                        tr("Repeat"),
+                        listOf(tr("Does Not Repeat"), tr("Daily"), tr("Weekly"), tr("Monthly"), tr("Yearly")) +
+                            if (custom) listOf(ptr("repeat", "Custom")) else emptyList(),
+                        repeat,
+                        icon = Icons.Outlined.Repeat,
+                    ) { repeat = it }
+                    if (repeat in 1..4) {
+                        FieldItem(
                             "$every",
                             { v -> v.toLongOrNull()?.takeIf { it in 1..999 }?.let { every = it } },
-                            label = { Text(tr("Every")) },
+                            tr("Every"),
+                            icon = Icons.Outlined.Pin,
+                            trailing = { Text(unit(FREQS[repeat - 1], every), Modifier.padding(end = 16.dp)) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.weight(1f),
                         )
-                        Text(unit(FREQS[repeat - 1], every), Modifier.weight(1f))
+                        DateTimeField(tr("Until"), until, true, Icons.Outlined.EventRepeat, { t, _ -> until = t?.let { it - Math.floorMod(it, DAY) } }, dateOnly = true)
                     }
-                    DateTimeField(tr("Until"), until, true, Icons.Outlined.EventRepeat, { t, _ -> until = t?.let { it - Math.floorMod(it, DAY) } }, dateOnly = true)
                 }
-                OutlinedTextField(
-                    notes,
-                    { notes = it },
-                    label = { Text(tr("Notes")) },
-                    minLines = 3,
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                Section(null) {
+                    FieldItem(
+                        notes,
+                        { notes = it },
+                        tr("Notes"),
+                        icon = Icons.AutoMirrored.Outlined.Notes,
+                        minLines = 3,
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                    )
+                }
                 Reminders(model, reminders, allDay, event = true)
-                if (ev != null) {
-                    Button(
-                        onClick = { askDelete = true },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                        ),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text(tr("Delete Event")) }
-                }
+                if (ev != null) DeleteButton(tr("Delete Event")) { askDelete = true }
                 Spacer(Modifier.height(EDITOR_END))
             }
         }

@@ -34,14 +34,27 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.FilterList
-import androidx.compose.material.icons.outlined.Label
+import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.DropdownMenu
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
+import androidx.compose.material.icons.automirrored.outlined.FormatIndentDecrease
+import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material.icons.outlined.SubdirectoryArrowRight
+import androidx.compose.ui.draw.clip
+import androidx.compose.material3.DropdownMenuGroup
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenuPopup
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -244,26 +257,12 @@ private fun CategoryFilter(screen: Screen, onPick: (String?) -> Unit) {
                 )
             }
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            DropdownMenuItem(
-                text = { Text(tr("All Categories")) },
-                leadingIcon = { if (screen.filter == null) Icon(Icons.Default.Check, null) },
-                onClick = {
-                    open = false
-                    onPick(null)
-                },
-            )
-            screen.categories.forEach { c ->
-                DropdownMenuItem(
-                    text = { Text(c) },
-                    leadingIcon = { if (screen.filter == c) Icon(Icons.Default.Check, null) },
-                    onClick = {
-                        open = false
-                        onPick(c)
-                    },
-                )
-            }
-        }
+        PickMenu(
+            open,
+            { open = false },
+            listOf(tr("All Categories")) + screen.categories,
+            screen.categories.indexOf(screen.filter) + 1,
+        ) { onPick(screen.categories.getOrNull(it - 1)) }
     }
 }
 
@@ -735,7 +734,7 @@ private fun Meta(model: Main, task: TodavTask, row: TaskRow, now: Long) {
             )
         }
         row.tag?.let {
-            Icon(Icons.Outlined.Label, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.secondary)
+            Icon(Icons.AutoMirrored.Outlined.Label, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.secondary)
             Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary, maxLines = 1)
         }
     }
@@ -759,66 +758,72 @@ private fun RowMenu(
     onAddSubtask: () -> Unit,
     onMove: () -> Unit,
 ) {
-    DropdownMenu(expanded = open, onDismissRequest = onClose) {
+    val actions = listOfNotNull(
+        Triple(tr("Edit…"), Icons.Outlined.Edit) { model.open(Dest.Task(task.uid)) },
+        Triple(tr("Add Subtask"), Icons.Outlined.SubdirectoryArrowRight, onAddSubtask).takeIf { !task.done },
+        Triple(if (task.pinned) tr("Unpin") else tr("Pin"), if (task.pinned) Icons.Filled.PushPin else Icons.Outlined.PushPin) {
+            model.update(task.uid, TaskPatch(pinned = !task.pinned))
+        }.takeIf { pinnable(screen, task, depth) },
+        Triple(tr("Make Top-Level Task"), Icons.AutoMirrored.Outlined.FormatIndentDecrease) {
+            model.act {
+                model.core.promote(task.uid)
+                model.synced()
+            }
+        }.takeIf { task.parentUid != null },
+        Triple(tr("Move to List…"), Icons.AutoMirrored.Outlined.DriveFileMove, onMove),
+    )
+    val groups = if (screen.stars) 3 else 2
+    DropdownMenuPopup(expanded = open, onDismissRequest = onClose) {
         if (screen.stars) {
-            Text(
-                tr("Priority"),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 16.dp, top = 4.dp),
-            )
-            Row(Modifier.padding(horizontal = 8.dp)) {
-                PRIORITIES.forEach { p ->
-                    Tip(priorityName(p)) {
-                        IconToggleButton(
-                            priorityIndex(p) == priorityIndex(task.priority),
-                            {
-                                onClose()
-                                model.update(task.uid, TaskPatch(priority = PriorityValue(p)))
-                            },
-                            colors = IconButtonDefaults.iconToggleButtonColors(checkedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest),
-                        ) { StarIcon(p) }
+            DropdownMenuGroup(MenuDefaults.groupShape(0, groups)) {
+                MenuDefaults.DropdownMenuGroupLabel { Text(tr("Priority")) }
+                Row(Modifier.padding(horizontal = 8.dp)) {
+                    PRIORITIES.forEach { p ->
+                        Tip(priorityName(p)) {
+                            IconToggleButton(
+                                priorityIndex(p) == priorityIndex(task.priority),
+                                {
+                                    onClose()
+                                    model.update(task.uid, TaskPatch(priority = PriorityValue(p)))
+                                },
+                                shapes = IconButtonDefaults.toggleableShapes(),
+                                colors = IconButtonDefaults.iconToggleButtonColors(checkedContainerColor = MaterialTheme.colorScheme.secondaryContainer),
+                            ) { StarIcon(p) }
+                        }
                     }
                 }
             }
-            HorizontalDivider(Modifier.padding(vertical = 4.dp))
+            Spacer(Modifier.height(MenuDefaults.GroupSpacing))
         }
-        DropdownMenuItem(text = { Text(tr("Edit…")) }, onClick = {
-            onClose()
-            model.open(Dest.Task(task.uid))
-        })
-        if (!task.done) {
-            DropdownMenuItem(text = { Text(tr("Add Subtask")) }, onClick = {
-                onClose()
-                onAddSubtask()
-            })
+        DropdownMenuGroup(MenuDefaults.groupShape(groups - 2, groups)) {
+            actions.forEachIndexed { i, (label, icon, act) ->
+                DropdownMenuItem(
+                    onClick = {
+                        onClose()
+                        act()
+                    },
+                    text = { Text(label) },
+                    shape = MenuDefaults.itemShape(i, actions.size).shape,
+                    leadingIcon = { Icon(icon, null) },
+                )
+            }
         }
-        if (pinnable(screen, task, depth)) {
-            DropdownMenuItem(text = { Text(if (task.pinned) tr("Unpin") else tr("Pin")) }, onClick = {
-                onClose()
-                model.update(task.uid, TaskPatch(pinned = !task.pinned))
-            })
+        Spacer(Modifier.height(MenuDefaults.GroupSpacing))
+        DropdownMenuGroup(MenuDefaults.groupShape(groups - 1, groups)) {
+            DropdownMenuItem(
+                onClick = {
+                    onClose()
+                    model.delete(task)
+                },
+                text = { Text(tr("Delete")) },
+                shape = MenuDefaults.itemShape(0, 1).shape,
+                leadingIcon = { Icon(Icons.Outlined.Delete, null) },
+                colors = MenuDefaults.itemColors(
+                    textColor = MaterialTheme.colorScheme.error,
+                    leadingIconColor = MaterialTheme.colorScheme.error,
+                ),
+            )
         }
-        if (task.parentUid != null) {
-            DropdownMenuItem(text = { Text(tr("Make Top-Level Task")) }, onClick = {
-                onClose()
-                model.act {
-                    model.core.promote(task.uid)
-                    model.synced()
-                }
-            })
-        }
-        DropdownMenuItem(text = { Text(tr("Move to List…")) }, onClick = {
-            onClose()
-            onMove()
-        })
-        DropdownMenuItem(
-            text = { Text(tr("Delete"), color = MaterialTheme.colorScheme.error) },
-            onClick = {
-                onClose()
-                model.delete(task)
-            },
-        )
     }
 }
 
@@ -830,19 +835,18 @@ fun MoveDialog(model: Main, task: TodavTask, onDismiss: () -> Unit) {
         onDismissRequest = onDismiss,
         title = { Text(tr("Move to List")) },
         text = {
-            LazyColumn {
+            LazyColumn(Modifier.clip(RoundedCornerShape(24.dp)), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 items(lists, key = { it.href }) { l ->
-                    Row(
-                        Modifier.fillMaxWidth().clickable {
+                    // This package's row, not the core's Item imported here.
+                    dev.aperte.todav.ui.Item(
+                        headlineContent = { Text(l.displayName) },
+                        leadingContent = { ColorMark(dev.aperte.todav.core.listColor(l)) },
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        modifier = Modifier.clickable {
                             onDismiss()
                             model.move(task, l.href)
-                        }.padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        Box(Modifier.size(12.dp).background(parseColor(dev.aperte.todav.core.listColor(l)), androidx.compose.foundation.shape.CircleShape))
-                        Text(l.displayName)
-                    }
+                        },
+                    )
                 }
             }
         },
@@ -889,18 +893,24 @@ fun AddSheet(model: Main, list: String, parent: TodavTask?, category: String?, i
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    placeholder = { Text(if (parent == null) tr("New task") else tr("New subtask")) },
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { add() }),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f).focusRequester(focus),
-                )
-                IconButton(onClick = add, enabled = text.isNotBlank()) {
-                    Icon(Icons.AutoMirrored.Filled.Send, tr("Add Task"))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Group(Modifier.weight(1f)) {
+                    FieldItem(
+                        text,
+                        { text = it },
+                        null,
+                        Modifier.focusRequester(focus),
+                        placeholder = if (parent == null) tr("New task") else tr("New subtask"),
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { add() }),
+                        singleLine = true,
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    )
+                }
+                Tip(tr("Add Task")) {
+                    FilledIconButton(onClick = add, enabled = text.isNotBlank(), modifier = Modifier.size(56.dp)) {
+                        Icon(Icons.AutoMirrored.Filled.Send, tr("Add Task"))
+                    }
                 }
             }
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -916,20 +926,14 @@ fun AddSheet(model: Main, list: String, parent: TodavTask?, category: String?, i
                             selected = cat != null,
                             onClick = { pickCategory = true },
                             label = { Text(cat ?: tr("Category")) },
-                            leadingIcon = { Icon(Icons.Outlined.Label, null, Modifier.size(18.dp)) },
+                            leadingIcon = { Icon(Icons.AutoMirrored.Outlined.Label, null, Modifier.size(18.dp)) },
                         )
-                        DropdownMenu(expanded = pickCategory, onDismissRequest = { pickCategory = false }) {
-                            DropdownMenuItem(text = { Text(ptr("category", "None")) }, onClick = {
-                                pickCategory = false
-                                cat = null
-                            })
-                            categories.forEach { c ->
-                                DropdownMenuItem(text = { Text(c) }, onClick = {
-                                    pickCategory = false
-                                    cat = c
-                                })
-                            }
-                        }
+                        PickMenu(
+                            pickCategory,
+                            { pickCategory = false },
+                            listOf(ptr("category", "None")) + categories,
+                            categories.indexOf(cat) + 1,
+                        ) { cat = categories.getOrNull(it - 1) }
                     }
                 }
                 FilterChip(

@@ -29,6 +29,7 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Notifications
@@ -40,18 +41,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -167,49 +163,6 @@ fun SettingsSubpage(model: Main, page: Page) {
 }
 
 // --- rows ---------------------------------------------------------------------------------------
-
-/** Rows in one rounded container, under `title` if any: as Android's own settings group them. */
-@Composable
-private fun Section(title: String?, content: @Composable ColumnScope.() -> Unit) {
-    if (title != null) {
-        Text(
-            title,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(start = 32.dp, top = 24.dp, bottom = 8.dp),
-        )
-    } else {
-        Spacer(Modifier.height(16.dp))
-    }
-    Column(
-        Modifier.padding(horizontal = 16.dp).clip(RoundedCornerShape(24.dp)),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-        content = content,
-    )
-}
-
-private val ITEM_SHAPE = RoundedCornerShape(4.dp)
-
-/** A row of a [Section]: a box of its own, the section's round corners at its ends. */
-@Composable
-private fun Item(
-    headlineContent: @Composable () -> Unit,
-    modifier: Modifier = Modifier,
-    supportingContent: @Composable (() -> Unit)? = null,
-    leadingContent: @Composable (() -> Unit)? = null,
-    trailingContent: @Composable (() -> Unit)? = null,
-    containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
-) {
-    ListItem(
-        modifier = Modifier.clip(ITEM_SHAPE).then(modifier),
-        leadingContent = leadingContent,
-        trailingContent = trailingContent,
-        supportingContent = supportingContent,
-        shapes = ListItemDefaults.shapes(shape = ITEM_SHAPE),
-        colors = ListItemDefaults.segmentedColors(containerColor = containerColor),
-        content = headlineContent,
-    )
-}
 
 /** A setting kept in the core (synced unless device-only), read again on every change. */
 @Composable
@@ -536,18 +489,9 @@ private fun ReminderRows(model: Main) {
         modifier = Modifier.clickable { pick = true },
     )
     if (pick) {
-        val state = rememberTimePickerState((allDayTime / 3600).toInt(), (allDayTime / 60 % 60).toInt(), hours24)
-        AlertDialog(
-            onDismissRequest = { pick = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    pick = false
-                    model.act { core.setSetting("reminder_time", "${state.hour * 60 + state.minute}") }
-                }) { Text(tr("OK")) }
-            },
-            dismissButton = { TextButton(onClick = { pick = false }) { Text(tr("Cancel")) } },
-            text = { TimePicker(state) },
-        )
+        TimeDialog(tr("Time for all-day tasks"), allDayTime, onDismiss = { pick = false }) { s ->
+            model.act { core.setSetting("reminder_time", "${s / 60}") }
+        }
     }
 }
 
@@ -642,15 +586,15 @@ fun AccountPage(model: Main, id: Long) {
                     })
                 },
             )
+            FieldItem(
+                name,
+                { name = it },
+                tr("Name"),
+                icon = Icons.Outlined.Badge,
+                placeholder = accountName(account.copy(name = "")),
+                singleLine = true,
+            )
         }
-        OutlinedTextField(
-            name,
-            { name = it },
-            label = { Text(tr("Name")) },
-            placeholder = { Text(accountName(account.copy(name = ""))) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 16.dp),
-        )
         LaunchedEffect(name) {
             if (name != account.name) {
                 kotlinx.coroutines.delay(600)

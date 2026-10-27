@@ -125,29 +125,27 @@ fun SearchPage(model: Main) {
                 item(key = "l:$list") { Heading(list) }
                 items(ts, key = { "t:" + it.uid }) { t ->
                     ListItem(
-                        headlineContent = {
-                            Text(
-                                t.summary,
-                                textDecoration = if (t.done) TextDecoration.LineThrough else null,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        },
+                        onClick = { model.open(Dest.Task(t.uid)) },
                         supportingContent = dueLabel(t, now)?.let { { Text(it) } },
                         leadingContent = { Checkbox(t.done, { model.setDone(t, it) }) },
-                        modifier = Modifier.clickable { model.open(Dest.Task(t.uid)) },
-                    )
+                    ) {
+                        Text(
+                            t.summary,
+                            textDecoration = if (t.done) TextDecoration.LineThrough else null,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
             if (events.isNotEmpty()) {
                 item(key = "events") { Heading(tr("Events")) }
                 items(events, key = { "e:" + it.uid + it.start }) { e ->
                     ListItem(
-                        headlineContent = { Text(e.summary, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                        onClick = { details = Item.Event(e) },
                         supportingContent = { Text(eventWhen(e, now)) },
                         leadingContent = { Icon(Icons.Outlined.Event, null, tint = parseColor(colors[e.listHref])) },
-                        modifier = Modifier.clickable { details = Item.Event(e) },
-                    )
+                    ) { Text(e.summary, maxLines = 2, overflow = TextOverflow.Ellipsis) }
                 }
             }
         }

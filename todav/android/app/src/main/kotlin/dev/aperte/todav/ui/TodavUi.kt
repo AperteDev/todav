@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.browser.customtabs.CustomTabsIntent
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,14 +22,24 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material.icons.outlined.Password
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.PhoneAndroid
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -44,7 +55,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -126,18 +139,22 @@ fun AccountChoice(model: Main, welcome: Boolean) {
     val entered = server
     if (entered == null) {
         Text(tr("Tasks and calendar synced with your Nextcloud, or kept on this device"))
-        if (remember { NextcloudApp.installed(context) }) {
-            Choice(tr("Account of the Nextcloud App"), tr("Sign in to the server of an account the Nextcloud app on this device has")) {
-                pick.launch(NextcloudApp.chooser(context))
+        Group {
+            if (remember { NextcloudApp.installed(context) }) {
+                Choice(
+                    tr("Account of the Nextcloud App"),
+                    tr("Sign in to the server of an account the Nextcloud app on this device has"),
+                    Icons.Outlined.AccountCircle,
+                ) { pick.launch(NextcloudApp.chooser(context)) }
             }
-        }
-        Choice(tr("Nextcloud Server"), tr("Sign in to your Nextcloud; Todav gets an app password of its own")) {
-            server = ""
-        }
-        if (model.core.accounts().none { it.kind == dev.aperte.todav.core.AccountKind.LOCAL }) {
-            Choice(tr("On This Device Only"), tr("Lists and calendars that stay on this device")) {
-                model.useLocally()
-                if (!welcome) model.back()
+            Choice(tr("Nextcloud Server"), tr("Sign in to your Nextcloud; Todav gets an app password of its own"), Icons.Outlined.Cloud) {
+                server = ""
+            }
+            if (model.core.accounts().none { it.kind == dev.aperte.todav.core.AccountKind.LOCAL }) {
+                Choice(tr("On This Device Only"), tr("Lists and calendars that stay on this device"), Icons.Outlined.PhoneAndroid) {
+                    model.useLocally()
+                    if (!welcome) model.back()
+                }
             }
         }
         if (welcome) {
@@ -158,14 +175,13 @@ fun AccountChoice(model: Main, welcome: Boolean) {
 }
 
 @Composable
-fun Choice(title: String, description: String, onClick: () -> Unit) {
-    ElevatedCard(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(description, style = MaterialTheme.typography.bodyMedium)
-        }
-    }
-}
+private fun Choice(title: String, description: String, icon: ImageVector, onClick: () -> Unit) = Item(
+    headlineContent = { Text(title) },
+    supportingContent = { Text(description) },
+    leadingContent = { Icon(icon, null) },
+    trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null) },
+    modifier = Modifier.clickable(onClick = onClick),
+)
 
 /** A server to sign in to, with the browser or an app password; `onDone` gets the credentials. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -186,15 +202,17 @@ fun SignInForm(
         LaunchedEffect(s.url) { CustomTabsIntent.Builder().build().launchUrl(context, s.url.toUri()) }
     }
     Text(tr("Sign in with the browser or an app password"))
-    OutlinedTextField(
-        value = server,
-        onValueChange = onServer,
-        label = { Text(tr("Nextcloud server")) },
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
-        keyboardActions = KeyboardActions(onGo = { model.signInWithBrowser(server, onDone, login) }),
-        modifier = Modifier.fillMaxWidth(),
-    )
+    Group {
+        FieldItem(
+            server,
+            onServer,
+            tr("Nextcloud server"),
+            icon = Icons.Outlined.Cloud,
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
+            keyboardActions = KeyboardActions(onGo = { model.signInWithBrowser(server, onDone, login) }),
+        )
+    }
     when (s) {
         SignIn.Working, is SignIn.Browser -> Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -224,27 +242,50 @@ fun SignInForm(
 private fun PasswordDialog(initial: String, onDismiss: () -> Unit, onConnect: (String, String) -> Unit) {
     var login by rememberSaveable { mutableStateOf(initial) }
     var secret by remember { mutableStateOf("") }
+    var shown by remember { mutableStateOf(false) }
+    val ready = login.isNotBlank() && secret.isNotEmpty()
+    val field = MaterialTheme.colorScheme.surfaceContainerHighest
     AlertDialog(
         onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Outlined.Key, null) },
         title = { Text(tr("Sign In with Password")) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(tr("Create an app password in Nextcloud under Settings → Security"))
-                OutlinedTextField(login, { login = it }, label = { Text(tr("Login name")) }, singleLine = true)
-                OutlinedTextField(
-                    secret,
-                    { secret = it },
-                    label = { Text(tr("App password")) },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                )
+                Group {
+                    FieldItem(
+                        login,
+                        { login = it },
+                        tr("Login name"),
+                        icon = Icons.Outlined.Person,
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        containerColor = field,
+                    )
+                    FieldItem(
+                        secret,
+                        { secret = it },
+                        tr("App password"),
+                        icon = Icons.Outlined.Password,
+                        trailing = {
+                            val label = if (shown) tr("Hide Password") else tr("Show Password")
+                            Tip(label) {
+                                IconButton(onClick = { shown = !shown }) {
+                                    Icon(if (shown) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility, label)
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        visualTransformation = if (shown) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { if (ready) onConnect(login, secret) }),
+                        containerColor = field,
+                    )
+                }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConnect(login, secret) }, enabled = login.isNotBlank() && secret.isNotEmpty()) {
-                Text(tr("Connect"))
-            }
+            Button(onClick = { onConnect(login, secret) }, enabled = ready) { Text(tr("Connect")) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(tr("Cancel")) } },
     )

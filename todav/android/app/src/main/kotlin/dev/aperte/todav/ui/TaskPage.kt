@@ -14,21 +14,23 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Label
+import androidx.compose.material.icons.automirrored.outlined.Notes
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.LinkOff
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Title
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -37,12 +39,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.graphics.Color
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -70,6 +67,7 @@ import dev.aperte.todav.core.ReminderSpan
 import dev.aperte.todav.core.TaskPatch
 import dev.aperte.todav.core.TextValue
 import dev.aperte.todav.core.TodavTask
+import dev.aperte.todav.core.listColor
 import dev.aperte.todav.core.reminderOffset
 import dev.aperte.todav.core.reminderSpan
 import dev.aperte.todav.core.trees
@@ -158,88 +156,90 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null) {
             Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Column(
-                Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
+            Column(Modifier.widthIn(max = 640.dp).fillMaxWidth()) {
                 task.syncError?.let { error ->
-                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                        modifier = Modifier.padding(horizontal = 16.dp).padding(top = 16.dp),
+                    ) {
                         Column(Modifier.padding(16.dp)) {
                             Text(tr("Not saved on the server"), style = MaterialTheme.typography.titleSmall)
                             Text(error, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
-                OutlinedTextField(
-                    summary,
-                    { summary = it },
-                    label = { Text(tr("Title")) },
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                ChoiceField(tr("List"), lists.map { it.displayName }, lists.indexOfFirst { it.href == list }) {
-                    list = lists[it].href
-                }
-                SuggestField(tr("Category"), category, categories) { category = it }
-                Text(tr("Priority"), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    PRIORITIES.forEachIndexed { i, p ->
-                        SegmentedButton(
-                            selected = priorityIndex(priority) == i,
-                            onClick = { priority = p },
-                            shape = SegmentedButtonDefaults.itemShape(i, PRIORITIES.size),
-                            label = { Text(priorityName(p)) },
-                        )
-                    }
+                Section(null) {
+                    FieldItem(
+                        summary,
+                        { summary = it },
+                        tr("Title"),
+                        icon = Icons.Outlined.Title,
+                        textStyle = MaterialTheme.typography.titleLarge,
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                    )
+                    ChoiceItem(
+                        tr("List"),
+                        lists.map { it.displayName },
+                        lists.indexOfFirst { it.href == list },
+                        mark = { ColorMark(lists.getOrNull(it)?.let(::listColor)) },
+                    ) { list = lists[it].href }
+                    SuggestField(tr("Category"), category, categories, Icons.AutoMirrored.Outlined.Label) { category = it }
+                    Item(
+                        leadingContent = { StarIcon(priority) },
+                        headlineContent = {
+                            Connected(PRIORITIES.map(::priorityName), priorityIndex(priority)) { priority = PRIORITIES[it] }
+                        },
+                    )
                 }
                 event?.let { e ->
                     val ev = remember(e) { core.event(e) }
-                    ListItem(
-                        headlineContent = { Text(ev?.summary ?: tr("Unknown event")) },
-                        overlineContent = { Text(tr("For Event")) },
-                        supportingContent = { ev?.let { Text(dayLabel(it.start, it.allDay, core.localNow())) } },
-                        leadingContent = { Icon(Icons.Outlined.Event, null) },
-                        trailingContent = {
-                            IconButton(onClick = { event = null }) { Icon(Icons.Outlined.LinkOff, tr("Unlink From Event")) }
-                        },
-                        modifier = Modifier.clickable(enabled = ev != null) { ev?.let { model.showDay(it.start) } },
+                    Section(null) {
+                        Item(
+                            headlineContent = { Text(ev?.summary ?: tr("Unknown event")) },
+                            overlineContent = { Text(tr("For Event")) },
+                            supportingContent = { ev?.let { Text(dayLabel(it.start, it.allDay, core.localNow())) } },
+                            leadingContent = { Icon(Icons.Outlined.Event, null) },
+                            trailingContent = {
+                                Tip(tr("Unlink From Event")) {
+                                    IconButton(onClick = { event = null }) { Icon(Icons.Outlined.LinkOff, tr("Unlink From Event")) }
+                                }
+                            },
+                            modifier = Modifier.clickable(enabled = ev != null) { ev?.let { model.showDay(it.start) } },
+                        )
+                    }
+                }
+                Section(null) {
+                    FieldItem(
+                        note,
+                        { note = it },
+                        tr("Note"),
+                        icon = Icons.AutoMirrored.Outlined.Notes,
+                        minLines = 3,
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                     )
                 }
-                OutlinedTextField(
-                    note,
-                    { note = it },
-                    label = { Text(tr("Note")) },
-                    minLines = 3,
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                DateTimeField(tr("Start"), start, startAllDay, Icons.Outlined.PlayArrow, { t, allDay ->
-                    start = t
-                    startAllDay = allDay
-                })
-                DateTimeField(tr("Due Date"), due, dueAllDay, Icons.Outlined.CalendarToday, { t, allDay ->
-                    // A first due date gets the default reminder; a change between a date and a time
-                    // takes the other kind's.
-                    if (t != null && (due == null || allDay != dueAllDay)) {
-                        reminders.clear()
-                        reminders.add(core.defaultReminder(allDay))
-                    }
-                    if (t == null) reminders.clear()
-                    due = t
-                    dueAllDay = allDay
-                })
+                Section(null) {
+                    DateTimeField(tr("Start"), start, startAllDay, Icons.Outlined.PlayArrow, { t, allDay ->
+                        start = t
+                        startAllDay = allDay
+                    })
+                    DateTimeField(tr("Due Date"), due, dueAllDay, Icons.Outlined.CalendarToday, { t, allDay ->
+                        // A first due date gets the default reminder; a change between a date and a time
+                        // takes the other kind's.
+                        if (t != null && (due == null || allDay != dueAllDay)) {
+                            reminders.clear()
+                            reminders.add(core.defaultReminder(allDay))
+                        }
+                        if (t == null) reminders.clear()
+                        due = t
+                        dueAllDay = allDay
+                    })
+                }
                 if (due != null) {
                     Reminders(model, reminders, dueAllDay, event = false)
                 }
                 Subtasks(model, task)
-                Button(
-                    onClick = { confirmDelete = true },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text(tr("Delete Task")) }
+                DeleteButton(tr("Delete Task")) { confirmDelete = true }
                 Spacer(Modifier.height(EDITOR_END))
             }
         }
@@ -283,17 +283,24 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null) {
 fun Reminders(model: Main, reminders: MutableList<Long>, allDay: Boolean, event: Boolean) {
     val core = model.core
     val presets = reminderPresets(core.reminderPresets(allDay), allDay, event, core.allDayTime())
-    SectionTitle(tr("Reminders"))
     // Rows whose user picked "Custom…" stay custom even when the span matches a preset.
     val custom = remember { mutableStateListOf<Int>() }
-    reminders.forEachIndexed { i, offset ->
-        val preset = presets.indexOfFirst { it.second == offset }.takeIf { i !in custom }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            ChoiceField(
-                tr("Reminder"),
+    Section(tr("Reminders")) {
+        reminders.forEachIndexed { i, offset ->
+            val preset = presets.indexOfFirst { it.second == offset }.takeIf { i !in custom }
+            ChoiceItem(
+                null,
                 presets.map { it.first } + tr("Custom…"),
                 preset ?: presets.size,
-                Modifier.weight(1f),
+                icon = Icons.Outlined.Notifications,
+                trailing = {
+                    Tip(tr("Remove Reminder")) {
+                        IconButton(onClick = {
+                            custom.remove(i)
+                            reminders.removeAt(i)
+                        }) { Icon(Icons.Default.Close, tr("Remove Reminder")) }
+                    }
+                },
             ) { c ->
                 if (c < presets.size) {
                     custom.remove(i)
@@ -302,36 +309,32 @@ fun Reminders(model: Main, reminders: MutableList<Long>, allDay: Boolean, event:
                     custom.add(i)
                 }
             }
-            IconButton(onClick = {
-                custom.remove(i)
-                reminders.removeAt(i)
-            }) { Icon(Icons.Default.Close, tr("Remove Reminder")) }
-        }
-        if (preset == null) {
-            val span = reminderSpan(offset)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = "${span.amount}",
-                    onValueChange = { v ->
-                        v.toLongOrNull()?.takeIf { it in 0..999 }?.let {
-                            reminders[i] = reminderOffset(ReminderSpan(it, span.unit, span.before))
-                        }
-                    },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(),
-                    modifier = Modifier.weight(0.7f),
-                )
-                ChoiceField("", reminderUnits(), span.unit.toInt(), Modifier.weight(1f)) {
-                    reminders[i] = reminderOffset(ReminderSpan(span.amount, it.toUInt(), span.before))
+            if (preset == null) {
+                val span = reminderSpan(offset)
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    FieldItem(
+                        "${span.amount}",
+                        { v ->
+                            v.toLongOrNull()?.takeIf { it in 0..999 }?.let {
+                                reminders[i] = reminderOffset(ReminderSpan(it, span.unit, span.before))
+                            }
+                        },
+                        null,
+                        Modifier.weight(1f),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                    )
+                    ChoiceItem(null, reminderUnits(), span.unit.toInt(), Modifier.weight(2f)) {
+                        reminders[i] = reminderOffset(ReminderSpan(span.amount, it.toUInt(), span.before))
+                    }
                 }
-                ChoiceField("", reminderDirections(allDay), if (span.before) 0 else 1, Modifier.weight(1.3f)) {
+                ChoiceItem(null, reminderDirections(allDay), if (span.before) 0 else 1) {
                     reminders[i] = reminderOffset(ReminderSpan(span.amount, span.unit, it == 0))
                 }
             }
         }
+        AddItem(tr("Add Reminder")) { reminders.add(core.defaultReminder(allDay)) }
     }
-    OutlinedButton(onClick = { reminders.add(core.defaultReminder(allDay)) }) { Text(tr("Add Reminder")) }
 }
 
 /** A task's subtasks, ticked and added at once (each its own undo step). */
@@ -349,31 +352,29 @@ private fun Subtasks(model: Main, task: TodavTask) {
             }
     }
     var text by rememberSaveable { mutableStateOf("") }
-    SectionTitle(tr("Subtasks"))
-    subtasks.forEach { s ->
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable {
-            model.open(dev.aperte.todav.Dest.Task(s.uid))
-        }) {
-            Checkbox(checked = s.done, onCheckedChange = { model.setDone(s, it) })
-            Text(
-                s.summary,
-                textDecoration = if (s.done) TextDecoration.LineThrough else null,
-                modifier = Modifier.weight(1f),
+    if (subtasks.isEmpty() && task.done) return
+    Section(tr("Subtasks")) {
+        subtasks.forEach { s ->
+            Item(
+                leadingContent = { Checkbox(checked = s.done, onCheckedChange = { model.setDone(s, it) }) },
+                headlineContent = { Text(s.summary, textDecoration = if (s.done) TextDecoration.LineThrough else null) },
+                modifier = Modifier.clickable { model.open(dev.aperte.todav.Dest.Task(s.uid)) },
             )
         }
-    }
-    if (!task.done) {
-        OutlinedTextField(
-            text,
-            { text = it },
-            placeholder = { Text(tr("Add Subtask")) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = {
-                model.add(task.listHref, text, task.uid, task.category)
-                text = ""
-            }),
-            modifier = Modifier.fillMaxWidth(),
-        )
+        if (!task.done) {
+            FieldItem(
+                text,
+                { text = it },
+                null,
+                icon = Icons.Default.Add,
+                placeholder = tr("Add Subtask"),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = {
+                    model.add(task.listHref, text, task.uid, task.category)
+                    text = ""
+                }),
+            )
+        }
     }
 }
