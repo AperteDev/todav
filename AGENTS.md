@@ -159,13 +159,23 @@
     scrolling abort it the same way: wait for a sync to finish before interacting. Use it for quick looks; to change a setting, write it to the stopped app's
     database (`kv`: `setting_<key>` plus `settime_<key>` = now) instead of using Preferences.
   - After a while some icons are no longer drawn; cosmetic, Broadway only.
-- For drag and drop, popovers and animations, use a headless nested GNOME Shell instead: copy
-  `todav/gnome-extension/run-nested.sh` with another `display`, `gnome-shell --headless
-  --unsafe-mode --virtual-monitor WxH` instead of `--devkit`, and absolute paths. Drive it through
-  `org.gnome.Shell.Eval` on its bus: a Clutter virtual pointer/keyboard
-  (`seat.create_virtual_device`) for input (turn hot corners off first: the pointer starts at
-  0,0), `org.gnome.Shell.Screenshot` for screenshots. Give the app its own `XDG_DATA_HOME` (a copy
-  of the database made with `sqlite3 .backup`) so the migration and test edits stay off the real
-  one.
+- For what Broadway cannot do (popovers, animations, drag and drop), use the `waydriver` MCP
+  server (`waydriver-mcp`, installed with `cargo install waydriver-mcp` and registered at user
+  level): `start_session` with `command` the absolute path of `scripts/waydriver-app.sh` and
+  `app_name` `todav-waydriver`. It runs the sandbox copy in a headless Mutter of its own (its own
+  screen and input: nothing reaches the desktop, the normal app can stay running), finds widgets
+  in the accessibility tree by XPath, and records each session (report under `/tmp/waydriver`).
+  Build the app first. What works:
+  - Find buttons and the like by name (`//ToggleButton[@name='Search (Ctrl+F)']`; icon buttons
+    are named after their tooltip; list rows have no name yet: `(//ListItem)[n]`). Never another
+    `app_name`: the tree is the desktop's, and a copy running there under its own name would be
+    driven instead.
+  - Click with `hover` then `pointer_click`; the first pointer click of a session is often lost,
+    so check the result (`query` for states such as `pressed`, `take_screenshot`) and click
+    again. `click` (the accessibility action) does nothing on rows and labels.
+  - Menus open (F10 for a primary menu) but their items are not in the tree: point at them by
+    their place in a screenshot (`move_pointer_absolute`, `pointer_click`), or use the keyboard.
+  - `read_text` reads a text field or view; `press_key`, `type_text` type. The sandbox syncs
+    with the Test account: what a session changes there, put back.
 - In the real GNOME Wayland session, xdotool and synthetic uinput input do not reach the window,
   and screenshots of it are not available.
