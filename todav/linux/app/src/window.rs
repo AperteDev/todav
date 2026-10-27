@@ -1161,12 +1161,12 @@ fn refresh_lists(ui: &Rc<Ui>) {
         row.append(&name);
         row.append(&count);
         ui.sidebar.append(&row);
-        if let Some(r) = row
-            .parent()
-            .and_downcast::<gtk::ListBoxRow>()
-            .filter(|_| l.writable)
-        {
-            list_drop(ui, &r, &l.href);
+        if let Some(r) = row.parent().and_downcast::<gtk::ListBoxRow>() {
+            if l.writable {
+                list_drop(ui, &r, &l.href);
+            }
+            let siblings = lists.iter().filter(|s| s.account == l.account);
+            crate::lists::reorderable(&r, l, siblings.map(|s| s.href.clone()).collect());
         }
     }
     // Upcoming and Important first, then the lists grouped by where they are kept.

@@ -534,10 +534,7 @@ fn connect_reorder(row: &adw::ActionRow, id: i64, title: &str) {
     let r = row.clone();
     drag.connect_drag_end(move |_, _, _| {
         r.remove_css_class("dragged");
-        // Cancelled drags get no leave.
-        if let Some((_, w, c)) = DROP_MARK.take() {
-            w.remove_css_class(c);
-        }
+        crate::lists::clear_mark();
     });
     handle.add_controller(drag);
     row.add_prefix(&handle);
@@ -547,18 +544,18 @@ fn connect_reorder(row: &adw::ActionRow, id: i64, title: &str) {
     let drop = gtk::DropTarget::new(i64::static_type(), gtk::gdk::DragAction::MOVE);
     drop.connect_motion(move |dt, _, y| {
         if let Some(w) = dt.widget() {
-            mark(&w, below(dt, y));
+            crate::lists::mark(&w, below(dt, y));
         }
         gtk::gdk::DragAction::MOVE
     });
     drop.connect_leave(|dt| {
         if let Some(w) = dt.widget() {
-            unmark(&w);
+            crate::lists::unmark(&w);
         }
     });
     drop.connect_drop(move |dt, value, _, y| {
         if let Some(w) = dt.widget() {
-            unmark(&w);
+            crate::lists::unmark(&w);
         }
         let Ok(moved) = value.get::<i64>() else {
             return false;
@@ -580,41 +577,6 @@ fn connect_reorder(row: &adw::ActionRow, id: i64, title: &str) {
         true
     });
     row.add_controller(drop);
-}
-
-thread_local! {
-    /// The drop line between account rows: (row dragged over, row showing it, its class).
-    static DROP_MARK: RefCell<Option<(gtk::Widget, gtk::Widget, &'static str)>> =
-        const { RefCell::new(None) };
-}
-
-/// Show where a drop on `owner` lands. Below it is drawn as the line above the next row when
-/// there is one, so the gap between two rows has a single line (as the task rows do).
-fn mark(owner: &gtk::Widget, below: bool) {
-    let (w, class) = match owner.next_sibling().filter(|_| below) {
-        Some(next) => (next, "drop-above"),
-        None => (
-            owner.clone(),
-            if below { "drop-below" } else { "drop-above" },
-        ),
-    };
-    DROP_MARK.with_borrow_mut(|m| {
-        if let Some((_, old, c)) = m.take() {
-            old.remove_css_class(c);
-        }
-        w.add_css_class(class);
-        *m = Some((owner.clone(), w, class));
-    });
-}
-
-/// Remove the line `owner` drew; one the row now entered drew stays.
-fn unmark(owner: &gtk::Widget) {
-    DROP_MARK.with_borrow_mut(|m| {
-        if m.as_ref().is_some_and(|(o, _, _)| o == owner) {
-            let (_, w, c) = m.take().unwrap();
-            w.remove_css_class(c);
-        }
-    });
 }
 
 fn account_icon(a: &Account) -> &'static str {

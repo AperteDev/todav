@@ -226,6 +226,8 @@ pub struct RemoteList {
     pub events: bool,
     /// We may change it (shared read-only calendars and Birthdays may not).
     pub writable: bool,
+    /// Its place among the user's calendars (calendar-order; 0 when not set).
+    pub order: i64,
 }
 
 pub enum SyncResult {
@@ -402,7 +404,7 @@ impl Dav {
     pub fn discover(&self) -> Result<Vec<RemoteList>> {
         let home = self.home()?;
         let props = format!(
-            r#"<d:resourcetype/><d:displayname/><d:sync-token/><cs:getctag/><a:calendar-color/><c:supported-calendar-component-set/><d:current-user-privilege-set/><p:transports xmlns:p="{PUSH}"/><p:topic xmlns:p="{PUSH}"/>"#
+            r#"<d:resourcetype/><d:displayname/><d:sync-token/><cs:getctag/><a:calendar-color/><a:calendar-order/><c:supported-calendar-component-set/><d:current-user-privilege-set/><p:transports xmlns:p="{PUSH}"/><p:topic xmlns:p="{PUSH}"/>"#
         );
         let mut lists = Vec::new();
         for r in self.propfind(&home, "1", &props)? {
@@ -437,6 +439,10 @@ impl Dav {
                     .child(PUSH, "transports")
                     .and_then(|t| t.child(PUSH, "web-push"))
                     .map(|w| w.find_text(PUSH, "vapid-public-key").unwrap_or_default()),
+                order: p
+                    .find_text(APPLE, "calendar-order")
+                    .and_then(|o| o.trim().parse().ok())
+                    .unwrap_or(0),
                 href: r.href,
                 tasks,
                 events,
@@ -537,10 +543,22 @@ impl Dav {
     }
 
     /// Rename and recolour calendar `href`.
-    pub fn proppatch(&self, href: &str, name: &str, color: &str) -> Result<()> {
+    pub fn rename(&self, href: &str, name: &str, color: &str) -> Result<()> {
+        self.proppatch(href, &name_and_color(name, color))
+    }
+
+    /// Give calendar `href` its place among the user's calendars.
+    pub fn set_order(&self, href: &str, order: i64) -> Result<()> {
+        self.proppatch(
+            href,
+            &format!("<a:calendar-order>{order}</a:calendar-order>"),
+        )
+    }
+
+    /// Set properties (`props`, in the `a:` namespace for Apple's) of calendar `href`.
+    fn proppatch(&self, href: &str, props: &str) -> Result<()> {
         let body = format!(
-            r#"<?xml version="1.0" encoding="utf-8"?><d:propertyupdate xmlns:d="DAV:" xmlns:a="{APPLE}"><d:set><d:prop>{}</d:prop></d:set></d:propertyupdate>"#,
-            name_and_color(name, color)
+            r#"<?xml version="1.0" encoding="utf-8"?><d:propertyupdate xmlns:d="DAV:" xmlns:a="{APPLE}"><d:set><d:prop>{props}</d:prop></d:set></d:propertyupdate>"#
         );
         let r = self.request("PROPPATCH", href, &[], &body)?;
         if r.status != 207 {

@@ -108,6 +108,13 @@ ALTER TABLE lists ADD COLUMN account INTEGER REFERENCES accounts(id) ON DELETE C
 ALTER TABLE accounts ADD COLUMN position INTEGER NOT NULL DEFAULT 0;
 UPDATE accounts SET position = id;
 "#,
+    // The user's order of the lists, within their account: the server's calendar-order (0 until
+    // set), or for lists on this device only ours; `position_dirty`: a new one waits for the
+    // server.
+    r#"
+ALTER TABLE lists ADD COLUMN position INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE lists ADD COLUMN position_dirty INTEGER NOT NULL DEFAULT 0;
+"#,
 ];
 
 /// `user_version` after the migration that adds accounts.
@@ -356,14 +363,15 @@ pub fn kv_set(db: &Connection, key: &str, value: &str) -> Result<()> {
     Ok(())
 }
 
-/// Every list and calendar; each server one keyed by its full URL (`Dav::absolute`).
+/// Every list and calendar, in the user's order (`Client::reorder_lists`), then by name; each
+/// server one keyed by its full URL (`Dav::absolute`).
 pub fn lists(db: &Connection) -> Result<Vec<List>> {
     let mut st = db.prepare(
         "SELECT l.href, l.display_name, l.color,
            (SELECT COUNT(*) FROM tasks t WHERE t.list_href = l.href AND t.dirty != 2
               AND t.status NOT IN ('COMPLETED', 'CANCELLED')),
            l.has_tasks, l.has_events, l.writable, COALESCE(l.account, 0)
-         FROM lists l ORDER BY l.display_name COLLATE NOCASE",
+         FROM lists l ORDER BY l.position, l.display_name COLLATE NOCASE",
     )?;
     let rows = st.query_map([], |r| {
         let href: String = r.get(0)?;

@@ -50,6 +50,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
@@ -60,6 +61,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
@@ -70,7 +72,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import kotlin.math.roundToInt
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -332,6 +338,34 @@ private fun Sidebar(model: Main, screen: Screen, view: View, modifier: Modifier,
     var newList by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<String?>(null) }
     val calendars by model.calendarLists.collectAsStateWithLifecycle()
+    // A list held to move, and the order it was dropped in until the lists come back in it.
+    var moving by remember { mutableStateOf<Moving?>(null) }
+    var dropped by remember { mutableStateOf<List<String>?>(null) }
+    LaunchedEffect(screen.places, calendars) { dropped = null }
+    val row = with(LocalDensity.current) { 56.dp.toPx() }
+    /** Drawer row `key` (one of `among`, its account's lists) moves when held and dragged; held alone, it is edited. */
+    @Composable
+    fun Modifier.movable(key: String, among: List<String>?): Modifier {
+        val held = moving?.key == key
+        val aside by animateFloatAsState(if (held) 0f else moving?.offset(key, row) ?: 0f, label = "aside")
+        return holdToMove(
+            among != null,
+            onMove = { dy ->
+                val m = moving?.takeIf { it.key == key } ?: Moving(key, among.orEmpty()).also { moving = it }
+                m.shift = dy
+            },
+            onEnd = { moved ->
+                val m = moving
+                moving = null
+                if (!moved) {
+                    editing = key
+                } else if (m != null && m.target(row) != m.from) {
+                    dropped = m.order(row)
+                    model.reorderLists(m.order(row))
+                }
+            },
+        ).zIndex(if (held) 1f else 0f).graphicsLayer { translationY = if (held) moving?.shift ?: 0f else aside }
+    }
     LazyColumn(
         modifier.background(MaterialTheme.colorScheme.surfaceContainerLow)
             .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Vertical)),
@@ -345,27 +379,34 @@ private fun Sidebar(model: Main, screen: Screen, view: View, modifier: Modifier,
             )
         }
         if (view == View.TASKS) {
-            items(screen.places, key = { "t:" + it.key }) { place ->
-                place.heading?.let { DrawerHeading(it) }
-                NavigationDrawerItem(
-                    label = { Text(place.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    icon = { PlaceIcon(place) },
-                    badge = { if (place.count > 0) Text("${place.count}") },
-                    selected = place.key == screen.current,
-                    onClick = {
-                        model.select(place.key)
-                        model.show(View.TASKS)
-                        close()
-                    },
-                    modifier = Modifier.padding(horizontal = 12.dp).longPress(place.key != UPCOMING && place.key != IMPORTANT) {
-                        editing = place.key
-                    },
-                )
+            val places = arranged(screen.places, dropped, { it.key }, { it.heading }) { p, h -> p.copy(heading = h) }
+            // Headings are rows of their own, staying put while a list moves under them.
+            places.forEach { place ->
+                place.heading?.let { item(key = "th:" + place.key) { DrawerHeading(it) } }
+                item(key = "t:" + place.key) {
+                    val among = place.account?.let { a -> places.filter { it.account == a }.map { it.key } }
+                    NavigationDrawerItem(
+                        label = { Text(place.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        icon = { PlaceIcon(place) },
+                        badge = { if (place.count > 0) Text("${place.count}") },
+                        selected = place.key == screen.current,
+                        onClick = {
+                            model.select(place.key)
+                            model.show(View.TASKS)
+                            close()
+                        },
+                        colors = heldColors(moving?.key == place.key),
+                        modifier = Modifier.movable(place.key, among).padding(horizontal = 12.dp),
+                    )
+                }
             }
         }
         if (view == View.CALENDAR) {
-            items(calendars, key = { "c:" + it.href }) { c ->
-                c.heading?.let { DrawerHeading(it) }
+            val rows = arranged(calendars, dropped, { it.href }, { it.heading }) { c, h -> c.copy(heading = h) }
+            rows.forEach { c ->
+                c.heading?.let { item(key = "ch:" + c.href) { DrawerHeading(it) } }
+                item(key = "c:" + c.href) {
+                val among = rows.filter { it.account == c.account }.map { it.href }
                 NavigationDrawerItem(
                     label = { Text(c.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     icon = {
@@ -378,8 +419,10 @@ private fun Sidebar(model: Main, screen: Screen, view: View, modifier: Modifier,
                     },
                     selected = false,
                     onClick = { model.setShown(c.href, !c.shown) },
-                    modifier = Modifier.padding(horizontal = 12.dp).longPress(true) { editing = c.href },
+                    colors = heldColors(moving?.key == c.href),
+                    modifier = Modifier.movable(c.href, among).padding(horizontal = 12.dp),
                 )
+                }
             }
         }
         item(key = "end") {
@@ -403,6 +446,49 @@ private fun Sidebar(model: Main, screen: Screen, view: View, modifier: Modifier,
     if (newList) ListDialog(model, null, view == View.CALENDAR) { newList = false }
     editing?.let { href -> ListDialog(model, href, false) { editing = null } }
 }
+
+/** A drawer row held to move among `among` (its account's, in order), dragged `shift` px. */
+private class Moving(val key: String, val among: List<String>) {
+    var shift by mutableFloatStateOf(0f)
+    val from = among.indexOf(key)
+
+    /** Where it lands, with rows `row` px high. */
+    fun target(row: Float) = (from + (shift / row).roundToInt()).coerceIn(0, among.lastIndex)
+
+    /** How far row `k` steps aside for it: one row, for those it passes. */
+    fun offset(k: String, row: Float): Float {
+        val i = among.indexOf(k)
+        val to = target(row)
+        return when {
+            i < 0 -> 0f
+            i in from + 1..to -> -row
+            i in to until from -> row
+            else -> 0f
+        }
+    }
+
+    /** The new order. */
+    fun order(row: Float) = among.toMutableList().apply { add(target(row), removeAt(from)) }
+}
+
+/**
+ * `rows` with those whose key is in `order` (one account's) put in that order, where they are;
+ * headings stay where they were.
+ */
+private fun <T> arranged(
+    rows: List<T>, order: List<String>?, key: (T) -> String, heading: (T) -> String?, withHeading: (T, String?) -> T,
+): List<T> {
+    if (order == null) return rows
+    val byKey = rows.associateBy(key)
+    val next = order.mapNotNull { byKey[it] }.iterator()
+    return rows.map { r -> if (key(r) in order && next.hasNext()) withHeading(next.next(), heading(r)) else r }
+}
+
+/** A drawer row's colours; raised while `held` to move. */
+@Composable
+private fun heldColors(held: Boolean) = NavigationDrawerItemDefaults.colors(
+    unselectedContainerColor = if (held) MaterialTheme.colorScheme.surfaceContainerHighest else Color.Transparent,
+)
 
 @Composable
 private fun DrawerHeading(text: String) {

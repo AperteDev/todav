@@ -287,6 +287,11 @@ impl Todav {
         Ok(self.c().edit_list(href, name, color)?)
     }
 
+    /// Put lists in this order (those of one account, as a sidebar shows them).
+    pub fn reorder_lists(&self, hrefs: Vec<String>) -> Result<()> {
+        Ok(self.c().reorder_lists(hrefs)?)
+    }
+
     pub fn delete_list(&self, href: String) -> Result<()> {
         Ok(self.c().delete_list(href)?)
     }

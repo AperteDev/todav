@@ -32,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from a menu.
 - Calendar: an event's or a task's title can be changed right in its details popover: click it,
   type, press Enter.
+- Lists and calendars can be put in any order by dragging them in the sidebar, within their
+  account; with Nextcloud the order is shared with its Calendar and Tasks apps and other
+  devices, lists on this device keep theirs here. On Android, hold a list, then drag it.
 - Linux: the sidebar can be hidden with the button at the start of the header or F9; in a
   narrow window it opens over the content instead of in place of it.
 

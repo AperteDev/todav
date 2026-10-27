@@ -967,15 +967,9 @@ fn refresh_calendars(c: &Rc<Cal>) {
             all.push(l);
         }
     }
-    // Calendars, then task lists, each grouped by account.
+    // Calendars, then task lists, each grouped by account, in the user's order.
     let rank = todav_app::lists::rank(core());
-    all.sort_by_key(|l| {
-        (
-            !l.holds_events,
-            rank(l.account),
-            l.display_name.to_lowercase(),
-        )
-    });
+    all.sort_by_key(|l| (!l.holds_events, rank(l.account)));
     let hidden = hidden();
     if *c.lists.borrow() == all && *c.hidden.borrow() == hidden {
         return;
@@ -1009,12 +1003,14 @@ fn refresh_calendars(c: &Rc<Cal>) {
         } else {
             c.task_lists.append(&row);
         }
-        if let Some(r) = row
-            .parent()
-            .and_downcast::<gtk::ListBoxRow>()
-            .filter(|_| l.writable)
-        {
-            list_drop(&r, l);
+        if let Some(r) = row.parent().and_downcast::<gtk::ListBoxRow>() {
+            if l.writable {
+                list_drop(&r, l);
+            }
+            let siblings = all
+                .iter()
+                .filter(|s| s.holds_events == l.holds_events && s.account == l.account);
+            crate::lists::reorderable(&r, l, siblings.map(|s| s.href.clone()).collect());
         }
     }
     for (rows, events) in [(&c.calendars, true), (&c.task_lists, false)] {

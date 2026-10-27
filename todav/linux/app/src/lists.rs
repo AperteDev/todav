@@ -176,6 +176,127 @@ pub fn context_menu(
     rows.add_controller(hold);
 }
 
+/// Sidebar row `row` of list `l` moves by dragging onto another of `siblings` (the hrefs of its
+/// account's lists in that sidebar section, in order): above or below that one (its upper or
+/// lower half). The new order syncs as Nextcloud's own, and stays here for lists on this device.
+pub fn reorderable(row: &gtk::ListBoxRow, l: &List, siblings: Vec<String>) {
+    // A variant, not a string: text fields would take a string and type it.
+    let drag = gtk::DragSource::new();
+    drag.set_actions(gdk::DragAction::MOVE);
+    let value = l.href.to_variant().to_value();
+    drag.set_content(Some(&gdk::ContentProvider::for_value(&value)));
+    let (r, name, href) = (row.clone(), l.display_name.clone(), l.href.clone());
+    drag.connect_drag_begin(move |_, drag| {
+        DRAGGED.replace(Some(href.clone()));
+        // The list's name on a card; the row stays in place, faded.
+        let card = gtk::Label::new(Some(&name));
+        card.add_css_class("drag-card");
+        if let Ok(icon) = gtk::DragIcon::for_drag(drag).downcast::<gtk::DragIcon>() {
+            icon.set_child(Some(&card));
+        }
+        r.add_css_class("dragged");
+    });
+    let r = row.clone();
+    drag.connect_drag_end(move |_, _, _| {
+        DRAGGED.take();
+        r.remove_css_class("dragged");
+        clear_mark();
+    });
+    row.add_controller(drag);
+
+    let below =
+        |dt: &gtk::DropTarget, y: f64| dt.widget().is_some_and(|w| y > f64::from(w.height()) / 2.0);
+    let drop = gtk::DropTarget::new(glib::Variant::static_type(), gdk::DragAction::MOVE);
+    let (own, s) = (l.href.clone(), siblings.clone());
+    drop.connect_accept(move |_, _| {
+        DRAGGED.with_borrow(|d| d.as_ref().is_some_and(|d| *d != own && s.contains(d)))
+    });
+    drop.connect_motion(move |dt, _, y| {
+        if let Some(w) = dt.widget() {
+            mark(&w, below(dt, y));
+        }
+        gdk::DragAction::MOVE
+    });
+    drop.connect_leave(|dt| {
+        if let Some(w) = dt.widget() {
+            unmark(&w);
+        }
+    });
+    let own = l.href.clone();
+    drop.connect_drop(move |dt, value, _, y| {
+        if let Some(w) = dt.widget() {
+            unmark(&w);
+        }
+        let Some(moved) = value
+            .get::<glib::Variant>()
+            .ok()
+            .and_then(|v| v.get::<String>())
+        else {
+            return false;
+        };
+        let mut order = siblings.clone();
+        order.retain(|h| *h != moved);
+        let at = order.iter().position(|h| *h == own).unwrap_or(order.len());
+        order.insert(at + usize::from(below(dt, y)), moved);
+        if let Err(e) = core().reorder_lists(order) {
+            crate::window::toast(&e.to_string());
+            return true;
+        }
+        // After the drop is done: the rows are made anew.
+        glib::idle_add_local_once(|| {
+            crate::window::lists_changed();
+            crate::calendar::refresh();
+            crate::request_sync();
+        });
+        true
+    });
+    row.add_controller(drop);
+}
+
+thread_local! {
+    /// The list being dragged by its sidebar row.
+    static DRAGGED: RefCell<Option<String>> = const { RefCell::new(None) };
+    /// The drop line between rows: (row dragged over, row showing it, its class).
+    static DROP_MARK: RefCell<Option<(gtk::Widget, gtk::Widget, &'static str)>> =
+        const { RefCell::new(None) };
+}
+
+/// Show where a drop on `owner` lands. Below it is drawn as the line above the next row when
+/// there is one, so the gap between two rows has a single line (as the task rows do).
+pub fn mark(owner: &gtk::Widget, below: bool) {
+    let (w, class) = match owner.next_sibling().filter(|_| below) {
+        Some(next) => (next, "drop-above"),
+        None => (
+            owner.clone(),
+            if below { "drop-below" } else { "drop-above" },
+        ),
+    };
+    DROP_MARK.with_borrow_mut(|m| {
+        if let Some((_, old, c)) = m.take() {
+            old.remove_css_class(c);
+        }
+        w.add_css_class(class);
+        *m = Some((owner.clone(), w, class));
+    });
+}
+
+/// Remove the line `owner` drew; one the row now entered drew stays.
+pub fn unmark(owner: &gtk::Widget) {
+    DROP_MARK.with_borrow_mut(|m| {
+        if m.as_ref().is_some_and(|(o, _, _)| o == owner) {
+            let (_, w, c) = m.take().unwrap();
+            w.remove_css_class(c);
+        }
+    });
+}
+
+/// Remove any drop line, at a drag's end: cancelled drags get no leave.
+pub fn clear_mark() {
+    if let Some((_, w, c)) = DROP_MARK.take() {
+        w.remove_css_class(c);
+    }
+}
+
 /// Where a list is kept, as its group is headed: its account's name.
 pub fn place(account: i64) -> String {
     core()

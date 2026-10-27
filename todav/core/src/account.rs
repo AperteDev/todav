@@ -283,7 +283,72 @@ mod tests {
             tasks: true,
             events: false,
             writable: true,
+            order: 0,
         }
+    }
+
+    #[test]
+    fn lists_keep_the_users_order() {
+        let dir = std::env::temp_dir().join(format!("todav-test-order-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let id = c
+            .add_account(
+                AccountKind::Nextcloud,
+                "https://one.example".into(),
+                "kris".into(),
+                "".into(),
+            )
+            .unwrap();
+        c.connect(id, "p".into()).unwrap();
+        let dav = c.dav(id).unwrap();
+        let list = |name: &str, order| RemoteList {
+            display_name: name.into(),
+            order,
+            ..remote(&format!("/cal/{name}/"))
+        };
+        let names = |c: &Client| {
+            c.lists()
+                .into_iter()
+                .map(|l| l.display_name)
+                .collect::<Vec<_>>()
+        };
+
+        // The server's order, then names.
+        c.save_lists(id, &dav, &[list("b", 1), list("a", 1), list("c", 0)])
+            .unwrap();
+        assert_eq!(names(&c), ["c", "a", "b"]);
+        assert!(!c.pending(Some(id)));
+
+        // Ours waits for the server, and a sync before it is sent does not undo it.
+        let href = |n: &str| dav.absolute(&format!("/cal/{n}/"));
+        c.reorder_lists(vec![href("b"), href("c"), href("a")])
+            .unwrap();
+        assert_eq!(names(&c), ["b", "c", "a"]);
+        assert!(c.pending(Some(id)));
+        c.save_lists(id, &dav, &[list("b", 1), list("a", 1), list("c", 0)])
+            .unwrap();
+        assert_eq!(names(&c), ["b", "c", "a"]);
+
+        // Lists on this device: kept here, nothing for a server.
+        let here = c
+            .add_account(AccountKind::Local, "".into(), "".into(), "".into())
+            .unwrap();
+        let x = c
+            .create_list(here, "x".into(), "#000".into(), false)
+            .unwrap();
+        let y = c
+            .create_list(here, "y".into(), "#000".into(), false)
+            .unwrap();
+        c.reorder_lists(vec![y.clone(), x.clone()]).unwrap();
+        let local: Vec<String> = c
+            .lists()
+            .into_iter()
+            .filter(|l| l.account == here)
+            .map(|l| l.href)
+            .collect();
+        assert_eq!(local, [y, x]);
+        assert!(!c.pending(Some(here)));
     }
 
     #[test]

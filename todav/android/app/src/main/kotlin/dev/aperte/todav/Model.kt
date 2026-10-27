@@ -80,13 +80,17 @@ enum class CalMode {
 /** Tasks or Calendar, switched by the navigation bar (both shown on wide screens). */
 enum class View { TASKS, CALENDAR }
 
-/** A row of the drawer: a page or a list, with its count; `heading` over the first of an account's. */
+/**
+ * A row of the drawer: a page or a list (of `account`), with its count; `heading` over the first
+ * of an account's.
+ */
 data class Place(
     val key: String,
     val name: String,
     val count: Int,
     val color: String?,
     val heading: String?,
+    val account: Long? = null,
 )
 
 /**
@@ -112,6 +116,7 @@ data class CalRow(
     val color: String?,
     val shown: Boolean,
     val heading: String?,
+    val account: Long,
 )
 
 /**
@@ -204,7 +209,7 @@ class Main(app: Application) : AndroidViewModel(app) {
         val hidden = core.hidden().toSet()
         val headings = listHeadings(all)
         return all.mapIndexed { i, l ->
-            CalRow(l.href, l.displayName, listColor(l), hidden.none { sameList(it, l.href) }, headings[i]?.let { accounts[it] })
+            CalRow(l.href, l.displayName, listColor(l), hidden.none { sameList(it, l.href) }, headings[i]?.let { accounts[it] }, l.account)
         }
     }
 
@@ -289,7 +294,7 @@ class Main(app: Application) : AndroidViewModel(app) {
                 SidebarPage.IMPORTANT -> Place(IMPORTANT, tr("Important"), it.count.toInt(), null, null)
             }
         } + lists.mapIndexed { i, l ->
-            Place(l.href, l.displayName, l.openCount.toInt(), listColor(l), headings[i]?.let { names[it] })
+            Place(l.href, l.displayName, l.openCount.toInt(), listColor(l), headings[i]?.let { names[it] }, l.account)
         }
         // The page or list shown: the one picked, else the last used, else the first.
         val current = (key ?: core.setting("last_list"))
@@ -409,6 +414,12 @@ class Main(app: Application) : AndroidViewModel(app) {
     /** Ask for a sync when something waits for the server (edits in local lists never do). */
     fun synced() {
         if (core.pending(null)) core.requestSync()
+    }
+
+    /** Put an account's lists in this order (hrefs); synced as Nextcloud's own. */
+    fun reorderLists(hrefs: List<String>) = act {
+        core.reorderLists(hrefs)
+        synced()
     }
 
     fun select(key: String) {

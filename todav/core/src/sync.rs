@@ -111,14 +111,14 @@ impl Client {
         store::kv_set(&db, &k, &crate::now().to_string())
     }
 
-    /// Something waits for the server: edits in synced lists, or old copies of moved tasks
-    /// (of account `id`, or of any). Edits in lists on this device never do.
+    /// Something waits for the server: edits in synced lists, old copies of moved tasks, or the
+    /// lists' new order (of account `id`, or of any). Edits in lists on this device never do.
     pub fn pending(&self, id: Option<i64>) -> bool {
         let db = self.db.lock().unwrap();
         let moved = db.query_row(
-            "SELECT EXISTS (SELECT 1 FROM moved m JOIN lists l ON l.href = m.list_href
-               LEFT JOIN accounts a ON a.id = l.account
-               WHERE COALESCE(a.enabled, 1) AND (?1 IS NULL OR l.account = ?1))",
+            "SELECT EXISTS (SELECT 1 FROM lists l LEFT JOIN accounts a ON a.id = l.account
+               WHERE COALESCE(a.enabled, 1) AND (?1 IS NULL OR l.account = ?1)
+                 AND (l.position_dirty OR l.href IN (SELECT list_href FROM moved)))",
             [id],
             |r| r.get(0),
         );
@@ -193,13 +193,35 @@ impl Client {
     pub fn edit_list(&self, href: String, name: String, color: String) -> Result<()> {
         let _guard = self.sync_lock.lock().unwrap();
         if !href.starts_with(store::LOCAL) {
-            self.list_dav(&href)?.proppatch(&href, &name, &color)?;
+            self.list_dav(&href)?.rename(&href, &name, &color)?;
         }
         self.db.lock().unwrap().execute(
             "UPDATE lists SET display_name = ?2, color = ?3 WHERE href = ?1",
             params![href, name, color],
         )?;
         self.emit(&href, Vec::new());
+        Ok(())
+    }
+
+    /// Put lists in this order (hrefs, those of one account as a sidebar shows them; the
+    /// others keep their place): at once here, on the server (its calendar-order, shared with
+    /// Nextcloud's apps) at the next sync.
+    pub fn reorder_lists(&self, hrefs: Vec<String>) -> Result<()> {
+        {
+            let db = self.db.lock().unwrap();
+            let tx = db.unchecked_transaction()?;
+            for (i, href) in hrefs.iter().enumerate() {
+                tx.execute(
+                    "UPDATE lists SET position = ?2, position_dirty = ?3
+                     WHERE href = ?1 AND position != ?2",
+                    params![href, i as i64, !href.starts_with(store::LOCAL)],
+                )?;
+            }
+            tx.commit()?;
+        }
+        if let Some(href) = hrefs.first() {
+            self.emit(href, Vec::new());
+        }
         Ok(())
     }
 
@@ -226,11 +248,13 @@ impl Client {
         let tx = db.unchecked_transaction()?;
         let keep: HashSet<String> = remote.iter().map(|l| dav.absolute(&l.href)).collect();
         for l in remote {
+            // An order not sent yet stays ours.
             tx.execute(
-                "INSERT INTO lists (href, display_name, color, ctag, push_topic, has_tasks, has_events, writable, account)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+                "INSERT INTO lists (href, display_name, color, ctag, push_topic, has_tasks, has_events, writable, account, position)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
                  ON CONFLICT(href) DO UPDATE SET display_name = ?2, color = ?3, ctag = ?4, push_topic = ?5,
-                   has_tasks = ?6, has_events = ?7, writable = ?8, account = ?9",
+                   has_tasks = ?6, has_events = ?7, writable = ?8, account = ?9,
+                   position = CASE WHEN position_dirty THEN position ELSE ?10 END",
                 params![
                     dav.absolute(&l.href),
                     l.display_name,
@@ -240,7 +264,8 @@ impl Client {
                     l.tasks,
                     l.events,
                     l.writable,
-                    account
+                    account,
+                    l.order
                 ],
             )?;
         }
@@ -279,6 +304,26 @@ impl Client {
             }
             let db = self.db.lock().unwrap();
             db.execute("DELETE FROM moved WHERE href = ?", [&href])?;
+        }
+        // The lists' order.
+        let orders: Vec<(String, i64)> = self
+            .db
+            .lock()
+            .unwrap()
+            .prepare("SELECT href, position FROM lists WHERE account = ? AND position_dirty")?
+            .query_map([account], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .collect::<rusqlite::Result<_>>()?;
+        for (href, position) in orders {
+            match dav.set_order(&href, position) {
+                Ok(()) => {}
+                Err(e) if refusal(&e).is_some() => {} // the server's order comes back
+                Err(e) => return Err(e),
+            }
+            // Unless moved again meanwhile.
+            self.db.lock().unwrap().execute(
+                "UPDATE lists SET position_dirty = 0 WHERE href = ?1 AND position = ?2",
+                params![href, position],
+            )?;
         }
         let dirty = store::dirty(&self.db.lock().unwrap(), Some(account))?;
         for t in dirty {

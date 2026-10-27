@@ -87,6 +87,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -105,27 +106,43 @@ import kotlinx.coroutines.withTimeoutOrNull
 const val DAY = 86_400L
 
 /**
- * A long press on something that is also clicked (a drawer item): `f` runs and the click that
- * would follow is swallowed.
+ * A long press on something that is also clicked (a drawer item), and a drag after it: while
+ * held, `onMove` gets how far it has been dragged up or down; lifted, `onEnd` whether it was
+ * (false: a long press alone). The click that would follow is swallowed. Put it before any
+ * modifier that moves what it is on, whose moves would otherwise add to the drag.
  */
-fun Modifier.longPress(enabled: Boolean, f: () -> Unit): Modifier = if (!enabled) this else pointerInput(f) {
-    awaitEachGesture {
-        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-        // Held: no lift, no move past the slop (a scroll) before the long-press time.
-        val held = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
-            while (true) {
-                val e = awaitPointerEvent(PointerEventPass.Initial)
-                val c = e.changes.firstOrNull { it.id == down.id } ?: break
-                if (!c.pressed || (c.position - down.position).getDistance() > viewConfiguration.touchSlop) break
-            }
-        } == null
-        if (held) {
-            f()
+@Composable
+fun Modifier.holdToMove(enabled: Boolean, onMove: (Float) -> Unit, onEnd: (moved: Boolean) -> Unit): Modifier {
+    // The gesture outlives recompositions: it calls the latest of these.
+    val move by rememberUpdatedState(onMove)
+    val end by rememberUpdatedState(onEnd)
+    return if (!enabled) this else pointerInput(Unit) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            // Held: no lift, no move past the slop (a scroll) before the long-press time.
+            val held = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                while (true) {
+                    val e = awaitPointerEvent(PointerEventPass.Initial)
+                    val c = e.changes.firstOrNull { it.id == down.id } ?: break
+                    if (!c.pressed || (c.position - down.position).getDistance() > viewConfiguration.touchSlop) break
+                }
+            } == null
+            if (!held) return@awaitEachGesture
             // The rest of the gesture is ours: the item underneath sees no click.
+            var moved = false
             do {
                 val e = awaitPointerEvent(PointerEventPass.Initial)
                 e.changes.forEach { it.consume() }
+                val c = e.changes.firstOrNull { it.id == down.id }
+                if (c != null && c.pressed) {
+                    val dy = c.position.y - down.position.y
+                    if (moved || kotlin.math.abs(dy) > viewConfiguration.touchSlop) {
+                        moved = true
+                        move(dy)
+                    }
+                }
             } while (e.changes.any { it.pressed })
+            end(moved)
         }
     }
 }
