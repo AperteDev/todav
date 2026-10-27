@@ -1,10 +1,11 @@
 # Agent notes
 
-## Architecture
+## Roadmap
 
-- `docs/ARCHITECTURE.md` holds the architecture, the design decisions and the plan (progress,
-  roadmap, open questions). Read it before working on a feature, and update it in the same
-  change when the work changes what it says: a decision made, a step done, a plan dropped.
+- `docs/ROADMAP.md` holds the planned work only (features, open questions, what was ruled out);
+  what is built is described by the code. Read it before working on a planned feature, and
+  update it in the same change: remove what is done, add a plan or an open question, move a
+  dropped plan under "Ruled out" with why.
 - Notav (`AperteDev/notav`, cloned next to this repository) started from copies of some of this
   code, listed under "Code from Todav" in its `docs/ARCHITECTURE.md`. A fix to one of those
   probably applies there too: port it or say so. Notav keeps its own configuration and
