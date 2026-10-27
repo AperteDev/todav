@@ -249,7 +249,7 @@ object Reminders {
     )
 
     private fun task(app: TodavApp, t: TodavTask, now: Long) = NotificationCompat.Builder(app, CHANNEL)
-        .setSmallIcon(R.drawable.ic_launcher_monochrome)
+        .setSmallIcon(R.drawable.ic_notification)
         .setContentTitle(t.summary)
         .setContentText(dueLabel(t, now))
         .setCategory(NotificationCompat.CATEGORY_REMINDER)
@@ -266,7 +266,7 @@ object Reminders {
         .build()
 
     private fun event(app: TodavApp, e: Event, now: Long) = NotificationCompat.Builder(app, CHANNEL)
-        .setSmallIcon(R.drawable.ic_launcher_monochrome)
+        .setSmallIcon(R.drawable.ic_notification)
         .setContentTitle(e.summary)
         .setContentText(listOfNotNull(dayLabel(e.start, e.allDay, now), e.location?.takeIf { it.isNotBlank() }).joinToString(" · "))
         .setCategory(NotificationCompat.CATEGORY_EVENT)
