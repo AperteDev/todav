@@ -110,6 +110,8 @@ fun reason(e: Throwable): String = when (e) {
     is TodavException.SavePassword -> tr("Cannot save password: {error}").replace("{error}", e.reason)
     is TodavException.Upload ->
         tr("Cannot upload pending changes first: {error}").replace("{error}", e.reason)
+    is TodavException.Unsupported ->
+        tr("Not possible for an account signed in through the Nextcloud app")
     is TodavException.NotUploaded ->
         tr("It has changes not uploaded yet: sign in again to upload them")
     else -> e.message ?: e.toString()

@@ -34,7 +34,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
-import dev.aperte.todav.canManageLists
 import dev.aperte.todav.Main
 import dev.aperte.todav.accountName
 import dev.aperte.todav.core.TodavList

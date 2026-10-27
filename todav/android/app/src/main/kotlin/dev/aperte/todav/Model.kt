@@ -528,6 +528,32 @@ class Main(app: Application) : AndroidViewModel(app) {
         signIn.value = SignIn.Idle
     }
 
+    /** An account of the Nextcloud app, granted to Todav: its requests go through the app. */
+    fun addNextcloudApp(g: NextcloudApp.Granted) = viewModelScope.launch(Dispatchers.IO) {
+        try {
+            val first = core.accounts().isEmpty()
+            val error = todav.passwords.store(g.server, g.user, g.token)
+            if (error != null) throw IllegalStateException(error)
+            val account = dev.aperte.todav.core.Account(0, AccountKind.NEXTCLOUD, "", g.server, g.user, NEXTCLOUD_APP + g.name, true)
+            val client = NextcloudApp.client(todav, account) ?: return@launch
+            core.addNextcloudApp(g.server, g.user, NEXTCLOUD_APP + g.name, client, first && core.settingsAccount() == null)
+            core.accountAdded(false)
+            todav.changed()
+            todav.pushSetup()
+            if (!first) launch(Dispatchers.Main) { back() }
+        } catch (e: Exception) {
+            messages.tryEmit(reason(e) to null)
+        }
+    }
+
+    /** The Nextcloud app granted access again (a new token) for `account`. */
+    fun reconnectNextcloudApp(account: Account, g: NextcloudApp.Granted) = act {
+        todav.passwords.store(account.url, account.user, g.token)
+        NextcloudApp.connect(todav, account)
+        core.syncNow()
+        todav.changed()
+    }
+
     /** Add the account; on the welcome page settings sync through it (`settings`). */
     fun connect(server: String, user: String, password: String) {
         try {
