@@ -394,6 +394,12 @@ class Main(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Store setting `key` (synced unless device-only); what shows it is read again at once. */
+    fun setSetting(key: String, value: String) = act {
+        core.setSetting(key, value)
+        todav.changed()
+    }
+
     /** Ask for a sync when something waits for the server (edits in local lists never do). */
     fun synced() {
         if (core.pending(null)) core.requestSync()

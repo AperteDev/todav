@@ -200,7 +200,7 @@ private fun ChoiceRow(
     if (open) {
         Choose(title, names, current, onDismiss = { open = false }) { i ->
             open = false
-            if (onPick != null) onPick(i) else model.act { model.core.setSetting(key, values[i]) }
+            if (onPick != null) onPick(i) else model.setSetting(key, values[i])
         }
     }
 }
@@ -236,8 +236,8 @@ private fun SwitchRow(model: Main, title: String, key: String, subtitle: String?
     Item(
         headlineContent = { Text(title) },
         supportingContent = subtitle?.let { { Text(it) } },
-        trailingContent = { Switch(on, { model.act { model.core.setSetting(key, it.toString()) } }) },
-        modifier = Modifier.clickable { model.act { model.core.setSetting(key, (!on).toString()) } },
+        trailingContent = { Switch(on, { model.setSetting(key, it.toString()) }) },
+        modifier = Modifier.clickable { model.setSetting(key, (!on).toString()) },
     )
 }
 
@@ -490,7 +490,7 @@ private fun ReminderRows(model: Main) {
     )
     if (pick) {
         TimeDialog(tr("Time for all-day tasks"), allDayTime, onDismiss = { pick = false }) { s ->
-            model.act { core.setSetting("reminder_time", "${s / 60}") }
+            model.setSetting("reminder_time", "${s / 60}")
         }
     }
 }
