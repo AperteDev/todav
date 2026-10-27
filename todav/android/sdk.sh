@@ -9,9 +9,10 @@
 # One SDK for every project: ~/Android/Sdk (or $ANDROID_HOME), as Android Studio and Noogle's
 # scripts/setup-avd.sh use it. It gets exactly the versions gradle.properties names, so the build
 # never downloads copies of its own. The emulator is the one for developing apps (Todav, later
-# Notav too), on a stock image no system-modding project uses: Noogle patches its own images
-# (Magisk) and keeps its own AVDs. Nothing system-wide is installed: missing tools are named with
-# the command that installs them.
+# Notav too), on the stock Google Play image, which Noogle's AVDs use too: each AVD links to the
+# shared image from an own copy (<avd>.avd/system-image) and changes only its own files there,
+# Noogle its ramdisk (Magisk), this one its fold states. Nothing system-wide is installed: missing
+# tools are named with the command that installs them.
 #
 # adb: the SDK's platform-tools stay installed (the SDK and Gradle check for them), but their adb
 # is a link to android-tools' /usr/bin/adb. Two adb versions keep restarting the server and drop
@@ -109,7 +110,23 @@ setup() {
 			-e 's/^hw.sensor.hinge.areas=.*/hw.sensor.hinge.areas=1086-0-0-2352/' \
 			"$HOME/.android/avd/$avd.avd/config.ini"
 	fi
+	own_image
 	echo "Ready: $sdk, AVD $avd ($image)"
+}
+
+# The fold states the emulator copies from the image into /data on the first boot put the device
+# to sleep when closed (Android's setting for it, "Continue using apps on fold", is off in the
+# emulator), and a Google Play image is a user build, without `adb root` to change them there. So
+# the AVD gets its own image: links to the shared one, its own copy of that file without "sleep".
+own_image() {
+	local own="$HOME/.android/avd/$avd.avd/system-image"
+	local states=data/misc/pixel_9_pro_fold/devicestate/device_state_configuration.xml
+	[ -d "$own" ] && return
+	mkdir -p "$own"
+	cp -as "$sdk/${image//;//}/." "$own"
+	rm "$own/$states"
+	sed /TRIGGER_SLEEP/d "$sdk/${image//;//}/$states" > "$own/$states"
+	sed -i "s|^image.sysdir.1=.*|image.sysdir.1=$own/|" "$HOME/.android/avd/$avd.avd/config.ini"
 }
 
 # $@: more emulator options
@@ -135,25 +152,11 @@ booted() {
 	done
 }
 
-# Always on and unlocked, as a phone in use: no screen timeout, no lock screen, apps kept open on
-# folding. The last is the device's fold states, which the emulator writes into /data on the first
-# boot: closed without "sleep" (Android's setting for it, "Continue using apps on fold", is off in
-# the emulator). Read as Android's framework starts, so it is restarted after that change (`adb
-# root` works on Google APIs images).
+# Always on and unlocked, as a phone in use: no screen timeout, no lock screen (apps kept open on
+# folding comes with the AVD's own image, `own_image`).
 always_on() {
 	adb shell settings put system screen_off_timeout 2147483647
 	adb shell locksettings set-disabled true > /dev/null
-	adb root > /dev/null
-	adb wait-for-device
-	local states=/data/system/devicestate/device_state_configuration.xml
-	if adb shell grep -q TRIGGER_SLEEP "$states"; then
-		adb shell "sed -i /TRIGGER_SLEEP/d $states && sync"
-		echo "Restarting Android's framework..."
-		adb shell 'setprop sys.boot_completed 0; stop; start'
-		booted
-	fi
-	adb unroot > /dev/null
-	adb wait-for-device
 }
 
 stop() {
