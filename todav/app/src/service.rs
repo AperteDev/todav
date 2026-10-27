@@ -235,22 +235,25 @@ impl Service {
         }
     }
 
-    /// Reminders of tasks and events that went off since the last call: at most a day back, so
-    /// a device that was off does not replay old ones.
+    /// Reminders of tasks and events that went off since the last call (`due_reminders`).
     pub fn due_reminders(&self) -> (Vec<Task>, Vec<Event>) {
-        let c = &self.client;
-        let now = c.local_now();
-        let from = c
-            .setting("reminded_until".into())
-            .and_then(|v| v.parse::<i64>().ok())
-            .unwrap_or(now)
-            .max(now - 86400);
-        let due = (c.reminders(from, now), c.event_reminders(from, now));
-        if from != now {
-            let _ = c.set_setting("reminded_until".into(), now.to_string());
-        }
-        due
+        due_reminders(&self.client)
     }
+}
+
+/// Reminders of tasks and events that went off since the last call: at most a day back, so a
+/// device that was off does not replay old ones. The first call only marks the time.
+pub fn due_reminders(c: &Client) -> (Vec<Task>, Vec<Event>) {
+    let now = c.local_now();
+    let stored = c
+        .setting("reminded_until".into())
+        .and_then(|v| v.parse::<i64>().ok());
+    let from = stored.unwrap_or(now).max(now - 86400);
+    let due = (c.reminders(from, now), c.event_reminders(from, now));
+    if stored != Some(now) {
+        let _ = c.set_setting("reminded_until".into(), now.to_string());
+    }
+    due
 }
 
 /// How far ahead `next_reminder` looks. A platform that sets an alarm for it sets it again after
@@ -328,6 +331,43 @@ mod tests {
         // Past it, the task's comes next; past both, none within the week.
         assert_eq!(next_reminder(&c, now + 1500), Some(now + 3600));
         assert_eq!(next_reminder(&c, now + 3600), None);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn reminders_go_off_once_from_the_first_call() {
+        let dir = std::env::temp_dir().join(format!("todav-app-due-{}", std::process::id()));
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let account = c
+            .add_account(
+                AccountKind::Local,
+                String::new(),
+                String::new(),
+                String::new(),
+            )
+            .unwrap();
+        let list = c
+            .create_list(account, "Tasks".into(), "#0082C9".into(), false)
+            .unwrap();
+        // The first call marks the time, even with nothing due.
+        assert!(due_reminders(&c).0.is_empty());
+        let now = c.local_now();
+        assert!(c.setting("reminded_until".into()).is_some());
+        // A reminder after that goes off at the next call, and only then.
+        c.set_setting("reminded_until".into(), (now - 100).to_string())
+            .unwrap();
+        let task = c.add_task(list, "Call".into(), None, None, false).unwrap();
+        let patch = TaskPatch {
+            due: Some(Some(Due {
+                at: now - 50,
+                all_day: false,
+            })),
+            reminders: Some(vec![0]),
+            ..Default::default()
+        };
+        c.update_task(task.uid, patch).unwrap();
+        assert_eq!(due_reminders(&c).0.len(), 1);
+        assert!(due_reminders(&c).0.is_empty());
         let _ = std::fs::remove_dir_all(dir);
     }
 }
