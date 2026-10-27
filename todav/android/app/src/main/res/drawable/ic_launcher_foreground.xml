@@ -1,48 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The app icon (todav/linux/data/dev.aperte.Todav.svg, 128 px), scaled so all of it, the
-     rings and corners too, fits the 66 dp safe zone of the 108 dp adaptive icon: the circle
-     every launcher's mask keeps. Also the splash screen's icon, where it fits the 192 dp
-     circle of its 288 dp. -->
+<!-- The app icon's drawing (todav/linux/data/dev.aperte.Todav.svg, in its 128 px coordinates)
+     over ic_launcher_background, the page that fills the whole adaptive icon. The rings and the
+     content are zoomed apart, so both stay in the 66 dp safe zone whatever the launcher's
+     mask, circle to square. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
-    android:viewportWidth="128"
-    android:viewportHeight="128">
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- The rings' holes, the rings and their highlights, on the header. -->
     <group
-        android:pivotX="64"
-        android:pivotY="64"
-        android:scaleX="0.59"
-        android:scaleY="0.59">
-        <!-- The cover, its header and the strip under it. -->
-        <path android:pathData="M24,19H104A8,8 0 0 1 112,27V109A8,8 0 0 1 104,117H24A8,8 0 0 1 16,109V27A8,8 0 0 1 24,19Z">
-            <aapt:attr name="android:fillColor">
-                <gradient android:type="linear" android:startX="16" android:startY="0" android:endX="112" android:endY="0">
-                    <item android:offset="0" android:color="#1e5690" />
-                    <item android:offset="1" android:color="#1b7275" />
-                </gradient>
-            </aapt:attr>
-        </path>
-        <path android:pathData="M24,19H104A8,8 0 0 1 112,27V41A8,8 0 0 1 104,49H24A8,8 0 0 1 16,41V27A8,8 0 0 1 24,19Z">
-            <aapt:attr name="android:fillColor">
-                <gradient android:type="linear" android:startX="16" android:startY="0" android:endX="112" android:endY="0">
-                    <item android:offset="0" android:color="#2f6cb6" />
-                    <item android:offset="1" android:color="#2c9d9b" />
-                </gradient>
-            </aapt:attr>
-        </path>
-        <path android:pathData="M16,38.5H112V41H16Z">
-            <aapt:attr name="android:fillColor">
-                <gradient android:type="linear" android:startX="16" android:startY="0" android:endX="112" android:endY="0">
-                    <item android:offset="0" android:color="#1e5690" />
-                    <item android:offset="1" android:color="#1b7275" />
-                </gradient>
-            </aapt:attr>
-        </path>
-        <!-- The page and its edge. -->
-        <path android:fillColor="#d5d3cf" android:pathData="M16 41h96v64a8 8 0 0 1-8 8H24a8 8 0 0 1-8-8z" />
-        <path android:fillColor="#f6f5f4" android:pathData="M16 41h96v60a8 8 0 0 1-8 8H24a8 8 0 0 1-8-8z" />
-        <!-- The rings' holes, the rings and their highlights. -->
+        android:translateX="18.8"
+        android:translateY="17.95"
+        android:scaleX="0.55"
+        android:scaleY="0.55">
         <path
             android:fillColor="#40000000"
             android:pathData="M27.5,28.5a5,5 0 1,0 10,0a5,5 0 1,0 -10,0M48.5,28.5a5,5 0 1,0 10,0a5,5 0 1,0 -10,0M69.5,28.5a5,5 0 1,0 10,0a5,5 0 1,0 -10,0M90.5,28.5a5,5 0 1,0 10,0a5,5 0 1,0 -10,0" />
@@ -85,7 +57,14 @@
         <path
             android:fillColor="#99ffffff"
             android:pathData="M31.25,13a0.75,0.75 0 0 1 0.75,0.75v2.5a0.75,0.75 0 0 1 -1.5,0v-2.5a0.75,0.75 0 0 1 0.75,-0.75zM52.25,13a0.75,0.75 0 0 1 0.75,0.75v2.5a0.75,0.75 0 0 1 -1.5,0v-2.5a0.75,0.75 0 0 1 0.75,-0.75zM73.25,13a0.75,0.75 0 0 1 0.75,0.75v2.5a0.75,0.75 0 0 1 -1.5,0v-2.5a0.75,0.75 0 0 1 0.75,-0.75zM94.25,13a0.75,0.75 0 0 1 0.75,0.75v2.5a0.75,0.75 0 0 1 -1.5,0v-2.5a0.75,0.75 0 0 1 0.75,-0.75z" />
-        <!-- The tasks: dots and bars on the left, days on the right. -->
+    </group>
+    <!-- The page's tasks (dots and bars on the left, days on the right) and the tick, zoomed in
+         more. -->
+    <group
+        android:translateX="12.5"
+        android:translateY="13.5"
+        android:scaleX="0.65"
+        android:scaleY="0.65">
         <path android:strokeColor="#9ccbf0" android:strokeWidth="5.5" android:strokeLineCap="round" android:pathData="M34.75 54h23" />
         <path android:strokeColor="#57c778" android:strokeWidth="5.5" android:strokeLineCap="round" android:pathData="M34.75 67h23" />
         <path android:strokeColor="#8ec4ee" android:strokeWidth="5.5" android:strokeLineCap="round" android:pathData="M34.75 80h7.25" />

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The app icon's calendar page, filling the whole adaptive icon so the launcher's mask is its
+     shape: the header (with its strip) across the top, the page below. Colours as in
+     todav/linux/data/dev.aperte.Todav.svg, the gradients across the 72 dp that show. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="#f6f5f4" android:pathData="M0,0H108V108H0Z" />
+    <path android:pathData="M0,0H108V39.125H0Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="18" android:startY="0" android:endX="90" android:endY="0">
+                <item android:offset="0" android:color="#2f6cb6" />
+                <item android:offset="1" android:color="#2c9d9b" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:pathData="M0,39.125H108V40.5H0Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="18" android:startY="0" android:endX="90" android:endY="0">
+                <item android:offset="0" android:color="#1e5690" />
+                <item android:offset="1" android:color="#1b7275" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>
