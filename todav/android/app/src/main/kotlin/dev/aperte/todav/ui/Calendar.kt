@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.CalendarViewMonth
+import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.CalendarViewWeek
 import androidx.compose.material.icons.outlined.Today
 import androidx.compose.material.icons.outlined.ViewAgenda
@@ -174,6 +175,8 @@ fun CalendarPane(model: Main) {
     val day = picked ?: midnight(now)
     var details by remember { mutableStateOf<Item?>(null) }
     var viewMenu by remember { mutableStateOf(false) }
+    var toPlan by remember { mutableStateOf(false) }
+    val planning by model.planning.collectAsStateWithLifecycle()
     val title = when (mode) {
         CalMode.AGENDA -> tr("Agenda")
         else -> format(day, "LLLL yyyy").replaceFirstChar { it.titlecase() }
@@ -188,6 +191,9 @@ fun CalendarPane(model: Main) {
                 actions = {
                     IconButton(onClick = { model.day.value = midnight(model.core.localNow()) }) {
                         Icon(Icons.Outlined.Today, tr("Today"))
+                    }
+                    if (mode == CalMode.WEEK) {
+                        IconButton(onClick = { toPlan = true }) { Icon(Icons.Outlined.Inbox, tr("To Plan")) }
                     }
                     IconButton(onClick = { model.open(Dest.Search) }) { Icon(Icons.Default.Search, tr("Search")) }
                     Box {
@@ -215,15 +221,31 @@ fun CalendarPane(model: Main) {
             }
         },
     ) { padding ->
-        Box(Modifier.padding(padding).fillMaxSize()) {
-            when (mode) {
-                CalMode.MONTH -> MonthView(model, day) { details = it }
-                CalMode.WEEK -> WeekView(model, day) { details = it }
-                CalMode.AGENDA -> AgendaView(model, day) { details = it }
+        Column(Modifier.padding(padding).fillMaxSize()) {
+            planning?.takeIf { mode == CalMode.WEEK }?.let { t ->
+                Row(
+                    Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.secondaryContainer).padding(start = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        tr("Tap an hour to plan “{title}”").replace("{title}", t.summary),
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = { model.planning.value = null }) { Text(tr("Cancel")) }
+                }
+            }
+            Box(Modifier.fillMaxSize()) {
+                when (mode) {
+                    CalMode.MONTH -> MonthView(model, day) { details = it }
+                    CalMode.WEEK -> WeekView(model, day) { details = it }
+                    CalMode.AGENDA -> AgendaView(model, day) { details = it }
+                }
             }
         }
     }
     details?.let { ItemSheet(model, it) { details = null } }
+    if (toPlan) ToPlanSheet(model, weekStart(day, firstWeekday()) + 7 * DAY) { toPlan = false }
 }
 
 /** A new event's start: the next full hour on `day` when it is today, else 9:00 there. */
@@ -612,7 +634,15 @@ private fun Week(model: Main, start: Long, picked: Long, scroll: androidx.compos
                             val at = start + d * DAY + h * 3600
                             Box(
                                 Modifier.weight(1f).fillMaxHeight().border(0.25.dp, line)
-                                    .clickable { model.open(Dest.EventEdit(null, null, null, at, false)) },
+                                    .clickable {
+                                        val t = model.planning.value
+                                        if (t == null) {
+                                            model.open(Dest.EventEdit(null, null, null, at, false))
+                                        } else {
+                                            model.planning.value = null
+                                            model.update(t.uid, model.core.planAt(t, at))
+                                        }
+                                    },
                             )
                         }
                     }
@@ -722,6 +752,36 @@ private fun Reschedule(model: Main, item: Item, at: Long, onDone: () -> Unit) {
     }
 }
 
+/**
+ * "To Plan": open tasks without a time slot, undated or due by `until` (the end of the week
+ * shown), as the Linux calendar's sidebar list. One picked waits for an hour to be tapped.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ToPlanSheet(model: Main, until: Long, onDismiss: () -> Unit) {
+    val changes by model.todav.changes.collectAsStateWithLifecycle()
+    val tasks = load(changes, until, initial = emptyList<TodavTask>()) { model.core.unscheduled(until) }
+    val now = model.core.localNow()
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Text(tr("To Plan"), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 24.dp))
+        if (tasks.isEmpty()) {
+            Text(tr("Nothing to plan"), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(24.dp))
+        }
+        LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
+            items(tasks, key = { it.uid }) { t ->
+                androidx.compose.material3.ListItem(
+                    headlineContent = { Text(t.summary) },
+                    supportingContent = dev.aperte.todav.dueLabel(t, now)?.let { { Text(it) } },
+                    modifier = Modifier.clickable {
+                        model.planning.value = t
+                        onDismiss()
+                    },
+                )
+            }
+        }
+    }
+}
+
 // --- details ---------------------------------------------------------------------------------
 
 /**
@@ -809,6 +869,12 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
                             onDismiss()
                             model.open(Dest.Task(t.uid))
                         }) { Text(tr("Edit…")) }
+                        dev.aperte.todav.core.unplan(t)?.let { patch ->
+                            TextButton(onClick = {
+                                onDismiss()
+                                model.update(t.uid, patch)
+                            }) { Text(tr("Unplan")) }
+                        }
                         TextButton(onClick = {
                             onDismiss()
                             model.delete(t)

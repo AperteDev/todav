@@ -407,7 +407,7 @@ Kotlin + Jetpack Compose (Material 3) on top of the core and `todav-app` via Uni
 - Task page (full screen, Save as one undo step): the Linux edit dialog's fields (title, list, category, priority, its event, note, start, due date with time, reminders as presets or a custom span), its subtasks (ticked and added at once), Delete.
 - Calendar: Month (six weeks, as many chips a day as fit, the picked day's events and tasks underneath or beside it), Week (hour grid, overlapping blocks side by side, the top row for what takes no hours, the current time) and Agenda (60 days); months and weeks change with a swipe; Today, a view menu and the add button. An item opens a details sheet as the Linux popover (an event's tasks or a task's subtasks with a field adding one; Edit, Delete); a tap on an empty hour adds an event there. The event page has the Linux event dialog's fields and asks which occurrences a change or delete is for.
 - Settings: General (style, language through the system's per-app setting, start page, notifications), Accounts (each account's page: on/off, name, connection, server status, Remove; "Sync settings with"; push status), Tasks, Calendar, About. The extension's options have no counterpart: each widget picks its list when placed.
-- Not done: dragging in the month view, planning unscheduled tasks into hours (the "To Plan" list), moving a task to another list by dragging it onto the drawer, reordering accounts.
+- Not done: dragging in the month view, moving a task to another list by dragging it onto the drawer, reordering accounts.
 
 **Push and sync**
 
