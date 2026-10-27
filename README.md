@@ -4,16 +4,16 @@
 
 <h1 align="center">Todav</h1>
 
-<p align="center">Tasks and calendar for GNOME, kept in your Nextcloud.</p>
+<p align="center">Tasks and calendar for GNOME and Android, kept in your Nextcloud.</p>
 
 <p align="center">
   <a href="https://github.com/AperteDev/todav/actions/workflows/ci.yml"><img src="https://github.com/AperteDev/todav/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 </p>
 
-Todav is a task list and calendar app for the GNOME desktop. Your tasks and events stay in your
-own Nextcloud as plain CalDAV, so the Nextcloud Tasks and Calendar web apps, DAVx⁵, Thunderbird
-and other CalDAV clients keep seeing the same data. Todav adds a fast desktop app on top: it
-works from a local copy, syncs in the background and picks up changes from other devices within
+Todav is a task list and calendar app for the GNOME desktop and Android. Your tasks and events
+stay in your own Nextcloud as plain CalDAV, so the Nextcloud Tasks and Calendar web apps, DAVx⁵,
+Thunderbird and other CalDAV clients keep seeing the same data. Todav adds fast apps on top: they
+work from a local copy, sync in the background and pick up changes from other devices within
 seconds.
 
 Todav is developed in my free time. If it keeps your days in order, you can support its
@@ -35,6 +35,20 @@ development:
   <img src="docs/screenshots/extension.png" width="480"
     alt="The GNOME Shell extension's menu: a task list, the month with dots and the coming week's agenda">
   <br><em>The GNOME Shell extension</em>
+</p>
+
+**Android**
+
+| Tasks, grouped by category | The week |
+| --- | --- |
+| ![A task list grouped by category, with subtasks](docs/screenshots/android-tasks.png) | ![The week view with events and tasks](docs/screenshots/android-week.png) |
+| **On an unfolded foldable or a tablet** | **The calendar beside its sidebar** |
+| ![The task lists in a sidebar beside a list's tasks](docs/screenshots/android-tablet-tasks.png) | ![The week view beside the calendars](docs/screenshots/android-tablet-week.png) |
+
+<p align="center">
+  <img src="docs/screenshots/android-widgets.png" width="600"
+    alt="Home-screen widgets: a month, a task list, the agenda and a day's hours">
+  <br><em>Home-screen widgets</em>
 </p>
 
 ## Features
@@ -111,9 +125,31 @@ development:
 - With a Nextcloud account too, add "On This Device" in Preferences → Accounts to keep some
   lists and calendars off the server, next to the synced ones.
 
+**Android**
+
+- The same tasks and calendar as on the desktop, in Material 3 Expressive: a navigation bar on
+  phones, a rail and a resizable sidebar on unfolded foldables and tablets.
+- Swipe actions of your choice (complete, star, pin or delete with Undo), drag and drop to
+  reorder tasks, make subtasks or change a category, and to plan tasks into the hours of the
+  calendar.
+- Month, Week, Work Week, 3 Days, Day and Agenda views.
+- Home-screen widgets: a task list, the month, the agenda, a day's hours and a month planner,
+  each with an add button and colours of your choice.
+- Push through [UnifiedPush](https://unifiedpush.org) (with the ntfy app, for instance), no
+  Google services; reminders with "Mark as Done", "New Task" from the launcher, sharing text as
+  a task, and keyboard shortcuts.
+- Signs in with the browser or an app password; with the Nextcloud app installed, its accounts
+  fill in the server and login name.
+
 ## Getting started
 
-Todav needs GNOME 49 or newer. The GNOME Shell extension is optional.
+Todav needs GNOME 49 or newer, or Android 10 or newer. The GNOME Shell extension is optional.
+
+**Android:** download `todav-<version>.apk` from the
+[latest release](https://github.com/AperteDev/todav/releases/latest) and open it on your phone
+(allow your browser or file manager to install apps when asked). Until Google Play and F-Droid,
+it is a test build signed differently each release: uninstall the previous version before
+installing a new one (lists on the device only are lost; your Nextcloud's sync back).
 
 **Arch Linux and derivatives** (Manjaro, EndeavourOS, CachyOS…): install from the
 [AUR](https://aur.archlinux.org/packages?K=todav) with an AUR helper:
@@ -152,16 +188,18 @@ Todav from source. Then:
    accounts can be added in Preferences → Accounts.
 3. For instant updates, install the [DAV Push](https://apps.nextcloud.com/apps/dav_push) app on
    your Nextcloud and enter your ntfy server in Preferences → Accounts → Push. Each account's
-   page there shows whether its server has DAV Push and whether it works.
+   page there shows whether its server has DAV Push and whether it works. On Android, install a
+   UnifiedPush distributor such as the [ntfy app](https://f-droid.org/packages/io.heckel.ntfy/)
+   instead.
 
 ## Roadmap
 
-Todav is under active development. Planned:
+Todav is under active development. Planned (details in [ROADMAP.md](docs/ROADMAP.md)):
 
 - **Advanced notifications**, configurable
 - **Advanced search, filtering and sorting**
 - **More services** besides Nextcloud
-- **Android app**
+- **Google Play and F-Droid** for the Android app
 - **Pebble app**, through the Android app
 - **Windows app**
 
@@ -172,8 +210,8 @@ working on a pull request.
 ## Translations
 
 Todav speaks English, Polish, German, French, Spanish, Italian and Brazilian Portuguese, and
-follows your GNOME language. English and Polish are reviewed; the others are first drafts, so
-corrections from native speakers are very welcome. Missing your language? Ask for it in an
+follows your GNOME or Android language. English and Polish are reviewed; the others are first
+drafts, so corrections from native speakers are very welcome. Missing your language? Ask for it in an
 [issue](https://github.com/AperteDev/todav/issues/new?template=translation.yml), or translate it
 yourself (see [CONTRIBUTING.md](docs/CONTRIBUTING.md#translations)).
 
@@ -186,6 +224,8 @@ Todav is developed and tested mainly on this setup:
 - **Nextcloud** with its built-in CalDAV server (the Tasks and Calendar apps are optional, but
   handy as web fallbacks).
 - **GNOME** 49 to 51, with the app (GTK 4 + libadwaita) and the optional GNOME Shell extension.
+- **Android** 15 to 17 on phones and foldables (the emulator), with the ntfy app as the
+  UnifiedPush distributor.
 - Optionally, for instant updates: the [DAV Push](https://github.com/bitfireAT/nc_ext_dav_push)
   Nextcloud app (`dav_push`) and an [ntfy](https://ntfy.sh) server.
 
@@ -210,6 +250,16 @@ it with `.copr/Makefile`, which also works locally:
 
 ```sh
 make -f .copr/Makefile srpm outdir=$PWD/target/rpm spec=$PWD/todav/linux/rpm/todav.spec
+```
+
+**Android:** the Gradle project in `todav/android` builds the Rust core with `cargo-ndk`. It needs
+`rustup`, `cargo-ndk`, JDK 21, `gettext` and `unzip`; `sdk.sh` sets up the Android SDK and an
+emulator in `~/Android/Sdk` with the versions in `gradle.properties`:
+
+```sh
+make -C todav/android setup   # the SDK, the NDK and the emulator
+make -C todav/android build   # debug APKs in todav/android/app/build/outputs/apk/debug/
+make -C todav/android run     # built for the emulator, installed and started
 ```
 
 Every push is checked and packaged by [CI](.github/workflows/ci.yml); releases are made by the
