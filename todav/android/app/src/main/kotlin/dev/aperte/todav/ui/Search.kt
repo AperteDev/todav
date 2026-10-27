@@ -100,9 +100,13 @@ fun SearchPage(model: Main) {
                         modifier = Modifier.fillMaxWidth().focusRequester(focus),
                     )
                 },
-                navigationIcon = { IconButton(onClick = model::back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Back")) } },
+                navigationIcon = {
+                    Tip(tr("Back")) { IconButton(onClick = model::back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Back")) } }
+                },
                 actions = {
-                    if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, tr("Clear")) }
+                    if (query.isNotEmpty()) {
+                        Tip(tr("Clear")) { IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, tr("Clear")) } }
+                    }
                 },
             )
         },

@@ -2,6 +2,8 @@
 agp = "9.4.1"
 kotlin = "2.4.21"
 compose-bom = "2026.09.00"
+# Ahead of the BOM's 1.4: Material 3 Expressive (its theme, flexible app bars, FAB menu, loading indicator).
+material3 = "1.5.0-beta02"
 activity = "1.13.0"
 lifecycle = "2.11.0"
 core = "1.19.1"
@@ -14,7 +16,7 @@ jna = "5.19.1"
 
 [libraries]
 compose-bom = { module = "androidx.compose:compose-bom", version.ref = "compose-bom" }
-compose-material3 = { module = "androidx.compose.material3:material3" }
+compose-material3 = { module = "androidx.compose.material3:material3", version.ref = "material3" }
 compose-material-icons = { module = "androidx.compose.material:material-icons-extended" }
 compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
 compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }

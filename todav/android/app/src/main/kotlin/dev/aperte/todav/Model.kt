@@ -210,9 +210,18 @@ class Main(app: Application) : AndroidViewModel(app) {
     /** The day the calendar shows (local midnight), set by a reminder, an event pill or Today. */
     val day = MutableStateFlow<Long?>(null)
 
+    /** The day a swipe to another month or week moved `day` to by itself: not highlighted as picked. */
+    val browsed = MutableStateFlow<Long?>(null)
+
+    /** Pick `d` (a tap, Today): highlighted, even when a swipe had moved there. */
+    fun pick(d: Long) {
+        browsed.value = null
+        day.value = d
+    }
+
     /** The calendar on the day of `t`, from wherever the user is. */
     fun showDay(t: Long) {
-        day.value = midnight(t)
+        pick(midnight(t))
         while (stack.size > 1) stack.removeAt(stack.lastIndex)
         show(View.CALENDAR)
     }

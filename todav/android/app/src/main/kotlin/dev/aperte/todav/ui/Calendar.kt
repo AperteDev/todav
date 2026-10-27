@@ -33,7 +33,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
@@ -47,7 +46,6 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -73,6 +71,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
@@ -93,6 +92,7 @@ import androidx.compose.ui.zIndex
 import dev.aperte.todav.core.Change
 import dev.aperte.todav.core.EventPatch
 import dev.aperte.todav.core.AgendaEntry
+import dev.aperte.todav.core.BlockColumn
 import dev.aperte.todav.core.DayBlock
 import dev.aperte.todav.core.Due
 import dev.aperte.todav.core.DueValue
@@ -116,6 +116,7 @@ import dev.aperte.todav.format
 import dev.aperte.todav.hourLabel
 import dev.aperte.todav.ntr
 import dev.aperte.todav.time
+import dev.aperte.todav.ptr
 import dev.aperte.todav.tr
 import java.time.LocalDate
 import java.time.temporal.WeekFields
@@ -161,12 +162,12 @@ fun eventWhen(e: Event, now: Long): String {
 }
 
 /**
- * The calendar: Month, Week or Agenda, as the Linux app's, with Today, the view menu and a
- * button adding an event. Months and weeks change with a swipe.
+ * The calendar: Month, Week or Agenda, as the Linux app's, with Today and the view menu, and the
+ * button adding an event when `addButton` (both panes shown). Months and weeks change with a swipe.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CalendarPane(model: Main) {
+fun CalendarPane(model: Main, addButton: Boolean) {
     val drawer = LocalDrawer.current
     val scope = rememberCoroutineScope()
     val mode by model.calMode.collectAsStateWithLifecycle()
@@ -177,6 +178,9 @@ fun CalendarPane(model: Main) {
     var viewMenu by remember { mutableStateOf(false) }
     var toPlan by remember { mutableStateOf(false) }
     val planning by model.planning.collectAsStateWithLifecycle()
+    val changes by model.todav.changes.collectAsStateWithLifecycle()
+    // Each list's colour, once for all pages: a page coming into view has them at once.
+    val colors = load(changes, initial = emptyMap<String, String>()) { model.core.colors() }
     val title = when (mode) {
         CalMode.AGENDA -> tr("Agenda")
         else -> format(day, "LLLL yyyy").replaceFirstChar { it.titlecase() }
@@ -186,18 +190,28 @@ fun CalendarPane(model: Main) {
             TopAppBar(
                 title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
-                    IconButton(onClick = { scope.launch { drawer?.open() } }) { Icon(Icons.Default.Menu, tr("Calendars")) }
+                    Tip(tr("Calendars")) {
+                        IconButton(onClick = { scope.launch { drawer?.open() } }) { Icon(Icons.Default.Menu, tr("Calendars")) }
+                    }
                 },
                 actions = {
-                    IconButton(onClick = { model.day.value = midnight(model.core.localNow()) }) {
-                        Icon(Icons.Outlined.Today, tr("Today"))
+                    Tip(tr("Today")) {
+                        IconButton(onClick = { model.pick(midnight(model.core.localNow())) }) {
+                            Icon(Icons.Outlined.Today, tr("Today"))
+                        }
                     }
                     if (mode == CalMode.WEEK) {
-                        IconButton(onClick = { toPlan = true }) { Icon(Icons.Outlined.Inbox, tr("To Plan")) }
+                        Tip(tr("To Plan")) {
+                            IconButton(onClick = { toPlan = true }) { Icon(Icons.Outlined.Inbox, tr("To Plan")) }
+                        }
                     }
-                    IconButton(onClick = { model.open(Dest.Search) }) { Icon(Icons.Default.Search, tr("Search")) }
+                    Tip(tr("Search")) {
+                        IconButton(onClick = { model.open(Dest.Search) }) { Icon(Icons.Default.Search, tr("Search")) }
+                    }
                     Box {
-                        IconButton(onClick = { viewMenu = true }) { Icon(modeIcon(mode), tr("View")) }
+                        Tip(tr("View")) {
+                            IconButton(onClick = { viewMenu = true }) { Icon(modeIcon(mode), tr("View")) }
+                        }
                         DropdownMenu(expanded = viewMenu, onDismissRequest = { viewMenu = false }) {
                             for (m in CalMode.entries) {
                                 DropdownMenuItem(
@@ -215,11 +229,7 @@ fun CalendarPane(model: Main) {
                 },
             )
         },
-        floatingActionButton = {
-            FloatingActionButton(onClick = { model.open(Dest.EventEdit(null, null, null, newStart(model, day), false)) }) {
-                Icon(Icons.Default.Add, tr("New Event"))
-            }
-        },
+        floatingActionButton = { if (addButton) AddButton(tr("New Event"), inBar = false) { newEvent(model) } },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             planning?.takeIf { mode == CalMode.WEEK }?.let { t ->
@@ -237,15 +247,21 @@ fun CalendarPane(model: Main) {
             }
             Box(Modifier.fillMaxSize()) {
                 when (mode) {
-                    CalMode.MONTH -> MonthView(model, day) { details = it }
-                    CalMode.WEEK -> WeekView(model, day) { details = it }
+                    CalMode.MONTH -> MonthView(model, day, colors) { details = it }
+                    CalMode.WEEK -> WeekView(model, day, colors) { details = it }
                     CalMode.AGENDA -> AgendaView(model, day) { details = it }
                 }
             }
         }
     }
     details?.let { ItemSheet(model, it) { details = null } }
-    if (toPlan) ToPlanSheet(model, weekStart(day, firstWeekday()) + 7 * DAY) { toPlan = false }
+    if (toPlan) ToPlanSheet(model, weekStart(day, firstWeekday()) + 7 * DAY, colors) { toPlan = false }
+}
+
+/** A new event on the day the calendar shows (the add button, the shortcut). */
+fun newEvent(model: Main) {
+    val day = model.day.value ?: midnight(model.core.localNow())
+    model.open(Dest.EventEdit(null, null, null, newStart(model, day), false))
 }
 
 /** A new event's start: the next full hour on `day` when it is today, else 9:00 there. */
@@ -279,7 +295,8 @@ private fun monthOf(day: Long, page: Int): Long {
  * picked lists its events and tasks underneath. Swiped, the next or previous month.
  */
 @Composable
-private fun MonthView(model: Main, day: Long, onItem: (Item) -> Unit) {
+private fun MonthView(model: Main, day: Long, colors: Map<String, String>, onItem: (Item) -> Unit) {
+    val browsed by model.browsed.collectAsStateWithLifecycle()
     // Pages count from the month shown when the view opened; picking a day elsewhere moves there.
     val base = remember { monthFirst(day) }
     val pager = rememberPagerState(initialPage = MIDDLE + monthsBetween(base, day)) { PAGES }
@@ -293,15 +310,18 @@ private fun MonthView(model: Main, day: Long, onItem: (Item) -> Unit) {
             if (monthFirst(model.day.value ?: day) != month) {
                 // Today when it is in that month, else its first day.
                 val today = midnight(model.core.localNow())
-                model.day.value = if (monthFirst(today) == month) today else month
+                val to = if (monthFirst(today) == month) today else month
+                model.browsed.value = to
+                model.day.value = to
             }
         }
     }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth > maxHeight
         val grid: @Composable (Modifier) -> Unit = { m ->
-            HorizontalPager(pager, m, beyondViewportPageCount = 0, key = { it }) { page ->
-                MonthGrid(model, monthOf(base, page), day, onItem)
+            // The months either side are made ready beforehand, so a swipe finds them filled in.
+            HorizontalPager(pager, m, beyondViewportPageCount = 1, key = { it }) { page ->
+                MonthGrid(model, monthOf(base, page), day.takeIf { it != browsed }, colors, onItem)
             }
         }
         if (wide) {
@@ -326,11 +346,14 @@ private fun monthsBetween(a: Long, b: Long): Int {
 }
 
 @Composable
-private fun MonthGrid(model: Main, month: Long, picked: Long, onItem: (Item) -> Unit) {
+private fun MonthGrid(model: Main, month: Long, picked: Long?, colors: Map<String, String>, onItem: (Item) -> Unit) {
     val changes by model.todav.changes.collectAsStateWithLifecycle()
     val start = weekStart(month, firstWeekday())
-    val items = load(changes, start, initial = emptyList<Item>()) { model.core.items(start, start + 42 * DAY) }
-    val colors = load(changes, initial = emptyMap<String, String>()) { model.core.colors() }
+    // What is on each of the 42 days, sorted out off the main thread: `onDay` is a call into the core.
+    val days = load(changes, start, initial = List(42) { emptyList<Item>() }) {
+        val items = model.core.items(start, start + 42 * DAY)
+        List(42) { n -> items.filter { onDay(it, start + n * DAY) } }
+    }
     val today = midnight(model.core.localNow())
     val thisMonth = fields(month).monthValue
     // A chip held and moved: the day under it, and the drop to apply.
@@ -353,7 +376,7 @@ private fun MonthGrid(model: Main, month: Long, picked: Long, onItem: (Item) -> 
             Row(Modifier.fillMaxWidth().weight(1f)) {
                 for (d in 0 until 7) {
                     val at = start + (w * 7 + d) * DAY
-                    val here = items.filter { onDay(it, at) }
+                    val here = days[w * 7 + d]
                     DayCell(
                         at, here, colors, at == today, at == picked || at == target, fields(at).monthValue == thisMonth,
                         Modifier.weight(1f).fillMaxHeight().pointerInput(at, here) {
@@ -383,7 +406,7 @@ private fun MonthGrid(model: Main, month: Long, picked: Long, onItem: (Item) -> 
                                 onDragCancel = { target = null },
                             )
                         },
-                    ) { model.day.value = at }
+                    ) { model.pick(at) }
                 }
             }
         }
@@ -562,7 +585,8 @@ private val HOUR: Dp = 48.dp
  * Tap an empty hour to add an event there; swipe for other weeks.
  */
 @Composable
-private fun WeekView(model: Main, day: Long, onItem: (Item) -> Unit) {
+private fun WeekView(model: Main, day: Long, colors: Map<String, String>, onItem: (Item) -> Unit) {
+    val browsed by model.browsed.collectAsStateWithLifecycle()
     val first = firstWeekday()
     val base = remember { weekStart(day, first) }
     val pager = rememberPagerState(initialPage = MIDDLE + ((weekStart(day, first) - base) / (7 * DAY)).toInt()) { PAGES }
@@ -576,27 +600,52 @@ private fun WeekView(model: Main, day: Long, onItem: (Item) -> Unit) {
             val now = model.day.value ?: day
             if (weekStart(now, first) != start) {
                 val today = midnight(model.core.localNow())
-                model.day.value = if (weekStart(today, first) == start) today else start
+                val to = if (weekStart(today, first) == start) today else start
+                model.browsed.value = to
+                model.day.value = to
             }
         }
     }
     val scroll = rememberScrollState()
     LaunchedEffect(Unit) { scroll.scrollTo((HOUR.value * 7.5f * 2.6f).toInt()) }
-    HorizontalPager(pager, Modifier.fillMaxSize(), key = { it }) { page ->
-        Week(model, base + (page - MIDDLE) * 7 * DAY, day, scroll, onItem)
+    // The weeks either side are made ready beforehand, so a swipe finds them filled in.
+    HorizontalPager(pager, Modifier.fillMaxSize(), beyondViewportPageCount = 1, key = { it }) { page ->
+        Week(model, base + (page - MIDDLE) * 7 * DAY, day.takeIf { it != browsed }, colors, scroll, onItem)
     }
 }
 
+/** A block in the week's hours: the item's index, its piece on that day, and its column there. */
+private class Block(val item: Int, val piece: dev.aperte.todav.core.Segment, val column: BlockColumn)
+
+/** A week's items, each day's blocks in the hours, and what is on each day without hours. */
+private class WeekItems(val items: List<Item>, val blocks: List<List<Block>>, val top: List<List<Item>>)
+
 @Composable
-private fun Week(model: Main, start: Long, picked: Long, scroll: androidx.compose.foundation.ScrollState, onItem: (Item) -> Unit) {
+private fun Week(
+    model: Main,
+    start: Long,
+    picked: Long?,
+    colors: Map<String, String>,
+    scroll: androidx.compose.foundation.ScrollState,
+    onItem: (Item) -> Unit,
+) {
     val changes by model.todav.changes.collectAsStateWithLifecycle()
-    val items = load(changes, start, initial = emptyList<Item>()) { model.core.items(start, start + 7 * DAY) }
-    val colors = load(changes, initial = emptyMap<String, String>()) { model.core.colors() }
-    // Each item's pieces in the hours (None: in the row above them).
-    val timed = load(items, start, initial = emptyList<Pair<Int, List<dev.aperte.todav.core.Segment>>>()) {
-        items.mapIndexedNotNull { i, it -> model.core.hours(it)?.let { _ -> i to model.core.segments(it, start) } }
+    // All read and laid out at once off the main thread: `hours`, `segments`, `columns` and `onDay`
+    // call into the core, too slow for every frame of a drag.
+    val week = load(changes, start, initial = WeekItems(emptyList(), List(7) { emptyList() }, List(7) { emptyList() })) {
+        val items = model.core.items(start, start + 7 * DAY)
+        // Each item's pieces in the hours (None: in the row above them).
+        val timed = items.mapIndexedNotNull { i, it -> model.core.hours(it)?.let { _ -> i to model.core.segments(it, start) } }
+        val inHours = timed.map { it.first }.toSet()
+        val untimed = items.filterIndexed { i, _ -> i !in inHours }
+        val blocks = List(7) { d ->
+            val pieces = timed.flatMap { (i, segs) -> segs.filter { it.day == d.toLong() }.map { i to it } }
+            val cols = columns(pieces.mapIndexed { n, (_, s) -> DayBlock(n.toUInt(), s.from, s.to) }).associateBy { it.index.toInt() }
+            pieces.mapIndexedNotNull { n, (i, s) -> cols[n]?.let { Block(i, s, it) } }
+        }
+        WeekItems(items, blocks, List(7) { d -> untimed.filter { onDay(it, start + d * DAY) } })
     }
-    val inHours = timed.map { it.first }.toSet()
+    val items = week.items
     var drag by remember { mutableStateOf<Held?>(null) }
     // A drop to apply: the item and where its start goes.
     var moved by remember { mutableStateOf<Pair<Item, Long>?>(null) }
@@ -612,7 +661,7 @@ private fun Week(model: Main, start: Long, picked: Long, scroll: androidx.compos
             for (d in 0 until 7) {
                 val at = start + d * DAY
                 Column(
-                    Modifier.weight(1f).clickable { model.day.value = at }.padding(vertical = 4.dp),
+                    Modifier.weight(1f).clickable { model.pick(at) }.padding(vertical = 4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(format(at, "EEE"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -637,13 +686,11 @@ private fun Week(model: Main, start: Long, picked: Long, scroll: androidx.compos
             }
         }
         // What takes no hours: all-day events and tasks due on a date.
-        val top = items.withIndex().filter { it.index !in inHours }
-        if (top.isNotEmpty()) {
+        if (week.top.any { it.isNotEmpty() }) {
             Row(Modifier.fillMaxWidth().padding(start = 40.dp).heightIn(max = 96.dp).verticalScroll(rememberScrollState())) {
                 for (d in 0 until 7) {
-                    val at = start + d * DAY
                     Column(Modifier.weight(1f).padding(1.dp), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        top.filter { onDay(it.value, at) }.forEach { (_, item) ->
+                        week.top[d].forEach { item ->
                             Box(Modifier.clickable { onItem(item) }) { Chip(item, colors) }
                         }
                     }
@@ -653,6 +700,7 @@ private fun Week(model: Main, start: Long, picked: Long, scroll: androidx.compos
         HorizontalDivider()
         Box(Modifier.fillMaxSize().verticalScroll(scroll)) {
             val line = MaterialTheme.colorScheme.outlineVariant
+            val surface = MaterialTheme.colorScheme.surface
             Column {
                 for (h in 0 until 24) {
                     Row(Modifier.height(HOUR)) {
@@ -684,13 +732,10 @@ private fun Week(model: Main, start: Long, picked: Long, scroll: androidx.compos
             // The blocks, day by day.
             Row(Modifier.padding(start = 40.dp).height(HOUR * 24)) {
                 for (d in 0 until 7) {
-                    val pieces = timed.flatMap { (i, segs) -> segs.filter { it.day == d.toLong() }.map { i to it } }
-                    val cols = columns(pieces.mapIndexed { n, (_, s) -> DayBlock(n.toUInt(), s.from, s.to) })
-                        .associateBy { it.index.toInt() }
                     BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
                         val w = maxWidth
-                        pieces.forEachIndexed { n, (i, s) ->
-                            val c = cols[n] ?: return@forEachIndexed
+                        week.blocks[d].forEach { b ->
+                            val (i, s, c) = Triple(b.item, b.piece, b.column)
                             val item = items[i]
                             val color = parseColor(colors[item.list()])
                             val height = (HOUR * ((s.to - s.from).coerceAtLeast(20) / 60f)) - 1.dp
@@ -709,7 +754,8 @@ private fun Week(model: Main, start: Long, picked: Long, scroll: androidx.compos
                                     .width(w / c.columns.toInt() - 1.dp)
                                     .height(height)
                                     .clip(RoundedCornerShape(4.dp))
-                                    .background(if (item is Item.Event) color else color.copy(alpha = 0.3f))
+                                    // A task's light shade made solid, so the hour lines don't show through.
+                                    .background(if (item is Item.Event) color else color.copy(alpha = 0.3f).compositeOver(surface))
                                     .clickable { onItem(item) }
                                     // Held and moved: to another hour (15-minute steps) or day.
                                     .pointerInput(item, d) {
@@ -790,26 +836,56 @@ private fun Reschedule(model: Main, item: Item, change: Change, onDone: () -> Un
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ToPlanSheet(model: Main, until: Long, onDismiss: () -> Unit) {
+private fun ToPlanSheet(model: Main, until: Long, colors: Map<String, String>, onDismiss: () -> Unit) {
     val changes by model.todav.changes.collectAsStateWithLifecycle()
-    val tasks = load(changes, until, initial = emptyList<TodavTask>()) { model.core.unscheduled(until) }
+    // Shown once read: a sheet whose list fills in after it opens jumps from full height to half.
+    // Hidden lists' tasks are left out, as on the calendar.
+    val tasks = load(changes, until, initial = null as List<TodavTask>?) {
+        val hidden = model.core.hidden()
+        model.core.unscheduled(until).filter { t -> hidden.none { dev.aperte.todav.core.sameList(it, t.listHref) } }
+    } ?: return
     val now = model.core.localNow()
+    // As the Linux sidebar: due by a date first, then without one.
+    val groups = tasks.partition { it.due != null }.toList()
+        .zip(listOf(ptr("to plan", "Due"), tr("No date")))
+        .filter { it.first.isNotEmpty() }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Text(tr("To Plan"), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 24.dp))
         if (tasks.isEmpty()) {
             Text(tr("Nothing to plan"), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(24.dp))
         }
         LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
-            items(tasks, key = { it.uid }) { t ->
-                androidx.compose.material3.ListItem(
-                    headlineContent = { Text(t.summary) },
-                    supportingContent = dev.aperte.todav.dueLabel(t, now)?.let { { Text(it) } },
-                    modifier = Modifier.clickable {
-                        model.planning.value = t
-                        onDismiss()
-                    },
-                )
+            groups.forEach { (group, title) ->
+                item(key = title) {
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 24.dp, top = 16.dp, bottom = 4.dp),
+                    )
+                }
+                items(group, key = { it.uid }) { t -> PlanRow(t, colors, now) { model.planning.value = t; onDismiss() } }
             }
+        }
+    }
+}
+
+/** A task in "To Plan": its list's colour, its title and the day it is due (red when overdue). */
+@Composable
+private fun PlanRow(t: TodavTask, colors: Map<String, String>, now: Long, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 24.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(Modifier.size(10.dp).background(parseColor(colors[t.listHref]), CircleShape))
+        Text(t.summary, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        t.due?.let {
+            Text(
+                format(it, "d MMM"),
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (dev.aperte.todav.core.overdue(t, now)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

@@ -22,6 +22,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import dev.aperte.todav.ui.TodavTheme
 import dev.aperte.todav.ui.TodavUi
+import dev.aperte.todav.ui.newEvent
+import dev.aperte.todav.ui.newTask
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -112,16 +114,11 @@ class MainActivity : ComponentActivity() {
                 KeyEvent.KEYCODE_R, KeyEvent.KEYCODE_F5 -> model.sync().let { true }
                 KeyEvent.KEYCODE_COMMA -> model.open(Dest.Settings).let { true }
                 KeyEvent.KEYCODE_N -> {
-                    if (calendar) {
-                        val now = model.core.localNow()
-                        model.open(Dest.EventEdit(null, null, null, now - Math.floorMod(now, 3600L) + 3600))
-                    } else {
-                        model.sharedText.value = ""
-                    }
+                    if (calendar) newEvent(model) else newTask(model)
                     true
                 }
                 KeyEvent.KEYCODE_T -> {
-                    model.day.value = dev.aperte.todav.core.midnight(model.core.localNow())
+                    model.pick(dev.aperte.todav.core.midnight(model.core.localNow()))
                     true
                 }
                 KeyEvent.KEYCODE_1, KeyEvent.KEYCODE_2, KeyEvent.KEYCODE_3 -> {

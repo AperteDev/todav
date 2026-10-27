@@ -190,8 +190,10 @@ fun EventPage(model: Main, dest: Dest.EventEdit) {
             TopAppBar(
                 title = { Text(if (ev == null) tr("New Event") else tr("Event")) },
                 navigationIcon = {
-                    IconButton(onClick = { if (changed) discard = true else model.back() }) {
-                        Icon(Icons.Default.Close, tr("Cancel"))
+                    Tip(tr("Cancel")) {
+                        IconButton(onClick = { if (changed) discard = true else model.back() }) {
+                            Icon(Icons.Default.Close, tr("Cancel"))
+                        }
                     }
                 },
                 actions = { TextButton(onClick = ::save, enabled = calendar != null) { Text(tr("Save")) } },

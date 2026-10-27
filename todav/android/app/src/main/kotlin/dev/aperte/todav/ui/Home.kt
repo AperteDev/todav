@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -115,9 +117,11 @@ fun Home(model: Main) {
                 }
             },
         ) {
+            // The add button, for what is shown: a task or an event.
+            val add = { if (view == View.TASKS) newTask(model) else newEvent(model) }
             Scaffold(
                 snackbarHost = { SnackbarHost(snackbar) },
-                bottomBar = { if (width == Width.COMPACT) Switcher(view, model::show) },
+                bottomBar = { if (width == Width.COMPACT) Switcher(view, model::show, add) },
                 contentWindowInsets = WindowInsets(0),
             ) { padding ->
                 androidx.compose.runtime.CompositionLocalProvider(
@@ -125,15 +129,14 @@ fun Home(model: Main) {
                     LocalSnackbar provides snackbar,
                 ) {
                     Row(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
-                        if (width == Width.MEDIUM) Rail(view, model::show)
-                        when {
-                            both -> {
-                                Box(Modifier.weight(1f).fillMaxHeight()) { TasksPane(model, screen) }
-                                VerticalDivider()
-                                Box(Modifier.weight(1f).fillMaxHeight()) { CalendarPane(model) }
-                            }
-                            view == View.TASKS -> TasksPane(model, screen)
-                            else -> CalendarPane(model)
+                        if (width == Width.MEDIUM) Rail(view, model::show, add)
+                        if (both) {
+                            // No bar or rail: each pane has its own add button.
+                            Box(Modifier.weight(1f).fillMaxHeight()) { TasksPane(model, screen, addButton = true) }
+                            VerticalDivider()
+                            Box(Modifier.weight(1f).fillMaxHeight()) { CalendarPane(model, addButton = true) }
+                        } else {
+                            Panes(model, screen, view, Modifier.weight(1f).fillMaxHeight())
                         }
                     }
                 }
@@ -142,8 +145,24 @@ fun Home(model: Main) {
     }
 }
 
+/**
+ * Tasks and Calendar as two pages, both kept composed so either shows at once; the buttons slide
+ * between them (not swipes: rows and months take those).
+ */
 @Composable
-private fun Switcher(view: View, onShow: (View) -> Unit) {
+private fun Panes(model: Main, screen: Screen, view: View, modifier: Modifier) {
+    val pager = rememberPagerState(initialPage = view.ordinal) { 2 }
+    LaunchedEffect(view) { if (pager.currentPage != view.ordinal) pager.animateScrollToPage(view.ordinal) }
+    HorizontalPager(pager, modifier, userScrollEnabled = false, beyondViewportPageCount = 1) { page ->
+        if (page == View.TASKS.ordinal) TasksPane(model, screen, addButton = false) else CalendarPane(model, addButton = false)
+    }
+}
+
+private fun addLabel(view: View) = if (view == View.TASKS) tr("Add Task") else tr("New Event")
+
+/** Tasks and Calendar, and the add button at the end (as a bottom app bar has it), to take less room. */
+@Composable
+private fun Switcher(view: View, onShow: (View) -> Unit, onAdd: () -> Unit) {
     NavigationBar {
         NavigationBarItem(
             selected = view == View.TASKS,
@@ -157,12 +176,14 @@ private fun Switcher(view: View, onShow: (View) -> Unit) {
             icon = { Icon(if (view == View.CALENDAR) Icons.Filled.CalendarMonth else Icons.Outlined.CalendarMonth, null) },
             label = { Text(tr("Calendar")) },
         )
+        Box(Modifier.padding(end = 12.dp)) { AddButton(addLabel(view), inBar = true, onClick = onAdd) }
     }
 }
 
+/** Tasks and Calendar, under the add button. */
 @Composable
-private fun Rail(view: View, onShow: (View) -> Unit) {
-    NavigationRail {
+private fun Rail(view: View, onShow: (View) -> Unit, onAdd: () -> Unit) {
+    NavigationRail(header = { AddButton(addLabel(view), inBar = true, onClick = onAdd) }) {
         NavigationRailItem(
             selected = view == View.TASKS,
             onClick = { onShow(View.TASKS) },
@@ -296,7 +317,7 @@ private fun Drawer(model: Main, screen: Screen, view: View?, close: () -> Unit) 
         item(key = "end") {
             HorizontalDivider(Modifier.padding(vertical = 8.dp, horizontal = 28.dp))
             NavigationDrawerItem(
-                label = { Text(tr("New List…")) },
+                label = { Text(if (view == View.CALENDAR) tr("New Calendar…") else tr("New List…")) },
                 icon = { Icon(Icons.Outlined.Add, null) },
                 selected = false,
                 onClick = { newList = true },

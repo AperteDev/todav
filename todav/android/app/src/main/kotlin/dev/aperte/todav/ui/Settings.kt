@@ -5,15 +5,20 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings as SystemSettings
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -32,10 +37,11 @@ import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -44,7 +50,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -56,6 +62,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -99,13 +108,18 @@ private val SORTS = listOf("manual", "newest", "oldest", "due_soonest", "due_lat
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun Frame(model: Main, title: String, content: @Composable () -> Unit) {
+    val bar = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
+        modifier = Modifier.nestedScroll(bar.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            LargeFlexibleTopAppBar(
                 title = { Text(title) },
                 navigationIcon = {
-                    IconButton(onClick = model::back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Back")) }
+                    Tip(tr("Back")) {
+                        IconButton(onClick = model::back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Back")) }
+                    }
                 },
+                scrollBehavior = bar,
             )
         },
     ) { padding ->
@@ -129,12 +143,14 @@ fun SettingsPage(model: Main) {
             Triple(Page.CALENDAR, tr("Calendar"), Icons.Outlined.CalendarMonth),
             Triple(Page.ABOUT, tr("About Todav"), Icons.Outlined.Info),
         )
-        pages.forEach { (page, title, icon) ->
-            ListItem(
-                headlineContent = { Text(title) },
-                leadingContent = { Icon(icon, null) },
-                modifier = Modifier.clickable { model.open(Dest.SettingsPage(page)) },
-            )
+        Section(null) {
+            pages.forEach { (page, title, icon) ->
+                Item(
+                    headlineContent = { Text(title) },
+                    leadingContent = { Icon(icon, null) },
+                    modifier = Modifier.clickable { model.open(Dest.SettingsPage(page)) },
+                )
+            }
         }
     }
 }
@@ -152,13 +168,46 @@ fun SettingsSubpage(model: Main, page: Page) {
 
 // --- rows ---------------------------------------------------------------------------------------
 
+/** Rows in one rounded container, under `title` if any: as Android's own settings group them. */
 @Composable
-private fun Group(title: String) {
-    Text(
-        title,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 16.dp, top = 24.dp, bottom = 8.dp),
+private fun Section(title: String?, content: @Composable ColumnScope.() -> Unit) {
+    if (title != null) {
+        Text(
+            title,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 32.dp, top = 24.dp, bottom = 8.dp),
+        )
+    } else {
+        Spacer(Modifier.height(16.dp))
+    }
+    Column(
+        Modifier.padding(horizontal = 16.dp).clip(RoundedCornerShape(24.dp)),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        content = content,
+    )
+}
+
+private val ITEM_SHAPE = RoundedCornerShape(4.dp)
+
+/** A row of a [Section]: a box of its own, the section's round corners at its ends. */
+@Composable
+private fun Item(
+    headlineContent: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    supportingContent: @Composable (() -> Unit)? = null,
+    leadingContent: @Composable (() -> Unit)? = null,
+    trailingContent: @Composable (() -> Unit)? = null,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
+) {
+    ListItem(
+        modifier = Modifier.clip(ITEM_SHAPE).then(modifier),
+        leadingContent = leadingContent,
+        trailingContent = trailingContent,
+        supportingContent = supportingContent,
+        shapes = ListItemDefaults.shapes(shape = ITEM_SHAPE),
+        colors = ListItemDefaults.segmentedColors(containerColor = containerColor),
+        content = headlineContent,
     )
 }
 
@@ -185,7 +234,7 @@ private fun ChoiceRow(
     val value = setting(model, key)
     val current = shown ?: values.indexOf(value).coerceAtLeast(0)
     var open by remember { mutableStateOf(false) }
-    ListItem(
+    Item(
         headlineContent = { Text(title) },
         supportingContent = {
             Column {
@@ -231,7 +280,7 @@ fun Choose(title: String, names: List<String>, current: Int, onDismiss: () -> Un
 private fun SwitchRow(model: Main, title: String, key: String, subtitle: String? = null, default: Boolean = true) {
     val value = setting(model, key)
     val on = if (default) value != "false" else value == "true"
-    ListItem(
+    Item(
         headlineContent = { Text(title) },
         supportingContent = subtitle?.let { { Text(it) } },
         trailingContent = { Switch(on, { model.act { model.core.setSetting(key, it.toString()) } }) },
@@ -253,123 +302,131 @@ private fun DurationRow(model: Main, title: String, subtitle: String, key: Strin
 @Composable
 private fun General(model: Main) {
     val context = LocalContext.current
-    Group(tr("Appearance"))
-    ChoiceRow(
-        model, tr("Style"), "color_scheme", listOf("", "light", "dark"),
-        listOf(ptr("style", "System"), ptr("style", "Light"), ptr("style", "Dark")),
-    )
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        ListItem(
-            headlineContent = { Text(tr("Language")) },
-            supportingContent = { Text(tr("Todav’s language in the system settings")) },
+    Section(tr("Appearance")) {
+        ChoiceRow(
+            model, tr("Style"), "color_scheme", listOf("", "light", "dark"),
+            listOf(ptr("style", "System"), ptr("style", "Light"), ptr("style", "Dark")),
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Item(
+                headlineContent = { Text(tr("Language")) },
+                supportingContent = { Text(tr("Todav’s language in the system settings")) },
+                modifier = Modifier.clickable {
+                    context.startActivity(
+                        Intent(SystemSettings.ACTION_APP_LOCALE_SETTINGS, Uri.fromParts("package", context.packageName, null)),
+                    )
+                },
+            )
+        }
+    }
+    Section(tr("Startup")) {
+        ChoiceRow(
+            model, tr("Open at start"), "start_view", listOf("last", "tasks", "calendar"),
+            listOf(tr("Last used"), tr("Tasks"), tr("Calendar")),
+        )
+    }
+    Section(tr("Notifications")) {
+        Item(
+            headlineContent = { Text(tr("Notifications")) },
+            supportingContent = { Text(tr("Reminder notifications, in the system settings")) },
+            leadingContent = { Icon(Icons.Outlined.Notifications, null) },
             modifier = Modifier.clickable {
                 context.startActivity(
-                    Intent(SystemSettings.ACTION_APP_LOCALE_SETTINGS, Uri.fromParts("package", context.packageName, null)),
+                    Intent(SystemSettings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(SystemSettings.EXTRA_APP_PACKAGE, context.packageName),
                 )
             },
         )
     }
-    Group(tr("Startup"))
-    ChoiceRow(
-        model, tr("Open at start"), "start_view", listOf("last", "tasks", "calendar"),
-        listOf(tr("Last used"), tr("Tasks"), tr("Calendar")),
-    )
-    Group(tr("Notifications"))
-    ListItem(
-        headlineContent = { Text(tr("Notifications")) },
-        supportingContent = { Text(tr("Reminder notifications, in the system settings")) },
-        leadingContent = { Icon(Icons.Outlined.Notifications, null) },
-        modifier = Modifier.clickable {
-            context.startActivity(
-                Intent(SystemSettings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(SystemSettings.EXTRA_APP_PACKAGE, context.packageName),
-            )
-        },
-    )
 }
 
 @Composable
 private fun Accounts(model: Main) {
     val changes by model.todav.changes.collectAsStateWithLifecycle()
     val accounts = load(changes, initial = model.core.accounts()) { model.core.accounts() }
-    Group(tr("Accounts"))
     // The order everything lists accounts in: dragged by the handles, as in the Linux app.
     var order by remember(accounts) { mutableStateOf(accounts) }
     // The handles' gestures outlive recompositions: they read the order through this.
     val current by androidx.compose.runtime.rememberUpdatedState(order)
     var held by remember { mutableStateOf<Long?>(null) }
     var shift by remember { mutableStateOf(0f) }
-    // Keyed by account, so a row keeps its handle's gesture while it moves.
-    order.forEach { a -> androidx.compose.runtime.key(a.id) {
-        ListItem(
-            headlineContent = { Text(accountName(a)) },
-            supportingContent = { Text(accountKind(model, a)) },
-            leadingContent = {
-                Icon(if (a.kind == AccountKind.LOCAL) Icons.Outlined.PhoneAndroid else Icons.Outlined.AccountCircle, null)
-            },
-            trailingContent = if (order.size > 1) {
-                {
-                    Icon(
-                        Icons.Default.DragHandle,
-                        tr("Drag to Move"),
-                        Modifier.pointerInput(a.id) {
-                            detectVerticalDragGestures(
-                                onDragStart = {
-                                    held = a.id
-                                    shift = 0f
-                                },
-                                onVerticalDrag = { change, dy ->
-                                    change.consume()
-                                    shift += dy
-                                    // Past half a row: one place up or down.
-                                    val row = 72.dp.toPx()
-                                    val i = current.indexOfFirst { it.id == a.id }
-                                    val to = (i + Math.round(shift / row)).coerceIn(0, current.lastIndex)
-                                    if (to != i) {
-                                        order = current.toMutableList().apply { add(to, removeAt(i)) }
-                                        shift -= (to - i) * row
-                                    }
-                                },
-                                onDragEnd = {
-                                    held = null
-                                    val ids = current.map { it.id }
-                                    model.act {
-                                        model.core.reorderAccounts(ids)
-                                        model.todav.changed()
-                                    }
-                                },
-                                onDragCancel = {
-                                    held = null
-                                    order = accounts
-                                },
-                            )
-                        },
-                    )
-                }
-            } else {
-                null
-            },
-            tonalElevation = if (held == a.id) 4.dp else 0.dp,
-            modifier = Modifier.clickable { model.open(Dest.Account(a.id)) },
+    Section(tr("Accounts")) {
+        // Keyed by account, so a row keeps its handle's gesture while it moves.
+        order.forEach { a -> androidx.compose.runtime.key(a.id) {
+            Item(
+                headlineContent = { Text(accountName(a)) },
+                supportingContent = { Text(accountKind(model, a)) },
+                leadingContent = {
+                    Icon(if (a.kind == AccountKind.LOCAL) Icons.Outlined.PhoneAndroid else Icons.Outlined.AccountCircle, null)
+                },
+                trailingContent = if (order.size > 1) {
+                    {
+                        Icon(
+                            Icons.Default.DragHandle,
+                            tr("Drag to Move"),
+                            Modifier.pointerInput(a.id) {
+                                detectVerticalDragGestures(
+                                    onDragStart = {
+                                        held = a.id
+                                        shift = 0f
+                                    },
+                                    onVerticalDrag = { change, dy ->
+                                        change.consume()
+                                        shift += dy
+                                        // Past half a row (with the gap below it): one place up or down.
+                                        val row = 74.dp.toPx()
+                                        val i = current.indexOfFirst { it.id == a.id }
+                                        val to = (i + Math.round(shift / row)).coerceIn(0, current.lastIndex)
+                                        if (to != i) {
+                                            order = current.toMutableList().apply { add(to, removeAt(i)) }
+                                            shift -= (to - i) * row
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        held = null
+                                        val ids = current.map { it.id }
+                                        model.act {
+                                            model.core.reorderAccounts(ids)
+                                            model.todav.changed()
+                                        }
+                                    },
+                                    onDragCancel = {
+                                        held = null
+                                        order = accounts
+                                    },
+                                )
+                            },
+                        )
+                    }
+                } else {
+                    null
+                },
+                containerColor = if (held == a.id) {
+                    MaterialTheme.colorScheme.surfaceContainerHighest
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainer
+                },
+                modifier = Modifier.clickable { model.open(Dest.Account(a.id)) },
+            )
+        } }
+        Item(
+            headlineContent = { Text(tr("Add Account")) },
+            leadingContent = { Icon(Icons.Outlined.Add, null) },
+            modifier = Modifier.clickable { model.open(Dest.AddAccount) },
         )
-    } }
-    ListItem(
-        headlineContent = { Text(tr("Add Account")) },
-        leadingContent = { Icon(Icons.Outlined.Add, null) },
-        modifier = Modifier.clickable { model.open(Dest.AddAccount) },
-    )
+    }
     val servers = accounts.filter { it.kind == AccountKind.NEXTCLOUD }
     if (servers.isNotEmpty()) {
-        Group(tr("Sync"))
-        val current = model.core.settingsAccount()
-        ChoiceRow(
-            model, tr("Sync settings with"), "settings_account",
-            listOf("") + servers.map { "${it.id}" },
-            listOf(ptr("settings sync", "Off")) + servers.map { accountName(it) },
-            subtitle = tr("Accounts and servers always stay on this device"),
-            shown = servers.indexOfFirst { it.id == current } + 1,
-        ) { i -> model.act { model.core.setSettingsAccount(servers.getOrNull(i - 1)?.id) } }
-        Group(tr("Push"))
-        PushRow(model)
+        Section(tr("Sync")) {
+            val current = model.core.settingsAccount()
+            ChoiceRow(
+                model, tr("Sync settings with"), "settings_account",
+                listOf("") + servers.map { "${it.id}" },
+                listOf(ptr("settings sync", "Off")) + servers.map { accountName(it) },
+                subtitle = tr("Accounts and servers always stay on this device"),
+                shown = servers.indexOfFirst { it.id == current } + 1,
+            ) { i -> model.act { model.core.setSettingsAccount(servers.getOrNull(i - 1)?.id) } }
+        }
+        Section(tr("Push")) { PushRow(model) }
     }
 }
 
@@ -386,7 +443,7 @@ fun accountKind(model: Main, a: dev.aperte.todav.core.Account): String = when {
 private fun PushRow(model: Main) {
     val context = LocalContext.current
     val distributor = remember { model.todav.push.distributor() }
-    ListItem(
+    Item(
         headlineContent = { Text(tr("Push")) },
         supportingContent = {
             Text(
@@ -402,33 +459,36 @@ private fun PushRow(model: Main) {
 
 @Composable
 private fun TaskSettings(model: Main) {
-    Group(tr("Tasks"))
-    OrderRows(model, "task", tr("Sort"), tr("Add new tasks"))
-    ChoiceRow(
-        model, tr("Completed tasks"), "done_tasks", listOf("group", "in_place", "last"),
-        listOf(tr("In a separate group"), tr("Keep in place"), tr("Move to the end")),
-    )
-    DurationRow(model, tr("Default duration"), tr("When a task gets a time, or is planned on the calendar"), "task_duration")
-    Group(tr("Stars and Pins"))
-    SwitchRow(model, tr("Stars"), "show_stars", tr("A star with each task’s priority, and the Important page"))
-    SwitchRow(model, tr("Pins"), "show_pins", tr("Pin tasks to the top of their list"))
-    Group(tr("Subtasks"))
-    OrderRows(model, "sub", tr("Sort"), tr("Add new subtasks"))
-    ChoiceRow(
-        model, tr("Completed subtasks"), "done_subtasks", listOf("show", "hide", "last"),
-        listOf(tr("Show"), tr("Hide"), tr("Move to the end")),
-    )
-    ChoiceRow(
-        model, tr("Completing a task with open subtasks"), "complete_subtasks", listOf("complete", "keep", "ask"),
-        listOf(tr("Completes them too"), tr("Leaves them open"), tr("Asks each time")),
-    )
-    Group(tr("Reminders"))
-    ReminderRows(model)
-    Group(tr("Categories"))
-    ChoiceRow(
-        model, tr("Show categories"), "category_view", listOf("group", "tags", "none"),
-        listOf(tr("Group by category"), tr("As tags"), tr("Hide")),
-    )
+    Section(tr("Tasks")) {
+        OrderRows(model, "task", tr("Sort"), tr("Add new tasks"))
+        ChoiceRow(
+            model, tr("Completed tasks"), "done_tasks", listOf("group", "in_place", "last"),
+            listOf(tr("In a separate group"), tr("Keep in place"), tr("Move to the end")),
+        )
+        DurationRow(model, tr("Default duration"), tr("When a task gets a time, or is planned on the calendar"), "task_duration")
+    }
+    Section(tr("Stars and Pins")) {
+        SwitchRow(model, tr("Stars"), "show_stars", tr("A star with each task’s priority, and the Important page"))
+        SwitchRow(model, tr("Pins"), "show_pins", tr("Pin tasks to the top of their list"))
+    }
+    Section(tr("Subtasks")) {
+        OrderRows(model, "sub", tr("Sort"), tr("Add new subtasks"))
+        ChoiceRow(
+            model, tr("Completed subtasks"), "done_subtasks", listOf("show", "hide", "last"),
+            listOf(tr("Show"), tr("Hide"), tr("Move to the end")),
+        )
+        ChoiceRow(
+            model, tr("Completing a task with open subtasks"), "complete_subtasks", listOf("complete", "keep", "ask"),
+            listOf(tr("Completes them too"), tr("Leaves them open"), tr("Asks each time")),
+        )
+    }
+    Section(tr("Reminders")) { ReminderRows(model) }
+    Section(tr("Categories")) {
+        ChoiceRow(
+            model, tr("Show categories"), "category_view", listOf("group", "tags", "none"),
+            listOf(tr("Group by category"), tr("As tags"), tr("Hide")),
+        )
+    }
 }
 
 /**
@@ -469,7 +529,7 @@ private fun ReminderRows(model: Main) {
         shown = presets.indexOfFirst { it.second == current }.coerceAtLeast(0),
     )
     var pick by remember { mutableStateOf(false) }
-    ListItem(
+    Item(
         headlineContent = { Text(tr("Time for all-day tasks")) },
         supportingContent = { Text(tr("When reminders of tasks due on a date go off")) },
         trailingContent = { Text(time(allDayTime)) },
@@ -493,13 +553,15 @@ private fun ReminderRows(model: Main) {
 
 @Composable
 private fun CalendarSettings(model: Main) {
-    Group(tr("Views"))
-    ChoiceRow(
-        model, tr("View at start"), "start_calendar_view", listOf("last", "month", "week", "agenda"),
-        listOf(tr("Last used"), tr("Month"), tr("Week"), tr("Agenda")),
-    )
-    Group(tr("Events"))
-    DurationRow(model, tr("Default duration"), tr("When an event is added at a time, or an all-day one gets a time"), "event_duration")
+    Section(tr("Views")) {
+        ChoiceRow(
+            model, tr("View at start"), "start_calendar_view", listOf("last", "month", "week", "agenda"),
+            listOf(tr("Last used"), tr("Month"), tr("Week"), tr("Agenda")),
+        )
+    }
+    Section(tr("Events")) {
+        DurationRow(model, tr("Default duration"), tr("When an event is added at a time, or an all-day one gets a time"), "event_duration")
+    }
 }
 
 @Composable
@@ -507,21 +569,23 @@ private fun About(model: Main) {
     val context = LocalContext.current
     val version = remember { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "" }
     val open = { url: String -> context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) }
-    ListItem(headlineContent = { Text("Todav") }, supportingContent = { Text(tr("Version {version}").replace("{version}", version)) })
-    ListItem(
-        headlineContent = { Text(tr("Source Code")) },
-        supportingContent = { Text("github.com/AperteDev/todav") },
-        modifier = Modifier.clickable { open("https://github.com/AperteDev/todav") },
-    )
-    ListItem(
-        headlineContent = { Text(tr("Report an Issue")) },
-        modifier = Modifier.clickable { open("https://github.com/AperteDev/todav/issues") },
-    )
-    ListItem(
-        headlineContent = { Text(tr("License")) },
-        supportingContent = { Text("GNU General Public License 3.0 or later") },
-        modifier = Modifier.clickable { open("https://www.gnu.org/licenses/gpl-3.0.html") },
-    )
+    Section(null) {
+        Item(headlineContent = { Text("Todav") }, supportingContent = { Text(tr("Version {version}").replace("{version}", version)) })
+        Item(
+            headlineContent = { Text(tr("Source Code")) },
+            supportingContent = { Text("github.com/AperteDev/todav") },
+            modifier = Modifier.clickable { open("https://github.com/AperteDev/todav") },
+        )
+        Item(
+            headlineContent = { Text(tr("Report an Issue")) },
+            modifier = Modifier.clickable { open("https://github.com/AperteDev/todav/issues") },
+        )
+        Item(
+            headlineContent = { Text(tr("License")) },
+            supportingContent = { Text("GNU General Public License 3.0 or later") },
+            modifier = Modifier.clickable { open("https://www.gnu.org/licenses/gpl-3.0.html") },
+        )
+    }
 }
 
 // --- accounts --------------------------------------------------------------------------------
@@ -555,26 +619,28 @@ fun AccountPage(model: Main, id: Long) {
     var signingIn by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     Frame(model, accountName(account)) {
-        ListItem(
-            headlineContent = { Text(tr("Use This Account")) },
-            supportingContent = { Text(tr("Off hides its lists and calendars and stops syncing them; nothing is deleted")) },
-            trailingContent = {
-                Switch(account.enabled, { on ->
-                    model.act {
-                        core.setAccountEnabled(id, on)
-                        model.todav.changed()
-                        core.syncNow()
-                    }
-                })
-            },
-        )
+        Section(null) {
+            Item(
+                headlineContent = { Text(tr("Use This Account")) },
+                supportingContent = { Text(tr("Off hides its lists and calendars and stops syncing them; nothing is deleted")) },
+                trailingContent = {
+                    Switch(account.enabled, { on ->
+                        model.act {
+                            core.setAccountEnabled(id, on)
+                            model.todav.changed()
+                            core.syncNow()
+                        }
+                    })
+                },
+            )
+        }
         OutlinedTextField(
             name,
             { name = it },
             label = { Text(tr("Name")) },
             placeholder = { Text(accountName(account.copy(name = ""))) },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 16.dp),
         )
         LaunchedEffect(name) {
             if (name != account.name) {
@@ -583,21 +649,23 @@ fun AccountPage(model: Main, id: Long) {
             }
         }
         if (account.kind == AccountKind.NEXTCLOUD) {
-            Group(tr("Connection"))
             val connected = core.connected(id)
-            ListItem(
-                headlineContent = {
-                    Text(if (connected) tr("Signed in as {name}").replace("{name}", account.user) else tr("Not connected"))
-                },
-                supportingContent = { Text(account.url) },
-            )
-            if (!signingIn) {
-                ListItem(
-                    headlineContent = { Text(tr("Sign In Again")) },
-                    leadingContent = { Icon(Icons.AutoMirrored.Outlined.Login, null) },
-                    modifier = Modifier.clickable { signingIn = true },
+            Section(tr("Connection")) {
+                Item(
+                    headlineContent = {
+                        Text(if (connected) tr("Signed in as {name}").replace("{name}", account.user) else tr("Not connected"))
+                    },
+                    supportingContent = { Text(account.url) },
                 )
-            } else {
+                if (!signingIn) {
+                    Item(
+                        headlineContent = { Text(tr("Sign In Again")) },
+                        leadingContent = { Icon(Icons.AutoMirrored.Outlined.Login, null) },
+                        modifier = Modifier.clickable { signingIn = true },
+                    )
+                }
+            }
+            if (signingIn) {
                 var server by rememberSaveable { mutableStateOf(account.url) }
                 Column(Modifier.padding(16.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
                     SignInForm(model, server, { server = it }, account.user) { url, user, password ->
@@ -621,12 +689,13 @@ fun AccountPage(model: Main, id: Long) {
             }
             if (connected) ServerStatus(model, id)
         }
-        HorizontalDivider(Modifier.padding(vertical = 8.dp))
-        ListItem(
-            headlineContent = { Text(tr("Remove Account"), color = MaterialTheme.colorScheme.error) },
-            leadingContent = { Icon(Icons.Outlined.Delete, null, tint = MaterialTheme.colorScheme.error) },
-            modifier = Modifier.clickable { confirm = true },
-        )
+        Section(null) {
+            Item(
+                headlineContent = { Text(tr("Remove Account"), color = MaterialTheme.colorScheme.error) },
+                leadingContent = { Icon(Icons.Outlined.Delete, null, tint = MaterialTheme.colorScheme.error) },
+                modifier = Modifier.clickable { confirm = true },
+            )
+        }
     }
     val title = tr("Remove {name}?").replace("{name}", accountName(account))
     if (confirm) {
@@ -689,7 +758,6 @@ private suspend fun remove(model: Main, id: Long, force: Boolean): String? = wit
 private fun ServerStatus(model: Main, id: Long) {
     val core = model.core
     val sync by model.syncState.collectAsStateWithLifecycle()
-    Group(tr("Server Status"))
     val server = load(id, initial = tr("Checking…")) {
         try {
             val info = core.serverInfo(id)
@@ -699,7 +767,6 @@ private fun ServerStatus(model: Main, id: Long) {
             tr("Cannot reach the server: {error}").replace("{error}", reason(e))
         }
     }
-    ListItem(headlineContent = { Text(tr("Server")) }, supportingContent = { Text(server) })
     val now = core.localNow()
     val status = when {
         sync == SyncState.Syncing -> tr("Syncing…")
@@ -710,7 +777,6 @@ private fun ServerStatus(model: Main, id: Long) {
             }
             ?: tr("Not synced yet")
     }
-    ListItem(headlineContent = { Text(tr("Sync")) }, supportingContent = { Text(status) })
     val push = remember(sync) { core.pushStatus(id) }
     val distributor = remember { model.todav.push.distributor() }
     val text = when {
@@ -720,5 +786,9 @@ private fun ServerStatus(model: Main, id: Long) {
         push.registered == 0u -> tr("Registering…")
         else -> tr("On: changes made elsewhere show up within seconds")
     }
-    ListItem(headlineContent = { Text(tr("DAV Push")) }, supportingContent = { Text(text) })
+    Section(tr("Server Status")) {
+        Item(headlineContent = { Text(tr("Server")) }, supportingContent = { Text(server) })
+        Item(headlineContent = { Text(tr("Sync")) }, supportingContent = { Text(status) })
+        Item(headlineContent = { Text(tr("DAV Push")) }, supportingContent = { Text(text) })
+    }
 }

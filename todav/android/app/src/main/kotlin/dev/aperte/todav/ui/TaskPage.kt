@@ -135,7 +135,7 @@ fun TaskPage(model: Main, uid: String) {
         topBar = {
             TopAppBar(
                 title = { Text(tr("Edit Task")) },
-                navigationIcon = { IconButton(onClick = close) { Icon(Icons.Default.Close, tr("Cancel")) } },
+                navigationIcon = { Tip(tr("Cancel")) { IconButton(onClick = close) { Icon(Icons.Default.Close, tr("Cancel")) } } },
                 actions = { TextButton(onClick = ::save, enabled = summary.isNotBlank()) { Text(tr("Save")) } },
             )
         },

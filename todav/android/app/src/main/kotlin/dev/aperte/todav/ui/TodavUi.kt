@@ -23,8 +23,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -56,12 +57,13 @@ import dev.aperte.todav.Main
 import dev.aperte.todav.SignIn
 import dev.aperte.todav.tr
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun TodavUi(model: Main) {
     val screen by model.screen.collectAsStateWithLifecycle()
     val current = screen
     when {
-        current == null -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
+        current == null -> Box(Modifier.fillMaxSize(), Alignment.Center) { LoadingIndicator() }
         current.accounts.isEmpty() -> Welcome(model)
         else -> NavDisplay(
             backStack = model.stack,
@@ -166,6 +168,7 @@ fun Choice(title: String, description: String, onClick: () -> Unit) {
 }
 
 /** A server to sign in to, with the browser or an app password; `onDone` gets the credentials. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SignInForm(
     model: Main,
@@ -197,7 +200,7 @@ fun SignInForm(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            CircularProgressIndicator(Modifier.size(24.dp))
+            LoadingIndicator(Modifier.size(40.dp))
             Text(tr("Waiting for Sign-In…"), Modifier.weight(1f))
             TextButton(onClick = model::cancelSignIn) { Text(tr("Cancel")) }
         }

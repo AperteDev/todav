@@ -2,7 +2,8 @@ package dev.aperte.todav.ui
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -29,7 +30,7 @@ fun TodavTheme(scheme: String?, content: @Composable () -> Unit) {
         dark -> darkColorScheme(primary = Color(0xFF8EC4EE), secondary = Color(0xFFA5E1D0))
         else -> lightColorScheme(primary = Color(0xFF2F6CB6), secondary = Color(0xFF1B7275))
     }
-    MaterialTheme(colorScheme = colors, content = content)
+    MaterialExpressiveTheme(colorScheme = colors, motionScheme = MotionScheme.expressive(), content = content)
 }
 
 /** "#rrggbb" (maybe with alpha) as a colour; grey when it is not one. */
