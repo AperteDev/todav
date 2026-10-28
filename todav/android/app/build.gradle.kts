@@ -30,7 +30,7 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // The release APK is built before its commit and tag exist (the Release workflow
             // tags only what passed), so F-Droid's rebuild of the tag would differ in the hash.
             vcsInfo.include = false

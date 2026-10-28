@@ -32,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when it next updates.
 - Android: Add Subtask in a task's details stays above the keyboard; with many subtasks it was
   hidden under it.
+- Android: the arrows of the calendar widgets turn the month or day again; in release builds
+  they did nothing.
 
 ## [2.0.4] - 2026-10-28
 
