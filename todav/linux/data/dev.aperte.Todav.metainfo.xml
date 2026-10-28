@@ -36,19 +36,19 @@
   <!-- From the release tag (scripts/release.py moves them to each new one). -->
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v1.3.1/docs/screenshots/tasks.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.0.0/docs/screenshots/tasks.png</image>
       <caption>Tasks grouped by category, with subtasks and due dates</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v1.3.1/docs/screenshots/calendar-month.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.0.0/docs/screenshots/calendar-month.png</image>
       <caption>The month, with an event's details</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v1.3.1/docs/screenshots/calendar-week.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.0.0/docs/screenshots/calendar-week.png</image>
       <caption>Tasks planned into the week next to events</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v1.3.1/docs/screenshots/event-dialog.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.0.0/docs/screenshots/event-dialog.png</image>
       <caption>Editing an event</caption>
     </screenshot>
   </screenshots>
@@ -63,6 +63,45 @@
     <control>touch</control>
   </supports>
   <releases>
+    <release version="2.0.0" date="2026-10-28">
+      <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.0.0</url>
+      <description translate="no">
+        <p>Added</p>
+        <ul>
+          <li>Linux: Todav can be the system's calendar app (Settings → Apps → Default Apps → Calendar): it opens iCalendar files (<code>.ics</code>), whose events and tasks go into the calendar and task list picked for them; an item already there is replaced.</li>
+          <li>Android: Todav can be the calendar other apps and the system open: at a time or an event of the system's calendars (clocks, At a Glance: their day), for other apps' "Add to calendar" (a new event with what they give), and for iCalendar files opened or shared (imported, as on Linux). Copy Link on a task's page and in a task's or an event's details gives a <code>todav://</code> link that opens it.</li>
+          <li>Android: "New Event" next to "New Task" on the launcher icon, a Quick Settings tile for a new task, and Snooze on reminders (back in ten minutes).</li>
+          <li>Linux: open tasks and events whose titles hold what is typed show in the Activities overview's search; one opens on its list or day, the app's heading searches its tasks in Todav.</li>
+          <li>Linux: Copy Link in a task's or an event's dialog and in their details on the calendar puts a <code>todav://</code> link on the clipboard; pasted elsewhere (notes, a chat), it opens the item in Todav: a task on its list, an event on its day.</li>
+          <li>Linux: Google calendars, through a Google account in GNOME Online Accounts: their events show, sync and can be edited, and the calendars renamed and recoloured; their order stays on this device. Google keeps no task lists, and calendars are added and deleted in Google Calendar. Only Nextcloud is fully supported, as adding one says; one whose sign-in gave no access to the calendars is not added, with what to do instead.</li>
+          <li>Android: System Calendars, on the welcome page and in Settings → Accounts → Add Account, shows the calendars of the device's own accounts (Google, Exchange, DAVx⁵…), read-only. None is shown at first; each is turned on in the account's page, and changes to them show up at once. One Todav already syncs itself (DAVx⁵'s copy of a Nextcloud calendar, say) is marked "Already in Todav", as its events would show twice. With nowhere to add a list, calendar, task or event (only these calendars), the add buttons are not shown.</li>
+          <li>A read-only calendar's events can no longer be changed, rather than the server refusing the change later; on Android their details no longer offer Edit and Delete.</li>
+          <li>Android: a full Material 3 Expressive app. Tasks and Calendar switched by a navigation bar on phones and a rail on wider screens, whose menu button shows the lists and calendars: a page of its own on phones, a sidebar that can be hidden and resized on unfolded foldables and tablets; a task page with everything the Linux edit dialog has; swipe actions picked in Settings for each direction (complete, star, pin or delete with Undo); drag tasks to reorder them, make them subtasks or change their category; month, week and agenda views where events and tasks move by dragging; an event editor with repeating events; "To Plan" for putting tasks into hours of the week; search; settings and accounts; reminders; push through UnifiedPush; "New Task" from the launcher; adding shared text as a task; keyboard shortcuts.</li>
+          <li>Android: home-screen widgets, read-only as the GNOME extension: a task list (or Upcoming, Important) by category with its subtasks, the month with a dot per calendar on each day, the coming week's agenda, a day's hours, and a month planner with bars across the days. A task or an event opens in its editor (on the month planner, the day tapped), a month's or day's title in the calendar. Each has an add button and settings (its list, or calendars other than those shown in the app; its add button), in the launcher's menu of the widget and in Settings → Widgets, which also sets their colours (the system's, or a background and a text colour for light and dark), the background's opacity, the corners' radius and a settings button on each widget.</li>
+          <li>Android: Saturdays and Sundays tinted red a little in the calendar's day names and numbers, and in the month widgets'.</li>
+          <li>Android: a launcher icon of its own, the calendar page filling whatever shape the launcher gives icons, with a themed version; the app opens on it over the system's accent colour, light or dark with it.</li>
+          <li>Android: About Todav in Settings has a Support section with the Ko-fi, GitHub Sponsors and Liberapay links, as About on Linux.</li>
+          <li>Android: an account of the Nextcloud app on the device fills in the server and login name of a sign-in.</li>
+          <li>Android: each release has an APK, a test build until Google Play and F-Droid: uninstall the previous one before installing the next.</li>
+          <li>Calendar: Work Week, 3 Days and Day views. Work Week shows the days picked in Preferences (Monday to Friday at first); 3 Days moves a day at a time; Day shows its week above the hours. Ctrl+4, Ctrl+5 and Ctrl+6 open them. On Linux the views are now picked from a menu.</li>
+          <li>Calendar: an event's or a task's title can be changed right in its details popover: click it, type, press Enter.</li>
+          <li>Lists and calendars can be put in any order by dragging them in the sidebar, within their account; with Nextcloud the order is shared with its Calendar and Tasks apps and other devices, lists on this device keep theirs here. On Android, hold a list, then drag it.</li>
+          <li>Linux: the sidebar can be hidden with the button at the start of the header or F9; in a narrow window it opens over the content instead of in place of it.</li>
+        </ul>
+        <p>Changed</p>
+        <ul>
+          <li>Calendar: clicking a task in "To Plan" says how to plan it: drag it onto the calendar; right-clicking it offers Edit….</li>
+          <li>Calendar: in the agenda, as in the GNOME extension, a task is a ring in its list's colour, with a tick when done, and an event a dot; a task is ticked in its details, not in the agenda.</li>
+        </ul>
+        <p>Fixed</p>
+        <ul>
+          <li>Android: signing in with the browser no longer fails with "Login failed" when Android cuts off Todav's network while the browser is in front.</li>
+          <li>On a new installation, reminders never went off.</li>
+          <li>The calendar no longer highlights the first day of a month or week moved to with the arrows as if it had been picked.</li>
+          <li>Calendar: a task or event dragged over the events of a day lights the day up, as over its free space.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.3.1" date="2026-10-26">
       <url type="details">https://github.com/AperteDev/todav/releases/tag/v1.3.1</url>
       <description translate="no">

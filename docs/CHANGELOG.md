@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-28
+
 ### Added
 
 - Linux: Todav can be the system's calendar app (Settings → Apps → Default Apps → Calendar): it
@@ -276,7 +278,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Its options are in the app's Preferences. Without the app installed, its
   menu says so and links to the download.
 
-[Unreleased]: https://github.com/AperteDev/todav/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/AperteDev/todav/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/AperteDev/todav/compare/v1.3.1...v2.0.0
 [1.3.1]: https://github.com/AperteDev/todav/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/AperteDev/todav/compare/v1.2.2...v1.3.0
 [1.2.2]: https://github.com/AperteDev/todav/compare/v1.2.1...v1.2.2

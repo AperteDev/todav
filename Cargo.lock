@@ -1251,21 +1251,21 @@ dependencies = [
 
 [[package]]
 name = "todav-app"
-version = "1.3.1"
+version = "2.0.0"
 dependencies = [
  "todav-core",
 ]
 
 [[package]]
 name = "todav-cli"
-version = "1.3.1"
+version = "2.0.0"
 dependencies = [
  "todav-core",
 ]
 
 [[package]]
 name = "todav-core"
-version = "1.3.1"
+version = "2.0.0"
 dependencies = [
  "p256",
  "quick-xml",
@@ -1276,7 +1276,7 @@ dependencies = [
 
 [[package]]
 name = "todav-linux"
-version = "1.3.1"
+version = "2.0.0"
 dependencies = [
  "gtk4",
  "libadwaita",
