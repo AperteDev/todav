@@ -10,6 +10,7 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.anchoredDraggable
 import androidx.compose.foundation.gestures.animateTo
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -47,6 +49,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -130,7 +133,9 @@ fun DetailsSheet(
         }
         // An editor's own handler, asking about unsaved edits, comes first.
         BackHandler { if (drag.targetValue == Rest.Full) state.collapse() else state.close() }
-        val connection = remember(drag) { sheetScroll(drag) { !state.locked } }
+        // A finger on it: scrolling a field into view moves the content, not the sheet.
+        var touched by remember { mutableStateOf(false) }
+        val connection = remember(drag) { sheetScroll(drag, { touched }) { !state.locked } }
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val height = constraints.maxHeight.toFloat()
             val top = WindowInsets.statusBars.getTop(density).toFloat()
@@ -170,6 +175,11 @@ fun DetailsSheet(
             Surface(
                 Modifier.offset { IntOffset(0, offset.roundToInt()) }.fillMaxWidth()
                     .height(with(density) { (height - top).toDp() })
+                    .pointerInput(Unit) {
+                        awaitPointerEventScope {
+                            while (true) touched = awaitPointerEvent(PointerEventPass.Initial).changes.any { it.pressed }
+                        }
+                    }
                     .nestedScroll(connection)
                     .anchoredDraggable(drag, Orientation.Vertical, enabled = !state.locked),
                 shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
@@ -181,8 +191,22 @@ fun DetailsSheet(
                     }
                     Box(Modifier.weight(1f)) {
                         if (details != null && up < 1f) {
+                            // Scrolling only in what is on screen and above the keyboard, so the
+                            // field with the cursor scrolls into view.
+                            val under = (offset - top + WindowInsets.ime.getBottom(density)).coerceAtLeast(0f)
+                            val scroll = rememberScrollState()
+                            // Scrolled (to a field), what is at the bottom stays there as rows are
+                            // added above it.
+                            LaunchedEffect(scroll) {
+                                var last = 0
+                                snapshotFlow { scroll.maxValue }.collect { max ->
+                                    if (scroll.value > 0 && max > last) scroll.scrollBy((max - last).toFloat())
+                                    last = max
+                                }
+                            }
                             Box(
-                                Modifier.graphicsLayer { alpha = 1 - up }.verticalScroll(rememberScrollState())
+                                Modifier.padding(bottom = with(density) { under.toDp() })
+                                    .graphicsLayer { alpha = 1 - up }.verticalScroll(scroll)
                                     .onSizeChanged { body = it.height.toFloat() }.navigationBarsPadding().fillMaxWidth(),
                                 androidx.compose.ui.Alignment.TopCenter,
                             ) { Box(Modifier.widthIn(max = CONTENT_WIDTH)) { details(state) } }
@@ -199,17 +223,20 @@ fun DetailsSheet(
 
 /**
  * Scrolls inside the sheet move the sheet first upward (to full height) and last downward (once
- * the content is at its top), as Material's sheets do; `free` says when it may move.
+ * the content is at its top), as Material's sheets do; `free` says when it may move. Only
+ * scrolls of a finger on it (`touched`): scrolling a field into view counts as user input too.
  */
 // ponytail: `settle(velocity)` is deprecated for a fling behaviour; it still does what Material's
 // own sheets do here.
 @Suppress("DEPRECATION")
-private fun sheetScroll(drag: AnchoredDraggableState<Rest>, free: () -> Boolean) = object : NestedScrollConnection {
+private fun sheetScroll(drag: AnchoredDraggableState<Rest>, touched: () -> Boolean, free: () -> Boolean) = object : NestedScrollConnection {
+    private fun moves(source: NestedScrollSource) = source == NestedScrollSource.UserInput && touched() && free()
+
     override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset =
-        if (available.y < 0 && source == NestedScrollSource.UserInput && free()) Offset(0f, drag.dispatchRawDelta(available.y)) else Offset.Zero
+        if (available.y < 0 && moves(source)) Offset(0f, drag.dispatchRawDelta(available.y)) else Offset.Zero
 
     override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset =
-        if (source == NestedScrollSource.UserInput && free()) Offset(0f, drag.dispatchRawDelta(available.y)) else Offset.Zero
+        if (moves(source)) Offset(0f, drag.dispatchRawDelta(available.y)) else Offset.Zero
 
     override suspend fun onPreFling(available: Velocity): Velocity {
         val moving = available.y < 0 && drag.offset > drag.anchors.minPosition()

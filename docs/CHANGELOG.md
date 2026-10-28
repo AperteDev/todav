@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Android: a widget resized on the home screen is laid out for its new size at once, not only
   when it next updates.
+- Android: Add Subtask in a task's details stays above the keyboard; with many subtasks it was
+  hidden under it.
 
 ## [2.0.4] - 2026-10-28
 
