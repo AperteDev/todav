@@ -187,7 +187,7 @@ private fun DayNumber(day: Long, today: Long, inMonth: Boolean, size: Dp, modifi
             }
         }
     } else {
-        text(modifier.height(size).padding(top = (size - 17.dp) / 2))
+        text(modifier.height(size).padding(top = ((size - 17.dp) / 2).coerceAtLeast(0.dp)))
     }
 }
 
@@ -522,7 +522,8 @@ class PlannerWidget : TodavWidget() {
         val size = LocalSize.current
         val cell = (size.width - 20.dp) / 7
         val week = (size.height - 20.dp - 44.dp - 18.dp) / 6
-        val number = 20.dp
+        // Shorter in a low widget, down to what a number needs; then no bars.
+        val number = (week - 1.dp).coerceIn(15.dp, 20.dp)
         val bar = 15.dp
         val fit = floor(((week - number - 1.dp) / bar)).toInt().coerceIn(0, 8)
         WidgetFrame(context) {

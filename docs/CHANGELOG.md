@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Android: the month view scrolls up and down a week at a time, as GNOME Calendar's, instead
   of swiping a month sideways; a mouse wheel scrolls it a week per notch, and Today or a day
   in another month scrolls there.
+- Android: the month planner widget can be made as low as the month widget; low, it shows
+  each week's days with as many bars as fit, down to none.
 
 ### Fixed
 
