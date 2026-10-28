@@ -5,6 +5,7 @@
 mod days;
 mod dialog;
 mod mini;
+mod month;
 mod week;
 
 use crate::i18n::{gettext, ngettext, pgettext};
@@ -110,6 +111,14 @@ struct Cal {
     views: gtk::Stack,
     weekdays: gtk::Box,
     month: gtk::Grid,
+    month_scroll: gtk::ScrolledWindow,
+    /// The weeks the month grid's first row and its top row in sight start (midnights).
+    month_start: Cell<i64>,
+    month_top: Cell<i64>,
+    /// Scrolling it to a row; the wheel's notches not scrolled yet; the wait for it to stop.
+    month_anim: RefCell<Option<adw::TimedAnimation>>,
+    month_wheel: Cell<f64>,
+    month_settle: RefCell<Option<glib::SourceId>>,
     agenda: gtk::Box,
     plan_heading: gtk::ToggleButton,
     plan: gtk::ListBox,
@@ -232,6 +241,12 @@ pub fn build(views: &adw::ViewStack, tasks: &adw::OverlaySplitView) {
         views: get(&b, "views"),
         weekdays: get(&b, "weekdays"),
         month: get(&b, "month"),
+        month_scroll: get(&b, "month_scroll"),
+        month_start: Cell::new(0),
+        month_top: Cell::new(0),
+        month_anim: RefCell::new(None),
+        month_wheel: Cell::new(0.0),
+        month_settle: RefCell::new(None),
         agenda: get(&b, "agenda"),
         plan_heading: get(&b, "plan_heading"),
         plan: get(&b, "plan"),
@@ -267,6 +282,7 @@ pub fn build(views: &adw::ViewStack, tasks: &adw::OverlaySplitView) {
     CAL.with(|cell| *cell.borrow_mut() = Some(c.clone()));
 
     week::setup(&c);
+    month::setup(&c);
     plan_drop(&c);
     // Clicking a calendar's row shows or hides it.
     for (list, events) in [(&c.calendars, true), (&c.task_lists, false)] {
@@ -685,7 +701,7 @@ pub fn refresh() {
         }
         Mode::Month => {
             c.views.set_visible_child_name("month");
-            render_month(&c)
+            month::render(&c)
         }
         Mode::Agenda => {
             c.views.set_visible_child_name("agenda");
@@ -1100,41 +1116,6 @@ fn clear(w: &impl IsA<gtk::Widget>) {
     }
 }
 
-/// Returns the end of the shown range.
-fn render_month(c: &Rc<Cal>) -> i64 {
-    let anchor = c.anchor.get();
-    let d = dates::fields(anchor);
-    let first = month_first(anchor);
-    let start = week_start(first);
-    let end = start + 42 * DAY;
-    c.title.set_title(&capitalized(&fmt(first, "%OB %Y")));
-    c.title.set_subtitle("");
-
-    clear(&c.weekdays);
-    for i in 0..7 {
-        c.weekdays
-            .append(&gtk::Label::new(Some(&fmt(start + i * DAY, "%a"))));
-    }
-    while let Some(child) = c.month.first_child() {
-        c.month.remove(&child);
-    }
-    let all = items(start, end);
-    let month = d.month();
-    for w in 0..6 {
-        let from = start + w * 7 * DAY;
-        let week: Vec<i64> = (0..7).map(|d| from + d * DAY).collect();
-        let here: Vec<&Item> = all
-            .iter()
-            .filter(|i| week.iter().any(|&d| on_day(i, d)))
-            .collect();
-        let row = days::row(c, &week, &here, CHIPS, false, |day| {
-            day_cell(c, day, dates::fields(day).month() != month, select_in_month)
-        });
-        c.month.attach(&row, 0, w as i32, 1, 1);
-    }
-    end
-}
-
 /// A day of the month grid: its number (dimmer when `other`, from another month), today and the
 /// selected day marked. Clicking it calls `select`, a double click or a long press adds an
 /// event that day; what is dropped on it moves there.
@@ -1173,32 +1154,6 @@ fn day_cell(c: &Rc<Cal>, day: i64, other: bool, select: fn(i64)) -> gtk::Box {
     day_drop(&cell, day, false);
     flash_if(c, &cell, day);
     cell
-}
-
-/// Select a day of the month grid. In the month shown only the highlight moves: a rebuilt
-/// grid would lose the second click of a double click.
-fn select_in_month(day: i64) {
-    let Some(c) = cal() else { return };
-    let first = month_first(day);
-    if first != month_first(c.anchor.get()) {
-        return go(|_| day);
-    }
-    c.anchor.set(day);
-    c.browsed.set(false);
-    let mut d = week_start(first);
-    let mut row = c.month.first_child();
-    while let Some(r) = row {
-        for w in days::cells(&r) {
-            if d == day {
-                w.add_css_class("selected");
-            } else {
-                w.remove_css_class("selected");
-            }
-            d += DAY;
-        }
-        row = r.next_sibling();
-    }
-    mini::refresh(&c);
 }
 
 /// A double click, or a long press on a touchscreen, on `w` adds an event at the time `at`

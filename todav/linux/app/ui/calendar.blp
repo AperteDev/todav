@@ -7,9 +7,11 @@ Adw.OverlaySplitView split {
   min-sidebar-width: 300;
   max-sidebar-width: 340;
 
-  // The page's shortcuts, while it is shown (listed in ui/shortcuts.blp).
+  // The page's shortcuts, while it is shown (listed in ui/shortcuts.blp). Before the views,
+  // whose scrolled windows would take Page Up and Page Down.
   Gtk.ShortcutController {
     scope: managed;
+    propagation-phase: capture;
 
     Gtk.Shortcut {
       trigger: "<Control>n";
@@ -372,7 +374,7 @@ Adw.OverlaySplitView split {
       Gtk.StackPage {
         name: "month";
 
-        // Weekday names over six rows of seven days, filled in code.
+        // Weekday names over rows of seven days, six in sight, filled and scrolled in code.
         child: Gtk.Box {
           orientation: vertical;
           margin-start: 6;
@@ -385,10 +387,11 @@ Adw.OverlaySplitView split {
             styles ["weekdays"]
           }
 
-          // Scrolls when the window is too short for six rows.
-          Gtk.ScrolledWindow {
+          // A week at a time, as GNOME Calendar's, without a scroll bar.
+          Gtk.ScrolledWindow month_scroll {
             vexpand: true;
             hscrollbar-policy: never;
+            vscrollbar-policy: external;
 
             Gtk.Grid month {
               row-homogeneous: true;

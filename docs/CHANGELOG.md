@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Linux: the month view scrolls up and down a week at a time, as GNOME Calendar's, by the
+  mouse wheel (a week per notch), a touchpad or a touchscreen; the arrows, Today and a day in
+  another month scroll there smoothly.
 - Android: the month view scrolls up and down a week at a time, as GNOME Calendar's, instead
   of swiping a month sideways; a mouse wheel scrolls it a week per notch, and Today or a day
   in another month scrolls there.
