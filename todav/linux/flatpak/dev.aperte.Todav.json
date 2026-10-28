@@ -11,8 +11,7 @@
     "--socket=wayland",
     "--socket=fallback-x11",
     "--device=dri",
-    "--talk-name=org.gnome.OnlineAccounts",
-    "--talk-name=org.freedesktop.secrets"
+    "--talk-name=org.gnome.OnlineAccounts"
   ],
   "build-options": {
     "append-path": "/usr/lib/sdk/rust-stable/bin",

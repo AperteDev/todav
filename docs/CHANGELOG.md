@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Flatpak: Todav no longer asks for access to the system keyring; it keeps its passwords
+  through the Secret portal, as it already did.
+
 ## [2.0.2] - 2026-10-28
 
 ### Changed

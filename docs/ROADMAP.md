@@ -57,9 +57,8 @@ Smaller items:
     meaningful history and real-world use first.
   - Translations: Flathub accepts no machine-generated translations. Only Polish is reviewed;
     de, es, fr, it and pt_BR are drafts and need a review or have to stay out of that build.
-  - `--talk-name=org.freedesktop.secrets` will likely have to go: inside Flatpak libsecret
-    uses the Secret portal, which is mandatory where it covers the use. GNOME Online Accounts
-    has no portal, so its `--talk-name` needs a justification.
+  - GNOME Online Accounts has no portal, so its `--talk-name` needs a justification. (The
+    keyring needs none: inside Flatpak libsecret keeps passwords through the Secret portal.)
   - The repository's manifest fetches crates over the network (`--share=network`), which
     Flathub's offline build does not allow.
   The metainfo validates; `https://aperte.dev` answers, as the ID's domain check needs, and
