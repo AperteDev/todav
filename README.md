@@ -152,10 +152,10 @@ Todav needs GNOME 49 or newer, or Android 10 or newer. The GNOME Shell extension
 
 **Android:** download `todav-<version>.apk` from the
 [latest release](https://github.com/AperteDev/todav/releases/latest) and open it on your phone
-(allow your browser or file manager to install apps when asked). Until Google Play and F-Droid,
-it is a test build signed differently each release: uninstall the previous version before
-installing a new one (lists on the device only are lost; your Nextcloud's sync back). Todav
-syncs with your Nextcloud itself; you don't need DAVx⁵ for it.
+(allow your browser or file manager to install apps when asked). Later versions install over it.
+Coming from 2.0.1 or earlier, which were test builds signed differently each release, uninstall
+that one first (lists on the device only are lost; your Nextcloud's sync back). Todav syncs with
+your Nextcloud itself; you don't need DAVx⁵ for it.
 
 **Arch Linux and derivatives** (Manjaro, EndeavourOS, CachyOS…): install from the
 [AUR](https://aur.archlinux.org/packages?K=todav) with an AUR helper:

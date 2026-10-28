@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Prepare a release: set the version in the Cargo manifests and locks, the app's metainfo, the
-extension's metadata.json and the RPM spec (with a changelog entry), move the Unreleased changelog section under the new version, and print
+"""Prepare a release: set the version in the Cargo manifests and locks, the Android version code,
+the app's metainfo, the extension's metadata.json and the RPM spec (with a changelog entry), move the Unreleased changelog section under the new version, and print
 its notes for the GitHub release. The metainfo gets those notes too, and its screenshots are
 taken from the new tag (app stores want them from a tag, not a branch). The Release workflow
 runs it.
@@ -130,7 +130,7 @@ def main() -> None:
     # The bindings are a workspace of their own.
     edit("todav/ffi/Cargo.toml", r'(\[package\].*?^version = )"[^"]*"', rf'\g<1>"{version}"')
     # The workspaces' own crates, the packages without a `source`, so `--locked` builds still work.
-    for lock in [ROOT / "Cargo.lock", ROOT / "todav/ffi/Cargo.lock"]:
+    for lock in [ROOT / "Cargo.lock", ROOT / "todav/Cargo.lock"]:
         lock.write_text(
             re.sub(
                 r'^(name = "[^"]+"\nversion = )"[^"]*"$(?!\nsource)',
@@ -139,6 +139,12 @@ def main() -> None:
                 flags=re.M,
             )
         )
+    major, minor, patch = map(int, version.split("."))
+    edit(
+        "todav/android/gradle.properties",
+        r"^(todav\.versionCode=)\d+$",
+        rf"\g<1>{major * 10000 + minor * 100 + patch}",
+    )
     edit(
         "todav/gnome-extension/metadata.json",
         r'("version-name": )"[^"]*"',

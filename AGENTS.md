@@ -16,7 +16,8 @@
 - Logic a front-end needs that is not about widgets goes in `todav/app` (`todav-app`), not in a
   front-end: settings with their defaults, date rules, task and calendar rules, the background
   service. It returns no text (enums, times, ids); each front-end words and formats it.
-  Android and Windows use it through `todav/ffi` (`todav-ffi`, a Cargo workspace of its own),
+  Android and Windows use it through `todav/ffi` (`todav-ffi`, in a Cargo workspace of its own,
+  `todav/Cargo.toml`),
   so keep its API exportable: synchronous, no closures or generics in what front-ends call.
 - `todav/ffi` exports the core and `todav-app` with UniFFI (Kotlin, C#). Add what a new
   front-end feature needs there too; after changing it or the types it mirrors, run
@@ -29,16 +30,25 @@
   change. It follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/): `Added`,
   `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`; version links at the end.
 - Releases are cut by the manual Release workflow (`.github/workflows/release.yml`): with the
-  version given, `scripts/release.py` sets it in `Cargo.toml`, the metainfo, the extension's
-  `metadata.json` and the RPM spec and moves the `[Unreleased]` changes and link under it; the
+  version given, `scripts/release.py` sets it in `Cargo.toml`, the Android version code
+  (`todav.versionCode`), the metainfo, the extension's `metadata.json` and the RPM spec and moves the `[Unreleased]` changes and link under it; the
   metainfo gets those changes as the release's notes (untranslated) and its screenshots from
   the new tag. CI builds the packages, then it commits `chore(release): X`, tags `vX` and
   publishes them. Don't bump versions by hand.
+- The Android APK of a release is signed in CI with the release key (secrets
+  `ANDROID_KEYSTORE`, base64 of a PKCS#12 keystore with the alias `todav`, and
+  `ANDROID_KEYSTORE_PASSWORD`). F-Droid rebuilds the tag and publishes that APK only if both
+  match byte for byte, so the release build must stay reproducible: the NDK, cargo-ndk
+  (`todav.cargoNdk`) and Rust (`todav/ffi/rust-toolchain.toml`) are pinned, the core's build
+  paths remapped, and its workspace is rooted at `todav/` so the crates it uses lie inside it
+  (Cargo hashes the absolute path of a path dependency outside the workspace). Nothing in it
+  may depend on the time, the build machine or the commit hash. Check a change that could
+  affect this by building the release APK in two directories and comparing them.
 - Packaging for stores: the metainfo must pass `appstreamcli validate` without warnings (Flathub
   treats them as errors), and links in it must answer automated requests (Ko-fi's does not).
 - CI (`.github/workflows/ci.yml`) runs on every push: `cargo fmt --check`, clippy with
   warnings as errors and the unit tests on Fedora (GNOME 51), the bindings
-  (`scripts/bindings.sh`), the Android debug APK (`assembleDebug`, both ABIs), plus the packages: the Flatpak
+  (`scripts/bindings.sh`), the Android release APK (`assembleRelease`, both ABIs), plus the packages: the Flatpak
   bundle, a tarball of the system-wide tree (`make -C todav/linux stage`, built on the oldest
   supported GNOME, now Fedora 43), the `.deb` made from it on Ubuntu 26.04 (`scripts/deb.sh`)
   and the extension zip. Run the checks before committing.
@@ -116,8 +126,8 @@
   to the shared image from its own copy (`<avd>.avd/system-image`) and changes only its own files
   there (Noogle its ramdisk, with Magisk; ours its fold states). Keep the shared image stock, and
   leave Noogle's AVDs alone. Android 15's images don't fold a foldable AVD (no device states).
-- System packages it needs (sdk.sh names the missing ones, it installs none): `rustup` (stable;
-  sdk.sh adds the Android targets), `cargo-ndk`, `android-tools` (adb: the SDK's adb is a link to
+- System packages it needs (sdk.sh names the missing ones, it installs none): `rustup` (it
+  installs the Rust `todav/ffi/rust-toolchain.toml` pins, with the Android targets), `cargo-ndk`, `android-tools` (adb: the SDK's adb is a link to
   it, as two adb versions drop the emulator), `jdk21-openjdk` (Gradle runs on JDK 21 through
   `JAVA_HOME`), `gettext`, `unzip`; `/dev/kvm` writable.
 - The emulator is the `apps` AVD on `emulator-5580`, next to Noogle's (5554 and up): a foldable,

@@ -1,0 +1,6 @@
+# The Rust the bindings build with, pinned so F-Droid's rebuild of a release's Android core
+# matches ours byte for byte. rustup installs it in this directory; update it now and then.
+[toolchain]
+channel = "1.99.1"
+components = ["clippy", "rustfmt"]
+targets = ["aarch64-linux-android", "x86_64-linux-android"]

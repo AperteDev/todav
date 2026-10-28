@@ -1,0 +1,8 @@
+# The bindings' workspace (ffi), apart from the repository's. Rooted here rather than in ffi so
+# todav-core and todav-app lie inside it: Cargo hashes the path of a path dependency outside the
+# workspace into its symbols, which made the Android library differ wherever it was built
+# (F-Droid rebuilds releases to compare). The rest belongs to the repository's workspace.
+[workspace]
+resolver = "3"
+members = ["ffi"]
+exclude = ["app", "cli", "core", "linux"]

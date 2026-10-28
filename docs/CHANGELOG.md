@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Android: the APK in the releases is signed with Todav's own key, so later versions install
+  over it. Coming from 2.0.1 or earlier, uninstall the old one first, one last time.
+
 ## [2.0.1] - 2026-10-28
 
 ### Fixed

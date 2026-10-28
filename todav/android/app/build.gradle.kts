@@ -9,10 +9,11 @@ val sdkVersion = providers.gradleProperty("todav.platform").get()
 val buildTools = providers.gradleProperty("todav.buildTools").get()
 val minimumSdk = providers.gradleProperty("todav.minSdk").get().toInt()
 
-// The workspace's version (scripts/release.py sets it in the root Cargo.toml): 1.2.3 is 10203.
+// The workspace's version (scripts/release.py sets it in the root Cargo.toml) and its code
+// (1.2.3 is 10203), which release.py writes to gradle.properties for F-Droid's update check.
 val todavVersion = rootDir.resolve("../../Cargo.toml").readText()
     .let { Regex("""\[workspace\.package][^\[]*?\nversion = "([^"]+)"""").find(it)!!.groupValues[1] }
-val todavCode = todavVersion.split(".").map { it.toInt() }.let { (a, b, c) -> a * 10000 + b * 100 + c }
+val todavCode = providers.gradleProperty("todav.versionCode").get().toInt()
 
 android {
     namespace = "dev.aperte.todav"
@@ -30,7 +31,16 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            // The release APK is built before its commit and tag exist (the Release workflow
+            // tags only what passed), so F-Droid's rebuild of the tag would differ in the hash.
+            vcsInfo.include = false
         }
+    }
+    // Unsigned release APKs, which CI signs with apksigner: F-Droid rebuilds them from the tag and
+    // publishes ours when they match byte for byte. The dependency list AGP adds is encrypted for
+    // Google, which F-Droid refuses; Play gets it in the bundle.
+    dependenciesInfo {
+        includeInApk = false
     }
     buildFeatures {
         compose = true

@@ -49,7 +49,7 @@ jobs:
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: todav/ffi
+          workspaces: todav -> ffi/target
       # uniffi-bindgen-cs, built by the script at the version it names.
       - uses: actions/cache@v6
         with:
@@ -82,12 +82,10 @@ jobs:
       - name: Set the release version
         if: env.VERSION != ''
         run: python3 scripts/release.py "$VERSION" > /dev/null
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android, x86_64-linux-android
+      # The runner's rustup installs the Rust todav/ffi/rust-toolchain.toml pins, with its targets.
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: todav/ffi
+          workspaces: todav -> ffi/target
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -102,19 +100,34 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
             "platforms;$(prop todav.platform)" "build-tools;$(prop todav.buildTools)" \
             "ndk;$(prop todav.ndk)" platform-tools
-          cargo install cargo-ndk --locked
+          cargo install cargo-ndk --locked --version "$(prop todav.cargoNdk)"
           sudo apt-get install -y --no-install-recommends gettext
       - uses: gradle/actions/setup-gradle@v6
-      # Debug APK for both ABIs: the core, its bindings and catalogs, the app.
-      - run: ./gradlew --console=plain assembleDebug
+      # Unsigned release APK for both ABIs: the core, its bindings and catalogs, the app.
+      - run: ./gradlew --console=plain assembleRelease
         working-directory: todav/android
-      # Named for the release, which publishes it until the stores take over (no signing key yet).
-      - name: Name the APK
+      # A release's APK signed with the release key. F-Droid builds the tag the same way and
+      # publishes this APK if its signature, copied onto F-Droid's build, verifies. That needs the
+      # padding left as AGP made it (--alignment-preserved) and no v1 signature, which Android 10
+      # does not need and which apksigner adds (and apksigcopier cannot reproduce) otherwise.
+      - name: Sign the APK
+        if: env.VERSION != ''
+        working-directory: todav/android
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
-          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
-          mkdir -p target
-          mv todav/android/app/build/outputs/apk/debug/app-debug.apk "target/todav-$version.apk"
+          prop() { sed -n "s/^$1=//p" gradle.properties; }
+          echo "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/release.p12"
+          mkdir -p ../../target
+          "$ANDROID_HOME/build-tools/$(prop todav.buildTools)/apksigner" sign \
+            --alignment-preserved --v1-signing-enabled false --ks "$RUNNER_TEMP/release.p12" \
+            --ks-pass env:KEYSTORE_PASSWORD --ks-key-alias todav \
+            --out "../../target/todav-$VERSION.apk" \
+            app/build/outputs/apk/release/app-release-unsigned.apk
+          rm "$RUNNER_TEMP/release.p12"
       - uses: actions/upload-artifact@v7
+        if: env.VERSION != ''
         with:
           name: todav-android
           path: target/todav-*.apk

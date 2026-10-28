@@ -61,9 +61,20 @@ abstract class CargoNdk @Inject constructor(private val exec: ExecOperations) : 
 
     @TaskAction
     fun build() {
+        // The same library wherever it is built (F-Droid rebuilds releases to compare): the
+        // repository's and Cargo's paths remapped, and no build ID, which hashes the paths in
+        // the debug info AGP strips later.
+        val repo = crate.get().asFile.resolve("../..").canonicalPath
+        val cargoHome = System.getenv("CARGO_HOME") ?: "${System.getProperty("user.home")}/.cargo"
+        val rustflags = listOf(
+            "--remap-path-prefix=$repo=/todav",
+            "--remap-path-prefix=$cargoHome=/cargo",
+            "-Clink-arg=-Wl,--build-id=none",
+        )
         exec.exec {
             workingDir(crate)
             environment("ANDROID_NDK_HOME", ndk.get().asFile.path)
+            environment("CARGO_ENCODED_RUSTFLAGS", rustflags.joinToString("\u001f"))
             commandLine(
                 listOf("cargo", "ndk", "--platform", "${platform.get()}") +
                     abis.get().flatMap { listOf("-t", it) } +
@@ -124,7 +135,7 @@ val cargoNdk = tasks.register<CargoNdk>("cargoNdk") {
     sources.from(
         fileTree(repo.resolve("todav")) {
             include("core/src/**", "core/Cargo.toml", "app/src/**", "app/Cargo.toml")
-            include("ffi/src/**", "ffi/Cargo.toml", "ffi/Cargo.lock", "ffi/uniffi.toml")
+            include("ffi/src/**", "ffi/Cargo.toml", "ffi/uniffi.toml", "Cargo.toml", "Cargo.lock")
         },
     )
     abis = targetAbis

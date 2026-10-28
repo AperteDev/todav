@@ -66,7 +66,6 @@ check_tools() {
 		echo "/dev/kvm is not writable: enable virtualization, or: sudo usermod -aG kvm $USER"
 		exit 1
 	fi
-	rustup -q target add aarch64-linux-android x86_64-linux-android
 }
 
 setup() {

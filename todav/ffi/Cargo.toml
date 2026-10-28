@@ -1,6 +1,7 @@
 # The bindings for Android and Windows (and later iOS and macOS): the core and todav-app
-# exported with UniFFI. A workspace of its own, so UniFFI and the bundled SQLite stay out of the
-# Linux builds and their packaging. The version is set by scripts/release.py.
+# exported with UniFFI. A workspace of its own (todav/Cargo.toml), so UniFFI and the bundled
+# SQLite stay out of the Linux builds and their packaging. The version is set by
+# scripts/release.py.
 [package]
 name = "todav-ffi"
 version = "2.0.1"
@@ -28,5 +29,3 @@ uniffi = "0.31"
 [features]
 # The Kotlin and Swift generator, as a binary of this crate (`cargo run --features bindgen`).
 bindgen = ["uniffi/cli"]
-
-[workspace]
