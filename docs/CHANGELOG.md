@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in another month scrolls there.
 - Android: the month planner widget can be made as low as the month widget; low, it shows
   each week's days with as many bars as fit, down to none.
+- Calendar: Ctrl+1 to Ctrl+6 open the views in the menu's order: Month, Week, Work Week,
+  3 Days, Day, Agenda (Agenda moves from Ctrl+3 to Ctrl+6).
 
 ### Fixed
 

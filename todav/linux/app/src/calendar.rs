@@ -379,7 +379,7 @@ enum Mode {
 }
 
 impl Mode {
-    /// In the menu's order.
+    /// In the menu's order, Ctrl+1 to 6.
     const ALL: [Mode; 6] = [
         Mode::Month,
         Mode::Week,
@@ -418,18 +418,6 @@ impl Mode {
             Mode::Agenda => gettext("Agenda"),
         }
     }
-
-    /// Its Ctrl+number shortcut: the first three as before there were more views.
-    fn key(self) -> u32 {
-        match self {
-            Mode::Month => 1,
-            Mode::Week => 2,
-            Mode::Agenda => 3,
-            Mode::WorkWeek => 4,
-            Mode::ThreeDays => 5,
-            Mode::Day => 6,
-        }
-    }
 }
 
 fn mode(c: &Cal) -> Mode {
@@ -458,7 +446,7 @@ fn view_menu() -> gtk::Popover {
     let pop = gtk::Popover::builder().child(&list).build();
     pop.add_css_class("view-menu");
     let current = cal().map(|c| c.mode.get());
-    for m in Mode::ALL {
+    for (i, m) in Mode::ALL.into_iter().enumerate() {
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
         row.append(
             &gtk::Label::builder()
@@ -467,7 +455,7 @@ fn view_menu() -> gtk::Popover {
                 .hexpand(true)
                 .build(),
         );
-        if let Some((key, mods)) = gtk::accelerator_parse(format!("<Control>{}", m.key())) {
+        if let Some((key, mods)) = gtk::accelerator_parse(format!("<Control>{}", i + 1)) {
             let accel = gtk::Label::new(Some(&gtk::accelerator_get_label(key, mods)));
             accel.add_css_class("dim-label");
             row.append(&accel);

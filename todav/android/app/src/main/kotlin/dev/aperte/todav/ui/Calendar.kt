@@ -286,10 +286,10 @@ fun CalendarPane(model: Main) {
                         PickMenu(
                             viewMenu,
                             { viewMenu = false },
-                            CalMode.MENU.map(::modeName),
-                            CalMode.MENU.indexOf(mode),
-                            mark = { Icon(modeIcon(CalMode.MENU[it]), null) },
-                        ) { model.setMode(CalMode.MENU[it]) }
+                            CalMode.entries.map(::modeName),
+                            CalMode.entries.indexOf(mode),
+                            mark = { Icon(modeIcon(CalMode.entries[it]), null) },
+                        ) { model.setMode(CalMode.entries[it]) }
                     }
                 },
             )

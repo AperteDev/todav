@@ -83,16 +83,10 @@ sealed interface Dest {
 }
 
 /**
- * The calendar's views, as the Linux app's `calendar_mode` names them; Ctrl+1 to 6 in this order
- * (the first three as before there were more), `MENU` in the menu's.
+ * The calendar's views, as the Linux app's `calendar_mode` names them, in the menu's order:
+ * Ctrl+1 to 6.
  */
-enum class CalMode {
-    MONTH, WEEK, AGENDA, WORK_WEEK, THREE_DAYS, DAY;
-
-    companion object {
-        val MENU = listOf(MONTH, WEEK, WORK_WEEK, THREE_DAYS, DAY, AGENDA)
-    }
-}
+enum class CalMode { MONTH, WEEK, WORK_WEEK, THREE_DAYS, DAY, AGENDA }
 
 /** Tasks or Calendar, switched by the navigation bar (both shown on wide screens). */
 enum class View { TASKS, CALENDAR }
