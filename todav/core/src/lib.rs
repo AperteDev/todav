@@ -7,6 +7,7 @@ mod import;
 pub mod json;
 mod login;
 pub mod push;
+pub mod release;
 pub mod rrule;
 mod settings;
 pub mod store;

@@ -234,6 +234,7 @@ pub fn setup_actions(app: &adw::Application) {
         );
         d.set_copyright("© 2026 SelfRef");
         about_support(&d);
+        about_update(&d);
         d.present(Some(&ui.window));
     });
     app.add_action(&about);
@@ -303,6 +304,60 @@ fn about_support(d: &adw::AboutDialog) {
             r.set_visible(false);
         }
     }
+}
+
+/// Checks GitHub for a newer stable release while About is open; if there is one, a first
+/// section links to its page. Its place is found like `about_support`'s rows: the box holding
+/// the group of What's New.
+fn about_update(d: &adw::AboutDialog) {
+    let Some(content) = d.child() else { return };
+    let Some(groups) = descendants(&content)
+        .into_iter()
+        .filter_map(|w| w.downcast::<adw::ActionRow>().ok())
+        .find(|r| {
+            r.action_name().as_deref() == Some("navigation.push")
+                && r.action_target_value()
+                    .is_some_and(|v| v.str() == Some("whatsnew"))
+        })
+        .and_then(|r| r.ancestor(adw::PreferencesGroup::static_type()))
+        .and_then(|g| g.parent())
+        .and_downcast::<gtk::Box>()
+    else {
+        return;
+    };
+    let groups = groups.downgrade();
+    glib::spawn_future_local(async move {
+        let Ok(Some((version, url))) =
+            gio::spawn_blocking(|| todav_core::release::newer(env!("CARGO_PKG_VERSION"))).await
+        else {
+            return;
+        };
+        let Some(groups) = groups.upgrade() else {
+            return;
+        };
+        let row = adw::ActionRow::builder()
+            // Translators: the About row linking to a newer release's page.
+            .title(gettext("Version {version} Available").replace("{version}", &version))
+            .tooltip_text(&url)
+            .activatable(true)
+            .build();
+        row.add_suffix(
+            &gtk::Image::builder()
+                .icon_name("adw-external-link-symbolic")
+                .accessible_role(gtk::AccessibleRole::Presentation)
+                .build(),
+        );
+        row.connect_activated(move |r| {
+            gtk::UriLauncher::new(&url).launch(
+                r.root().and_downcast_ref::<gtk::Window>(),
+                gio::Cancellable::NONE,
+                |_| {},
+            );
+        });
+        let group = adw::PreferencesGroup::new();
+        group.add(&row);
+        groups.prepend(&group);
+    });
 }
 
 /// `w` and every widget inside it.
