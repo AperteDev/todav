@@ -8,6 +8,12 @@ Planned work, not yet done. The README lists it publicly; the order is not fixed
   iCloud…), which mostly means login without Login Flow v2, settings and categories without
   Nextcloud Files, and polling where there is no WebDAV-Push. Each would be another
   `AccountKind`.
+- **Google Tasks** in the Google account (events only now): Google keeps tasks out of CalDAV, so
+  they come over the Tasks REST API (`tasks.googleapis.com`), polled. The token GNOME Online
+  Accounts gives already has the `tasks` scope; Android has no Google account of its own yet,
+  so it needs its own OAuth sign-in first. The API knows title, notes, done, a due date
+  without time, subtasks and order only: no priority, categories, reminders or repeats, so the
+  app hides or disables those for Google lists.
 - **Advanced notifications**, configurable, beyond the reminder notifications shown now; details
   to be specified.
 - **Advanced search, filtering and sorting**; details to be specified.
