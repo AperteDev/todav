@@ -36,19 +36,19 @@
   <!-- From the release tag (scripts/release.py moves them to each new one). -->
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.0.4/docs/screenshots/tasks.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.1.0/docs/screenshots/tasks.png</image>
       <caption>Tasks grouped by category, with subtasks and due dates</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.0.4/docs/screenshots/calendar-month.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.1.0/docs/screenshots/calendar-month.png</image>
       <caption>The month, with an event's details</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.0.4/docs/screenshots/calendar-week.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.1.0/docs/screenshots/calendar-week.png</image>
       <caption>Tasks planned into the week next to events</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.0.4/docs/screenshots/event-dialog.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.1.0/docs/screenshots/event-dialog.png</image>
       <caption>Editing an event</caption>
     </screenshot>
   </screenshots>
@@ -63,6 +63,30 @@
     <control>touch</control>
   </supports>
   <releases>
+    <release version="2.1.0" date="2026-10-28">
+      <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.1.0</url>
+      <description translate="no">
+        <p>Added</p>
+        <ul>
+          <li>Linux: Saturdays and Sundays tinted red a little in the calendar's day names and numbers, and in the sidebar's month, as on Android.</li>
+          <li>Tasks whose subtasks are shown stay so after a restart, on each device.</li>
+        </ul>
+        <p>Changed</p>
+        <ul>
+          <li>Linux: the month view scrolls up and down a week at a time, as GNOME Calendar's, by the mouse wheel (a week per notch), a touchpad or a touchscreen; the arrows, Today and a day in another month scroll there smoothly.</li>
+          <li>Android: the month view scrolls up and down a week at a time, as GNOME Calendar's, instead of swiping a month sideways; a mouse wheel scrolls it a week per notch, and Today or a day in another month scrolls there.</li>
+          <li>Android: the month planner widget can be made as low as the month widget; low, it shows each week's days with as many bars as fit, down to none.</li>
+          <li>Calendar: Ctrl+1 to Ctrl+6 open the views in the menu's order: Month, Week, Work Week, 3 Days, Day, Agenda (Agenda moves from Ctrl+3 to Ctrl+6).</li>
+          <li>Android: pulling a task's details up while adding a subtask goes on in the editor's Add Subtask, with what was typed and the cursor; back down, the text is still there.</li>
+        </ul>
+        <p>Fixed</p>
+        <ul>
+          <li>Android: a widget resized on the home screen is laid out for its new size at once, not only when it next updates.</li>
+          <li>Android: Add Subtask in a task's details stays above the keyboard; with many subtasks it was hidden under it.</li>
+          <li>Android: the arrows of the calendar widgets turn the month or day again; in release builds they did nothing.</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.0.4" date="2026-10-28">
       <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.0.4</url>
       <description translate="no">
