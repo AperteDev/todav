@@ -46,11 +46,22 @@ Smaller items:
 ## Distribution
 
 - **Flathub**: a manifest building offline from the release tag, with a generated
-  `cargo-sources.json`, in its own `flathub/dev.aperte.Todav` repository. It is written and
-  opened by hand: Flathub accepts no AI-generated manifests or AI-opened submissions, and
-  AI-assisted code in the app must be disclosed (Claude). Expect questions on the two
-  `--talk-name` permissions (libsecret uses the Secret portal inside Flatpak) and on the
-  project's age. The metainfo already has what Flathub asks for.
+  `cargo-sources.json`, in its own `flathub/dev.aperte.Todav` repository. Written, opened and
+  answered by hand only: Flathub's generative AI policy bans AI-generated or AI-assisted
+  content in the manifest, and AI-opened or AI-written PRs, commit messages and replies; the
+  app's AI-generated code, docs and translations must be disclosed with their extent (Claude),
+  and reviewers may reject on it. Blockers as of 2026-10-28:
+  - Project age: the first commit is from 2026-10-08, 1.0.0 from 2026-10-22; Flathub wants a
+    meaningful history and real-world use first.
+  - Translations: Flathub accepts no machine-generated translations. Only Polish is reviewed;
+    de, es, fr, it and pt_BR are drafts and need a review or have to stay out of that build.
+  - `--talk-name=org.freedesktop.secrets` will likely have to go: inside Flatpak libsecret
+    uses the Secret portal, which is mandatory where it covers the use. GNOME Online Accounts
+    has no portal, so its `--talk-name` needs a justification.
+  - The repository's manifest fetches crates over the network (`--share=network`), which
+    Flathub's offline build does not allow.
+  The metainfo validates; `https://aperte.dev` answers, as the ID's domain check needs, and
+  the verification token goes to `/.well-known/org.flathub.VerifiedApps.txt` after acceptance.
 - **extensions.gnome.org**: reviews reject code with clear signs of AI generation; the extension
   must be one its author can explain line by line.
 - **Fedora's own repositories** (COPR works now) would want Fedora's crates instead of vendored
