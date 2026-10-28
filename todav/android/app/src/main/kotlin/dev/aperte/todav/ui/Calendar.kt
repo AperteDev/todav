@@ -1677,7 +1677,7 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
                     val subs = remember(changes, t.uid) { core.subtasks(t.uid, false) + core.subtasks(t.uid, true) }
                     if (subs.isNotEmpty() || !t.done) SectionTitle(tr("Subtasks"))
                     subs.forEach { s -> CheckRow(model, s) }
-                    if (!t.done) AddLine(tr("Add Subtask")) { text -> model.add(t.listHref, text, t.uid, t.category) }
+                    if (!t.done) AddLine(tr("Add Subtask"), sheet) { text -> model.add(t.listHref, text, t.uid, t.category) }
                 }
             }
         }
@@ -1770,20 +1770,24 @@ fun CopyLink(model: Main, link: String) {
 }
 
 @Composable
-private fun AddLine(placeholder: String, onAdd: (String) -> Unit) {
-    var text by rememberSaveable { mutableStateOf("") }
+private fun AddLine(placeholder: String, sheet: DetailsSheetState? = null, onAdd: (String) -> Unit) {
+    var own by rememberSaveable { mutableStateOf("") }
+    // With a sheet, its text, which its editor's field goes on with.
+    val text = sheet?.subtask ?: own
+    val set = { v: String -> if (sheet != null) sheet.subtask = v else own = v }
     Group {
         FieldItem(
             text,
-            { text = it },
+            set,
             null,
+            Modifier.onFocusChanged { sheet?.adding = it.isFocused },
             icon = Icons.Default.Add,
             placeholder = placeholder,
             singleLine = true,
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = {
                 if (text.isNotBlank()) onAdd(text.trim())
-                text = ""
+                set("")
             }),
             containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         )

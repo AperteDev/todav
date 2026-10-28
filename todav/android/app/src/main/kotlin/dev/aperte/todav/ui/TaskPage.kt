@@ -52,7 +52,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
@@ -250,7 +254,7 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null, draft: 
                     Reminders(model, reminders, dueAllDay, event = false)
                 }
                 if (draft == null) {
-                    Subtasks(model, task)
+                    Subtasks(model, task, sheet)
                     CopyLink(model, dev.aperte.todav.core.linkTask(task.uid))
                     DeleteButton(tr("Delete Task")) { confirmDelete = true }
                 }
@@ -351,9 +355,12 @@ fun Reminders(model: Main, reminders: MutableList<Long>, allDay: Boolean, event:
     }
 }
 
-/** A task's subtasks, ticked and added at once (each its own undo step). */
+/**
+ * A task's subtasks, ticked and added at once (each its own undo step). In a details sheet the
+ * new one's text is the details' field's, and its cursor comes along when pulled up from there.
+ */
 @Composable
-private fun Subtasks(model: Main, task: TodavTask) {
+private fun Subtasks(model: Main, task: TodavTask, sheet: DetailsSheetState?) {
     val core = model.core
     val changes by model.todav.changes.collectAsStateWithLifecycle()
     val subtasks = remember(changes) {
@@ -365,7 +372,16 @@ private fun Subtasks(model: Main, task: TodavTask) {
                 flat.filter { t -> (t.parentUid in under).also { if (it) under += t.uid } }
             }
     }
-    var text by rememberSaveable { mutableStateOf("") }
+    var own by rememberSaveable { mutableStateOf("") }
+    val text = sheet?.subtask ?: own
+    val set = { v: String -> if (sheet != null) sheet.subtask = v else own = v }
+    // The cursor after the text taken over, not before it.
+    var field by remember { mutableStateOf(TextFieldValue()) }
+    val shown = if (field.text == text) field else TextFieldValue(text, TextRange(text.length))
+    val focus = remember { FocusRequester() }
+    // Taken as it starts up: the details' field loses the cursor on the way.
+    val adding = remember { sheet?.adding == true }
+    if (adding && sheet != null) LaunchedEffect(sheet.full) { if (sheet.full) focus.requestFocus() }
     if (subtasks.isEmpty() && task.done) return
     Section(tr("Subtasks")) {
         subtasks.forEach { s ->
@@ -377,16 +393,18 @@ private fun Subtasks(model: Main, task: TodavTask) {
         }
         if (!task.done) {
             FieldItem(
-                text,
-                { text = it },
-                null,
+                shown,
+                {
+                    field = it
+                    set(it.text)
+                },
+                Modifier.focusRequester(focus),
                 icon = Icons.Default.Add,
                 placeholder = tr("Add Subtask"),
-                singleLine = true,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = {
                     model.add(task.listHref, text, task.uid, task.category)
-                    text = ""
+                    set("")
                 }),
             )
         }

@@ -76,6 +76,16 @@ class DetailsSheetState internal constructor(
     /** Unsaved edits: the sheet is not dragged down from under them. */
     var locked by mutableStateOf(false)
 
+    /**
+     * A new subtask's text, the same in the details' field and the editor's; `adding` while the
+     * details' has the cursor, which the editor's takes over at full height.
+     */
+    var subtask by mutableStateOf("")
+    var adding by mutableStateOf(false)
+
+    /** At full height (the editor), not on the way. */
+    val full get() = drag.settledValue == Rest.Full
+
     /** Up to the full height (the editor). */
     fun expand() {
         scope.launch { drag.animateTo(Rest.Full) }

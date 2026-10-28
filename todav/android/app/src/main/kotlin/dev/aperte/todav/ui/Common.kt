@@ -49,6 +49,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.Column
@@ -268,14 +269,40 @@ fun FieldItem(
     singleLine = singleLine,
     minLines = minLines,
     shape = ITEM_SHAPE,
-    colors = TextFieldDefaults.colors(
-        focusedContainerColor = containerColor,
-        unfocusedContainerColor = containerColor,
-        disabledContainerColor = containerColor,
-        focusedIndicatorColor = Color.Transparent,
-        unfocusedIndicatorColor = Color.Transparent,
-        disabledIndicatorColor = Color.Transparent,
-    ),
+    colors = fieldColors(containerColor),
+)
+
+/** A [FieldItem] given where the cursor is too (`value`'s selection), a line to add with. */
+@Composable
+fun FieldItem(
+    value: TextFieldValue,
+    onValueChange: (TextFieldValue) -> Unit,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    placeholder: String? = null,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
+) = TextField(
+    value = value,
+    onValueChange = onValueChange,
+    modifier = modifier.fillMaxWidth(),
+    placeholder = placeholder?.let { { Text(it) } },
+    leadingIcon = icon?.let { { Icon(it, null, Modifier.offset(x = 4.dp)) } },
+    keyboardOptions = keyboardOptions,
+    keyboardActions = keyboardActions,
+    singleLine = true,
+    shape = ITEM_SHAPE,
+    colors = fieldColors(MaterialTheme.colorScheme.surfaceContainer),
+)
+
+@Composable
+private fun fieldColors(containerColor: Color) = TextFieldDefaults.colors(
+    focusedContainerColor = containerColor,
+    unfocusedContainerColor = containerColor,
+    disabledContainerColor = containerColor,
+    focusedIndicatorColor = Color.Transparent,
+    unfocusedIndicatorColor = Color.Transparent,
+    disabledIndicatorColor = Color.Transparent,
 )
 
 /**

@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   each week's days with as many bars as fit, down to none.
 - Calendar: Ctrl+1 to Ctrl+6 open the views in the menu's order: Month, Week, Work Week,
   3 Days, Day, Agenda (Agenda moves from Ctrl+3 to Ctrl+6).
+- Android: pulling a task's details up while adding a subtask goes on in the editor's Add
+  Subtask, with what was typed and the cursor; back down, the text is still there.
 
 ### Fixed
 
