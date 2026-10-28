@@ -166,5 +166,10 @@ repository. The two keep separate configuration and credentials. What Todav prov
   2026-10-27): it forwards no REPORT, MKCALENDAR or PROPPATCH, sends PROPFIND at depth 1 only and
   appends "?" to every URL, which breaks DAV Push registration. Worth another look only if it
   forwards any method and the URL as given.
+- **Honor's liquid glass widget background** (looked into 2026-10-28, MagicOS 11): the launcher
+  draws it behind widgets whose receiver has `com.hihonor.android.launcher.widget_type`
+  `cardstyle` and `card_background` `blur`, but only for the packages in its built-in
+  `widgetcard_whitelist` (Honor's own apps and the system UI). Another app's widget stays a
+  plain one, and a widget can't blur what is behind it itself.
 - **A cross-platform UI toolkit** (Compose Multiplatform, Flutter, Slint): a native UI per
   platform over the shared Rust instead.
