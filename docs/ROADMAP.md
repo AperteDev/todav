@@ -28,9 +28,11 @@ Smaller items:
 
 - Release on F-Droid and Google Play (`USE_EXACT_ALARM` is allowed for a calendar app), with the
   release key the GitHub APK is signed with, so all three update one another:
-  - F-Droid: a recipe in `fdroiddata` that rebuilds the tag and publishes our APK when it
-    matches (`Binaries`, `AllowedAPKSigningKeys`); the store text is in
-    `todav/android/app/fastlane`. Not yet checked against F-Droid's own build server.
+  - F-Droid: the recipe (`metadata/dev.aperte.todav.yml`, branch `dev.aperte.todav` of the
+    user's `fdroiddata` fork) builds and matches our signed 2.0.2 in F-Droid's CI. The merge
+    request was closed on 2026-10-28 under the inclusion policy's Quality point 6: at least 3
+    months of active development (first commit 2026-10-08). Reopen it from about 2027-01-08,
+    with the recipe's build updated to the latest release (version, code, full commit hash).
   - Google Play, as an organisation account (D-U-N-S number requested): `bundleRelease` signed
     in the Release workflow, the key for Play App Signing uploaded with PEPK, the Data safety
     and exact-alarm forms, a privacy policy page.
