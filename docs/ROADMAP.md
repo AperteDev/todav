@@ -26,11 +26,14 @@ Smaller items:
 
 ## Android
 
-- Release on Google Play and F-Droid (`USE_EXACT_ALARM` is allowed for a calendar app). Until
-  then GitHub releases carry the debug APK, signed with the CI runner's throwaway key, so each
-  release needs a reinstall. Then: one key per app (an alias in one keystore), only Todav's in
-  the CI secrets, a signed release build; the same key for Play App Signing (uploaded with
-  PEPK) and for F-Droid through a reproducible build, so all three can update one another.
+- Release on F-Droid and Google Play (`USE_EXACT_ALARM` is allowed for a calendar app), with the
+  release key the GitHub APK is signed with, so all three update one another:
+  - F-Droid: a recipe in `fdroiddata` that rebuilds the tag and publishes our APK when it
+    matches (`Binaries`, `AllowedAPKSigningKeys`); the store text is in
+    `todav/android/app/fastlane`. Not yet checked against F-Droid's own build server.
+  - Google Play, as an organisation account (D-U-N-S number requested): `bundleRelease` signed
+    in the Release workflow, the key for Play App Signing uploaded with PEPK, the Data safety
+    and exact-alarm forms, a privacy policy page.
 - Verify push delivery through a real UnifiedPush distributor (ntfy) in the background.
 - Move a task to another list by dragging it onto the sidebar (Move to List in its menu does it
   now).
