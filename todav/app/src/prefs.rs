@@ -242,3 +242,61 @@ pub fn set_hidden<'a>(c: &Client, hrefs: impl IntoIterator<Item = &'a str>, hide
     v.sort();
     let _ = c.set_setting("hidden_calendars".into(), v.join("\n"));
 }
+
+/// Tasks showing their subtasks (`expanded_tasks`, one UID per line; this device's only).
+pub fn expanded(c: &Client) -> HashSet<String> {
+    c.setting("expanded_tasks".into())
+        .unwrap_or_default()
+        .lines()
+        .map(String::from)
+        .collect()
+}
+
+/// Show or hide the subtasks of `uid`, forgetting tasks that are gone.
+pub fn set_expanded(c: &Client, uid: &str, open: bool) {
+    let mut e = expanded(c);
+    if open {
+        e.insert(uid.to_string());
+    } else {
+        e.remove(uid);
+    }
+    let mut v: Vec<String> = e
+        .into_iter()
+        .filter(|u| c.task(u.clone()).is_some())
+        .collect();
+    v.sort();
+    let _ = c.set_setting("expanded_tasks".into(), v.join("\n"));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn expanded_tasks_are_kept_until_closed_or_gone() {
+        let dir = std::env::temp_dir().join(format!("todav-app-expanded-{}", std::process::id()));
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let account = c
+            .add_account(
+                todav_core::AccountKind::Local,
+                String::new(),
+                String::new(),
+                String::new(),
+            )
+            .unwrap();
+        let list = c
+            .create_list(account, "Tasks".into(), "#0082C9".into(), false)
+            .unwrap();
+        let add = |name: &str| c.add_task(list.clone(), name.into(), None, None, false);
+        let (a, b) = (add("a").unwrap().uid, add("b").unwrap().uid);
+        set_expanded(&c, &a, true);
+        set_expanded(&c, &b, true);
+        assert_eq!(expanded(&c), HashSet::from([a.clone(), b.clone()]));
+        set_expanded(&c, &b, false);
+        assert_eq!(expanded(&c), HashSet::from([a.clone()]), "closed");
+        c.delete_task(a).unwrap();
+        set_expanded(&c, &b, true);
+        assert_eq!(expanded(&c), HashSet::from([b]), "deleted one forgotten");
+        let _ = std::fs::remove_dir_all(dir);
+    }
+}

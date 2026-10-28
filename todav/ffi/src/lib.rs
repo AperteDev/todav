@@ -768,6 +768,17 @@ impl Todav {
         todav_app::prefs::set_hidden(self.c(), hrefs.iter().map(String::as_str), hide)
     }
 
+    /// Tasks showing their subtasks, remembered on this device.
+    pub fn expanded(&self) -> Vec<String> {
+        let mut e: Vec<String> = todav_app::prefs::expanded(self.c()).into_iter().collect();
+        e.sort();
+        e
+    }
+
+    pub fn set_expanded(&self, uid: String, open: bool) {
+        todav_app::prefs::set_expanded(self.c(), &uid, open)
+    }
+
     // --- sync and push
 
     /// Push and pull every account now (the service does this by itself).

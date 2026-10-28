@@ -535,6 +535,16 @@ pub fn show_list(href: &str) {
     }
 }
 
+/// Show or hide the subtasks of `uid`, also after a restart.
+fn expand(ui: &Ui, uid: &str, open: bool) {
+    if open {
+        ui.expanded.borrow_mut().insert(uid.into());
+    } else {
+        ui.expanded.borrow_mut().remove(uid);
+    }
+    prefs::set_expanded(core(), uid, open);
+}
+
 /// The Tasks page on task `uid`'s list, its row in view and pulsing once (from the extension):
 /// its parents open, a category filter or search that hides it gone.
 pub fn show_task(uid: &str) {
@@ -546,7 +556,7 @@ pub fn show_task(uid: &str) {
     };
     let mut parent = t.parent_uid.clone();
     while let Some(p) = parent {
-        ui.expanded.borrow_mut().insert(p.clone());
+        expand(&ui, &p, true);
         parent = core().task(p).and_then(|p| p.parent_uid);
     }
     ui.filter.take();
@@ -749,7 +759,7 @@ fn build(app: &adw::Application) -> Rc<Ui> {
         cats: get(&b, "cats"),
         cat: get(&b, "cat"),
         groups: get(&b, "groups"),
-        expanded: RefCell::new(HashSet::new()),
+        expanded: RefCell::new(prefs::expanded(core())),
         adding: RefCell::new(None),
         tags: Cell::new(false),
         counts: RefCell::default(),
@@ -2036,7 +2046,7 @@ fn add_button(ui: &Rc<Ui>, t: &Task) -> gtk::Button {
     let (weak, uid) = (Rc::downgrade(ui), t.uid.clone());
     add.connect_clicked(move |_| {
         let Some(ui) = weak.upgrade() else { return };
-        ui.expanded.borrow_mut().insert(uid.clone());
+        expand(&ui, &uid, true);
         *ui.adding.borrow_mut() = Some(uid.clone());
         *ui.focus_sub.borrow_mut() = Some(uid.clone());
         // Rebuild outside the handler: refresh_tasks replaces this row.
@@ -2109,11 +2119,10 @@ fn tree_row(
     let empty = subs.is_empty();
     row.connect_expanded_notify(move |r| {
         let Some(ui) = weak.upgrade() else { return };
+        expand(&ui, &uid, r.is_expanded());
         if r.is_expanded() {
-            ui.expanded.borrow_mut().insert(uid.clone());
             return;
         }
-        ui.expanded.borrow_mut().remove(&uid);
         // Closed before adding a first subtask: back to a plain row with "+".
         if empty && ui.adding.borrow().as_ref() == Some(&uid) {
             ui.adding.take();
@@ -2462,7 +2471,7 @@ fn adopt_target(
         };
         match tasks::adopt(core(), &d, &p) {
             Ok(()) => {
-                ui.expanded.borrow_mut().insert(p.uid.clone()); // show where it went
+                expand(&ui, &p.uid, true); // show where it went
                 request_sync();
             }
             Err(e) => ui.toasts.add_toast(note(&e.to_string())),

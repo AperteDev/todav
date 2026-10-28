@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Tasks whose subtasks are shown stay so after a restart, on each device.
+
 ### Changed
 
 - Linux: the month view scrolls up and down a week at a time, as GNOME Calendar's, by the

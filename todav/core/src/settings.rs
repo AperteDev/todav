@@ -27,6 +27,8 @@ pub const DEVICE_ONLY: &[&str] = &[
     // UI state: which view (tasks, calendar) and calendar layout (month, week, agenda) is open.
     "last_view",
     "calendar_mode",
+    // The tasks showing their subtasks (UIDs, one per line).
+    "expanded_tasks",
     "window_size",
     "window_maximized",
     // Android's sidebar pane, as wide as the screen allows.

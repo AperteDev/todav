@@ -441,7 +441,9 @@ class Main(app: Application) : AndroidViewModel(app) {
     }
 
     fun toggle(uid: String) {
-        expanded.value = expanded.value.let { if (uid in it) it - uid else it + uid }
+        val open = uid !in expanded.value
+        expanded.value = if (open) expanded.value + uid else expanded.value - uid
+        act { core.setExpanded(uid, open) }
     }
 
     fun filterBy(list: String, category: String?) {
@@ -455,7 +457,10 @@ class Main(app: Application) : AndroidViewModel(app) {
         val text = summary.trim()
         if (text.isEmpty()) return@act
         val order = core.order()
-        if (parent != null) expanded.value += parent
+        if (parent != null) {
+            expanded.value += parent
+            core.setExpanded(parent, true)
+        }
         core.together(object : Changes {
             override fun run() {
                 val t = core.addTask(list, text, category, parent, if (parent == null) order.taskStart else order.subStart)
@@ -636,6 +641,7 @@ class Main(app: Application) : AndroidViewModel(app) {
                 }
                 calMode.value = CalMode.entries.firstOrNull { it.name.lowercase() == m } ?: CalMode.MONTH
                 workDays.value = core.workDays()
+                expanded.value = core.expanded().toSet()
                 core.setting("sidebar_width")?.toFloatOrNull()?.let { sidebarWidth.value = it }
             }
         }
