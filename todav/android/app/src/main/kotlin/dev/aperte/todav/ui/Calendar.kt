@@ -80,6 +80,13 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.gestures.snapping.SnapPosition
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -182,7 +189,6 @@ import dev.aperte.todav.ntr
 import dev.aperte.todav.time
 import dev.aperte.todav.ptr
 import dev.aperte.todav.tr
-import java.time.LocalDate
 import java.time.temporal.WeekFields
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
@@ -227,7 +233,7 @@ fun eventWhen(e: Event, now: Long): String {
 
 /**
  * The calendar: Month, Week or Agenda, as the Linux app's, with Today and the view menu. Months
- * and weeks change with a swipe.
+ * scroll up and down, weeks change with a swipe.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -431,31 +437,38 @@ private fun modeIcon(m: CalMode) = when (m) {
     CalMode.AGENDA -> Icons.Outlined.ViewAgenda
 }
 
-/** The month of page `page` around the month of `day`. */
-private fun monthOf(day: Long, page: Int): Long {
-    val d = LocalDate.ofEpochDay(day / DAY).withDayOfMonth(1).plusMonths((page - MIDDLE).toLong())
-    return d.toEpochDay() * DAY
-}
-
 // --- month ----------------------------------------------------------------------------------
 
 /**
- * Six weeks around the month, each day with what is on it (three at most, then "+n"); the day
- * picked lists its events and tasks underneath. Swiped, the next or previous month.
+ * Six weeks at a time, each day with what is on it (as many as fit, then "+n"); the day picked
+ * lists its events and tasks underneath. Scrolled up and down a week at a time, as GNOME
+ * Calendar's; the month shown is the one most of them are in.
  */
 @Composable
 private fun MonthView(model: Main, day: Long, colors: Map<String, String>, onItem: (Item) -> Unit) {
     val browsed by model.browsed.collectAsStateWithLifecycle()
-    // Pages count from the month shown when the view opened; picking a day elsewhere moves there.
-    val base = remember { monthFirst(day) }
-    val pager = rememberPagerState(initialPage = MIDDLE + monthsBetween(base, day)) { PAGES }
+    val first = firstWeekday()
+    // Rows count from the week the view opened on; a day picked in another month scrolls there.
+    val base = remember { weekStart(monthFirst(day), first) }
+    val rowOf = { t: Long -> MIDDLE + ((weekStart(t, first) - base) / (7 * DAY)).toInt() }
+    val list = rememberLazyListState(rowOf(monthFirst(day)))
+    // The month of the middle of the six weeks from the top row.
+    val shown by remember { derivedStateOf { monthFirst(base + (list.firstVisibleItemIndex - MIDDLE) * 7 * DAY + 21 * DAY) } }
     LaunchedEffect(day) {
-        val target = MIDDLE + monthsBetween(base, day)
-        if (pager.currentPage != target) pager.scrollToPage(target)
+        if (monthFirst(day) != shown) list.animateScrollToItem(rowOf(monthFirst(day)))
     }
-    LaunchedEffect(pager) {
-        snapshotFlow { pager.settledPage }.collect { page ->
-            val month = monthOf(base, page)
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(list) {
+        snapshotFlow { list.isScrollInProgress }.collect { moving ->
+            if (moving) return@collect
+            // A wheel or a touchpad may stop between rows: onto the nearest.
+            val offset = list.firstVisibleItemScrollOffset
+            if (offset != 0) {
+                val half = (list.layoutInfo.visibleItemsInfo.firstOrNull()?.size ?: 0) / 2
+                scope.launch { list.animateScrollToItem(list.firstVisibleItemIndex + if (offset > half) 1 else 0) }
+                return@collect
+            }
+            val month = shown
             if (monthFirst(model.day.value ?: day) != month) {
                 // Today when it is in that month, else its first day.
                 val today = midnight(model.core.localNow())
@@ -468,10 +481,7 @@ private fun MonthView(model: Main, day: Long, colors: Map<String, String>, onIte
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth > maxHeight
         val grid: @Composable (Modifier) -> Unit = { m ->
-            // The months either side are made ready beforehand, so a swipe finds them filled in.
-            HorizontalPager(pager, m, beyondViewportPageCount = 1, key = { it }) { page ->
-                MonthGrid(model, monthOf(base, page), day.takeIf { it != browsed }, colors, onItem)
-            }
+            MonthGrid(model, list, base, shown, day.takeIf { it != browsed }, colors, onItem, m)
         }
         if (wide) {
             Row(Modifier.fillMaxSize()) {
@@ -488,20 +498,33 @@ private fun MonthView(model: Main, day: Long, colors: Map<String, String>, onIte
     }
 }
 
-private fun monthsBetween(a: Long, b: Long): Int {
-    val x = LocalDate.ofEpochDay(a / DAY)
-    val y = LocalDate.ofEpochDay(b / DAY)
-    return (y.year - x.year) * 12 + (y.monthValue - x.monthValue)
-}
-
+/**
+ * The weeks of [MonthView], six in sight, from row `MIDDLE` at `base`: snapped to a row when
+ * flung, a row per notch of a mouse wheel. Days outside `month` are dimmer.
+ */
 @Composable
-private fun MonthGrid(model: Main, month: Long, picked: Long?, colors: Map<String, String>, onItem: (Item) -> Unit) {
+private fun MonthGrid(
+    model: Main,
+    list: LazyListState,
+    base: Long,
+    month: Long,
+    picked: Long?,
+    colors: Map<String, String>,
+    onItem: (Item) -> Unit,
+    modifier: Modifier,
+) {
     val changes by model.todav.changes.collectAsStateWithLifecycle()
-    val start = weekStart(month, firstWeekday())
-    // What is on each of the 42 days, sorted out off the main thread: `onDay` is a call into the core.
-    val days = load(changes, start, initial = List(42) { emptyList<Item>() }) {
-        val items = model.core.items(start, start + 42 * DAY, null)
-        List(42) { n -> items.filter { onDay(it, start + n * DAY) } }
+    val weekAt = { row: Int -> base + (row - MIDDLE) * 7 * DAY }
+    // What is on each day from six weeks before the month to twelve after, sorted out off the
+    // main thread (`onDay` is a call into the core: a week at a time, each item only tried on the
+    // days of its week); until loaded, what the last month had.
+    val from = weekStart(month, firstWeekday()) - 42 * DAY
+    val days = load(changes, from, initial = emptyMap<Long, List<Item>>()) {
+        (0 until 18).flatMap { w ->
+            val start = from + w * 7 * DAY
+            val items = model.core.items(start, start + 7 * DAY, null)
+            (0 until 7).map { n -> (start + n * DAY).let { d -> d to items.filter { onDay(it, d) } } }
+        }.toMap()
     }
     val today = midnight(model.core.localNow())
     val thisMonth = fields(month).monthValue
@@ -509,59 +532,86 @@ private fun MonthGrid(model: Main, month: Long, picked: Long?, colors: Map<Strin
     var target by remember { mutableStateOf<Long?>(null) }
     var moved by remember { mutableStateOf<Pair<Item, Change>?>(null) }
     moved?.let { (item, change) -> Reschedule(model, item, change) { moved = null } }
-    // A task from "To Plan" dragged over: the day under the finger, if on these weeks.
+    // A task from "To Plan" dragged over: the day under the finger, if on the weeks in sight.
     val plan = LocalPlanning.current
     val weeks = remember { arrayOfNulls<LayoutCoordinates>(1) }
     val dayAt = { w: Offset ->
         weeks[0]?.takeIf { it.isAttached && it.boundsInWindow().contains(w) }?.let { g ->
             val p = g.windowToLocal(w)
             val col = (p.x / (g.size.width / 7f)).toInt().coerceIn(0, 6)
-            val row = (p.y / (g.size.height / 6f)).toInt().coerceIn(0, 5)
-            start + (row * 7 + col) * DAY
+            val row = ((p.y + list.firstVisibleItemScrollOffset) / (g.size.height / 6f)).toInt()
+            weekAt(list.firstVisibleItemIndex + row) + col * DAY
         }
     }
     PlanTarget(plan) { w -> dayAt(w)?.let { PlanDrop(it, true) } }
     // Only when the day under it changes, not every move.
     val planDay by remember(plan) { derivedStateOf { plan?.let { dayAt(it.at) } } }
-    Column(Modifier.fillMaxSize()) {
-        WeekdayNames(start)
-        Column(Modifier.fillMaxWidth().weight(1f).onGloballyPositioned { weeks[0] = it }) {
-            for (w in 0 until 6) {
-                Row(Modifier.fillMaxWidth().weight(1f)) {
-                    for (d in 0 until 7) {
-                        val at = start + (w * 7 + d) * DAY
-                        val here = days[w * 7 + d]
-                        DayCell(
-                            at, here, colors, at == today, at == picked || at == target || at == planDay, fields(at).monthValue == thisMonth,
-                            Modifier.weight(1f).fillMaxHeight().gridLines(left = d > 0).pointerInput(at, here) {
-                                // Held on a chip and moved: to the day it is let go over.
-                                var held: Item? = null
-                                var total = Offset.Zero
-                                detectDragGesturesAfterLongPress(
-                                    onDragStart = { p ->
-                                        // Under the day's number (2 dp in, 22 dp), chips 13 sp and 1 dp apart.
-                                        held = here.getOrNull(((p.y - 24.dp.toPx()) / (13.sp.toPx() + 1.dp.toPx())).toInt())
-                                        total = Offset.Zero
-                                        target = held?.let { at }
-                                    },
-                                    onDrag = { change, amount ->
-                                        if (held != null) {
-                                            change.consume()
-                                            total += amount
-                                            val rows = Math.round(total.y / size.height)
-                                            val cols = Math.round(total.x / size.width)
-                                            target = at + (rows * 7L + cols) * DAY
-                                        }
-                                    },
-                                    onDragEnd = {
-                                        val (item, day) = held to target
-                                        target = null
-                                        if (item != null && day != null && day != at) moved = item to dev.aperte.todav.core.dayDrop(item, day, false)
-                                    },
-                                    onDragCancel = { target = null },
-                                )
-                            },
-                        ) { model.pick(at) }
+    val scope = rememberCoroutineScope()
+    // Notches of a wheel, or a touchpad's fractions of them, not yet scrolled; where they lead.
+    var wheel by remember { mutableFloatStateOf(0f) }
+    var aim by remember { mutableIntStateOf(0) }
+    Column(modifier) {
+        WeekdayNames(base)
+        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+            val rowHeight = maxHeight / 6
+            LazyColumn(
+                Modifier.fillMaxSize().onGloballyPositioned { weeks[0] = it }.pointerInput(list) {
+                    // Before the list, which would scroll by some pixels instead.
+                    awaitPointerEventScope {
+                        while (true) {
+                            val e = awaitPointerEvent(PointerEventPass.Initial)
+                            if (e.type != PointerEventType.Scroll) continue
+                            e.changes.forEach { it.consume() }
+                            wheel += e.changes.sumOf { it.scrollDelta.y.toDouble() }.toFloat()
+                            val rows = wheel.toInt()
+                            if (rows == 0) continue
+                            wheel -= rows
+                            aim = (if (list.isScrollInProgress) aim else list.firstVisibleItemIndex) + rows
+                            scope.launch { list.animateScrollToItem(aim) }
+                        }
+                    }
+                },
+                list,
+                flingBehavior = rememberSnapFlingBehavior(list, SnapPosition.Start),
+            ) {
+                items(PAGES, key = { it }) { row ->
+                    val start = weekAt(row)
+                    Row(Modifier.fillMaxWidth().height(rowHeight)) {
+                        for (d in 0 until 7) {
+                            val at = start + d * DAY
+                            val here = days[at].orEmpty()
+                            DayCell(
+                                at, here, colors, at == today, at == picked || at == target || at == planDay, fields(at).monthValue == thisMonth,
+                                Modifier.weight(1f).fillMaxHeight().gridLines(left = d > 0).pointerInput(at, here) {
+                                    // Held on a chip and moved: to the day it is let go over.
+                                    var held: Item? = null
+                                    var total = Offset.Zero
+                                    detectDragGesturesAfterLongPress(
+                                        onDragStart = { p ->
+                                            // Under the day's number (2 dp in, 22 dp), chips 13 sp and 1 dp apart.
+                                            held = here.getOrNull(((p.y - 24.dp.toPx()) / (13.sp.toPx() + 1.dp.toPx())).toInt())
+                                            total = Offset.Zero
+                                            target = held?.let { at }
+                                        },
+                                        onDrag = { change, amount ->
+                                            if (held != null) {
+                                                change.consume()
+                                                total += amount
+                                                val rows = Math.round(total.y / size.height)
+                                                val cols = Math.round(total.x / size.width)
+                                                target = at + (rows * 7L + cols) * DAY
+                                            }
+                                        },
+                                        onDragEnd = {
+                                            val (item, day) = held to target
+                                            target = null
+                                            if (item != null && day != null && day != at) moved = item to dev.aperte.todav.core.dayDrop(item, day, false)
+                                        },
+                                        onDragCancel = { target = null },
+                                    )
+                                },
+                            ) { model.pick(at) }
+                        }
                     }
                 }
             }
@@ -1710,7 +1760,7 @@ private fun EditButton(onClick: () -> Unit) = FilledTonalButton(onClick = onClic
 @Composable
 fun CopyLink(model: Main, link: String) {
     val clipboard = androidx.compose.ui.platform.LocalClipboard.current
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val scope = rememberCoroutineScope()
     TextButton(onClick = {
         val clip = android.content.ClipData.newPlainText(tr("Link"), link)
         scope.launch { clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(clip)) }
