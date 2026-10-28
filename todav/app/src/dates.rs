@@ -47,6 +47,11 @@ pub fn weekday(t: i64) -> i64 {
     (t.div_euclid(DAY) + 4).rem_euclid(7)
 }
 
+/// Whether `t` falls on a Saturday or a Sunday (their names and numbers are tinted red a little).
+pub fn weekend(t: i64) -> bool {
+    matches!(weekday(t), 0 | 6)
+}
+
 /// The days of the week holding `t` (weeks starting on `first`) that are among `weekdays`
 /// (0 = Sunday), in order: the Work Week view's days.
 pub fn days_of_week(t: i64, first: i64, weekdays: &[i64]) -> Vec<i64> {
@@ -168,6 +173,7 @@ mod tests {
         assert_eq!(weekday(wed), 3);
         let days = |first, weekdays: &[i64]| days_of_week(wed, first, weekdays);
         let (mon, fri, sun) = (at("20261012"), at("20261016"), at("20261011"));
+        assert!(!weekend(wed) && !weekend(fri) && weekend(at("20261017")) && weekend(sun));
         assert_eq!(days(1, &[1, 2, 3, 4, 5]).first(), Some(&mon));
         assert_eq!(days(1, &[1, 2, 3, 4, 5]).last(), Some(&fri));
         // Sunday ends a week starting on Monday, and starts one starting on Sunday.

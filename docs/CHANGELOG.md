@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Linux: Saturdays and Sundays tinted red a little in the calendar's day names and numbers, and
+  in the sidebar's month, as on Android.
 - Tasks whose subtasks are shown stay so after a restart, on each device.
 
 ### Changed

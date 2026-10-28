@@ -41,6 +41,9 @@ const CSS: &str = "
 .day.other .num { opacity: 0.4; }
 .day.today .num { background: @accent_bg_color; color: @accent_fg_color; border-radius: 9999px; font-weight: bold; }
 .day.selected { background: alpha(@accent_bg_color, 0.08); }
+/* Saturdays' and Sundays' names and numbers, tinted red a little (not today's or the selected). */
+label.weekend { color: color-mix(in srgb, currentColor 55%, @error_color); }
+.mini button.day.selected label { color: inherit; }
 /* The day the extension (or a reminder) opened, pulsing twice as a task the Tasks page opens. */
 @keyframes day-flash { from { background-color: transparent; } 50% { background-color: alpha(@accent_bg_color, 0.3); } to { background-color: transparent; } }
 .flash { animation: day-flash 900ms ease-in-out 2; border-radius: 6px; }
@@ -1100,6 +1103,13 @@ fn week_start(day: i64) -> i64 {
     todav_app::dates::week_start(day, crate::i18n::first_weekday())
 }
 
+/// `w`, a day's name or number, tinted red a little when `day` is a Saturday or a Sunday.
+fn weekend(w: &impl IsA<gtk::Widget>, day: i64) {
+    if todav_app::dates::weekend(day) {
+        w.add_css_class("weekend");
+    }
+}
+
 fn clear(w: &impl IsA<gtk::Widget>) {
     while let Some(child) = w.first_child() {
         child.unparent();
@@ -1126,6 +1136,7 @@ fn day_cell(c: &Rc<Cal>, day: i64, other: bool, select: fn(i64)) -> gtk::Box {
         .halign(gtk::Align::End)
         .build();
     num.add_css_class("num");
+    weekend(&num, day);
     cell.append(&num);
     let click = gtk::GestureClick::new();
     click.connect_released(move |_, n, _, _| {

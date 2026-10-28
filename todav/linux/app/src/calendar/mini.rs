@@ -76,6 +76,7 @@ fn render(c: &Rc<Cal>) {
     for d in 0..7 {
         let name = gtk::Label::new(Some(&fmt(start + d * DAY, "%a")));
         name.add_css_class("weekday");
+        weekend(&name, start + d * DAY);
         m.grid.attach(&name, d as i32, 0, 1, 1);
     }
     let (today, anchor, month) = (today(), c.anchor.get(), dates::fields(first).month());
@@ -115,7 +116,9 @@ fn render(c: &Rc<Cal>) {
             .orientation(gtk::Orientation::Vertical)
             .valign(gtk::Align::Center)
             .build();
-        content.append(&gtk::Label::new(Some(&fmt(day, "%-d"))));
+        let num = gtk::Label::new(Some(&fmt(day, "%-d")));
+        weekend(&num, day);
+        content.append(&num);
         content.append(&dots);
         let b = gtk::Button::builder()
             .child(&content)

@@ -143,8 +143,9 @@ pub(super) fn render(c: &Rc<Cal>) -> i64 {
 
     clear(&c.weekdays);
     for i in 0..7 {
-        c.weekdays
-            .append(&gtk::Label::new(Some(&fmt(start + i * DAY, "%a"))));
+        let name = gtk::Label::new(Some(&fmt(start + i * DAY, "%a")));
+        weekend(&name, start + i * DAY);
+        c.weekdays.append(&name);
     }
     while let Some(child) = c.month.first_child() {
         c.month.remove(&child);

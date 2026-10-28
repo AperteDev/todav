@@ -378,6 +378,7 @@ pub(super) fn render(c: &Rc<Cal>) -> i64 {
     let items = items(start, end);
     for &day in &days {
         let name = gtk::Label::new(Some(&fmt(day, "%a %-d")));
+        weekend(&name, day);
         if day == today() {
             name.add_css_class("today");
         }
@@ -469,7 +470,9 @@ fn strip(c: &Rc<Cal>, shown: bool) {
     let names = gtk::Box::builder().homogeneous(true).build();
     names.add_css_class("weekdays");
     for &day in &week {
-        names.append(&gtk::Label::new(Some(&fmt(day, "%a"))));
+        let name = gtk::Label::new(Some(&fmt(day, "%a")));
+        weekend(&name, day);
+        names.append(&name);
     }
     c.week_strip.append(&names);
     let all = items(start, start + 7 * DAY);
