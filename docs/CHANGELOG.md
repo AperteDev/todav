@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of swiping a month sideways; a mouse wheel scrolls it a week per notch, and Today or a day
   in another month scrolls there.
 
+### Fixed
+
+- Android: a widget resized on the home screen is laid out for its new size at once, not only
+  when it next updates.
+
 ## [2.0.4] - 2026-10-28
 
 ### Added

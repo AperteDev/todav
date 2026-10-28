@@ -1,6 +1,7 @@
 package dev.aperte.todav
 
 import android.appwidget.AppWidgetManager
+import kotlinx.coroutines.launch
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -155,11 +156,24 @@ object WidgetPrefs {
     }.apply()
 }
 
-/** Removing a widget removes its settings. */
+/** Counts widgets resized, for a running widget to lay itself out again. */
+private val resized = kotlinx.coroutines.flow.MutableStateFlow(0)
+
+/** Removing a widget removes its settings; resizing one lays it out again. */
 abstract class TodavWidgetReceiver : GlanceAppWidgetReceiver() {
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
         super.onDeleted(context, appWidgetIds)
         appWidgetIds.forEach { WidgetPrefs.forget(context, it) }
+    }
+
+    // Glance does nothing on a resize in `SizeMode.Single`.
+    override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: android.os.Bundle) {
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+        resized.value++
+        // One no longer running starts again.
+        (context.applicationContext as TodavApp).scope.launch {
+            runCatching { glanceAppWidget.update(context, GlanceAppWidgetManager(context).getGlanceIdBy(appWidgetId)) }
+        }
     }
 }
 
@@ -191,17 +205,22 @@ abstract class TodavWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val app = context.applicationContext as TodavApp
         app.awaitReady()
-        val manager = GlanceAppWidgetManager(context)
-        val widget = manager.getAppWidgetId(id)
-        // Its size upright (the narrowest and tallest the launcher gives; on its side the bottom
-        // may be cut): laid out once.
-        // ponytail: one layout for both orientations; a layout each (`SizeMode.Exact`) doubles the
-        // update, too big for the launcher with the month planner.
-        val size = manager.getAppWidgetSizes(id).takeIf { it.isNotEmpty() }
-            ?.let { all -> androidx.compose.ui.unit.DpSize(all.minOf { it.width }, all.maxOf { it.height }) }
+        val widget = GlanceAppWidgetManager(context).getAppWidgetId(id)
         // The app may not have opened in this process: times as the system shows them.
         hours24 = android.text.format.DateFormat.is24HourFormat(context)
         provideContent {
+            // Its size upright (the narrowest and tallest the launcher gives; on its side the
+            // bottom may be cut), again when resized.
+            // ponytail: one layout for both orientations; a layout each (`SizeMode.Exact`) doubles
+            // the update, too big for the launcher with the month planner.
+            val resizes by resized.collectAsState()
+            val size = androidx.compose.runtime.remember(resizes) {
+                val options = AppWidgetManager.getInstance(context).getAppWidgetOptions(widget)
+                androidx.compose.ui.unit.DpSize(
+                    options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH).dp,
+                    options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT).dp,
+                ).takeIf { it.width > 0.dp && it.height > 0.dp }
+            }
             val changes by app.changes.collectAsState()
             // All of it again: parts reading the widgets' settings would be skipped otherwise.
             androidx.compose.runtime.key(changes) {
