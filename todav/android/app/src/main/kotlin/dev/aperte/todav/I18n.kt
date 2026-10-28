@@ -16,7 +16,10 @@ object I18n {
     private var catalog: Translations = Translations.english()
     private val cache = ConcurrentHashMap<String, String>()
 
-    /** The catalog of the context's first language that has one (the app's own language, when set). */
+    /**
+     * The catalog of the context's first language that has one (the app's own language, when set).
+     * English, the source, has none but counts as one, so a language after it doesn't win.
+     */
     fun load(context: Context) {
         val locales = context.resources.configuration.locales
         val names = (0 until locales.size()).flatMap {
@@ -24,6 +27,7 @@ object I18n {
             listOf("${l.language}_${l.country}", l.language)
         }
         catalog = names.firstNotNullOfOrNull { name ->
+            if (name == "en") return@firstNotNullOfOrNull Translations.english()
             try {
                 context.assets.open("locale/$name/todav.mo").use { Translations(it.readBytes()) }
             } catch (_: IOException) {

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Android: Todav is in English when English comes first in the system's languages, not in the
+  next language it has a translation for.
+
 ## [2.0.0] - 2026-10-28
 
 ### Added
