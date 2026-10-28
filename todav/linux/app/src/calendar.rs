@@ -35,6 +35,8 @@ const CSS: &str = "
 .weekdays label { font-size: smaller; opacity: 0.6; padding: 6px 0; }
 .month .day { border-top: 1px solid alpha(currentColor, 0.1); padding: 2px; }
 .month .day:not(:first-child) { border-left: 1px solid alpha(currentColor, 0.1); }
+/* Scrolled, the grid's rows keep their own line at the top. */
+.month > scrolledwindow > undershoot { background: none; box-shadow: none; }
 .day .num { font-feature-settings: 'tnum'; padding: 1px 7px; margin: 2px; }
 .day.other .num { opacity: 0.4; }
 .day.today .num { background: @accent_bg_color; color: @accent_fg_color; border-radius: 9999px; font-weight: bold; }
