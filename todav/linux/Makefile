@@ -9,9 +9,11 @@ ID = dev.aperte.Todav
 # Translations (see scripts/i18n.sh); po/its says what of the metainfo is translated.
 PO = ../../po
 export GETTEXTDATADIRS = $(abspath $(PO))
+# The repository's workspace: from here Cargo would find the bindings' one (todav/Cargo.toml).
+CARGO_BUILD = cargo build --manifest-path ../../Cargo.toml
 
 install:
-	cargo build --release -p todav-linux
+	$(CARGO_BUILD) --release -p todav-linux
 	$(MAKE) install-data
 	install -Dm644 data/$(ID)-autostart.desktop $(AUTOSTART)/$(ID).desktop
 
@@ -41,7 +43,7 @@ install-data:
 #   make stage PREFIX=/usr DESTDIR=$PWD/../../target/stage
 # The app and its data, autostart for every session, and the GNOME Shell extension.
 stage:
-	cargo build --release --locked -p todav-linux
+	$(CARGO_BUILD) --release --locked -p todav-linux
 	$(MAKE) install-data
 	install -Dm644 data/$(ID)-autostart.desktop $(DESTDIR)/etc/xdg/autostart/$(ID).desktop
 	$(MAKE) -C ../gnome-extension install DEST=$(DESTDIR)$(DATADIR)/gnome-shell/extensions/todav@aperte.dev
@@ -60,7 +62,7 @@ flatpak:
 # A running instance is quit first: the app is single-instance, so a new launch would only
 # show the existing window. broadwayd stops with the app.
 broadway:
-	cargo build -p todav-linux
+	$(CARGO_BUILD) -p todav-linux
 	busctl --user --auto-start=no call $(ID) /dev/aperte/Todav org.gtk.Actions Activate 'sava{sv}' quit 0 0 2>/dev/null || true
 	for i in $$(seq 50); do busctl --user status $(ID) >/dev/null 2>&1 || break; sleep 0.1; done
 	mkdir -p ../../target/broadway/gtk-4.0
@@ -74,7 +76,7 @@ broadway:
 # A separate copy for testing other connections: own data in target/sandbox (kept between
 # runs; sandbox-reset wipes it), own keyring entries, runs next to the normal app.
 sandbox:
-	cargo build -p todav-linux
+	$(CARGO_BUILD) -p todav-linux
 	TODAV_SANDBOX=1 XDG_DATA_HOME=$(CURDIR)/../../target/sandbox ../../target/debug/todav-linux
 
 sandbox-reset:
