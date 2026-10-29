@@ -185,6 +185,10 @@ class TodavIndicator extends PanelMenu.Button {
         const {_calendar: calendar, _eventsItem: events} = this._dateMenu;
         calendar.visible = !clock('month');
         this._clockMonth.visible = clock('month');
+        if (!clock('month')) {
+            const column = calendar.get_parent();
+            column.min_width_set = column.natural_width_set = false;
+        }
         // The events section shows itself again as calendars change: out of the menu instead.
         const box = this._clockBox.get_parent();
         if (clock('agenda') && events.get_parent() === box)
@@ -214,12 +218,15 @@ class TodavIndicator extends PanelMenu.Button {
         this._month = null;
         this._clockMonth.destroy_all_children();
         if (clock('month')) {
-            // As wide as the calendar, the column too: measured shown, as hidden (or at Shell
-            // start) it says less.
+            // The column as wide as with the calendar: it takes the calendar's width only, which
+            // hidden (or at Shell start) is less; measured shown.
+            // Both widths: a natural one under the minimum makes Clutter abort.
             const calendar = this._dateMenu._calendar;
             calendar.show();
-            this._clockMonth.min_width = calendar.get_preferred_width(-1)[1];
+            const width = calendar.get_preferred_width(-1)[1];
             calendar.hide();
+            const column = calendar.get_parent();
+            column.min_width = column.natural_width = width;
             this._clockMonth.add_child(this._monthView(on('month_dots')));
         }
         this._clockBox.destroy_all_children();
