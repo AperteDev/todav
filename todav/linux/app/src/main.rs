@@ -529,6 +529,7 @@ fn main() -> glib::ExitCode {
         }
         window::setup_actions(app.upcast_ref());
         settings::apply_color_scheme();
+        settings::apply_ext_preset();
         if restore_accounts() {
             start_background();
         }

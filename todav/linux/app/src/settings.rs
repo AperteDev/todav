@@ -105,6 +105,36 @@ fn connect_duration(b: &gtk::Builder, key: &'static str) {
 /// all in its menu with fields (`panel`), or in the clock menu with buttons (`clock`).
 const EXTENSION_PRESETS: [(&str, [u32; 3], u32); 2] = [("panel", [0; 3], 0), ("clock", [1; 3], 1)];
 
+/// On start: the options of the way picked in Preferences → Extension, so that options added since
+/// (as the kinds of adding) take its values, not their defaults. Custom keeps them as they are.
+pub fn apply_ext_preset() {
+    let c = core();
+    let picked = c.setting("ext_preset".into());
+    let Some((_, places, kind)) = EXTENSION_PRESETS
+        .iter()
+        .find(|(name, ..)| picked.as_deref() == Some(*name))
+    else {
+        return;
+    };
+    let places = places.map(|p| ["true", "clock", "false"][p as usize]);
+    let kinds = [ADD_KINDS[*kind as usize]; 2];
+    let values = EXTENSION_PARTS.iter().zip(places).chain(
+        ["ext_add_task_kind", "ext_add_event_kind"]
+            .iter()
+            .zip(kinds),
+    );
+    let mut changed = false;
+    for (key, value) in values {
+        if c.setting((*key).into()).as_deref() != Some(value) {
+            let _ = c.set_setting((*key).into(), value.into());
+            changed = true;
+        }
+    }
+    if changed {
+        sync_adds();
+    }
+}
+
 /// Preferences → Extension's choice of where its parts go: one of `EXTENSION_PRESETS`, or each
 /// where its row says (`custom`: the rows shown, as they were). Stored in `ext_preset`; unset,
 /// the one the parts match.
