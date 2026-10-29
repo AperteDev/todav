@@ -135,6 +135,8 @@ struct Ui {
     stale: Cell<bool>,
     /// The task being dragged and where it came from.
     dragging: RefCell<Option<(Task, Slot)>>,
+    /// This drag was told that reordering needs manual sort (once a drag).
+    told_sort: Cell<bool>,
     /// "+" buttons taking dropped tasks as subtasks of their task; for a tree row's drag-only
     /// "+", the row it shows on while collapsed.
     adopters: RefCell<Vec<(gtk::Widget, Task, Option<adw::ExpanderRow>)>>,
@@ -779,6 +781,7 @@ fn build(app: &adw::Application) -> Rc<Ui> {
         renaming: Cell::new(false),
         stale: Cell::new(false),
         dragging: RefCell::new(None),
+        told_sort: Cell::new(false),
         drop_mark: RefCell::new(None),
         adopters: RefCell::new(Vec::new()),
         focus_sub: RefCell::new(None),
@@ -2286,6 +2289,7 @@ fn connect_dnd(
     drag.connect_drag_begin(move |_, drag| {
         if let Some(ui) = weak.upgrade() {
             *ui.dragging.borrow_mut() = Some((task.clone(), s.clone()));
+            ui.told_sort.set(false);
             for (w, parent, tree) in ui.adopters.borrow().iter() {
                 if tasks::can_adopt(core(), &task, parent)
                     && tree.as_ref().is_none_or(|t| !t.is_expanded())
@@ -2334,9 +2338,18 @@ fn connect_dnd(
     drop.connect_accept(move |_, _| {
         weak.upgrade().is_some_and(|ui| {
             let dragging = ui.dragging.borrow();
-            dragging
-                .as_ref()
-                .is_some_and(|(d, ds)| tasks::can_drop(core(), d, ds, &target, &s))
+            let Some((d, ds)) = dragging.as_ref() else {
+                return false;
+            };
+            let ok = tasks::can_drop(core(), d, ds, &target, &s);
+            // Refused only for the sort: say why, as nothing marks the place.
+            if !ok && !ui.told_sort.get() && tasks::needs_manual(core(), d, ds, &target, &s) {
+                ui.told_sort.set(true);
+                ui.toasts.add_toast(note(&gettext(
+                    "To reorder, set Sort to Manual in Preferences",
+                )));
+            }
+            ok
         })
     });
     let (weak, target, s) = (Rc::downgrade(ui), t.clone(), slot.clone());
