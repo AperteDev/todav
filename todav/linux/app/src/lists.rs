@@ -119,10 +119,11 @@ pub fn setup(window: &adw::ApplicationWindow) {
 
 /// Right-click or a long press on a row of `rows` offers to edit what `target_at` gives for it
 /// (None: a row with nothing to edit), with `action` (a list's "win.edit-list", a task's
-/// "win.edit-task").
+/// "win.edit-task"), and to delete it with `delete` when given.
 pub fn context_menu(
     rows: &gtk::ListBox,
     action: &'static str,
+    delete: Option<&'static str>,
     target_at: impl Fn(&gtk::ListBoxRow) -> Option<String> + 'static,
 ) {
     let r = rows.clone();
@@ -134,8 +135,13 @@ pub fn context_menu(
             return false;
         };
         let m = gio::Menu::new();
-        let action = gio::Action::print_detailed_name(action, Some(&target.to_variant()));
-        m.append(Some(&gettext("Edit…")), Some(&action));
+        let target = target.to_variant();
+        let edit = gio::Action::print_detailed_name(action, Some(&target));
+        m.append(Some(&gettext("Edit…")), Some(&edit));
+        if let Some(delete) = delete {
+            let delete = gio::Action::print_detailed_name(delete, Some(&target));
+            m.append(Some(&gettext("Delete")), Some(&delete));
+        }
         // On the row (a list box takes no other children), gone once closed.
         let menu = gtk::PopoverMenu::from_model(Some(&m));
         menu.set_parent(&row);

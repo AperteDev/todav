@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Linux: a task's context menu in "To Plan" can delete it too (with Undo), next to Edit….
 - Settings → General → Default App → Calendar: the system's calendar app, with a button making
   it Todav. On Linux it does so at once (the app opening calendar files, which GNOME takes as
   its calendar app; not in the Flatpak). On Android, which lets no app do that, the system asks

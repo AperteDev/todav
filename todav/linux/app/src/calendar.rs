@@ -299,7 +299,7 @@ pub fn build(views: &adw::ViewStack, tasks: &adw::OverlaySplitView) {
                 glib::idle_add_local_once(refresh);
             }
         });
-        crate::lists::context_menu(list, "win.edit-list", move |row| {
+        crate::lists::context_menu(list, "win.edit-list", None, move |row| {
             let c = cal()?;
             section(&c, events).get(row.index() as usize).cloned()
         });
@@ -970,8 +970,8 @@ fn plan_drop(c: &Rc<Cal>) {
     c.plan.connect_row_activated(|_, _| {
         crate::window::toast(&gettext("Drag a task onto the calendar to plan it"))
     });
-    // Right-click or a long press: Edit…, its edit dialog.
-    crate::lists::context_menu(&c.plan, "win.edit-task", |row| {
+    // Right-click or a long press: Edit… (its edit dialog) and Delete.
+    crate::lists::context_menu(&c.plan, "win.edit-task", Some("win.delete-task"), |row| {
         cal()?.plan_uids.borrow().get(row.index() as usize).cloned()
     });
     // Only planned tasks: one dragged out of the list does not light it up.
