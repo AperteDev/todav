@@ -54,3 +54,14 @@ jobs:
         run: >-
           gh release create "v$VERSION" dist/*
           --title "v$VERSION" --notes-file "$RUNNER_TEMP/notes.md"
+      # The Fedora RPMs: COPR builds the tag with .copr/Makefile. COPR_CONFIG is the API token
+      # file from https://copr.fedorainfracloud.org/api/, which expires after 180 days.
+      - name: Build on COPR
+        env:
+          COPR_CONFIG: ${{ secrets.COPR_CONFIG }}
+        run: |
+          pipx install copr-cli
+          printf '%s\n' "$COPR_CONFIG" > "$RUNNER_TEMP/copr"
+          copr-cli --config "$RUNNER_TEMP/copr" buildscm --nowait \
+            --clone-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" --commit "v$VERSION" \
+            --spec todav/linux/rpm/todav.spec --method make_srpm selfref/todav

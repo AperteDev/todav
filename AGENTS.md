@@ -34,7 +34,8 @@
   (`todav.versionCode`), the metainfo, the extension's `metadata.json` and the RPM spec and moves the `[Unreleased]` changes and link under it; the
   metainfo gets those changes as the release's notes (untranslated) and its screenshots from
   the new tag. CI builds the packages, then it commits `chore(release): X`, tags `vX` and
-  publishes them. Don't bump versions by hand.
+  publishes them, and COPR (`selfref/todav`) builds the tag's RPMs (secret `COPR_CONFIG`, an
+  API token that expires after 180 days). Don't bump versions by hand.
 - The Android APK of a release is signed in CI with the release key (secrets
   `ANDROID_KEYSTORE`, base64 of a PKCS#12 keystore with the alias `todav`, and
   `ANDROID_KEYSTORE_PASSWORD`). F-Droid rebuilds the tag and publishes that APK only if both
