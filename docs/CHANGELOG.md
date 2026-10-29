@@ -51,6 +51,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it is smaller than it is.
 - Android: a task dragged off the middle of a row, down past it, lands below that row rather
   than staying set to become its subtask.
+- Android: in a sorted list, a task dragged over another moves no rows aside (a drop there
+  makes it a subtask, highlighting that row, and reorders nothing).
 - Linux: a task dragged beside another in a sorted list says why it cannot go there (set Sort
   to Manual), as on Android.
 

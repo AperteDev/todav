@@ -370,6 +370,8 @@ private fun TaskList(model: Main, screen: Screen, state: LazyListState, padding:
             if (showCompleted) screen.completed.forEach { add("done:${it.task.uid}") }
         }.withIndex().associate { (i, k) -> k to i }
     }
+    // Not in manual order: a drag reorders nothing, so no row moves aside for it.
+    val sorted = remember(screen) { core.order().tasks != dev.aperte.todav.core.Sort.MANUAL }
     /** How far the item at `key` moves aside for the gap of `d`. */
     fun shift(d: Drag?, key: String): Float {
         val gap = d?.gap?.takeIf { it >= 0 } ?: return 0f
@@ -426,7 +428,13 @@ private fun TaskList(model: Main, screen: Screen, state: LazyListState, padding:
                             !dev.aperte.todav.core.staysPut(d.row.task, ds, what.task, ts, mode < 0)
                     }
                     if (!ok && mode != 0) d.sorted = core.needsManual(d.row.task, ds, what.task, ts)
-                    if (ok) Target(key, what, null, mode) to (if (mode < 0) i else i + 1) else null to -1
+                    // Into a row of a sorted list: highlighted only, as no row may move there.
+                    val gap = when {
+                        mode < 0 -> i
+                        mode == 0 && sorted -> -1
+                        else -> i + 1
+                    }
+                    if (ok) Target(key, what, null, mode) to gap else null to -1
                 }
             }
             else -> null to -1
