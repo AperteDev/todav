@@ -36,19 +36,19 @@
   <!-- From the release tag (scripts/release.py moves them to each new one). -->
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.1.0/docs/screenshots/tasks.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.2.0/docs/screenshots/tasks.png</image>
       <caption>Tasks grouped by category, with subtasks and due dates</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.1.0/docs/screenshots/calendar-month.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.2.0/docs/screenshots/calendar-month.png</image>
       <caption>The month, with an event's details</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.1.0/docs/screenshots/calendar-week.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.2.0/docs/screenshots/calendar-week.png</image>
       <caption>Tasks planned into the week next to events</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.1.0/docs/screenshots/event-dialog.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.2.0/docs/screenshots/event-dialog.png</image>
       <caption>Editing an event</caption>
     </screenshot>
   </screenshots>
@@ -63,6 +63,41 @@
     <control>touch</control>
   </supports>
   <releases>
+    <release version="2.2.0" date="2026-10-29">
+      <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.2.0</url>
+      <description translate="no">
+        <p>Added</p>
+        <ul>
+          <li>Checking off tasks outside the app, off by default: a task's circle completes or reopens it in the GNOME extension (Preferences → Extension → Tasks → Check off tasks; in the task list and the agenda) and in Android's task and agenda widgets (each widget's settings → Check Off Tasks). Subtasks follow as Settings → Tasks say, when they would be asked about: then they stay as they are.</li>
+          <li>A sort button next to Search on the task page picks the task order. Settings → Tasks → Sort is now Sort at start: the last used (the default, so the order picked last stays), or one the app sorts by whenever it opens.</li>
+          <li>Linux: a task's context menu in "To Plan" can delete it too (with Undo), next to Edit….</li>
+          <li>Settings → General → Default App → Calendar: the system's calendar app, with a button making it Todav. On Linux it does so at once (the app opening calendar files, which GNOME takes as its calendar app; not in the Flatpak). On Android, which lets no app do that, the system asks which app (Todav, then Always); another app's default is cleared first in its "Open by default" settings, which the button opens.</li>
+          <li>Extension: its parts can go in GNOME's clock menu, the month in place of its calendar and the agenda in place of its events, with the task list under them. Preferences → Extension shows the two ways with pictures, Todav's icon with its own menu (with fields for adding) or the clock menu (with buttons), and Custom for each part (the task list, the month, the agenda) in either menu or nowhere. The icon shows only with something in its menu.</li>
+          <li>Extension: Preferences → Extension → Adding tasks and Adding events: a field (as before), a button opening Todav (in the list's field for adding a task, or on a new event on the day picked), or none; with the task list, and with the agenda (else the month).</li>
+          <li>Extension: Preferences → Extension → Number by the icon: the open tasks of the list shown (as before), tasks due today or earlier, important tasks, today's events, or none.</li>
+          <li>Extension: Preferences → Extension → Order puts the calendar before the tasks in its own menu (on the left in two columns, on top in one).</li>
+          <li>Extension: a right click on its icon opens a menu with Open Todav and Preferences (Todav's, on the Extension page).</li>
+        </ul>
+        <p>Changed</p>
+        <ul>
+          <li>Android: a low month planner widget shows slimmer bars, as Fossify Calendar's, before none.</li>
+          <li>Android: a list or calendar held in the sidebar to move it rises off it, with a shadow.</li>
+          <li>Android: a task held to move rises as soon as the long press is felt, not once it moves.</li>
+          <li>Android: a tap anywhere on the task widget but a task or a button opens its list in the app, not only on its name.</li>
+          <li>Extension: its icon sits in the middle of the top bar, next to the clock; Preferences → Extension → Icon puts it back on the right.</li>
+          <li>Extension: a day clicked in the month shows that day in the agenda, and an event added then starts on it; a double click opens it in Todav (one click, without the agenda in sight).</li>
+          <li>Extension: Preferences → Extension → Open in the editor, for tasks and for events: a task or an event clicked (in the task list or the agenda) opens in its editor in Todav, rather than in its list or on its day. Off by default.</li>
+        </ul>
+        <p>Fixed</p>
+        <ul>
+          <li>Android: "Mark as Done" on a reminder completes the task's subtasks too when Settings → Tasks say so (Completing a task with open subtasks: Completes them too), as on Linux.</li>
+          <li>Android: the month planner widget's weeks fill it to the bottom, also where the launcher says it is smaller than it is.</li>
+          <li>Android: a task dragged off the middle of a row, down past it, lands below that row rather than staying set to become its subtask.</li>
+          <li>Android: in a sorted list, a task dragged over another moves no rows aside (a drop there makes it a subtask, highlighting that row, and reorders nothing).</li>
+          <li>Linux: a task dragged beside another in a sorted list says why it cannot go there (set Sort to Manual), as on Android.</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.1.0" date="2026-10-28">
       <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.1.0</url>
       <description translate="no">
