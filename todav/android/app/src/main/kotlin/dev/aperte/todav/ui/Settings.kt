@@ -115,13 +115,13 @@ private fun durationNames() = listOf(
     tr("15 minutes"), tr("30 minutes"), tr("45 minutes"), tr("1 hour"), tr("1.5 hours"), tr("2 hours"), tr("3 hours"),
 )
 
-private fun sortNames() = listOf(
+fun sortNames() = listOf(
     tr("Manual"), tr("Newest first"), tr("Oldest first"), tr("Due date, soonest first"),
     tr("Due date, latest first"), tr("Priority, highest first"),
 )
 
 /** The keys of `sortNames`, as `todav_app::prefs::SORTS`. */
-private val SORTS = listOf("manual", "newest", "oldest", "due_soonest", "due_latest", "priority")
+val SORTS = listOf("manual", "newest", "oldest", "due_soonest", "due_latest", "priority")
 
 @Composable
 private fun Frame(model: Main, title: String, content: @Composable () -> Unit) = SettingsFrame(title, model::back, content)
@@ -206,7 +206,7 @@ fun SettingsSubpage(model: Main, page: Page) {
 
 /** A setting kept in the core (synced unless device-only), read again on every change. */
 @Composable
-private fun setting(model: Main, key: String): String? {
+fun setting(model: Main, key: String): String? {
     val changes by model.todav.changes.collectAsStateWithLifecycle()
     return load(changes, key, initial = model.core.setting(key)) { model.core.setting(key) }
 }

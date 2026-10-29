@@ -20,6 +20,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
@@ -191,6 +192,7 @@ fun TasksPane(model: Main, screen: Screen) {
                     Tip(tr("Search")) {
                         IconButton(onClick = { model.open(Dest.Search) }) { Icon(Icons.Default.Search, tr("Search")) }
                     }
+                    SortMenu(model)
                     screen.list?.takeIf { screen.categories.isNotEmpty() }?.let { list ->
                         CategoryFilter(screen) { model.filterBy(list.href, it) }
                     }
@@ -257,6 +259,21 @@ private fun SyncButton(syncing: Boolean, onClick: () -> Unit) {
     Tip(tr("Sync")) {
         IconButton(onClick = onClick) {
             Icon(Icons.Default.Refresh, tr("Sync"), Modifier.graphicsLayer { rotationZ = turn.value })
+        }
+    }
+}
+
+/** The task sort of Settings → Tasks, at hand. */
+@Composable
+private fun SortMenu(model: Main) {
+    var open by remember { mutableStateOf(false) }
+    val sort = setting(model, "task_sort")
+    Box {
+        Tip(tr("Sort")) {
+            IconButton(onClick = { open = true }) { Icon(Icons.AutoMirrored.Filled.Sort, tr("Sort")) }
+        }
+        PickMenu(open, { open = false }, sortNames(), SORTS.indexOf(sort).coerceAtLeast(0)) {
+            model.setSetting("task_sort", SORTS[it])
         }
     }
 }
