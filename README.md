@@ -210,6 +210,7 @@ Todav is under active development. Planned (details in [ROADMAP.md](docs/ROADMAP
 
 - **Advanced notifications**, configurable
 - **Advanced search, filtering and sorting**
+- **Settings per list and calendar**, such as how its completed tasks show
 - **Export** of lists and calendars to iCalendar files
 - **More services** besides Nextcloud
 - **Google Tasks** in the Google account

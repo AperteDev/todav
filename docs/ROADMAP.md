@@ -17,6 +17,16 @@ Planned work, not yet done. The README lists it publicly; the order is not fixed
 - **Advanced notifications**, configurable, beyond the reminder notifications shown now; details
   to be specified.
 - **Advanced search, filtering and sorting**; details to be specified.
+- **Settings per list and per calendar**, overriding Preferences for that one: for a task list
+  how completed tasks show (`done_tasks`, `done_subtasks`), its sort and where new tasks go,
+  completing a task with open subtasks, the default duration and reminders; for a calendar the
+  default event duration and reminders. Each option "As in Preferences" until changed, in the
+  list's or calendar's edit dialog on Linux and Android. `prefs::order`, `done_view` and the
+  like would take the list; Upcoming, Important and search, across lists, keep the defaults.
+  Open questions: stored next to the categories' order in the account's `todav/config.json`
+  (with the list, for every device on the account; lists on this device only in `kv`) or in the
+  synced settings keyed by list; which options are worth it per list; how the GNOME extension
+  and the widgets, which show one list, follow them.
 - **Export**, the counterpart of the iCalendar import (`core/src/import.rs`): lists and
   calendars (one, some or all) to an `.ics` file, on Linux and Android; details to be
   specified (one file or one per list, done tasks, a date range for events).
@@ -31,7 +41,6 @@ Smaller items:
 - Key tasks by list and UID, as events are: a task in a calendar two accounts share shows once
   now, in the account that had it first (`store::task_elsewhere`).
 - Show the conflict log (`kv:conflict_log`) in the app's settings.
-- GNOME extension: tick and edit tasks (read-only now).
 
 ## Android
 
