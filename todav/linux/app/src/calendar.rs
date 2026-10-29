@@ -172,7 +172,7 @@ fn cal() -> Option<Rc<Cal>> {
     CAL.with(|c| c.borrow().clone())
 }
 
-fn today() -> i64 {
+pub fn today() -> i64 {
     todav_app::dates::midnight(core().local_now())
 }
 
@@ -618,10 +618,10 @@ fn new_event() -> Option<adw::EntryRow> {
     Some(dialog::open(&c, None, time))
 }
 
-/// For the extension's agenda: what is on each of `days` days from today, as the Agenda view
-/// lists it: (day, time, title, colour, is a task, done).
-pub fn agenda(days: i64) -> Vec<(i64, String, String, String, bool, bool)> {
-    calendar::agenda(core(), today(), days, None)
+/// For the extension's agenda: what is on each of `days` days from `from` (a day's midnight), as
+/// the Agenda view lists it: (day, time, title, colour, is a task, done).
+pub fn agenda(from: i64, days: i64) -> Vec<(i64, String, String, String, bool, bool)> {
+    calendar::agenda(core(), from, days, None)
         .into_iter()
         .map(|e| {
             let time = match e.time {

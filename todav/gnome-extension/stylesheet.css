@@ -47,6 +47,8 @@
 .todav-nav { padding: 4px; border-radius: 99px; }
 .todav-weekday { font-size: 0.8em; padding: 2px 0; }
 .todav-day { width: 30px; height: 28px; border-radius: 99px; font-size: 0.9em; font-feature-settings: "tnum"; }
+/* The day whose agenda shows; today keeps its own fill. */
+.todav-day.selected { background-color: rgba(128, 128, 128, 0.35); font-weight: bold; }
 .todav-day.today { background-color: -st-accent-color; color: -st-accent-fg-color; font-weight: bold; }
 /* With dots: a taller day, three dots at most under its number. */
 .todav-day.dotted { height: 34px; border-radius: 10px; }

@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Extension: its icon sits in the middle of the top bar, next to the clock; Preferences →
   Extension → Icon puts it back on the right.
+- Extension: a day clicked in the month shows that day in the agenda; a double click opens it
+  in Todav (one click, without the agenda in sight).
 
 ## [2.1.0] - 2026-10-28
 

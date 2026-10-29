@@ -17,6 +17,7 @@ const XML: &str = r#"<node>
   <method name="ShowTask"><arg direction="in" name="uid" type="s"/></method>
   <method name="GetDays"><arg direction="in" name="from" type="x"/><arg direction="in" name="days" type="u"/><arg direction="out" type="aas"/></method>
   <method name="GetAgenda"><arg direction="in" name="days" type="u"/><arg direction="out" type="a(xsssbb)"/></method>
+  <method name="GetAgendaFrom"><arg direction="in" name="from" type="x"/><arg direction="in" name="days" type="u"/><arg direction="out" type="a(xsssbb)"/></method>
   <method name="GetCounts"><arg direction="out" type="a{su}"/></method>
   <method name="ShowDay"><arg direction="in" name="at" type="x"/></method>
   <method name="NewEvent"><arg direction="in" name="summary" type="s"/></method>
@@ -162,7 +163,13 @@ fn call(method: &str, params: &glib::Variant) -> Result<Option<glib::Variant>, S
         // thing on the `days` days from today, in the calendars shown.
         "GetAgenda" => {
             let (days,) = params.get::<(u32,)>().ok_or_else(bad)?;
-            let items = crate::calendar::agenda(i64::from(days.min(31)));
+            let items = crate::calendar::agenda(crate::calendar::today(), i64::from(days.min(31)));
+            Some((items,).to_variant())
+        }
+        // The same from the day `from` (local midnight): a day picked in the extension's month.
+        "GetAgendaFrom" => {
+            let (from, days) = params.get::<(i64, u32)>().ok_or_else(bad)?;
+            let items = crate::calendar::agenda(from, i64::from(days.min(31)));
             Some((items,).to_variant())
         }
         // What the number by the extension's icon can count (`ext_count`, besides a list's open

@@ -86,6 +86,8 @@ class TodavIndicator extends PanelMenu.Button {
         super._init(0.5, 'Todav');
         this.add_style_class_name('todav-button');
         this._proxy = null;
+        // The day picked in the month, its agenda shown (null: the coming week's).
+        this._selected = null;
         this._midnight();
 
         const box = new St.BoxLayout({style_class: 'todav-panel'});
@@ -121,6 +123,7 @@ class TodavIndicator extends PanelMenu.Button {
             if (open) {
                 this._choosing = false;
                 this._month = null;
+                this._selected = null;
                 this._rebuild();
             }
         });
@@ -175,6 +178,7 @@ class TodavIndicator extends PanelMenu.Button {
             if (!open)
                 return;
             this._choosing = false;
+            this._selected = null;
             this._clockRebuild().catch(e => logError(e, 'Todav: cannot fill the clock menu'));
         });
     }
@@ -499,28 +503,45 @@ class TodavIndicator extends PanelMenu.Button {
         return col;
     }
 
-    /// The coming week's events and dated tasks under their days; one opens the calendar there.
+    /// The coming week's events and dated tasks under their days, or those of the day picked in
+    /// the month (`_selected`, shown again by `_showAgenda`); one opens the calendar there.
     async _agenda() {
-        const [items] = await this._proxy.GetAgendaAsync(AGENDA_DAYS).catch(e => {
-            logError(e, 'Todav: cannot read the agenda');
-            return [[]];
-        });
-        const content = new St.BoxLayout({orientation: VERTICAL, x_expand: true});
-        const today = dayKey(GLib.DateTime.new_now_local());
-        let shown = null;
-        for (const [day, time, title, color, task, done] of items) {
-            if (day !== shown) {
-                shown = day;
+        const show = async () => {
+            const picked = this._selected;
+            const [items] = await (picked === null
+                ? this._proxy.GetAgendaAsync(AGENDA_DAYS)
+                : this._proxy.GetAgendaFromAsync(picked, 1)
+            ).catch(e => {
+                logError(e, 'Todav: cannot read the agenda');
+                return [[]];
+            });
+            // Another day picked meanwhile, or the menu gone.
+            if (this._selected !== picked || this._showAgenda !== show)
+                return;
+            const content = new St.BoxLayout({orientation: VERTICAL, x_expand: true});
+            const today = dayKey(GLib.DateTime.new_now_local());
+            const heading = day => {
                 const date = GLib.DateTime.new_from_unix_utc(day).format('%A %-d %B');
                 const when = [_('Today'), _('Tomorrow')][(day - today) / DAY];
-                const heading = when ? `${when} · ${date}` : date.charAt(0).toUpperCase() + date.slice(1);
-                content.add_child(label(heading, 'todav-category'));
+                content.add_child(label(when ? `${when} · ${date}` : date.charAt(0).toUpperCase() + date.slice(1), 'todav-category'));
+            };
+            // A picked day's heading even when it holds nothing.
+            let shown = picked;
+            if (picked !== null)
+                heading(picked);
+            for (const [day, time, title, color, task, done] of items) {
+                if (day !== shown) {
+                    shown = day;
+                    heading(day);
+                }
+                content.add_child(this._agendaRow(day, time, title, color, task, done));
             }
-            content.add_child(this._agendaRow(day, time, title, color, task, done));
-        }
-        if (items.length === 0)
-            content.add_child(label(_('Nothing planned this week'), 'todav-empty'));
-        const scroll = new St.ScrollView({
+            if (items.length === 0)
+                content.add_child(label(picked === null ? _('Nothing planned this week') : _('Nothing planned'), 'todav-empty'));
+            scroll.child = content;
+        };
+        this._showAgenda = show;
+        const scroll = this._agendaView = new St.ScrollView({
             style_class: 'todav-agenda',
             hscrollbar_policy: St.PolicyType.NEVER,
             vscrollbar_policy: St.PolicyType.AUTOMATIC,
@@ -528,7 +549,11 @@ class TodavIndicator extends PanelMenu.Button {
             x_expand: true,
             y_expand: true,
         });
-        scroll.child = content;
+        scroll.connect('destroy', () => {
+            if (this._showAgenda === show)
+                this._showAgenda = null;
+        });
+        await show();
         return scroll;
     }
 
@@ -551,8 +576,25 @@ class TodavIndicator extends PanelMenu.Button {
         return item;
     }
 
-    /// This month (arrows turn it), with dots for what the days hold when `dots`; a day opens
-    /// the calendar there.
+    /// A day of the month clicked (`days`: the month's day buttons by day): the agenda shows it.
+    /// Clicked again at once (a double click), or with no agenda in sight, Todav opens there.
+    _dayClicked(key, days) {
+        const now = GLib.get_monotonic_time() / 1000;
+        const last = this._lastClick;
+        this._lastClick = {key, at: now};
+        this._mouse ??= new Gio.Settings({schema_id: 'org.gnome.desktop.peripherals.mouse'});
+        const again = last?.key === key && now - last.at < this._mouse.get_int('double-click');
+        if (again || !this._showAgenda || !this._agendaView?.is_mapped()) {
+            this._open(p => p.ShowDayAsync(key));
+            return;
+        }
+        this._selected = key;
+        days.forEach((b, k) => (k === key ? b.add_style_class_name('selected') : b.remove_style_class_name('selected')));
+        this._showAgenda().catch(e => logError(e, 'Todav: cannot show the day'));
+    }
+
+    /// This month (arrows turn it), with dots for what the days hold when `dots`; a day shows
+    /// its agenda, or opens the calendar there (`_dayClicked`).
     _monthView(dots) {
         const today = GLib.DateTime.new_now_local();
         this._month ??= GLib.DateTime.new_local(today.get_year(), today.get_month(), 1, 0, 0, 0);
@@ -591,6 +633,7 @@ class TodavIndicator extends PanelMenu.Button {
             }
             const weeks = Math.ceil((offset + days) / 7);
             const marks = [];
+            const buttons = new Map();
             for (let i = 0; i < weeks * 7; i++) {
                 const d = start.add_days(i);
                 const [y, m, n] = [d.get_year(), d.get_month(), d.get_day_of_month()];
@@ -603,11 +646,13 @@ class TodavIndicator extends PanelMenu.Button {
                     content.add_child(box);
                     marks.push([box, isToday]);
                 }
-                const classes = ['todav-day', isToday && 'today', dots && 'dotted'].filter(Boolean);
-                const day = new St.Button({child: content, style_class: classes.join(' '), can_focus: true, x_align: CENTER});
+                const key = dayKey(d);
+                const classes = ['todav-day', isToday && 'today', dots && 'dotted', key === this._selected && 'selected'];
+                const day = new St.Button({child: content, style_class: classes.filter(Boolean).join(' '), can_focus: true, x_align: CENTER});
                 if (m !== first.get_month())
                     day.opacity = DIM;
-                day.connect('clicked', () => this._open(p => p.ShowDayAsync(dayKey(d))));
+                buttons.set(key, day);
+                day.connect('clicked', () => this._dayClicked(key, buttons));
                 layout.attach(day, i % 7, 1 + Math.floor(i / 7), 1, 1);
             }
             if (!dots)
