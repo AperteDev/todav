@@ -1,6 +1,7 @@
 // Todav panel indicator: a list's tasks and a month calendar, read through the app's D-Bus API;
-// clicking one opens Todav there. Holds no state and does no networking of its own. Its options
-// are app settings (Todav's Preferences → Extension), synced like the rest.
+// clicking one opens Todav there. Each part shows in its own menu, in GNOME's clock menu (in
+// place of its calendar and events) or nowhere. Holds no state and does no networking of its
+// own. Its options are app settings (Todav's Preferences → Extension), synced like the rest.
 
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
@@ -123,6 +124,81 @@ class TodavIndicator extends PanelMenu.Button {
             }
         });
         this._placeholder(_('Starting…'));
+        // With nothing in its own menu but something in the clock menu, the icon opens that.
+        const toggle = this.menu.toggle.bind(this.menu);
+        this.menu.toggle = () => (this._toClock ? this._dateMenu.menu.toggle() : toggle());
+        this._clockSetup();
+    }
+
+    /// GNOME's clock menu: a place for the month next to its calendar, one for the agenda and the
+    /// task list after its events. Its parts are private: when they are gone, nothing goes there.
+    _clockSetup() {
+        const dateMenu = Main.panel.statusArea.dateMenu;
+        const calendar = dateMenu?._calendar;
+        const events = dateMenu?._eventsItem;
+        if (!calendar?.get_parent() || !events?.get_parent())
+            return;
+        this._dateMenu = dateMenu;
+        this._clockMonth = new St.Bin({style_class: 'todav-clock-month', x_expand: true, visible: false});
+        calendar.get_parent().insert_child_above(this._clockMonth, calendar);
+        this._clockBox = new St.BoxLayout({orientation: VERTICAL, x_expand: true});
+        events.get_parent().insert_child_above(this._clockBox, events);
+        this._clockOpenId = dateMenu.menu.connect('open-state-changed', (_menu, open) => {
+            if (!open)
+                return;
+            this._choosing = false;
+            this._clockRebuild().catch(e => logError(e, 'Todav: cannot fill the clock menu'));
+        });
+    }
+
+    /// Swap GNOME's calendar and events for ours as the options say (`true` restores them).
+    _clockPlace(clock) {
+        if (!this._dateMenu)
+            return;
+        const {_calendar: calendar, _eventsItem: events} = this._dateMenu;
+        calendar.visible = !clock('month');
+        this._clockMonth.visible = clock('month');
+        // The events section shows itself again as calendars change: out of the menu instead.
+        const box = this._clockBox.get_parent();
+        if (clock('agenda') && events.get_parent() === box)
+            box.remove_child(events);
+        else if (!clock('agenda') && !events.get_parent())
+            box.insert_child_below(events, this._clockBox);
+    }
+
+    /// The parts set to the clock menu, as they are now. Only from a running app: opening the
+    /// clock menu doesn't start it (it starts with the session).
+    async _clockRebuild() {
+        if (!this._dateMenu || !this._proxy?.g_name_owner)
+            return;
+        const data = await this._load();
+        const {on, clock} = data;
+        const card = children => {
+            const box = new St.BoxLayout({orientation: VERTICAL, style_class: 'events-button todav-clock-card'});
+            children.forEach(c => box.add_child(c));
+            return box;
+        };
+        const cards = [];
+        const event = clock('add_event') && entry(_('Add an event…'), text => this._open(p => p.NewEventAsync(text)));
+        if (clock('agenda') || event)
+            cards.push(card([clock('agenda') && await this._agenda(), event].filter(Boolean)));
+        if (clock('tasks') || clock('add_task'))
+            cards.push(card([await this._tasksColumn(data, clock)]));
+        this._month = null;
+        this._clockMonth.child = clock('month') ? this._monthView(on('month_dots')) : null;
+        this._clockBox.destroy_all_children();
+        cards.forEach(c => this._clockBox.add_child(c));
+    }
+
+    /// The icon on the right, or in the middle after the clock (`ext_icon`).
+    _placeIcon(where) {
+        const box = where === 'center' ? Main.panel._centerBox : Main.panel._rightBox;
+        const parent = this.container.get_parent();
+        if (!box || !parent || parent === box)
+            return;
+        parent.remove_child(this.container);
+        const clock = box.get_children().indexOf(this._dateMenu?.container);
+        box.insert_child_at_index(this.container, where === 'center' ? clock + 1 : 0);
     }
 
     _updateState() {
@@ -130,7 +206,8 @@ class TodavIndicator extends PanelMenu.Button {
         this._warning.visible = state.startsWith('error:');
     }
 
-    /// The options, the lists and the one shown (`ext_list`, else the first).
+    /// The options, the lists and the one shown (`ext_list`, else the first); the parts and the
+    /// icon go where the options say. A part is `true` (in this menu), `clock` or `false`.
     async _load() {
         const [[settings], [lists]] = await Promise.all([
             this._proxy.GetSettingsAsync(),
@@ -138,7 +215,15 @@ class TodavIndicator extends PanelMenu.Button {
         ]);
         const pinned = lists.find(l => l[0] === settings.ext_list) ?? lists[0];
         this._count.text = pinned && pinned[2] > 0 ? `${pinned[2]}` : '';
-        return {on: key => settings[`ext_${key}`] !== 'false', settings, lists, pinned};
+        // Without a clock menu to go in, its parts stay here.
+        const at = key => settings[`ext_${key}`];
+        const clock = key => Boolean(this._dateMenu) && at(key) === 'clock';
+        const on = key => at(key) === 'true' || (at(key) === 'clock' && !this._dateMenu);
+        this._clockPlace(clock);
+        const parts = ['tasks', 'add_task', 'month', 'agenda', 'add_event'];
+        this._toClock = !on('open') && !parts.some(on) && parts.some(clock);
+        this._placeIcon(settings.ext_icon);
+        return {on, clock, settings, lists, pinned};
     }
 
     async _refreshCount() {
@@ -176,6 +261,7 @@ class TodavIndicator extends PanelMenu.Button {
     /// says "is ready" rather than raise a window on a D-Bus call); asked by us, it is raised.
     _open(call) {
         this.menu.close();
+        this._dateMenu?.menu.close();
         const id = global.display.connect('window-demands-attention', (_display, window) => {
             if (window.get_wm_class()?.startsWith(BUS_NAME))
                 Main.activateWindow(window);
@@ -225,12 +311,17 @@ class TodavIndicator extends PanelMenu.Button {
             open.connect('activate', () => this._open(p => p.ShowListAsync(pinned?.[0] ?? '')));
             this.menu.addMenuItem(open);
         }
-        if (!tasks && !calendar && !on('open'))
+        if (this._toClock && this.menu.isOpen) {
+            this.menu.close();
+            this._dateMenu.menu.open();
+        } else if (!tasks && !calendar && !on('open')) {
             this._placeholder(_('Everything is turned off in Todav’s Preferences'));
+        }
     }
 
-    /// The list's tasks, or (its header clicked) the lists to pick another; then a field to add one.
-    async _tasksColumn({on, lists, pinned}) {
+    /// The list's tasks, or (its header clicked) the lists to pick another; then a field to add
+    /// one. `has` tells whether those two go here.
+    async _tasksColumn({on, lists, pinned}, has = on) {
         const col = new St.BoxLayout({style_class: 'todav-column', orientation: VERTICAL, x_expand: true});
         if (!pinned) {
             col.add_child(label(_('No task lists — sign in in Todav'), 'todav-empty'));
@@ -253,7 +344,7 @@ class TodavIndicator extends PanelMenu.Button {
                 await this._fillTasks(content, href, on('subtasks'));
             body.child = content;
         };
-        if (on('tasks')) {
+        if (has('tasks')) {
             const arrow = new St.Icon({icon_name: 'pan-down-symbolic', style_class: 'todav-arrow'});
             const header = row([dot(color), label(name, 'todav-header-name', {x_expand: true}), arrow], 'todav-row todav-header');
             header.accessible_name = _('%s, choose another list').replace('%s', name);
@@ -266,10 +357,10 @@ class TodavIndicator extends PanelMenu.Button {
             col.add_child(body);
             await fill();
         }
-        if (on('add_task')) {
+        if (has('add_task')) {
             addAtBottom(col, entry(_('Add a task…'), text => {
                 this._proxy.AddTaskAsync(href, text)
-                    .then(() => on('tasks') && !this._choosing && fill())
+                    .then(() => has('tasks') && !this._choosing && fill())
                     .catch(e => logError(e, 'Todav: AddTask failed'));
             }));
         }
@@ -283,7 +374,7 @@ class TodavIndicator extends PanelMenu.Button {
         item.connect('clicked', () => {
             this._choosing = false;
             this._proxy.SetSettingAsync('ext_list', href)
-                .then(() => this._rebuild())
+                .then(() => (this._dateMenu?.menu.isOpen ? this._clockRebuild() : this._rebuild()))
                 .catch(e => logError(e, 'Todav: cannot pick the list'));
         });
         return item;
@@ -465,6 +556,12 @@ class TodavIndicator extends PanelMenu.Button {
 
     destroy() {
         this._destroyed = true;
+        if (this._dateMenu) {
+            this._clockPlace(() => false);
+            this._dateMenu.menu.disconnect(this._clockOpenId);
+            this._clockMonth.destroy();
+            this._clockBox.destroy();
+        }
         if (this._proxy) {
             this._proxy.disconnectSignal(this._signalId);
             this._proxy.disconnect(this._propsId);

@@ -26,9 +26,11 @@ pub fn apply_color_scheme() {
 }
 
 /// The GNOME extension's options (Preferences → Extension, synced like the rest) with their
-/// defaults; it reads them over D-Bus. `ext_list` is the list it shows (empty: the first).
-pub const EXTENSION: [(&str, &str); 10] = [
+/// defaults; it reads them over D-Bus. `ext_list` is the list it shows (empty: the first). A part
+/// (`EXTENSION_PARTS`) is in its own menu (`true`), the clock menu (`clock`) or not shown.
+pub const EXTENSION: [(&str, &str); 11] = [
     ("ext_columns", "double"),
+    ("ext_icon", "right"),
     ("ext_tasks", "true"),
     ("ext_subtasks", "true"),
     ("ext_add_task", "true"),
@@ -38,6 +40,13 @@ pub const EXTENSION: [(&str, &str); 10] = [
     ("ext_add_event", "true"),
     ("ext_open", "true"),
     ("ext_list", ""),
+];
+const EXTENSION_PARTS: [&str; 5] = [
+    "ext_tasks",
+    "ext_add_task",
+    "ext_month",
+    "ext_agenda",
+    "ext_add_event",
 ];
 
 /// `EXTENSION` with this device's values.
@@ -231,14 +240,32 @@ pub fn present(parent: &adw::ApplicationWindow, page: Option<&str>) -> adw::Pref
     double.connect_active_notify(|d| {
         let _ = core().set_setting("double_click_edit".into(), d.is_active().to_string());
     });
-    // The extension: its switches carry the setting's name as their id.
+    // The extension: its rows carry the setting's name as their id. It hears of a change at
+    // once, to put its parts and icon where they now go.
+    let ext_changed = || crate::dbus::on_event(&crate::Event::Changed(String::new()));
     connect_choice(&b, "ext_columns", &["double", "single"]);
-    for (key, _) in EXTENSION.iter().filter(|(_, d)| *d == "true") {
+    connect_choice(&b, "ext_icon", &["right", "center"]);
+    for key in EXTENSION_PARTS {
+        connect_choice(&b, key, &["true", "clock", "false"]);
+        get::<adw::ComboRow>(&b, key).connect_selected_notify(move |_| ext_changed());
+    }
+    for key in ["ext_subtasks", "ext_month_dots", "ext_open"] {
         let row: adw::SwitchRow = get(&b, key);
-        row.set_active(core().setting((*key).into()).as_deref() != Some("false"));
+        row.set_active(core().setting(key.into()).as_deref() != Some("false"));
         row.connect_active_notify(move |r| {
-            let _ = core().set_setting((*key).into(), r.is_active().to_string());
+            let _ = core().set_setting(key.into(), r.is_active().to_string());
         });
+    }
+    get::<adw::ComboRow>(&b, "ext_icon").connect_selected_notify(move |_| ext_changed());
+    // Subtasks and dots only where the list and the month are shown.
+    for (part, option) in [
+        ("ext_tasks", "ext_subtasks"),
+        ("ext_month", "ext_month_dots"),
+    ] {
+        let (part, option): (adw::ComboRow, adw::SwitchRow) = (get(&b, part), get(&b, option));
+        let sync = move |p: &adw::ComboRow| option.set_sensitive(p.selected() != 2);
+        sync(&part);
+        part.connect_selected_notify(sync);
     }
     // Stars and pins, on unless turned off; the sidebar may gain or lose Important.
     for key in ["show_stars", "show_pins"] {

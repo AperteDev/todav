@@ -102,7 +102,8 @@ development:
   Starts with your session.
 - A **GNOME Shell extension** with the open-task count in the top bar and a menu showing a task
   list, a month calendar and the coming week's agenda; it can add tasks and events and opens the app
-  where you click.
+  where you click. Each part can go in GNOME's clock menu instead, in place of its calendar and
+  events.
 - Follows the system style (light/dark), adaptive layout for narrow windows and touchscreens,
   keyboard shortcuts.
 

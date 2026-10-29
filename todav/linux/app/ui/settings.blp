@@ -293,8 +293,8 @@ Adw.PreferencesDialog dialog {
     }
   }
 
-  // The GNOME Shell extension's panel menu (ids are the settings' names, see settings.rs
-  // EXTENSION).
+  // The GNOME Shell extension: its panel menu and what goes in the clock menu (ids are the
+  // settings' names, see settings.rs EXTENSION).
   Adw.PreferencesPage {
     name: "extension";
     title: _("Extension");
@@ -310,6 +310,11 @@ Adw.PreferencesDialog dialog {
         model: Gtk.StringList { strings [_("Two columns"), _("One column")] };
       }
 
+      Adw.ComboRow ext_icon {
+        title: _("Icon");
+        model: Gtk.StringList { strings [_("On the right"), _("Next to the clock")] };
+      }
+
       Adw.SwitchRow ext_open {
         title: _("“Open Todav” button");
       }
@@ -317,42 +322,47 @@ Adw.PreferencesDialog dialog {
 
     Adw.PreferencesGroup {
       title: _("Tasks");
+      description: _("In the clock menu they go under the events");
 
-      Adw.SwitchRow ext_tasks {
+      Adw.ComboRow ext_tasks {
         title: _("Task list");
+        model: Gtk.StringList { strings [_("Todav menu"), _("Clock menu"), _("Nowhere")] };
       }
 
       Adw.SwitchRow ext_subtasks {
         title: _("Subtasks");
-        sensitive: bind ext_tasks.active;
       }
 
-      Adw.SwitchRow ext_add_task {
+      Adw.ComboRow ext_add_task {
         title: _("Field for adding a task");
+        model: Gtk.StringList { strings [_("Todav menu"), _("Clock menu"), _("Nowhere")] };
       }
     }
 
     Adw.PreferencesGroup {
       title: _("Calendar");
+      description: _("In the clock menu they take the place of GNOME’s calendar and events");
 
-      Adw.SwitchRow ext_month {
+      Adw.ComboRow ext_month {
         title: _("Month calendar");
+        model: Gtk.StringList { strings [_("Todav menu"), _("Clock menu"), _("Nowhere")] };
       }
 
       Adw.SwitchRow ext_month_dots {
         title: _("Dots in the month");
         subtitle: _("Mark the days that have events or tasks");
-        sensitive: bind ext_month.active;
       }
 
-      Adw.SwitchRow ext_agenda {
+      Adw.ComboRow ext_agenda {
         title: _("Agenda");
         subtitle: _("Events and tasks of the coming week, under the month");
+        model: Gtk.StringList { strings [_("Todav menu"), _("Clock menu"), _("Nowhere")] };
       }
 
-      Adw.SwitchRow ext_add_event {
+      Adw.ComboRow ext_add_event {
         title: _("Field for adding an event");
         subtitle: _("Opens a new event in Todav with the title typed");
+        model: Gtk.StringList { strings [_("Todav menu"), _("Clock menu"), _("Nowhere")] };
       }
     }
   }

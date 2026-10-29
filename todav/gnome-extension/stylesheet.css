@@ -8,7 +8,8 @@
 /* The menu: dense rows, two columns of about the same width. */
 .todav-item { padding: 6px 8px; }
 .todav-columns { spacing: 10px; }
-.todav-column { spacing: 2px; width: 270px; }
+.todav-column { spacing: 2px; }
+.todav-columns > .todav-column { width: 270px; }
 .todav-vsep { width: 1px; background-color: rgba(128, 128, 128, 0.25); }
 .todav-hsep { height: 1px; margin: 6px 0; background-color: rgba(128, 128, 128, 0.25); }
 .todav-scroll { max-height: 380px; }
@@ -52,3 +53,7 @@
 .todav-day-dots { spacing: 2px; height: 4px; margin-top: 1px; }
 .todav-day-dot { width: 4px; height: 4px; border-radius: 99px; }
 .todav-day.today .todav-day-dot { background-color: -st-accent-fg-color; }
+
+/* In GNOME's clock menu: the month where its calendar was, the rest in cards like its own. */
+.todav-clock-month { padding: 0 0.818em; margin: 4px; }
+.todav-clock-card { spacing: 2px; }

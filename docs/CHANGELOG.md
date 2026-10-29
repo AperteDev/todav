@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Extension: each part (the task list, the month, the agenda, the fields for adding a task and
+  an event) can go in GNOME's clock menu, the month in place of its calendar and the agenda in
+  place of its events, with the task list under them; Preferences → Extension says where. Its
+  icon can sit in the middle of the top bar, after the clock; with nothing left in its own
+  menu, it opens the clock menu.
+
 ## [2.1.0] - 2026-10-28
 
 ### Added
