@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Todav\n"
 "Report-Msgid-Bugs-To: https://github.com/AperteDev/todav/issues\n"
-"POT-Creation-Date: 2026-10-29 12:28+0100\n"
+"POT-Creation-Date: 2026-10-29 12:32+0100\n"
 "PO-Revision-Date: 2026-10-22 21:00+0200\n"
 "Last-Translator: \n"
 "Language-Team: German\n"
@@ -21,7 +21,7 @@ msgstr ""
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:67
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:246
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TaskPage.kt:174
-#: todav/gnome-extension/extension.js:453 todav/linux/app/ui/shortcuts.blp:65
+#: todav/linux/app/ui/shortcuts.blp:65
 msgid "New Task"
 msgstr "Neue Aufgabe"
 
@@ -45,7 +45,6 @@ msgstr "Als erledigt markieren"
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/EventPage.kt:175
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/EventPage.kt:226
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:196
-#: todav/gnome-extension/extension.js:605
 #: todav/linux/app/src/calendar/dialog.rs:88
 #: todav/linux/app/src/calendar/dialog.rs:386
 #: todav/linux/app/ui/shortcuts.blp:79
@@ -157,7 +156,7 @@ msgstr "Tag"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:254
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Widget.kt:329
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:446
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:454
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:169
 msgid "Settings"
 msgstr "Einstellungen"
@@ -1060,11 +1059,11 @@ msgstr "Alle wieder öffnen"
 msgid "Only This Task"
 msgstr "Nur diese Aufgabe"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:438
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:446
 msgid "New Calendar…"
 msgstr "Neuer Kalender…"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:438
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:446
 msgid "New List…"
 msgstr "Neue Liste …"
 
@@ -2267,6 +2266,10 @@ msgstr "%s, andere Liste wählen"
 msgid "Choose a list"
 msgstr "Liste auswählen"
 
+#: todav/gnome-extension/extension.js:453
+msgid "New Task…"
+msgstr "Neue Aufgabe…"
+
 #: todav/gnome-extension/extension.js:455
 msgid "Add a task…"
 msgstr "Aufgabe hinzufügen …"
@@ -2281,6 +2284,10 @@ msgstr[1] "+ %d weitere"
 #: todav/gnome-extension/extension.js:560
 msgid "Nothing planned"
 msgstr "Nichts geplant"
+
+#: todav/gnome-extension/extension.js:605
+msgid "New Event…"
+msgstr "Neuer Termin…"
 
 #: todav/gnome-extension/extension.js:606
 msgid "Add an event…"
@@ -3033,7 +3040,8 @@ msgstr "Termine hinzufügen"
 
 #: todav/linux/app/ui/settings.blp:529
 msgid "A new event in Todav, on the day picked; a field gives its title"
-msgstr "Ein neuer Termin in Todav, am gewählten Tag; ein Feld gibt seinen Titel"
+msgstr ""
+"Ein neuer Termin in Todav, am gewählten Tag; ein Feld gibt seinen Titel"
 
 #: todav/linux/app/ui/shortcuts.blp:26
 msgid "Show Tasks"

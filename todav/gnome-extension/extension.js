@@ -80,9 +80,9 @@ function entry(hint, done) {
     return e;
 }
 
-/// A button the width of its column, in place of a field: `done` on a click.
+/// In place of a field, a flat row reading as a link: `done` on a click.
 function button(text, done) {
-    const b = new St.Button({label: text, can_focus: true, x_expand: true, style_class: 'button todav-add'});
+    const b = row([label(text, 'todav-add-label')], 'todav-row todav-add');
     b.connect('clicked', done);
     return b;
 }
@@ -450,7 +450,7 @@ class TodavIndicator extends PanelMenu.Button {
         }
         if (has('add_task') && this._buttons?.task) {
             // An app without NewTask shows the list.
-            addAtBottom(col, button(_('New Task'), () => this._open(p => p.NewTaskAsync(href).catch(() => p.ShowListAsync(href)))));
+            addAtBottom(col, button(_('New Task…'), () => this._open(p => p.NewTaskAsync(href).catch(() => p.ShowListAsync(href)))));
         } else if (has('add_task')) {
             addAtBottom(col, entry(_('Add a task…'), text => {
                 this._proxy.AddTaskAsync(href, text)
@@ -602,7 +602,7 @@ class TodavIndicator extends PanelMenu.Button {
     /// How an event is added: a button opening a new one, or a field giving its title.
     _eventAdder() {
         return this._buttons?.event
-            ? button(_('New Event'), () => this._newEvent(''))
+            ? button(_('New Event…'), () => this._newEvent(''))
             : entry(_('Add an event…'), text => this._newEvent(text));
     }
 
