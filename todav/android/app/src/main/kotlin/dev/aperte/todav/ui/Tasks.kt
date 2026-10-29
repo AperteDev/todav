@@ -365,6 +365,20 @@ private fun TaskList(model: Main, screen: Screen, state: LazyListState, padding:
     }
 
     /**
+     * Off every row (the gap, its own place, past the end): not into the row it left, which
+     * would hold on as the finger moved down off it, but below it, in the same gap; or nowhere.
+     */
+    fun leftRows(d: Drag) {
+        val t = d.target?.takeIf { it.mode == 0 } ?: return
+        val row = t.row ?: return
+        val (ts, ds) = (row.slot ?: return) to (d.row.slot ?: return)
+        val ok = core.canDrop(d.row.task, ds, row.task, ts) &&
+            !dev.aperte.todav.core.staysPut(d.row.task, ds, row.task, ts, false)
+        d.target = if (ok) t.copy(mode = 1) else null
+        if (!ok) d.sorted = core.needsManual(d.row.task, ds, row.task, ts)
+    }
+
+    /**
      * Where `d` would land with the finger where it is: the item under it as drawn (moved aside
      * or not), by thirds: the top one above it, the bottom one below it, the middle one into it.
      * Over the gap itself nothing changes; an item moving aside moves out from under the finger,
@@ -374,7 +388,7 @@ private fun TaskList(model: Main, screen: Screen, state: LazyListState, padding:
         val item = state.layoutInfo.visibleItemsInfo.firstOrNull {
             val top = it.offset + shift(d, it.key as? String ?: "")
             it.key != d.key && d.y >= top && d.y < top + it.size
-        } ?: return
+        } ?: return leftRows(d)
         val key = item.key as? String ?: return
         d.sorted = false
         val (t, g) = when (val what = rows[key]) {
