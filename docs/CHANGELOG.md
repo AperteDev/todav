@@ -9,10 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Android: a sort button next to Search on the task page, picking the task order as Settings →
-  Tasks → Sort does.
-- Linux: a sort button next to Search on the task page, picking the task order as Preferences →
-  Tasks → Sort does.
+- A sort button next to Search on the task page picks the task order. Settings → Tasks → Sort
+  is now Sort at start: the last used (the default, so the order picked last stays), or one the
+  app sorts by whenever it opens.
 - Linux: a task's context menu in "To Plan" can delete it too (with Undo), next to Edit….
 - Settings → General → Default App → Calendar: the system's calendar app, with a button making
   it Todav. On Linux it does so at once (the app opening calendar files, which GNOME takes as

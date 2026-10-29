@@ -227,16 +227,29 @@ fn connect_choice(b: &gtk::Builder, key: &'static str, values: &'static [&'stati
 
 /// Tie a "Sort" row to its "Add new …" row: sorting by creation date shows (and locks) where
 /// new items go; manual and due date sorting let the user pick (by due date: among the undated
-/// ones). `hint` is the "Add new …" subtitle when the user picks.
+/// ones). `hint` is the "Add new …" subtitle when the user picks. Tasks pick their sort at start
+/// (`start_task_sort`), the last used first, which the header's sort menu sets; picking one
+/// sorts by it now too.
 fn connect_order(b: &gtk::Builder, which: &'static str, hint: Option<&'static str>) {
     let (sort_key, new_key) = (format!("{which}_sort"), format!("{which}_new"));
     let sort: adw::ComboRow = get(b, &sort_key);
     let new: adw::ComboRow = get(b, &new_key);
+    let at_start = which == "task";
+    // The sort the row means, in `prefs::SORTS`: for "Last used", the one in use.
+    let picked = {
+        let sort_key = sort_key.clone();
+        move |row: u32| match (at_start, row) {
+            (true, 0) => prefs::sort_index(core(), &sort_key),
+            (true, i) => i as usize - 1,
+            (false, i) => i as usize,
+        }
+    };
     let show = {
         let (sort, new, new_key) = (sort.clone(), new.clone(), new_key.clone());
         move || {
-            let manual = !matches!(sort.selected(), 1 | 2);
-            let start = match sort.selected() {
+            let i = picked(sort.selected());
+            let manual = !matches!(i, 1 | 2);
+            let start = match i {
                 1 => true,
                 2 => false,
                 _ => core().setting(new_key.clone()).as_deref() == Some("start"),
@@ -250,13 +263,28 @@ fn connect_order(b: &gtk::Builder, which: &'static str, hint: Option<&'static st
             });
         }
     };
-    sort.set_selected(prefs::sort_index(core(), &sort_key) as u32);
+    sort.set_selected(if at_start {
+        let v = core().setting("start_task_sort".into()).unwrap_or_default();
+        prefs::SORTS
+            .iter()
+            .position(|(s, _)| *s == v)
+            .map_or(0, |i| i + 1) as u32
+    } else {
+        prefs::sort_index(core(), &sort_key) as u32
+    });
     show();
     sort.connect_selected_notify(move |s| {
-        let _ = core().set_setting(
-            sort_key.clone(),
-            prefs::SORTS[s.selected() as usize].0.into(),
-        );
+        let i = s.selected() as usize;
+        if at_start {
+            let v = i.checked_sub(1).map_or("last", |i| prefs::SORTS[i].0);
+            let _ = core().set_setting("start_task_sort".into(), v.into());
+        }
+        if !at_start || i > 0 {
+            let _ = core().set_setting(
+                sort_key.clone(),
+                prefs::SORTS[i - at_start as usize].0.into(),
+            );
+        }
         show();
         crate::window::refresh();
     });

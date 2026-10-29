@@ -585,7 +585,7 @@ private fun TaskList(model: Main, screen: Screen, state: LazyListState, padding:
             contentColor = MaterialTheme.colorScheme.inverseOnSurface,
             shadowElevation = 4.dp,
         ) {
-            Text(tr("To reorder, set Sort to Manual in Settings"), Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+            Text(tr("To reorder, set Sort to Manual"), Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
         }
     }
 }

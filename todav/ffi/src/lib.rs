@@ -694,6 +694,12 @@ impl Todav {
         todav_app::prefs::sort_index(self.c(), &key) as u32
     }
 
+    /// On opening the app: the task sort picked for the start, unless it is the last used;
+    /// whether that changed it.
+    pub fn sort_at_start(&self) -> bool {
+        todav_app::prefs::sort_at_start(self.c())
+    }
+
     pub fn stars(&self) -> bool {
         todav_app::prefs::stars(self.c())
     }

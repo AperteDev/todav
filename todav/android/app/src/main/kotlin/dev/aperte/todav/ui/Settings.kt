@@ -533,7 +533,7 @@ private fun PushRow(model: Main) {
 @Composable
 private fun TaskSettings(model: Main) {
     Section(tr("Tasks")) {
-        OrderRows(model, "task", tr("Sort"), tr("Add new tasks"))
+        OrderRows(model, "task", tr("Sort at start"), tr("Add new tasks"))
         ChoiceRow(
             model, tr("Completed tasks"), "done_tasks", listOf("group", "in_place", "last"),
             listOf(tr("In a separate group"), tr("Keep in place"), tr("Move to the end")),
@@ -573,13 +573,22 @@ private fun TaskSettings(model: Main) {
 
 /**
  * A "Sort" row and its "Add new …" row: sorting by creation date sets (and locks) where new
- * items go; manual and due date sorting let the user pick.
+ * items go; manual and due date sorting let the user pick. Tasks pick their sort at start
+ * (`start_task_sort`), the last used first, which the task page's sort menu sets; picking one
+ * sorts by it now too.
  */
 @Composable
 private fun OrderRows(model: Main, which: String, sortTitle: String, newTitle: String) {
     val sort = setting(model, "${which}_sort")
     val index = SORTS.indexOf(sort).coerceAtLeast(0)
-    ChoiceRow(model, sortTitle, "${which}_sort", SORTS, sortNames())
+    if (which == "task") {
+        ChoiceRow(model, sortTitle, "start_task_sort", listOf("last") + SORTS, listOf(tr("Last used")) + sortNames()) { i ->
+            model.setSetting("start_task_sort", (listOf("last") + SORTS)[i])
+            if (i > 0) model.setSetting("task_sort", SORTS[i - 1])
+        }
+    } else {
+        ChoiceRow(model, sortTitle, "${which}_sort", SORTS, sortNames())
+    }
     val manual = index != 1 && index != 2
     val start = when (index) {
         1 -> true

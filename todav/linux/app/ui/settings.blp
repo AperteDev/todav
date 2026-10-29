@@ -139,8 +139,8 @@ Adw.PreferencesDialog dialog {
       title: _("Tasks");
 
       Adw.ComboRow task_sort {
-        title: _("Sort");
-        model: Gtk.StringList { strings [_("Manual"), _("Newest first"), _("Oldest first"), _("Due date, soonest first"), _("Due date, latest first"), _("Priority, highest first")] };
+        title: _("Sort at start");
+        model: Gtk.StringList { strings [_("Last used"), _("Manual"), _("Newest first"), _("Oldest first"), _("Due date, soonest first"), _("Due date, latest first"), _("Priority, highest first")] };
       }
 
       Adw.ComboRow task_new {

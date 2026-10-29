@@ -640,6 +640,7 @@ class Main(app: Application) : AndroidViewModel(app) {
                     if (it == "last") core.setting("calendar_mode") else it
                 }
                 calMode.value = CalMode.entries.firstOrNull { it.name.lowercase() == m } ?: CalMode.MONTH
+                if (core.sortAtStart()) todav.changed()
                 workDays.value = core.workDays()
                 expanded.value = core.expanded().toSet()
                 core.setting("sidebar_width")?.toFloatOrNull()?.let { sidebarWidth.value = it }

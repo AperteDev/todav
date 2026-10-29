@@ -20,6 +20,16 @@ pub fn sort_index(c: &Client, key: &str) -> usize {
     SORTS.iter().position(|(s, _)| *s == v).unwrap_or(0)
 }
 
+/// On opening the app: the task sort picked in `start_task_sort`, unless that is the last used
+/// (the default), which `task_sort` keeps. Stored only when it changes, so as not to sync it
+/// again; whether it did.
+pub fn sort_at_start(c: &Client) -> bool {
+    let start = c.setting("start_task_sort".into()).unwrap_or_default();
+    SORTS.iter().any(|(s, _)| *s == start)
+        && c.setting("task_sort".into()).as_deref() != Some(&start)
+        && c.set_setting("task_sort".into(), start).is_ok()
+}
+
 /// Where tasks show up and where new ones go; date sorting decides the latter.
 pub struct Order {
     pub tasks: Sort,
@@ -271,6 +281,25 @@ pub fn set_expanded(c: &Client, uid: &str, open: bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sort_at_start_keeps_the_last_used_unless_one_is_picked() {
+        let dir = std::env::temp_dir().join(format!("todav-app-sort-{}", std::process::id()));
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let sort = || c.setting("task_sort".into());
+        c.set_setting("task_sort".into(), "newest".into()).unwrap();
+        sort_at_start(&c);
+        assert_eq!(sort().as_deref(), Some("newest"), "last used by default");
+        c.set_setting("start_task_sort".into(), "last".into())
+            .unwrap();
+        sort_at_start(&c);
+        assert_eq!(sort().as_deref(), Some("newest"));
+        c.set_setting("start_task_sort".into(), "priority".into())
+            .unwrap();
+        sort_at_start(&c);
+        assert_eq!(sort().as_deref(), Some("priority"));
+        let _ = std::fs::remove_dir_all(dir);
+    }
 
     #[test]
     fn expanded_tasks_are_kept_until_closed_or_gone() {

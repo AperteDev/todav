@@ -795,6 +795,7 @@ fn build(app: &adw::Application) -> Rc<Ui> {
     let views = get(&b, "views");
     connect_search(&ui, &get(&b, "task_search"), &get(&b, "task_query"), &views);
     crate::calendar::build(&views, &ui.split);
+    let _ = prefs::sort_at_start(core());
     ui
 }
 
@@ -2369,9 +2370,8 @@ fn connect_dnd(
             // Refused only for the sort: say why, as nothing marks the place.
             if !ok && !ui.told_sort.get() && tasks::needs_manual(core(), d, ds, &target, &s) {
                 ui.told_sort.set(true);
-                ui.toasts.add_toast(note(&gettext(
-                    "To reorder, set Sort to Manual in Preferences",
-                )));
+                ui.toasts
+                    .add_toast(note(&gettext("To reorder, set Sort to Manual")));
             }
             ok
         })
