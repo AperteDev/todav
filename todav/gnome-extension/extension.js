@@ -80,6 +80,13 @@ function entry(hint, done) {
     return e;
 }
 
+/// A button the width of its column, in place of a field: `done` on a click.
+function button(text, done) {
+    const b = new St.Button({label: text, can_focus: true, x_expand: true, style_class: 'button todav-add'});
+    b.connect('clicked', done);
+    return b;
+}
+
 const Indicator = GObject.registerClass(
 class TodavIndicator extends PanelMenu.Button {
     _init(path) {
@@ -218,7 +225,7 @@ class TodavIndicator extends PanelMenu.Button {
             return box;
         };
         const cards = [];
-        const event = clock('add_event') && entry(_('Add an event…'), text => this._newEvent(text));
+        const event = clock('add_event') && this._eventAdder();
         if (clock('agenda') || event)
             cards.push(card([clock('agenda') && await this._agenda(), event].filter(Boolean)));
         if (clock('tasks') || clock('add_task'))
@@ -301,6 +308,8 @@ class TodavIndicator extends PanelMenu.Button {
         const on = key => at(key) === 'true' || (at(key) === 'clock' && !this._dateMenu);
         // A task or an event clicked opens its editor, else its place in Todav.
         this._edit = {tasks: on('edit_tasks'), events: on('edit_events')};
+        // Adding a task or an event with a button opening Todav, else a field (`ext_add_*_kind`).
+        this._buttons = {task: at('add_task_kind') === 'button', event: at('add_event_kind') === 'button'};
         this._clockPlace(clock);
         // With none of them in its menu, no icon (until then it shows, to say what is missing).
         this.container.visible = ['tasks', 'add_task', 'month', 'agenda', 'add_event'].some(on);
@@ -439,7 +448,10 @@ class TodavIndicator extends PanelMenu.Button {
             col.add_child(body);
             await fill();
         }
-        if (has('add_task')) {
+        if (has('add_task') && this._buttons?.task) {
+            // An app without NewTask shows the list.
+            addAtBottom(col, button(_('New Task'), () => this._open(p => p.NewTaskAsync(href).catch(() => p.ShowListAsync(href)))));
+        } else if (has('add_task')) {
             addAtBottom(col, entry(_('Add a task…'), text => {
                 this._proxy.AddTaskAsync(href, text)
                     .then(() => has('tasks') && !this._choosing && fill())
@@ -507,7 +519,7 @@ class TodavIndicator extends PanelMenu.Button {
         if (on('agenda'))
             col.add_child(await this._agenda());
         if (on('add_event'))
-            addAtBottom(col, entry(_('Add an event…'), text => this._newEvent(text)));
+            addAtBottom(col, this._eventAdder());
         return col;
     }
 
@@ -585,6 +597,13 @@ class TodavIndicator extends PanelMenu.Button {
         const edit = uid && this._edit?.[task ? 'tasks' : 'events'];
         item.connect('clicked', () => this._open(p => (edit ? p.EditItemAsync(uid, task, start) : p.ShowDayAsync(day))));
         return item;
+    }
+
+    /// How an event is added: a button opening a new one, or a field giving its title.
+    _eventAdder() {
+        return this._buttons?.event
+            ? button(_('New Event'), () => this._newEvent(''))
+            : entry(_('Add an event…'), text => this._newEvent(text));
     }
 
     /// A new event titled `text` in Todav: on the day picked in the month, else today. An app

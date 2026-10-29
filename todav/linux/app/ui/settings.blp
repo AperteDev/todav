@@ -490,9 +490,11 @@ Adw.PreferencesDialog dialog {
         subtitle: _("A task clicked opens for editing; otherwise Todav shows it in its list");
       }
 
-      Adw.ComboRow ext_add_task {
-        title: _("Field for adding a task");
-        model: Gtk.StringList { strings [_("Todav menu"), _("Clock menu"), _("Nowhere")] };
+      // With the task list, wherever it is (settings.rs, sync_adds).
+      Adw.ComboRow ext_add_task_kind {
+        title: _("Adding tasks");
+        subtitle: _("A field adds one to the list shown; a button opens Todav to add one");
+        model: Gtk.StringList { strings [_("Field"), _("Button"), _("None")] };
       }
     }
 
@@ -521,10 +523,11 @@ Adw.PreferencesDialog dialog {
         model: Gtk.StringList { strings [_("Todav menu"), _("Clock menu"), _("Nowhere")] };
       }
 
-      Adw.ComboRow ext_add_event {
-        title: _("Field for adding an event");
-        subtitle: _("Opens a new event in Todav with the title typed");
-        model: Gtk.StringList { strings [_("Todav menu"), _("Clock menu"), _("Nowhere")] };
+      // With the agenda, else the month (settings.rs, sync_adds).
+      Adw.ComboRow ext_add_event_kind {
+        title: _("Adding events");
+        subtitle: _("A new event in Todav, on the day picked; a field gives its title");
+        model: Gtk.StringList { strings [_("Field"), _("Button"), _("None")] };
       }
     }
   }

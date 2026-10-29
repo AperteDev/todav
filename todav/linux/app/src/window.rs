@@ -545,6 +545,17 @@ fn expand(ui: &Ui, uid: &str, open: bool) {
     prefs::set_expanded(core(), uid, open);
 }
 
+/// The Tasks page on the list `href`, in the entry adding tasks (the extension's New Task).
+pub fn new_task_in(href: &str) {
+    if let Some(app) = gio::Application::default().and_downcast::<adw::Application>() {
+        present(&app); // builds the window when running in the background
+    }
+    let Some(ui) = ui() else { return };
+    let _ = WidgetExt::activate_action(&ui.window, "win.page", Some(&"tasks".to_variant()));
+    show_list(href);
+    ui.entry.grab_focus();
+}
+
 /// The Tasks page on task `uid`'s list, its row in view and pulsing once (from the extension):
 /// its parents open, a category filter or search that hides it gone.
 pub fn show_task(uid: &str) {

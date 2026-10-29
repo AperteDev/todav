@@ -29,7 +29,9 @@ pub fn apply_color_scheme() {
 /// defaults; it reads them over D-Bus. `ext_list` is the list it shows (empty: the first). A part
 /// (`EXTENSION_PARTS`) is in its own menu (`true`), the clock menu (`clock`) or not shown.
 /// `ext_edit_*`: a task or event clicked opens its editor, else its place in Todav.
-pub const EXTENSION: [(&str, &str); 15] = [
+/// `ext_add_*_kind`: adding a task or an event with a `field`, a `button` (opening Todav) or
+/// `none`; `ext_add_*`, where (`sync_adds`).
+pub const EXTENSION: [(&str, &str); 17] = [
     ("ext_columns", "double"),
     ("ext_order", "tasks"),
     ("ext_icon", "center"),
@@ -44,15 +46,35 @@ pub const EXTENSION: [(&str, &str); 15] = [
     ("ext_open", "true"),
     ("ext_edit_tasks", "false"),
     ("ext_edit_events", "false"),
+    ("ext_add_task_kind", "field"),
+    ("ext_add_event_kind", "field"),
     ("ext_list", ""),
 ];
-const EXTENSION_PARTS: [&str; 5] = [
-    "ext_tasks",
-    "ext_add_task",
-    "ext_month",
-    "ext_agenda",
-    "ext_add_event",
-];
+const EXTENSION_PARTS: [&str; 3] = ["ext_tasks", "ext_month", "ext_agenda"];
+
+/// How the extension adds a task and an event (`ext_add_*_kind`), as their rows' entries.
+const ADD_KINDS: [&str; 3] = ["field", "button", "none"];
+
+/// Put the ways of adding (`ext_add_task`, `ext_add_event`, which the extension reads) where
+/// their parts are: a task's with the task list, an event's with the agenda (else the month);
+/// nowhere when their kind is `none` or their part shows nowhere.
+fn sync_adds() {
+    let c = core();
+    let at = |key: &str| c.setting(key.into()).unwrap_or_else(|| "true".into());
+    let none = |key: &str| c.setting(key.into()).as_deref() == Some("none");
+    let task = if none("ext_add_task_kind") {
+        "false".into()
+    } else {
+        at("ext_tasks")
+    };
+    let event = match at("ext_agenda") {
+        _ if none("ext_add_event_kind") => "false".into(),
+        a if a == "false" => at("ext_month"),
+        a => a,
+    };
+    let _ = c.set_setting("ext_add_task".into(), task);
+    let _ = c.set_setting("ext_add_event".into(), event);
+}
 
 /// `EXTENSION` with this device's values.
 pub fn extension() -> Vec<(String, String)> {
@@ -79,19 +101,25 @@ fn connect_duration(b: &gtk::Builder, key: &'static str) {
 }
 
 /// Where the two ways of Preferences → Extension put `EXTENSION_PARTS`, as their rows' entries
-/// (0 its own menu, 1 the clock menu, 2 nowhere): all in its menu (`panel`), or the list, the
-/// month and the agenda in the clock menu, without the fields for adding (`clock`).
-const EXTENSION_PRESETS: [(&str, [u32; 5]); 2] = [("panel", [0; 5]), ("clock", [1, 2, 1, 1, 2])];
+/// (0 its own menu, 1 the clock menu, 2 nowhere), and how it adds tasks and events (`ADD_KINDS`):
+/// all in its menu with fields (`panel`), or in the clock menu with buttons (`clock`).
+const EXTENSION_PRESETS: [(&str, [u32; 3], u32); 2] = [("panel", [0; 3], 0), ("clock", [1; 3], 1)];
 
 /// Preferences → Extension's choice of where its parts go: one of `EXTENSION_PRESETS`, or each
 /// where its row says (`custom`: the rows shown, as they were). Stored in `ext_preset`; unset,
 /// the one the parts match.
 fn connect_ext_preset(b: &gtk::Builder) {
     let parts: Vec<adw::ComboRow> = EXTENSION_PARTS.iter().map(|k| get(b, k)).collect();
+    let adds: Vec<adw::ComboRow> = ["ext_add_task_kind", "ext_add_event_kind"]
+        .iter()
+        .map(|k| get(b, k))
+        .collect();
     let current = core().setting("ext_preset".into()).unwrap_or_else(|| {
         let at: Vec<u32> = parts.iter().map(|p| p.selected()).collect();
-        let preset = EXTENSION_PRESETS.iter().find(|(_, places)| at == places);
-        preset.map_or("custom", |(name, _)| name).into()
+        let preset = EXTENSION_PRESETS
+            .iter()
+            .find(|(_, places, kind)| at == places && adds.iter().all(|a| a.selected() == *kind));
+        preset.map_or("custom", |(name, ..)| name).into()
     });
     let panel: adw::PreferencesGroup = get(b, "ext_panel_group");
     // The groups' notes on the clock menu, only where the rows choosing it are shown.
@@ -116,22 +144,27 @@ fn connect_ext_preset(b: &gtk::Builder) {
         }
     });
     show(&current);
-    let choices = EXTENSION_PRESETS.iter().map(|(n, p)| (*n, Some(*p)));
-    for (name, places) in choices.chain([("custom", None)]) {
+    let choices = EXTENSION_PRESETS
+        .iter()
+        .map(|(n, p, k)| (*n, Some((*p, *k))));
+    for (name, preset) in choices.chain([("custom", None)]) {
         let check: gtk::CheckButton = get(b, &format!("ext_preset_{name}"));
         check.set_active(name == current);
-        let (parts, show) = (parts.clone(), show.clone());
+        let (parts, adds, show) = (parts.clone(), adds.clone(), show.clone());
         check.connect_toggled(move |c| {
             if !c.is_active() {
                 return;
             }
             let _ = core().set_setting("ext_preset".into(), name.into());
-            for (part, place) in parts.iter().zip(places.iter().flatten()) {
-                part.set_selected(*place);
+            if let Some((places, kind)) = preset {
+                for (part, place) in parts.iter().zip(places) {
+                    part.set_selected(place);
+                }
+                adds.iter().for_each(|a| a.set_selected(kind));
             }
             show(name);
         });
-        if places.is_some() {
+        if preset.is_some() {
             let picture: gtk::Button = get(b, &format!("ext_preset_{name}_picture"));
             picture.connect_clicked(move |_| check.set_active(true));
         }
@@ -362,7 +395,27 @@ pub fn present(parent: &adw::ApplicationWindow, page: Option<&str>) -> adw::Pref
     get::<adw::ComboRow>(&b, "ext_count").connect_selected_notify(move |_| ext_changed());
     for key in EXTENSION_PARTS {
         connect_choice(&b, key, &["true", "clock", "false"]);
-        get::<adw::ComboRow>(&b, key).connect_selected_notify(move |_| ext_changed());
+        get::<adw::ComboRow>(&b, key).connect_selected_notify(move |_| {
+            sync_adds();
+            ext_changed();
+        });
+    }
+    // Unset, a way of adding that was put nowhere (before there were kinds) is none.
+    for (key, place) in [
+        ("ext_add_task_kind", "ext_add_task"),
+        ("ext_add_event_kind", "ext_add_event"),
+    ] {
+        let row: adw::ComboRow = get(&b, key);
+        let kind = core().setting(key.into()).unwrap_or_else(|| {
+            let nowhere = core().setting(place.into()).as_deref() == Some("false");
+            (if nowhere { "none" } else { "field" }).into()
+        });
+        row.set_selected(ADD_KINDS.iter().position(|k| *k == kind).unwrap_or(0) as u32);
+        row.connect_selected_notify(move |r| {
+            let _ = core().set_setting(key.into(), ADD_KINDS[r.selected() as usize].into());
+            sync_adds();
+            ext_changed();
+        });
     }
     for key in [
         "ext_subtasks",
