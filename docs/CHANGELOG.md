@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Settings → General → Default App → Calendar: the system's calendar app, with a button making
+  it Todav. On Linux it does so at once (the app opening calendar files, which GNOME takes as
+  its calendar app; not in the Flatpak). On Android, which lets no app do that, the system asks
+  which app (Todav, then Always); another app's default is cleared first in its "Open by
+  default" settings, which the button opens.
 - Extension: its parts can go in GNOME's clock menu, the month in place of its calendar and the
   agenda in place of its events, with the task list under them. Preferences → Extension shows
   the two ways with pictures, Todav's icon with its own menu or the clock menu (without the

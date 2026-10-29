@@ -21,6 +21,11 @@
         </intent>
         <package android:name="com.nextcloud.client" />
         <package android:name="com.nextcloud.android.beta" />
+        <!-- The calendar apps, to name the default one (Settings → General → Default App). -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.APP_CALENDAR" />
+        </intent>
     </queries>
 
     <!-- No backup: the app passwords are encrypted with a key that stays on this device. -->

@@ -27,7 +27,7 @@ thread_local! {
     static PORTAL: RefCell<Option<gio::SignalSubscription>> = const { RefCell::new(None) };
 }
 
-fn flatpak() -> bool {
+pub fn flatpak() -> bool {
     std::path::Path::new("/.flatpak-info").exists()
 }
 

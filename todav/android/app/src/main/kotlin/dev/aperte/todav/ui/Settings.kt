@@ -1,7 +1,12 @@
 package dev.aperte.todav.ui
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
+import androidx.compose.material.icons.outlined.Check
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -326,6 +331,7 @@ private fun General(model: Main) {
             listOf(tr("Last used"), tr("Tasks"), tr("Calendar")),
         )
     }
+    Section(tr("Default App")) { DefaultCalendarRow(model) }
     Section(tr("Notifications")) {
         Item(
             headlineContent = { Text(tr("Notifications")) },
@@ -338,6 +344,64 @@ private fun General(model: Main) {
             },
         )
     }
+}
+
+/** What launchers and clocks open as the calendar app. */
+private val calendarApp = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CALENDAR)
+
+/** The default calendar app, or null when the system asks each time. */
+private fun defaultCalendar(context: Context): ActivityInfo? {
+    val pm = context.packageManager
+    val chosen = pm.resolveActivity(calendarApp, PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo ?: return null
+    // Without a default, the system's chooser answers, which is none of the calendar apps.
+    return chosen.takeIf { c -> pm.queryIntentActivities(calendarApp, 0).any { it.activityInfo.packageName == c.packageName } }
+}
+
+/**
+ * Default App → Calendar: the app named, a check when it is Todav, else a button doing what
+ * Android lets an app do (no app may make itself the default): with none yet, the system asks
+ * which (Todav, then Always); with another app's, that app's Open by default settings, to clear
+ * its defaults, and back from there, the system asks.
+ */
+@Composable
+private fun DefaultCalendarRow(model: Main) {
+    val context = LocalContext.current
+    var current by remember { mutableStateOf(defaultCalendar(context)) }
+    // Sent to clear another app's defaults.
+    var clearing by remember { mutableStateOf(false) }
+    // Read again on coming back from the system's question or settings.
+    LifecycleResumeEffect(Unit) {
+        current = defaultCalendar(context)
+        if (clearing && current == null) context.startActivity(calendarApp)
+        clearing = false
+        onPauseOrDispose {}
+    }
+    val ours = current?.packageName == context.packageName
+    Item(
+        headlineContent = { Text(tr("Calendar")) },
+        supportingContent = { Text(current?.loadLabel(context.packageManager)?.toString() ?: tr("None")) },
+        trailingContent = {
+            if (ours) {
+                Icon(Icons.Outlined.Check, null)
+            } else {
+                TextButton(onClick = {
+                    val other = current
+                    if (other == null) {
+                        context.startActivity(calendarApp)
+                    } else {
+                        val page = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            SystemSettings.ACTION_APP_OPEN_BY_DEFAULT_SETTINGS
+                        } else {
+                            SystemSettings.ACTION_APPLICATION_DETAILS_SETTINGS
+                        }
+                        model.messages.tryEmit(tr("Clear the default preferences there, then come back") to null)
+                        clearing = true
+                        context.startActivity(Intent(page, Uri.fromParts("package", other.packageName, null)))
+                    }
+                }) { Text(tr("Make Default")) }
+            }
+        },
+    )
 }
 
 @Composable

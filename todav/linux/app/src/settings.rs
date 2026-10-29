@@ -138,6 +138,48 @@ fn connect_ext_preset(b: &gtk::Builder) {
     }
 }
 
+/// Preferences → General → Default App → Calendar: the app opening calendar files, which GNOME
+/// takes as its calendar app (Settings → Default Apps, the clock menu's date), and a button
+/// making it Todav. Hidden in a Flatpak, whose sandbox neither sees nor sets the system's
+/// choice, and without Todav's desktop file (a build run).
+fn connect_default_app(b: &gtk::Builder) {
+    const TYPE: &str = "text/calendar";
+    let id = format!("{}.desktop", crate::APP_ID);
+    let ours = gio::AppInfo::all_for_type(TYPE)
+        .into_iter()
+        .find(|a| a.id().is_some_and(|i| i == id))
+        .filter(|_| !crate::update::flatpak());
+    let Some(ours) = ours else {
+        get::<adw::PreferencesGroup>(b, "default_app_group").set_visible(false);
+        return;
+    };
+    let (row, button, check): (adw::ActionRow, gtk::Button, gtk::Image) = (
+        get(b, "default_app"),
+        get(b, "make_default"),
+        get(b, "default_app_check"),
+    );
+    let shown = button.clone();
+    let show = move || {
+        let button = &shown;
+        let current = gio::AppInfo::default_for_type(TYPE, false);
+        let is_ours = current
+            .as_ref()
+            .and_then(|a| a.id())
+            .is_some_and(|i| i == id);
+        let name = current.map(|a| a.display_name().to_string());
+        row.set_subtitle(&name.unwrap_or_else(|| gettext("None")));
+        button.set_visible(!is_ours);
+        check.set_visible(is_ours);
+    };
+    show();
+    button.connect_clicked(move |_| {
+        if let Err(e) = ours.set_as_default_for_type(TYPE) {
+            eprintln!("Todav: cannot become the default calendar app: {e}");
+        }
+        show();
+    });
+}
+
 /// Bind a ComboRow to the setting `key`, one stored value per row entry (the first is the
 /// default); changes apply at once.
 fn connect_choice(b: &gtk::Builder, key: &'static str, values: &'static [&'static str]) {
@@ -265,6 +307,7 @@ pub fn present(parent: &adw::ApplicationWindow, page: Option<&str>) -> adw::Pref
         apply_color_scheme();
     });
     connect_choice(&b, "start_view", &["last", "tasks", "calendar"]);
+    connect_default_app(&b);
     connect_choice(
         &b,
         "start_calendar_view",

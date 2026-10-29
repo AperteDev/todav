@@ -46,6 +46,27 @@ Adw.PreferencesDialog dialog {
         model: Gtk.StringList { strings [_("Last used"), _("Tasks"), _("Calendar")] };
       }
     }
+
+    // The app opening calendar files, GNOME's default calendar app (see settings.rs).
+    Adw.PreferencesGroup default_app_group {
+      title: _("Default App");
+
+      // As in GNOME Settings' Default Apps: the subtitle names the app.
+      Adw.ActionRow default_app {
+        title: _("Calendar");
+
+        [suffix]
+        Gtk.Image default_app_check {
+          icon-name: "object-select-symbolic";
+        }
+
+        [suffix]
+        Gtk.Button make_default {
+          label: _("Make Default");
+          valign: center;
+        }
+      }
+    }
   }
 
   Adw.PreferencesPage {
