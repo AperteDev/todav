@@ -205,7 +205,9 @@ Todav is under active development. Planned (details in [ROADMAP.md](docs/ROADMAP
 
 - **Advanced notifications**, configurable
 - **Advanced search, filtering and sorting**
+- **Export** of lists and calendars to iCalendar files
 - **More services** besides Nextcloud
+- **Google Tasks** in the Google account
 - **Google Play and F-Droid** for the Android app
 - **Pebble app**, through the Android app
 - **Windows app**

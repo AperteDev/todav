@@ -17,6 +17,9 @@ Planned work, not yet done. The README lists it publicly; the order is not fixed
 - **Advanced notifications**, configurable, beyond the reminder notifications shown now; details
   to be specified.
 - **Advanced search, filtering and sorting**; details to be specified.
+- **Export**, the counterpart of the iCalendar import (`core/src/import.rs`): lists and
+  calendars (one, some or all) to an `.ics` file, on Linux and Android; details to be
+  specified (one file or one per list, done tasks, a date range for events).
 - **Pebble app**, fed by the Android app (see [Pebble](#pebble-watchapp--companion)).
 - **Windows app**: a native WinUI 3 front-end (see [Windows](#windows-app)).
 - iOS and macOS, later: SwiftUI over UniFFI's Swift bindings from `todav-ffi`.
