@@ -620,7 +620,7 @@ fn new_event() -> Option<adw::EntryRow> {
 
 /// For the extension's agenda: what is on each of `days` days from `from` (a day's midnight), as
 /// the Agenda view lists it: (day, time, title, colour, is a task, done).
-pub fn agenda(from: i64, days: i64) -> Vec<(i64, String, String, String, bool, bool)> {
+pub fn agenda(from: i64, days: i64) -> Vec<AgendaRow> {
     calendar::agenda(core(), from, days, None)
         .into_iter()
         .map(|e| {
@@ -630,9 +630,9 @@ pub fn agenda(from: i64, days: i64) -> Vec<(i64, String, String, String, bool, b
                 Time::At(t) => fmt(t, "%H:%M"),
                 Time::Date => String::new(),
             };
-            let (task, done) = match &e.item {
-                Item::Task(t) => (true, t.done),
-                Item::Event(_) => (false, false),
+            let (task, done, uid, start) = match &e.item {
+                Item::Task(t) => (true, t.done, t.uid.clone(), 0),
+                Item::Event(ev) => (false, false, ev.uid.clone(), ev.start),
             };
             (
                 e.day,
@@ -641,9 +641,35 @@ pub fn agenda(from: i64, days: i64) -> Vec<(i64, String, String, String, bool, b
                 e.color,
                 task,
                 done,
+                uid,
+                start,
             )
         })
         .collect()
+}
+
+/// A row of the extension's agenda: (day, time, title, colour, is a task, done, its UID, an
+/// event's start, which tells its occurrences apart; 0 for a task).
+pub type AgendaRow = (i64, String, String, String, bool, bool, String, i64);
+
+/// Edit what a row of the extension's agenda holds: a task, or the occurrence of an event
+/// starting at `start`, over its day in the calendar. In a calendar that may not be written to,
+/// only the day shows.
+pub fn edit_item(uid: &str, task: bool, start: i64) {
+    if task {
+        if let Some(t) = core().task(uid.into()) {
+            crate::window::edit_task(&t);
+        }
+        return;
+    }
+    show_day(start);
+    let event = core()
+        .events(start, start + 1)
+        .into_iter()
+        .find(|e| e.uid == uid && e.start == start);
+    if let Some(e) = event {
+        edit_event(&e);
+    }
 }
 
 /// Switch to the calendar on the day holding `t` (local time), the day pulsing once.

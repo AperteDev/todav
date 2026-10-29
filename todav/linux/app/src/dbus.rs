@@ -17,7 +17,8 @@ const XML: &str = r#"<node>
   <method name="ShowTask"><arg direction="in" name="uid" type="s"/></method>
   <method name="GetDays"><arg direction="in" name="from" type="x"/><arg direction="in" name="days" type="u"/><arg direction="out" type="aas"/></method>
   <method name="GetAgenda"><arg direction="in" name="days" type="u"/><arg direction="out" type="a(xsssbb)"/></method>
-  <method name="GetAgendaFrom"><arg direction="in" name="from" type="x"/><arg direction="in" name="days" type="u"/><arg direction="out" type="a(xsssbb)"/></method>
+  <method name="GetAgendaFrom"><arg direction="in" name="from" type="x"/><arg direction="in" name="days" type="u"/><arg direction="out" type="a(xsssbbsx)"/></method>
+  <method name="EditItem"><arg direction="in" name="uid" type="s"/><arg direction="in" name="task" type="b"/><arg direction="in" name="start" type="x"/></method>
   <method name="GetCounts"><arg direction="out" type="a{su}"/></method>
   <method name="ShowDay"><arg direction="in" name="at" type="x"/></method>
   <method name="NewEvent"><arg direction="in" name="summary" type="s"/></method>
@@ -170,17 +171,33 @@ fn call(method: &str, params: &glib::Variant) -> Result<Option<glib::Variant>, S
             Some((days,).to_variant())
         }
         // (day as local midnight for ShowDay, time, title, colour, is a task, done) for each
-        // thing on the `days` days from today, in the calendars shown.
+        // thing on the `days` days from today, in the calendars shown (for older extensions).
         "GetAgenda" => {
             let (days,) = params.get::<(u32,)>().ok_or_else(bad)?;
-            let items = crate::calendar::agenda(crate::calendar::today(), i64::from(days.min(31)));
+            let items: Vec<_> =
+                crate::calendar::agenda(crate::calendar::today(), i64::from(days.min(31)))
+                    .into_iter()
+                    .map(|(day, time, title, color, task, done, _, _)| {
+                        (day, time, title, color, task, done)
+                    })
+                    .collect();
             Some((items,).to_variant())
         }
-        // The same from the day `from` (local midnight): a day picked in the extension's month.
+        // The same from the day `from` (local midnight), each with its UID and an event's start
+        // for EditItem (calendar::AgendaRow).
         "GetAgendaFrom" => {
             let (from, days) = params.get::<(i64, u32)>().ok_or_else(bad)?;
             let items = crate::calendar::agenda(from, i64::from(days.min(31)));
             Some((items,).to_variant())
+        }
+        // Edit an agenda row's task or event (calendar::edit_item).
+        "EditItem" => {
+            let (uid, task, start) = params.get::<(String, bool, i64)>().ok_or_else(bad)?;
+            if let Some(app) = gio::Application::default().and_downcast::<adw::Application>() {
+                window::present(&app);
+            }
+            crate::calendar::edit_item(&uid, task, start);
+            None
         }
         // What the number by the extension's icon can count (`ext_count`, besides a list's open
         // tasks): tasks due today or earlier (Upcoming's count), important tasks, today's events.

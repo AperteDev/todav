@@ -504,22 +504,22 @@ class TodavIndicator extends PanelMenu.Button {
     }
 
     /// The coming week's events and dated tasks under their days, or those of the day picked in
-    /// the month (`_selected`, shown again by `_showAgenda`); one opens the calendar there.
+    /// the month (`_selected`, shown again by `_showAgenda`); one opens in Todav's editor.
     async _agenda() {
         const show = async () => {
             const picked = this._selected;
-            const [items] = await (picked === null
-                ? this._proxy.GetAgendaAsync(AGENDA_DAYS)
-                : this._proxy.GetAgendaFromAsync(picked, 1)
-            ).catch(e => {
-                logError(e, 'Todav: cannot read the agenda');
-                return [[]];
-            });
+            const today = dayKey(GLib.DateTime.new_now_local());
+            const [items] = await this._proxy.GetAgendaFromAsync(picked ?? today, picked === null ? AGENDA_DAYS : 1)
+                // An app without it: the week, its rows without what EditItem needs.
+                .catch(e => (picked === null ? this._proxy.GetAgendaAsync(AGENDA_DAYS) : Promise.reject(e)))
+                .catch(e => {
+                    logError(e, 'Todav: cannot read the agenda');
+                    return [[]];
+                });
             // Another day picked meanwhile, or the menu gone.
             if (this._selected !== picked || this._showAgenda !== show)
                 return;
             const content = new St.BoxLayout({orientation: VERTICAL, x_expand: true});
-            const today = dayKey(GLib.DateTime.new_now_local());
             const heading = day => {
                 const date = GLib.DateTime.new_from_unix_utc(day).format('%A %-d %B');
                 const when = [_('Today'), _('Tomorrow')][(day - today) / DAY];
@@ -529,12 +529,12 @@ class TodavIndicator extends PanelMenu.Button {
             let shown = picked;
             if (picked !== null)
                 heading(picked);
-            for (const [day, time, title, color, task, done] of items) {
-                if (day !== shown) {
-                    shown = day;
-                    heading(day);
+            for (const item of items) {
+                if (item[0] !== shown) {
+                    shown = item[0];
+                    heading(shown);
                 }
-                content.add_child(this._agendaRow(day, time, title, color, task, done));
+                content.add_child(this._agendaRow(...item));
             }
             if (items.length === 0)
                 content.add_child(label(picked === null ? _('Nothing planned this week') : _('Nothing planned'), 'todav-empty'));
@@ -558,8 +558,8 @@ class TodavIndicator extends PanelMenu.Button {
     }
 
     /// An event's dot or a task's circle (checked when done) in its calendar's colour, its time
-    /// and title.
-    _agendaRow(day, time, title, color, task, done) {
+    /// and title (a row of GetAgendaFrom: its UID and an event's start, for EditItem).
+    _agendaRow(day, time, title, color, task, done, uid, start) {
         let mark;
         if (task) {
             mark = new St.Bin({style_class: 'todav-mark', style: `border-color: ${color};`, y_align: CENTER});
@@ -572,7 +572,8 @@ class TodavIndicator extends PanelMenu.Button {
         if (done)
             name.opacity = DIM;
         const item = row([mark, label(time, 'todav-time'), name]);
-        item.connect('clicked', () => this._open(p => p.ShowDayAsync(day)));
+        // From an app without EditItem (no UID in the row), its day.
+        item.connect('clicked', () => this._open(p => (uid ? p.EditItemAsync(uid, task, start) : p.ShowDayAsync(day))));
         return item;
     }
 
