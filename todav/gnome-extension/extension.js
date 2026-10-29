@@ -146,7 +146,10 @@ class TodavIndicator extends PanelMenu.Button {
         this._context = new PopupMenu.PopupMenu(this, 0.5, St.Side.TOP);
         Main.uiGroup.add_child(this._context.actor);
         this._context.actor.hide();
-        Main.panel.menuManager.addMenu(this._context);
+        // A manager of its own: the panel's opens a button's menu as the pointer comes over it
+        // from another open one, and with this one there too it would open this one.
+        this._contextManager = new PopupMenu.PopupMenuManager(this);
+        this._contextManager.addMenu(this._context);
         // Highlighted while open, as for its main menu.
         this._context.connect('open-state-changed', (_menu, open) => {
             if (open)
