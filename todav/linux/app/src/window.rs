@@ -206,9 +206,8 @@ pub fn setup_actions(app: &adw::Application) {
     let complete = gio::SimpleAction::new("complete", Some(glib::VariantTy::STRING));
     complete.connect_activate(|_, uid| {
         // From a notification nobody can be asked: subtasks stay open unless set to complete.
-        let tree = prefs::subtask_completion(core()) == prefs::SubtaskCompletion::Complete;
         if let Some(uid) = uid.and_then(|u| u.str())
-            && tasks::set_done(core(), uid, true, tree, false).is_ok()
+            && tasks::set_done_unasked(core(), uid, true).is_ok()
         {
             request_sync();
         }

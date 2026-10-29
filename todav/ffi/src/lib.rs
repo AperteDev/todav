@@ -411,6 +411,12 @@ impl Todav {
         Ok(self.c().set_done(uid, done)?)
     }
 
+    /// Complete or reopen a task where nobody can be asked about its subtasks (a reminder, a
+    /// widget): they follow only as Preferences complete them.
+    pub fn set_done_unasked(&self, uid: String, done: bool) -> Result<()> {
+        Ok(todav_app::tasks::set_done_unasked(self.c(), &uid, done)?)
+    }
+
     /// As `set_done`, one change for undo. With `subtasks`, its subtasks follow (the open ones
     /// completed, or the completed ones reopened); with `parents`, reopening it reopens its
     /// completed parents (`SubtaskCompletion::Complete`).

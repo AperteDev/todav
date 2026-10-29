@@ -51,6 +51,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Android: "Mark as Done" on a reminder completes the task's subtasks too when Settings → Tasks
+  say so (Completing a task with open subtasks: Completes them too), as on Linux.
 - Android: the month planner widget's weeks fill it to the bottom, also where the launcher says
   it is smaller than it is.
 - Android: a task dragged off the middle of a row, down past it, lands below that row rather

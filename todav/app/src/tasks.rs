@@ -339,6 +339,14 @@ pub fn set_done(c: &Client, uid: &str, done: bool, subtasks: bool, parents: bool
     })
 }
 
+/// Complete or reopen task `uid` where nobody can be asked about its subtasks (a reminder's
+/// "Mark as Done", the extension, a widget): they follow only as Preferences complete them
+/// (`SubtaskCompletion::Complete`, its parents reopening with it too); else they stay as they are.
+pub fn set_done_unasked(c: &Client, uid: &str, done: bool) -> Result<()> {
+    let tree = prefs::subtask_completion(c) == prefs::SubtaskCompletion::Complete;
+    set_done(c, uid, done, done && tree, tree)
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
@@ -537,6 +545,25 @@ pub(crate) mod tests {
             !done(&a) && !done(&a1) && !done(&a1x) && !done(&a2),
             "all of them"
         );
+
+        // Nobody asked: as Preferences complete subtasks (by default, all along).
+        set_done_unasked(&c, &a, true).unwrap();
+        assert!(done(&a) && done(&a1) && done(&a1x) && done(&a2));
+        set_done_unasked(&c, &a1x, false).unwrap();
+        assert!(
+            !done(&a1x) && !done(&a1) && !done(&a),
+            "its parents reopened"
+        );
+        for mode in ["keep", "ask"] {
+            c.set_setting("complete_subtasks".into(), mode.into())
+                .unwrap();
+            set_done(&c, &a, false, true, false).unwrap();
+            set_done_unasked(&c, &a, true).unwrap();
+            assert!(done(&a) && !done(&a1) && !done(&a2), "{mode}: alone");
+            set_done(&c, &a1, true, false, false).unwrap();
+            set_done_unasked(&c, &a1, false).unwrap();
+            assert!(done(&a) && !done(&a1), "{mode}: its parent stays done");
+        }
         let _ = std::fs::remove_dir_all(dir);
     }
 }

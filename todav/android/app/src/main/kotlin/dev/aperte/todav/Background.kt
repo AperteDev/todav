@@ -338,9 +338,9 @@ class ReminderReceiver : BroadcastReceiver() {
         if (intent.action == Reminders.DONE) {
             val uid = intent.getStringExtra("task") ?: return
             NotificationManagerCompat.from(context).cancel(uid.hashCode())
-            // As the Linux app's: it cannot ask about subtasks, so they stay open.
+            // As the Linux app's: it cannot ask about subtasks, so they stay open unless set to complete.
             background(context) {
-                it.core.setDoneTree(uid, true, false, false)
+                it.core.setDoneUnasked(uid, true)
                 it.core.requestSync()
             }
             return
