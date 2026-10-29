@@ -300,9 +300,129 @@ Adw.PreferencesDialog dialog {
     title: _("Extension");
     icon-name: "application-x-addon-symbolic";
 
+    // Where its parts go: all in its own menu, all in the clock menu, or each where the rows
+    // below say (Custom shows them). See settings.rs.
     Adw.PreferencesGroup {
-      title: _("Panel Menu");
+      title: _("Tasks and Calendar in the Top Bar");
       description: _("For the Todav GNOME Shell extension");
+
+      Gtk.ListBoxRow {
+        activatable: false;
+        selectable: false;
+
+        // Side by side, one under the other when too narrow.
+        Adw.WrapBox {
+          child-spacing: 12;
+          line-spacing: 12;
+          justify: fill;
+          justify-last-line: true;
+          margin-top: 12;
+          margin-bottom: 12;
+          margin-start: 12;
+          margin-end: 12;
+
+          Gtk.Box {
+            orientation: vertical;
+            spacing: 12;
+
+            Gtk.Button ext_preset_panel_picture {
+              tooltip-text: _("Todav icon");
+
+              styles [
+                "card",
+              ]
+
+              Gtk.Image {
+                icon-name: "todav-ext-panel-symbolic";
+                pixel-size: 180;
+                margin-top: 6;
+                margin-bottom: 6;
+              }
+            }
+
+            // The note under the title, not in the check button: its circle stays by the title.
+            Gtk.Box {
+              orientation: vertical;
+
+              Gtk.CheckButton ext_preset_panel {
+                label: _("Todav icon");
+              }
+
+              Gtk.Label {
+                label: _("A menu of its own, next to the clock");
+                xalign: 0;
+                wrap: true;
+                // Narrow enough for two side by side.
+                max-width-chars: 20;
+                margin-start: 26;
+
+                styles [
+                  "caption",
+                  "dim-label",
+                ]
+              }
+            }
+          }
+
+          Gtk.Box {
+            orientation: vertical;
+            spacing: 12;
+
+            Gtk.Button ext_preset_clock_picture {
+              tooltip-text: _("Clock menu");
+
+              styles [
+                "card",
+              ]
+
+              Gtk.Image {
+                icon-name: "todav-ext-clock-symbolic";
+                pixel-size: 180;
+                margin-top: 6;
+                margin-bottom: 6;
+              }
+            }
+
+            Gtk.Box {
+              orientation: vertical;
+
+              Gtk.CheckButton ext_preset_clock {
+                group: ext_preset_panel;
+                label: _("Clock menu");
+              }
+
+              Gtk.Label {
+                label: _("In place of GNOME’s calendar and events, no icon");
+                xalign: 0;
+                wrap: true;
+                max-width-chars: 20;
+                margin-start: 26;
+
+                styles [
+                  "caption",
+                  "dim-label",
+                ]
+              }
+            }
+          }
+        }
+      }
+
+      Adw.ActionRow {
+        title: _("Custom");
+        subtitle: _("Choose where each part goes");
+        activatable-widget: ext_preset_custom;
+
+        [prefix]
+        Gtk.CheckButton ext_preset_custom {
+          group: ext_preset_panel;
+          valign: center;
+        }
+      }
+    }
+
+    Adw.PreferencesGroup ext_panel_group {
+      title: _("Panel Menu");
 
       Adw.ComboRow ext_columns {
         title: _("Layout");
@@ -317,7 +437,7 @@ Adw.PreferencesDialog dialog {
 
       Adw.ComboRow ext_icon {
         title: _("Icon");
-        model: Gtk.StringList { strings [_("On the right"), _("Next to the clock")] };
+        model: Gtk.StringList { strings [_("Next to the clock"), _("On the right")] };
       }
 
       Adw.SwitchRow ext_open {
@@ -325,7 +445,7 @@ Adw.PreferencesDialog dialog {
       }
     }
 
-    Adw.PreferencesGroup {
+    Adw.PreferencesGroup ext_tasks_group {
       title: _("Tasks");
       description: _("In the clock menu they go under the events");
 
@@ -344,7 +464,7 @@ Adw.PreferencesDialog dialog {
       }
     }
 
-    Adw.PreferencesGroup {
+    Adw.PreferencesGroup ext_calendar_group {
       title: _("Calendar");
       description: _("In the clock menu they take the place of GNOME’s calendar and events");
 

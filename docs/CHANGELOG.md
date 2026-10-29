@@ -9,15 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Extension: each part (the task list, the month, the agenda, the fields for adding a task and
-  an event) can go in GNOME's clock menu, the month in place of its calendar and the agenda in
-  place of its events, with the task list under them; Preferences → Extension says where. Its
-  icon can sit in the middle of the top bar, after the clock; with nothing left in its own
-  menu, it opens the clock menu.
+- Extension: its parts can go in GNOME's clock menu, the month in place of its calendar and the
+  agenda in place of its events, with the task list under them. Preferences → Extension shows
+  the two ways with pictures, Todav's icon with its own menu or the clock menu, and Custom
+  for each part (the task list, the month, the agenda, the fields for adding a task and an
+  event) in either menu or nowhere. The icon shows only with something in its menu.
 - Extension: Preferences → Extension → Order puts the calendar before the tasks in its own menu
   (on the left in two columns, on top in one).
 - Extension: a right click on its icon opens a menu with Open Todav and Preferences (Todav's,
   on the Extension page).
+
+### Changed
+
+- Extension: its icon sits in the middle of the top bar, next to the clock; Preferences →
+  Extension → Icon puts it back on the right.
 
 ## [2.1.0] - 2026-10-28
 

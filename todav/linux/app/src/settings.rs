@@ -31,7 +31,7 @@ pub fn apply_color_scheme() {
 pub const EXTENSION: [(&str, &str); 12] = [
     ("ext_columns", "double"),
     ("ext_order", "tasks"),
-    ("ext_icon", "right"),
+    ("ext_icon", "center"),
     ("ext_tasks", "true"),
     ("ext_subtasks", "true"),
     ("ext_add_task", "true"),
@@ -72,6 +72,65 @@ fn connect_duration(b: &gtk::Builder, key: &'static str) {
     row.connect_selected_notify(move |r| {
         let _ = core().set_setting(key.into(), DURATIONS[r.selected() as usize].to_string());
     });
+}
+
+/// Preferences → Extension's choice of where its parts go: all in its own menu (`panel`), all
+/// in the clock menu (`clock`), or each where its row says (`custom`: the rows shown, as they
+/// were). Stored in `ext_preset`; unset, it is what the parts say.
+fn connect_ext_preset(b: &gtk::Builder) {
+    let parts: Vec<adw::ComboRow> = EXTENSION_PARTS.iter().map(|k| get(b, k)).collect();
+    let current = core().setting("ext_preset".into()).unwrap_or_else(|| {
+        let first = parts[0].selected();
+        match first {
+            0 | 1 if parts.iter().all(|p| p.selected() == first) => {
+                ["panel", "clock"][first as usize]
+            }
+            _ => "custom",
+        }
+        .into()
+    });
+    let panel: adw::PreferencesGroup = get(b, "ext_panel_group");
+    // The groups' notes on the clock menu, only where the rows choosing it are shown.
+    let notes: Vec<(adw::PreferencesGroup, Option<glib::GString>)> =
+        ["ext_tasks_group", "ext_calendar_group"]
+            .iter()
+            .map(|id| {
+                let g: adw::PreferencesGroup = get(b, id);
+                let d = g.description();
+                (g, d)
+            })
+            .collect();
+    let show = Rc::new({
+        let parts = parts.clone();
+        move |preset: &str| {
+            let custom = preset == "custom";
+            parts.iter().for_each(|p| p.set_visible(custom));
+            panel.set_visible(preset != "clock");
+            for (group, note) in &notes {
+                group.set_description(note.as_deref().filter(|_| custom));
+            }
+        }
+    });
+    show(&current);
+    for (name, place) in [("panel", Some(0)), ("clock", Some(1)), ("custom", None)] {
+        let check: gtk::CheckButton = get(b, &format!("ext_preset_{name}"));
+        check.set_active(name == current);
+        let (parts, show) = (parts.clone(), show.clone());
+        check.connect_toggled(move |c| {
+            if !c.is_active() {
+                return;
+            }
+            let _ = core().set_setting("ext_preset".into(), name.into());
+            if let Some(i) = place {
+                parts.iter().for_each(|p| p.set_selected(i));
+            }
+            show(name);
+        });
+        if place.is_some() {
+            let picture: gtk::Button = get(b, &format!("ext_preset_{name}_picture"));
+            picture.connect_clicked(move |_| check.set_active(true));
+        }
+    }
 }
 
 /// Bind a ComboRow to the setting `key`, one stored value per row entry (the first is the
@@ -246,7 +305,7 @@ pub fn present(parent: &adw::ApplicationWindow, page: Option<&str>) -> adw::Pref
     let ext_changed = || crate::dbus::on_event(&crate::Event::Changed(String::new()));
     connect_choice(&b, "ext_columns", &["double", "single"]);
     connect_choice(&b, "ext_order", &["tasks", "calendar"]);
-    connect_choice(&b, "ext_icon", &["right", "center"]);
+    connect_choice(&b, "ext_icon", &["center", "right"]);
     for key in EXTENSION_PARTS {
         connect_choice(&b, key, &["true", "clock", "false"]);
         get::<adw::ComboRow>(&b, key).connect_selected_notify(move |_| ext_changed());
@@ -269,6 +328,7 @@ pub fn present(parent: &adw::ApplicationWindow, page: Option<&str>) -> adw::Pref
         sync(&part);
         part.connect_selected_notify(sync);
     }
+    connect_ext_preset(&b);
     // Stars and pins, on unless turned off; the sidebar may gain or lose Important.
     for key in ["show_stars", "show_pins"] {
         let row: adw::SwitchRow = get(&b, key);

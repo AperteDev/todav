@@ -125,14 +125,11 @@ class TodavIndicator extends PanelMenu.Button {
         });
         this._placeholder(_('Starting…'));
         this._contextSetup();
-        // A right click opens the context menu. With nothing in its own menu but something in the
-        // clock menu, the icon opens that.
+        // A right click opens the context menu.
         const toggle = this.menu.toggle.bind(this.menu);
         this.menu.toggle = () => {
             if (Clutter.get_current_event()?.get_button() === Clutter.BUTTON_SECONDARY)
                 this._context.toggle();
-            else if (this._toClock)
-                this._dateMenu.menu.toggle();
             else
                 toggle();
         };
@@ -219,20 +216,21 @@ class TodavIndicator extends PanelMenu.Button {
         cards.forEach(c => this._clockBox.add_child(c));
     }
 
-    /// The icon on the right, or in the middle after the clock (`ext_icon`).
+    /// The icon after the clock (`ext_icon`, the default), or on the right.
     _placeIcon(where) {
-        const box = where === 'center' ? Main.panel._centerBox : Main.panel._rightBox;
+        const center = where !== 'right';
+        // The clock's highlight is its time only, inside its button's padding (12px): moved over
+        // that padding, as far from the clock as panel buttons are from one another. Drawn
+        // there, laid out as before (St has no negative margins).
+        const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+        this.container.translation_x = center ? -12 * scale : 0;
+        const box = center ? Main.panel._centerBox : Main.panel._rightBox;
         const parent = this.container.get_parent();
         if (!box || !parent || parent === box)
             return;
         parent.remove_child(this.container);
         const clock = box.get_children().indexOf(this._dateMenu?.container);
-        box.insert_child_at_index(this.container, where === 'center' ? clock + 1 : 0);
-        // The clock's highlight is its time only, inside its button's padding (12px): moved over
-        // that padding, as far from the clock as panel buttons are from one another. Drawn
-        // there, laid out as before (St has no negative margins).
-        const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
-        this.container.translation_x = where === 'center' ? -12 * scale : 0;
+        box.insert_child_at_index(this.container, center ? clock + 1 : 0);
     }
 
     _updateState() {
@@ -255,8 +253,8 @@ class TodavIndicator extends PanelMenu.Button {
         const clock = key => Boolean(this._dateMenu) && at(key) === 'clock';
         const on = key => at(key) === 'true' || (at(key) === 'clock' && !this._dateMenu);
         this._clockPlace(clock);
-        const parts = ['tasks', 'add_task', 'month', 'agenda', 'add_event'];
-        this._toClock = !on('open') && !parts.some(on) && parts.some(clock);
+        // With none of them in its menu, no icon (until then it shows, to say what is missing).
+        this.container.visible = ['tasks', 'add_task', 'month', 'agenda', 'add_event'].some(on);
         this._placeIcon(settings.ext_icon);
         return {on, clock, settings, lists, pinned};
     }
@@ -346,12 +344,6 @@ class TodavIndicator extends PanelMenu.Button {
             const open = new PopupMenu.PopupMenuItem(_('Open Todav'));
             open.connect('activate', () => this._open(p => p.ShowListAsync(pinned?.[0] ?? '')));
             this.menu.addMenuItem(open);
-        }
-        if (this._toClock && this.menu.isOpen) {
-            this.menu.close();
-            this._dateMenu.menu.open();
-        } else if (!tasks && !calendar && !on('open')) {
-            this._placeholder(_('Everything is turned off in Todav’s Preferences'));
         }
     }
 
@@ -613,6 +605,8 @@ export default class TodavExtension extends Extension {
     enable() {
         this._indicator = new Indicator(this.path);
         Main.panel.addToStatusArea(this.uuid, this._indicator);
+        // Where it goes by default, before the options come.
+        this._indicator._placeIcon('center');
     }
 
     disable() {
