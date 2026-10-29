@@ -21,6 +21,7 @@ const XML: &str = r#"<node>
   <method name="GetCounts"><arg direction="out" type="a{su}"/></method>
   <method name="ShowDay"><arg direction="in" name="at" type="x"/></method>
   <method name="NewEvent"><arg direction="in" name="summary" type="s"/></method>
+  <method name="NewEventOn"><arg direction="in" name="summary" type="s"/><arg direction="in" name="at" type="x"/></method>
   <method name="GetSettings"><arg direction="out" type="a{ss}"/></method>
   <method name="SetSetting"><arg direction="in" name="key" type="s"/><arg direction="in" name="value" type="s"/></method>
   <method name="Sync"/>
@@ -125,7 +126,16 @@ fn call(method: &str, params: &glib::Variant) -> Result<Option<glib::Variant>, S
             if let Some(app) = gio::Application::default().and_downcast::<adw::Application>() {
                 window::present(&app);
             }
-            crate::calendar::new_event_titled(&summary);
+            crate::calendar::new_event_titled(&summary, c.local_now());
+            None
+        }
+        // The same on the day `at` (local midnight): one picked in the extension's month.
+        "NewEventOn" => {
+            let (summary, at) = params.get::<(String, i64)>().ok_or_else(bad)?;
+            if let Some(app) = gio::Application::default().and_downcast::<adw::Application>() {
+                window::present(&app);
+            }
+            crate::calendar::new_event_titled(&summary, at);
             None
         }
         // The extension's options, see settings::EXTENSION; it may only change those.

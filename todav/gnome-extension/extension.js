@@ -215,7 +215,7 @@ class TodavIndicator extends PanelMenu.Button {
             return box;
         };
         const cards = [];
-        const event = clock('add_event') && entry(_('Add an event…'), text => this._open(p => p.NewEventAsync(text)));
+        const event = clock('add_event') && entry(_('Add an event…'), text => this._newEvent(text));
         if (clock('agenda') || event)
             cards.push(card([clock('agenda') && await this._agenda(), event].filter(Boolean)));
         if (clock('tasks') || clock('add_task'))
@@ -499,7 +499,7 @@ class TodavIndicator extends PanelMenu.Button {
         if (on('agenda'))
             col.add_child(await this._agenda());
         if (on('add_event'))
-            addAtBottom(col, entry(_('Add an event…'), text => this._open(p => p.NewEventAsync(text))));
+            addAtBottom(col, entry(_('Add an event…'), text => this._newEvent(text)));
         return col;
     }
 
@@ -574,6 +574,15 @@ class TodavIndicator extends PanelMenu.Button {
         const item = row([mark, label(time, 'todav-time'), name]);
         item.connect('clicked', () => this._open(p => p.ShowDayAsync(day)));
         return item;
+    }
+
+    /// A new event titled `text` in Todav: on the day picked in the month, else today. An app
+    /// without NewEventOn opens it today.
+    _newEvent(text) {
+        const day = this._selected;
+        this._open(p => (day === null
+            ? p.NewEventAsync(text)
+            : p.NewEventOnAsync(text, day).catch(() => p.NewEventAsync(text))));
     }
 
     /// A day of the month clicked (`days`: the month's day buttons by day): the agenda shows it.

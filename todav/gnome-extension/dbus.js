@@ -19,6 +19,7 @@ const XML = `<node>
   <method name="GetCounts"><arg direction="out" type="a{su}"/></method>
   <method name="ShowDay"><arg direction="in" name="at" type="x"/></method>
   <method name="NewEvent"><arg direction="in" name="summary" type="s"/></method>
+  <method name="NewEventOn"><arg direction="in" name="summary" type="s"/><arg direction="in" name="at" type="x"/></method>
   <method name="GetSettings"><arg direction="out" type="a{ss}"/></method>
   <method name="SetSetting"><arg direction="in" name="key" type="s"/><arg direction="in" name="value" type="s"/></method>
   <method name="Sync"/>

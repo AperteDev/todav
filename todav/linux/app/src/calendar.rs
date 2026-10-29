@@ -590,9 +590,9 @@ fn step(by: i64) {
     }
 }
 
-/// A new event titled `summary` today (from the extension).
-pub fn new_event_titled(summary: &str) {
-    show_day(core().local_now());
+/// A new event titled `summary` on the day holding `at` (local time; from the extension).
+pub fn new_event_titled(summary: &str, at: i64) {
+    show_day(at);
     if let Some(title) = new_event() {
         title.set_text(summary);
         title.set_position(-1);
