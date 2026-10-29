@@ -228,6 +228,11 @@ class TodavIndicator extends PanelMenu.Button {
         parent.remove_child(this.container);
         const clock = box.get_children().indexOf(this._dateMenu?.container);
         box.insert_child_at_index(this.container, where === 'center' ? clock + 1 : 0);
+        // The clock's highlight is its time only, inside its button's padding (12px): moved over
+        // that padding, as far from the clock as panel buttons are from one another. Drawn
+        // there, laid out as before (St has no negative margins).
+        const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+        this.container.translation_x = where === 'center' ? -12 * scale : 0;
     }
 
     _updateState() {
