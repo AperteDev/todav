@@ -652,7 +652,8 @@ private fun TaskItem(
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     var moving by remember { mutableStateOf(false) }
-    val dragged = drag?.key == key && drag.moved
+    // Lifted once held (a long press alone does what a tap does), if it can move at all.
+    val dragged = drag?.key == key && drag.row.slot != null
     val mode = target?.takeIf { it.key == key }?.mode
     val dy = eased(shift, drag != null)
     // Held: indented as deep as it would land (beside a row: that row's depth; into it: one deeper).
