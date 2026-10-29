@@ -518,14 +518,19 @@ class PlannerWidget : TodavWidget() {
             val items = core.items(start, start + 42 * DAY, shown.map { it.href })
             (0 until 6).map { w -> bars(items, start + w * 7 * DAY, colors) }
         }
-        // The frame's padding, the header and the weekday names off the size; six weeks in the rest.
+        // The frame's padding, the header (40) and the weekday names (16) off the size; six weeks
+        // in the rest. They share what is there (a launcher may say less than it gives); this says
+        // how many bars fit in each.
         val size = LocalSize.current
         val cell = (size.width - 20.dp) / 7
-        val week = (size.height - 20.dp - 44.dp - 18.dp) / 6
-        // Shorter in a low widget, down to what a number needs; then no bars.
+        val week = (size.height - 20.dp - 40.dp - 16.dp) / 6
+        // Shorter in a low widget, down to what a number needs; then slimmer bars, as Fossify
+        // Calendar's, before none.
         val number = (week - 1.dp).coerceIn(15.dp, 20.dp)
-        val bar = 15.dp
-        val fit = floor(((week - number - 1.dp) / bar)).toInt().coerceIn(0, 8)
+        val room = week - number - 1.dp
+        val slim = room < 15.dp
+        val bar = if (slim) 12.dp else 15.dp
+        val fit = floor(room / bar).toInt().coerceIn(0, 8)
         WidgetFrame(context) {
             TurnHeader(context, widget, monthTitle(first), openDay(context, first, month = true), newEvent(context, widget, account, shown, today))
             WeekdayNames(start)
@@ -534,7 +539,7 @@ class PlannerWidget : TodavWidget() {
                 val monday = start + w * 7 * DAY
                 // A day opens wherever it is tapped, on a bar too (they are too small to aim at): the
                 // days take taps under the numbers and bars, which take none.
-                Box(GlanceModifier.fillMaxWidth().height(week)) {
+                Box(GlanceModifier.fillMaxWidth().defaultWeight()) {
                     Row(GlanceModifier.fillMaxSize()) {
                         for (d in 0 until 7) {
                             Box(GlanceModifier.width(cell).fillMaxHeight().clickable(actionStartActivity(openDay(context, monday + d * DAY)))) {}
@@ -561,7 +566,7 @@ class PlannerWidget : TodavWidget() {
                                     Text(
                                         b.item.title(),
                                         maxLines = 1,
-                                        style = TextStyle(fontSize = 10.sp, color = ColorProvider(androidx.compose.ui.graphics.Color.White)),
+                                        style = TextStyle(fontSize = if (slim) 9.sp else 10.sp, color = ColorProvider(androidx.compose.ui.graphics.Color.White)),
                                         modifier = GlanceModifier.width(cell * (b.last - b.first + 1) - 2.dp).height(bar - 1.dp)
                                             .cornerRadius(3.dp).background(ColorProvider(color)).padding(horizontal = 3.dp),
                                     )

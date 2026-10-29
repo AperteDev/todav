@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Android: a low month planner widget shows slimmer bars, as Fossify Calendar's, before none.
 - Extension: its icon sits in the middle of the top bar, next to the clock; Preferences →
   Extension → Icon puts it back on the right.
 - Extension: a day clicked in the month shows that day in the agenda, and an event added then
@@ -37,6 +38,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Extension: Preferences → Extension → Open in the editor, for tasks and for events: a task or
   an event clicked (in the task list or the agenda) opens in its editor in Todav, rather than
   in its list or on its day. Off by default.
+
+### Fixed
+
+- Android: the month planner widget's weeks fill it to the bottom, also where the launcher says
+  it is smaller than it is.
 
 ## [2.1.0] - 2026-10-28
 
