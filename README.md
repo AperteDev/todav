@@ -32,9 +32,11 @@ development:
 | ![The week view with a planned task's details open](docs/screenshots/calendar-week.png) | ![The Edit Event dialog](docs/screenshots/event-dialog.png) |
 
 <p align="center">
-  <img src="docs/screenshots/extension.png" width="480"
-    alt="The GNOME Shell extension's menu: a task list, the month with dots and the coming week's agenda">
-  <br><em>The GNOME Shell extension</em>
+  <img src="docs/screenshots/extension.png" height="420"
+    alt="The GNOME Shell extension's menu by the clock: a task list, the month with dots and the coming days' agenda">
+  <img src="docs/screenshots/extension-clock.png" height="420"
+    alt="The extension in GNOME's clock menu: the month, the agenda and a task list in place of its calendar and events">
+  <br><em>The GNOME Shell extension: its own menu, or in GNOME's clock menu</em>
 </p>
 
 **Android**
