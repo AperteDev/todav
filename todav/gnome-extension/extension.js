@@ -296,6 +296,8 @@ class TodavIndicator extends PanelMenu.Button {
         const at = key => settings[`ext_${key}`];
         const clock = key => Boolean(this._dateMenu) && at(key) === 'clock';
         const on = key => at(key) === 'true' || (at(key) === 'clock' && !this._dateMenu);
+        // A task or an event clicked opens its editor, else its place in Todav.
+        this._edit = {tasks: on('edit_tasks'), events: on('edit_events')};
         this._clockPlace(clock);
         // With none of them in its menu, no icon (until then it shows, to say what is missing).
         this.container.visible = ['tasks', 'add_task', 'month', 'agenda', 'add_event'].some(on);
@@ -478,7 +480,8 @@ class TodavIndicator extends PanelMenu.Button {
         }
     }
 
-    /// Read-only: a circle, with a check in it when done; clicking opens the task in Todav.
+    /// Read-only: a circle, with a check in it when done; clicking opens the task in Todav, in
+    /// its list or its editor (`_edit`).
     _taskRow([uid, summary, , done, depth]) {
         const mark = new St.Bin({style_class: 'todav-mark', y_align: CENTER});
         if (done)
@@ -488,7 +491,9 @@ class TodavIndicator extends PanelMenu.Button {
             title.opacity = DIM;
         const item = row([mark, title]);
         item.child.style = `padding-left: ${depth * 16}px;`;
-        item.connect('clicked', () => this._open(p => p.ShowTaskAsync(uid)));
+        item.connect('clicked', () => this._open(p => (this._edit?.tasks
+            ? p.EditItemAsync(uid, true, 0).catch(() => p.ShowTaskAsync(uid))
+            : p.ShowTaskAsync(uid))));
         return item;
     }
 
@@ -504,7 +509,7 @@ class TodavIndicator extends PanelMenu.Button {
     }
 
     /// The coming week's events and dated tasks under their days, or those of the day picked in
-    /// the month (`_selected`, shown again by `_showAgenda`); one opens in Todav's editor.
+    /// the month (`_selected`, shown again by `_showAgenda`); one opens in Todav (`_agendaRow`).
     async _agenda() {
         const show = async () => {
             const picked = this._selected;
@@ -572,8 +577,10 @@ class TodavIndicator extends PanelMenu.Button {
         if (done)
             name.opacity = DIM;
         const item = row([mark, label(time, 'todav-time'), name]);
-        // From an app without EditItem (no UID in the row), its day.
-        item.connect('clicked', () => this._open(p => (uid ? p.EditItemAsync(uid, task, start) : p.ShowDayAsync(day))));
+        // Its editor if `_edit` says so for tasks or events, else (and from an app without
+        // EditItem: no UID in the row) its day.
+        const edit = uid && this._edit?.[task ? 'tasks' : 'events'];
+        item.connect('clicked', () => this._open(p => (edit ? p.EditItemAsync(uid, task, start) : p.ShowDayAsync(day))));
         return item;
     }
 

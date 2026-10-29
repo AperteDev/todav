@@ -464,6 +464,11 @@ Adw.PreferencesDialog dialog {
         title: _("Subtasks");
       }
 
+      Adw.SwitchRow ext_edit_tasks {
+        title: _("Open in the editor");
+        subtitle: _("A task clicked opens for editing; otherwise Todav shows it in its list");
+      }
+
       Adw.ComboRow ext_add_task {
         title: _("Field for adding a task");
         model: Gtk.StringList { strings [_("Todav menu"), _("Clock menu"), _("Nowhere")] };
@@ -482,6 +487,11 @@ Adw.PreferencesDialog dialog {
       Adw.SwitchRow ext_month_dots {
         title: _("Dots in the month");
         subtitle: _("Mark the days that have events or tasks");
+      }
+
+      Adw.SwitchRow ext_edit_events {
+        title: _("Open in the editor");
+        subtitle: _("An event clicked in the agenda opens for editing; otherwise Todav shows its day");
       }
 
       Adw.ComboRow ext_agenda {

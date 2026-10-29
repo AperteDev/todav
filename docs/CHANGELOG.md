@@ -28,8 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Extension → Icon puts it back on the right.
 - Extension: a day clicked in the month shows that day in the agenda, and an event added then
   starts on it; a double click opens it in Todav (one click, without the agenda in sight).
-- Extension: an event or a task clicked in the agenda opens in its editor in Todav, not only its
-  day.
+- Extension: Preferences → Extension → Open in the editor, for tasks and for events: a task or
+  an event clicked (in the task list or the agenda) opens in its editor in Todav, rather than
+  in its list or on its day. Off by default.
 
 ## [2.1.0] - 2026-10-28
 

@@ -28,7 +28,8 @@ pub fn apply_color_scheme() {
 /// The GNOME extension's options (Preferences → Extension, synced like the rest) with their
 /// defaults; it reads them over D-Bus. `ext_list` is the list it shows (empty: the first). A part
 /// (`EXTENSION_PARTS`) is in its own menu (`true`), the clock menu (`clock`) or not shown.
-pub const EXTENSION: [(&str, &str); 13] = [
+/// `ext_edit_*`: a task or event clicked opens its editor, else its place in Todav.
+pub const EXTENSION: [(&str, &str); 15] = [
     ("ext_columns", "double"),
     ("ext_order", "tasks"),
     ("ext_icon", "center"),
@@ -41,6 +42,8 @@ pub const EXTENSION: [(&str, &str); 13] = [
     ("ext_agenda", "true"),
     ("ext_add_event", "true"),
     ("ext_open", "true"),
+    ("ext_edit_tasks", "false"),
+    ("ext_edit_events", "false"),
     ("ext_list", ""),
 ];
 const EXTENSION_PARTS: [&str; 5] = [
@@ -318,9 +321,17 @@ pub fn present(parent: &adw::ApplicationWindow, page: Option<&str>) -> adw::Pref
         connect_choice(&b, key, &["true", "clock", "false"]);
         get::<adw::ComboRow>(&b, key).connect_selected_notify(move |_| ext_changed());
     }
-    for key in ["ext_subtasks", "ext_month_dots", "ext_open"] {
+    for key in [
+        "ext_subtasks",
+        "ext_month_dots",
+        "ext_open",
+        "ext_edit_tasks",
+        "ext_edit_events",
+    ] {
         let row: adw::SwitchRow = get(&b, key);
-        row.set_active(core().setting(key.into()).as_deref() != Some("false"));
+        let default = EXTENSION.iter().find(|(k, _)| *k == key).map(|(_, d)| *d);
+        let value = core().setting(key.into());
+        row.set_active(value.as_deref().or(default) == Some("true"));
         row.connect_active_notify(move |r| {
             let _ = core().set_setting(key.into(), r.is_active().to_string());
         });
