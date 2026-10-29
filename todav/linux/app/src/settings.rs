@@ -30,8 +30,8 @@ pub fn apply_color_scheme() {
 /// (`EXTENSION_PARTS`) is in its own menu (`true`), the clock menu (`clock`) or not shown.
 /// `ext_edit_*`: a task or event clicked opens its editor, else its place in Todav.
 /// `ext_add_*_kind`: adding a task or an event with a `field`, a `button` (opening Todav) or
-/// `none`; `ext_add_*`, where (`sync_adds`).
-pub const EXTENSION: [(&str, &str); 17] = [
+/// `none`; `ext_add_*`, where (`sync_adds`). `ext_check_tasks`: a task's circle ticks it.
+pub const EXTENSION: [(&str, &str); 18] = [
     ("ext_columns", "double"),
     ("ext_order", "tasks"),
     ("ext_icon", "center"),
@@ -48,6 +48,7 @@ pub const EXTENSION: [(&str, &str); 17] = [
     ("ext_edit_events", "false"),
     ("ext_add_task_kind", "field"),
     ("ext_add_event_kind", "field"),
+    ("ext_check_tasks", "false"),
     ("ext_list", ""),
 ];
 const EXTENSION_PARTS: [&str; 3] = ["ext_tasks", "ext_month", "ext_agenda"];
@@ -481,6 +482,7 @@ pub fn present(parent: &adw::ApplicationWindow, page: Option<&str>) -> adw::Pref
         "ext_open",
         "ext_edit_tasks",
         "ext_edit_events",
+        "ext_check_tasks",
     ] {
         let row: adw::SwitchRow = get(&b, key);
         let default = EXTENSION.iter().find(|(k, _)| *k == key).map(|(_, d)| *d);

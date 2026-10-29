@@ -292,6 +292,7 @@ class AgendaWidget : TodavWidget() {
         val today = midnight(core.localNow())
         val (account, shown) = remember(changes) { widgetCalendars(context, app, widget) }
         val entries = remember(changes, shown) { core.agenda(today, AGENDA_DAYS, shown.map { it.href }) }
+        val check = WidgetPrefs.check(context, widget)
         WidgetFrame(context) {
             Row(GlanceModifier.fillMaxWidth().padding(start = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -306,22 +307,28 @@ class AgendaWidget : TodavWidget() {
             val rows: List<Any> = entries.groupBy { it.day }.flatMap { (day, es) -> listOf(agendaHeading(day, today)) + es }
             LazyColumn {
                 items(rows) { r ->
-                    if (r is String) WidgetHeading(r) else AgendaRow(context, r as dev.aperte.todav.core.AgendaEntry)
+                    if (r is String) WidgetHeading(r) else AgendaRow(context, r as dev.aperte.todav.core.AgendaEntry, check)
                 }
             }
         }
     }
 
     @Composable
-    private fun AgendaRow(context: Context, e: dev.aperte.todav.core.AgendaEntry) {
+    private fun AgendaRow(context: Context, e: dev.aperte.todav.core.AgendaEntry, check: Boolean) {
         val item = e.item
         val open = openItem(context, item)
         Row(
-            GlanceModifier.fillMaxWidth().clickable(actionStartActivity(open)).padding(horizontal = 4.dp, vertical = 5.dp),
+            // A circle that ticks has room around it: the row's own goes.
+            GlanceModifier.fillMaxWidth().clickable(actionStartActivity(open))
+                .padding(horizontal = 4.dp, vertical = if (check && item is Item.Task) 0.dp else 5.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            WidgetMark(item is Item.Task, item.done(), widgetColor(e.color), 18.dp)
-            Spacer(GlanceModifier.width(8.dp))
+            if (item is Item.Task) {
+                TaskMark(item.task.uid, item.done(), check, widgetColor(e.color), 18.dp)
+            } else {
+                WidgetMark(false, false, widgetColor(e.color), 18.dp)
+            }
+            Spacer(GlanceModifier.width(if (check && item is Item.Task) 2.dp else 8.dp))
             Text(
                 when (val t = e.time) {
                     Time.AllDay -> tr("All day")

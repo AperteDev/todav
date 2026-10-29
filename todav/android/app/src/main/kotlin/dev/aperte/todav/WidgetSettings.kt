@@ -268,6 +268,19 @@ fun WidgetPage(app: TodavApp, id: Int, onBack: () -> Unit) {
                         })
                     },
                 )
+                // Where tasks show with their circles.
+                if (tasks || kind == WidgetKind.AGENDA) {
+                    Item(
+                        headlineContent = { Text(tr("Check Off Tasks")) },
+                        supportingContent = { Text(tr("A task’s circle completes or reopens it")) },
+                        trailingContent = {
+                            Switch(WidgetPrefs.check(context, id), {
+                                WidgetPrefs.setCheck(context, id, it)
+                                changed()
+                            })
+                        },
+                    )
+                }
             }
             if (!tasks) {
                 val own = WidgetPrefs.own(context, id)

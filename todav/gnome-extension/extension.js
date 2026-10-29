@@ -308,6 +308,8 @@ class TodavIndicator extends PanelMenu.Button {
         const on = key => at(key) === 'true' || (at(key) === 'clock' && !this._dateMenu);
         // A task or an event clicked opens its editor, else its place in Todav.
         this._edit = {tasks: on('edit_tasks'), events: on('edit_events')};
+        // A task's circle completes or reopens it (`ext_check_tasks`).
+        this._check = settings.ext_check_tasks === 'true';
         // Adding a task or an event with a button opening Todav, else a field (`ext_add_*_kind`).
         this._buttons = {task: at('add_task_kind') === 'button', event: at('add_event_kind') === 'button'};
         this._clockPlace(clock);
@@ -495,15 +497,41 @@ class TodavIndicator extends PanelMenu.Button {
         }
     }
 
-    /// Read-only: a circle, with a check in it when done; clicking opens the task in Todav, in
-    /// its list or its editor (`_edit`).
+    /// A task's circle (in `color`, its calendar's, in the agenda), with a check in it when done,
+    /// and its `title` struck through then. With `_check` (and a `uid`) the circle is a button
+    /// completing or reopening it; read-only otherwise.
+    _taskMark(uid, done, title, color = null) {
+        const props = {style_class: 'todav-mark', style: color ? `border-color: ${color};` : null, y_align: CENTER};
+        const check = this._check && uid;
+        const mark = check ? new St.Button({...props, style_class: 'todav-mark todav-check', can_focus: true}) : new St.Bin(props);
+        const show = d => {
+            mark.child = d ? new St.Icon({icon_name: 'object-select-symbolic', style_class: 'todav-mark-icon'}) : null;
+            title.style_class = d ? 'todav-task done' : 'todav-task';
+            title.opacity = d ? DIM : 255;
+            if (check)
+                mark.accessible_name = d ? pgettext('task', 'Reopen') : _('Mark as Done');
+        };
+        show(done);
+        if (!check)
+            return mark;
+        // At once, put back if the app refuses; the rest of the row still opens the task.
+        mark.connect('clicked', () => {
+            done = !done;
+            show(done);
+            this._proxy.SetDoneAsync(uid, done).catch(e => {
+                logError(e, 'Todav: SetDone failed');
+                done = !done;
+                show(done);
+            });
+        });
+        return mark;
+    }
+
+    /// A task's circle (`_taskMark`) and title; clicking opens the task in Todav, in its list or
+    /// its editor (`_edit`).
     _taskRow([uid, summary, , done, depth]) {
-        const mark = new St.Bin({style_class: 'todav-mark', y_align: CENTER});
-        if (done)
-            mark.child = new St.Icon({icon_name: 'object-select-symbolic', style_class: 'todav-mark-icon'});
-        const title = label(summary, done ? 'todav-task done' : 'todav-task', {x_expand: true});
-        if (done)
-            title.opacity = DIM;
+        const title = label(summary, 'todav-task', {x_expand: true});
+        const mark = this._taskMark(uid, done, title);
         const item = row([mark, title]);
         item.child.style = `padding-left: ${depth * 16}px;`;
         item.connect('clicked', () => this._open(p => (this._edit?.tasks
@@ -580,17 +608,10 @@ class TodavIndicator extends PanelMenu.Button {
     /// An event's dot or a task's circle (checked when done) in its calendar's colour, its time
     /// and title (a row of GetAgendaFrom: its UID and an event's start, for EditItem).
     _agendaRow(day, time, title, color, task, done, uid, start) {
-        let mark;
-        if (task) {
-            mark = new St.Bin({style_class: 'todav-mark', style: `border-color: ${color};`, y_align: CENTER});
-            if (done)
-                mark.child = new St.Icon({icon_name: 'object-select-symbolic', style_class: 'todav-mark-icon'});
-        } else {
-            mark = new St.Bin({style_class: 'todav-mark-slot', child: dot(color), y_align: CENTER});
-        }
-        const name = label(title, done ? 'todav-task done' : 'todav-task', {x_expand: true});
-        if (done)
-            name.opacity = DIM;
+        const name = label(title, 'todav-task', {x_expand: true});
+        const mark = task
+            ? this._taskMark(uid, done, name, color)
+            : new St.Bin({style_class: 'todav-mark-slot', child: dot(color), y_align: CENTER});
         const item = row([mark, label(time, 'todav-time'), name]);
         // Its editor if `_edit` says so for tasks or events, else (and from an app without
         // EditItem: no UID in the row) its day.

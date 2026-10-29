@@ -16,6 +16,7 @@ const XML: &str = r#"<node>
   <method name="ShowList"><arg direction="in" name="list" type="s"/></method>
   <method name="NewTask"><arg direction="in" name="list" type="s"/></method>
   <method name="ShowTask"><arg direction="in" name="uid" type="s"/></method>
+  <method name="SetDone"><arg direction="in" name="uid" type="s"/><arg direction="in" name="done" type="b"/></method>
   <method name="GetDays"><arg direction="in" name="from" type="x"/><arg direction="in" name="days" type="u"/><arg direction="out" type="aas"/></method>
   <method name="GetAgenda"><arg direction="in" name="days" type="u"/><arg direction="out" type="a(xsssbb)"/></method>
   <method name="GetAgendaFrom"><arg direction="in" name="from" type="x"/><arg direction="in" name="days" type="u"/><arg direction="out" type="a(xsssbbsx)"/></method>
@@ -126,6 +127,13 @@ fn call(method: &str, params: &glib::Variant) -> Result<Option<glib::Variant>, S
         "ShowTask" => {
             let (uid,) = params.get::<(String,)>().ok_or_else(bad)?;
             window::show_task(&uid);
+            None
+        }
+        // Ticked in the extension, which cannot ask about subtasks.
+        "SetDone" => {
+            let (uid, done) = params.get::<(String, bool)>().ok_or_else(bad)?;
+            todav_app::tasks::set_done_unasked(c, &uid, done).map_err(|e| e.to_string())?;
+            request_sync();
             None
         }
         "NewEvent" => {

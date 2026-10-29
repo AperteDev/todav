@@ -24,7 +24,11 @@ import androidx.glance.GlanceTheme
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.action.Action
+import androidx.glance.action.ActionParameters
+import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
+import androidx.glance.appwidget.action.ActionCallback
+import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
@@ -150,9 +154,13 @@ object WidgetPrefs {
     fun add(c: Context, id: Int) = prefs(c).getBoolean("$id.add", true)
     fun setAdd(c: Context, id: Int, v: Boolean) = prefs(c).edit().putBoolean("$id.add", v).apply()
 
+    /** Whether a task's circle on a widget (the task list, the agenda) completes or reopens it. */
+    fun check(c: Context, id: Int) = prefs(c).getBoolean("$id.check", false)
+    fun setCheck(c: Context, id: Int, v: Boolean) = prefs(c).edit().putBoolean("$id.check", v).apply()
+
     /** A removed widget's settings go. */
     fun forget(c: Context, id: Int) = prefs(c).edit().apply {
-        for (k in listOf("$id", "$id.account", "$id.calendars", "$id.add", "$id.own")) remove(k)
+        for (k in listOf("$id", "$id.account", "$id.calendars", "$id.add", "$id.own", "$id.check")) remove(k)
     }.apply()
 }
 
@@ -359,6 +367,33 @@ fun WidgetMark(task: Boolean, done: Boolean, color: androidx.glance.unit.ColorPr
     colorFilter = ColorFilter.tint(color),
 )
 
+private val TICK_UID = ActionParameters.Key<String>("uid")
+private val TICK_DONE = ActionParameters.Key<Boolean>("done")
+
+/** A task's circle tapped on a widget that may (`WidgetPrefs.check`): completed or reopened. */
+class Tick : ActionCallback {
+    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
+        val uid = parameters[TICK_UID] ?: return
+        val app = context.applicationContext as TodavApp
+        app.awaitReady()
+        app.core.setDoneUnasked(uid, parameters[TICK_DONE] ?: true)
+        app.core.requestSync()
+        app.changed()
+        val id = GlanceAppWidgetManager(context).getAppWidgetId(glanceId)
+        WidgetKind.of(context, id)?.widget()?.update(context, glanceId)
+    }
+}
+
+/** Task `uid`'s circle; with `check`, tapping it (with room around it for a finger) ticks it. */
+@Composable
+fun TaskMark(uid: String, done: Boolean, check: Boolean, color: androidx.glance.unit.ColorProvider, size: Dp = 20.dp) {
+    if (!check) return WidgetMark(true, done, color, size)
+    Box(
+        GlanceModifier.cornerRadius(size).clickable(actionRunCallback<Tick>(actionParametersOf(TICK_UID to uid, TICK_DONE to !done)))
+            .padding(6.dp),
+    ) { WidgetMark(true, done, color, size) }
+}
+
 /** A list's colour for a widget. */
 fun widgetColor(hex: String?) = FixedColor(parseColor(hex))
 
@@ -408,13 +443,15 @@ private sealed interface TaskLine {
 
 /**
  * The task widget, as the GNOME extension's task column: a list (or Upcoming, Important) under
- * its name, by category, subtasks under their tasks, done ones struck through; read-only, a
- * task opens in the app. Its account, list and add button are picked in its settings.
+ * its name, by category, subtasks under their tasks, done ones struck through; a task opens in
+ * the app, and its circle ticks it if the widget's settings say so. Its account, list and add
+ * button are picked there too.
  */
 class TasksWidget : TodavWidget() {
     @Composable
     override fun Content(context: Context, app: TodavApp, widget: Int, changes: Long) {
         val (title, color, href, lines) = remember(changes) { content(context, app, widget) }
+        val check = WidgetPrefs.check(context, widget)
         val add = Intent(context, MainActivity::class.java).setAction(MainActivity.NEW_TASK)
             .apply { if (href != UPCOMING && href != IMPORTANT) putExtra("list", href) }
             .setData(Uri.parse("todav-add://$widget"))
@@ -441,7 +478,7 @@ class TasksWidget : TodavWidget() {
                 items(lines) { line ->
                     when (line) {
                         is TaskLine.Heading -> WidgetHeading(line.text)
-                        is TaskLine.Task -> TaskRow(context, line)
+                        is TaskLine.Task -> TaskRow(context, line, check)
                     }
                 }
             }
@@ -449,15 +486,15 @@ class TasksWidget : TodavWidget() {
     }
 
     @Composable
-    private fun TaskRow(context: Context, line: TaskLine.Task) {
+    private fun TaskRow(context: Context, line: TaskLine.Task, check: Boolean) {
         val t = line.task
         Row(
             GlanceModifier.fillMaxWidth().clickable(actionStartActivity(openTask(context, t.uid)))
-                .padding(start = (4 + line.depth * 20).dp, top = 5.dp, bottom = 5.dp, end = 4.dp),
+                .padding(start = (4 + line.depth * 20).dp, top = if (check) 0.dp else 5.dp, bottom = if (check) 0.dp else 5.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            WidgetMark(true, t.done, GlanceTheme.colors.onSurfaceVariant)
-            Spacer(GlanceModifier.width(10.dp))
+            TaskMark(t.uid, t.done, check, GlanceTheme.colors.onSurfaceVariant)
+            Spacer(GlanceModifier.width(if (check) 4.dp else 10.dp))
             Text(
                 t.summary,
                 maxLines = 1,

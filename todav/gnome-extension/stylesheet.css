@@ -28,6 +28,8 @@
 /* Done or not, the same circle; done adds a check in it. */
 .todav-mark { width: 14px; height: 14px; border-radius: 99px; border: 1.5px solid rgba(128, 128, 128, 0.85); }
 .todav-mark-icon { icon-size: 10px; }
+/* A circle that ticks the task (`ext_check_tasks`): filled a little under the pointer. */
+.todav-check:hover, .todav-check:focus { background-color: rgba(128, 128, 128, 0.35); }
 .todav-task.done { text-decoration: line-through; }
 
 .todav-entry { margin-top: 6px; }

@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Checking off tasks outside the app, off by default: a task's circle completes or reopens it
+  in the GNOME extension (Preferences → Extension → Tasks → Check off tasks; in the task list
+  and the agenda) and in Android's task and agenda widgets (each widget's settings → Check Off
+  Tasks). Subtasks follow as Settings → Tasks say, when they would be asked about: then they
+  stay as they are.
 - A sort button next to Search on the task page picks the task order. Settings → Tasks → Sort
   is now Sort at start: the last used (the default, so the order picked last stays), or one the
   app sorts by whenever it opens.
