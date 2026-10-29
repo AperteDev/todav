@@ -82,7 +82,7 @@ function entry(hint, done) {
 
 /// In place of a field, a flat row reading as a link: `done` on a click.
 function button(text, done) {
-    const b = row([label(text, 'todav-add-label')], 'todav-row todav-add');
+    const b = row([label(text, null)], 'todav-row todav-add');
     b.connect('clicked', done);
     return b;
 }
