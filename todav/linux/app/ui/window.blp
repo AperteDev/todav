@@ -166,6 +166,14 @@ Adw.ApplicationWindow window {
                       }
                     }
                   }
+
+                  // As Preferences → Tasks → Sort.
+                  [end]
+                  Gtk.MenuButton {
+                    icon-name: "view-sort-descending-symbolic";
+                    tooltip-text: _("Sort");
+                    menu-model: sort_menu;
+                  }
                 }
 
                 // A newer version installed, and accounts that are not connected (src/window.rs
@@ -264,6 +272,47 @@ Adw.ApplicationWindow window {
 
     setters {
       split.collapsed: true;
+    }
+  }
+}
+
+// Targets as prefs::SORTS.
+menu sort_menu {
+  section {
+    item {
+      label: _("Manual");
+      action: "win.task-sort";
+      target: "manual";
+    }
+
+    item {
+      label: _("Newest first");
+      action: "win.task-sort";
+      target: "newest";
+    }
+
+    item {
+      label: _("Oldest first");
+      action: "win.task-sort";
+      target: "oldest";
+    }
+
+    item {
+      label: _("Due date, soonest first");
+      action: "win.task-sort";
+      target: "due_soonest";
+    }
+
+    item {
+      label: _("Due date, latest first");
+      action: "win.task-sort";
+      target: "due_latest";
+    }
+
+    item {
+      label: _("Priority, highest first");
+      action: "win.task-sort";
+      target: "priority";
     }
   }
 }

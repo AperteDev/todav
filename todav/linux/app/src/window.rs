@@ -1022,6 +1022,21 @@ fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
     });
     ui.window.add_action(&prefs);
 
+    // The header's sort menu: the task sort of Preferences (its state set with each rebuild).
+    let sort = gio::SimpleAction::new_stateful(
+        "task-sort",
+        Some(glib::VariantTy::STRING),
+        &"manual".to_variant(),
+    );
+    sort.connect_change_state(|a, v| {
+        if let Some(s) = v.and_then(|v| v.str()) {
+            a.set_state(&s.to_variant());
+            let _ = core().set_setting("task_sort".into(), s.into());
+            refresh();
+        }
+    });
+    ui.window.add_action(&sort);
+
     // Undo the latest change; in a text field, the typing there.
     let window = ui.window.downgrade();
     let undo_last = gio::SimpleAction::new("undo", None);
@@ -1412,6 +1427,15 @@ fn refresh_tasks(ui: &Rc<Ui>) {
         .and_downcast::<gtk::ScrolledWindow>()
         .map(|s| s.vadjustment());
     let keep = adj.as_ref().map(|a| a.value());
+    // Only shown: changing it would save it again.
+    if let Some(a) = ui
+        .window
+        .lookup_action("task-sort")
+        .and_downcast::<gio::SimpleAction>()
+    {
+        let i = prefs::sort_index(core(), "task_sort");
+        a.set_state(&prefs::SORTS[i].0.to_variant());
+    }
     rebuild_tasks(ui);
     if let (Some(adj), Some(v)) = (adj, keep) {
         adj.set_value(v);
