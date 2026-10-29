@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   menu, it opens the clock menu.
 - Extension: Preferences → Extension → Order puts the calendar before the tasks in its own menu
   (on the left in two columns, on top in one).
+- Extension: a right click on its icon opens a menu with Open Todav and Preferences (Todav's,
+  on the Extension page).
 
 ## [2.1.0] - 2026-10-28
 

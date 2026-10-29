@@ -124,10 +124,39 @@ class TodavIndicator extends PanelMenu.Button {
             }
         });
         this._placeholder(_('Starting…'));
-        // With nothing in its own menu but something in the clock menu, the icon opens that.
+        this._contextSetup();
+        // A right click opens the context menu. With nothing in its own menu but something in the
+        // clock menu, the icon opens that.
         const toggle = this.menu.toggle.bind(this.menu);
-        this.menu.toggle = () => (this._toClock ? this._dateMenu.menu.toggle() : toggle());
+        this.menu.toggle = () => {
+            if (Clutter.get_current_event()?.get_button() === Clutter.BUTTON_SECONDARY)
+                this._context.toggle();
+            else if (this._toClock)
+                this._dateMenu.menu.toggle();
+            else
+                toggle();
+        };
         this._clockSetup();
+    }
+
+    /// Open Todav, and the extension's preferences: Todav's, on the Extension page, asked
+    /// directly (the Extensions app's settings window would only flash up to ask it).
+    _contextSetup() {
+        this._context = new PopupMenu.PopupMenu(this, 0.5, St.Side.TOP);
+        Main.uiGroup.add_child(this._context.actor);
+        this._context.actor.hide();
+        Main.panel.menuManager.addMenu(this._context);
+        // Highlighted while open, as for its main menu.
+        this._context.connect('open-state-changed', (_menu, open) => {
+            if (open)
+                this.add_style_pseudo_class('active');
+            else
+                this.remove_style_pseudo_class('active');
+        });
+        this._context.addAction(_('Open Todav'), () => this._open(p => p.ShowListAsync(this._pinned ?? '')));
+        const args = new GLib.Variant('(sava{sv})', ['show-preferences', [new GLib.Variant('s', 'extension')], {}]);
+        this._context.addAction(_('Preferences'), () => this._open(() => Gio.DBus.session.call(BUS_NAME,
+            OBJECT_PATH, 'org.freedesktop.Application', 'ActivateAction', args, null, Gio.DBusCallFlags.NONE, -1, null)));
     }
 
     /// GNOME's clock menu: a place for the month next to its calendar, one for the agenda and the
@@ -215,6 +244,7 @@ class TodavIndicator extends PanelMenu.Button {
         ]);
         const pinned = lists.find(l => l[0] === settings.ext_list) ?? lists[0];
         this._count.text = pinned && pinned[2] > 0 ? `${pinned[2]}` : '';
+        this._pinned = pinned?.[0];
         // Without a clock menu to go in, its parts stay here.
         const at = key => settings[`ext_${key}`];
         const clock = key => Boolean(this._dateMenu) && at(key) === 'clock';
@@ -557,6 +587,7 @@ class TodavIndicator extends PanelMenu.Button {
 
     destroy() {
         this._destroyed = true;
+        this._context.destroy();
         if (this._dateMenu) {
             this._clockPlace(() => false);
             this._dateMenu.menu.disconnect(this._clockOpenId);
