@@ -175,6 +175,13 @@ These build the latest release from source; `todav-bin` and `gnome-shell-extensi
 install the prebuilt release instead, and `todav-git` and `gnome-shell-extension-todav-git` build
 the latest commit.
 
+**Fedora** 43 and newer: install from [COPR](https://copr.fedorainfracloud.org/coprs/selfref/todav/):
+
+```sh
+sudo dnf copr enable selfref/todav
+sudo dnf install todav gnome-shell-extension-todav
+```
+
 **Other distributions:** download a package from the
 [latest release](https://github.com/AperteDev/todav/releases/latest):
 

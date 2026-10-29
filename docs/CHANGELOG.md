@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   colours stay on each device. Google keeps a task's title, notes, done, a due date without a
   time, subtasks and order only, so the edit dialog offers just those, rows have no star or
   pin, and the calendar plans these tasks onto days, not into hours.
+- Fedora packages on COPR (`selfref/todav`), built with each release.
 
 ## [2.2.0] - 2026-10-29
 
