@@ -58,8 +58,8 @@ development:
 - Task lists from your Nextcloud calendars; create, rename, recolour and delete lists.
 - Categories (CalDAV `CATEGORIES`), shown as groups or tags, with a category filter in the
   sidebar.
-- Subtasks, nested to any depth, manual order by drag and drop (the same order Nextcloud Tasks uses), sorting by due
-  date or priority, and notes.
+- Subtasks, nested to any depth, manual order by drag and drop (the same order Nextcloud Tasks uses), sorting by
+  creation date, due date or priority from the task page, and notes.
 - Priority on a star, coloured by its level and set from its menu, as Nextcloud Tasks stars
   tasks; an Important page with the high-priority tasks of every list.
 - Pinned tasks stay at the top of their list.
@@ -100,10 +100,13 @@ development:
   sidebar groups lists by account, in the order you drag them into.
 - Runs in the background: closing the window hides it, and reminders and sync keep working.
   Starts with your session.
-- A **GNOME Shell extension** with the open-task count in the top bar and a menu showing a task
-  list, a month calendar and the coming week's agenda; it can add tasks and events and opens the app
-  where you click. Each part can go in GNOME's clock menu instead, in place of its calendar and
-  events.
+- A **GNOME Shell extension**: an icon by the clock, with a count of your choice (open tasks,
+  tasks due, important tasks or today's events), and a menu showing a task list, a month calendar
+  and the agenda of the coming days (or of a day clicked in the month); it can add tasks and
+  events and opens the app where you click. Or put it all in GNOME's clock menu, in place of its
+  calendar and events, with one click in Preferences → Extension, or each part where you like.
+- Can be the system's calendar app (Preferences → General), which the date in GNOME's clock menu
+  opens.
 - Follows the system style (light/dark), adaptive layout for narrow windows and touchscreens,
   keyboard shortcuts.
 
