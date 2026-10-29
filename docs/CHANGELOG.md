@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Android: a low month planner widget shows slimmer bars, as Fossify Calendar's, before none.
+- Android: a list or calendar held in the sidebar to move it rises off it, with a shadow.
 - Extension: its icon sits in the middle of the top bar, next to the clock; Preferences →
   Extension → Icon puts it back on the right.
 - Extension: a day clicked in the month shows that day in the agenda, and an event added then

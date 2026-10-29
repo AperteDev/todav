@@ -352,6 +352,8 @@ private fun Sidebar(model: Main, screen: Screen, view: View, modifier: Modifier,
     fun Modifier.movable(key: String, among: List<String>?): Modifier {
         val held = moving?.key == key
         val aside by animateFloatAsState(if (held) 0f else moving?.offset(key, row) ?: 0f, label = "aside")
+        // Held, it rises off the drawer: a shadow in its pill's shape, a little larger.
+        val lift by animateFloatAsState(if (held) 1f else 0f, label = "lift")
         return holdToMove(
             among != null,
             onMove = { dy ->
@@ -369,7 +371,13 @@ private fun Sidebar(model: Main, screen: Screen, view: View, modifier: Modifier,
                     model.reorderLists(m.order(row))
                 }
             },
-        ).zIndex(if (held) 1f else 0f).graphicsLayer { translationY = if (held) moving?.shift ?: 0f else aside }
+        ).zIndex(if (held) 1f else 0f).graphicsLayer {
+            translationY = if (held) moving?.shift ?: 0f else aside
+            shadowElevation = 8.dp.toPx() * lift
+            shape = CircleShape
+            scaleX = 1f + 0.02f * lift
+            scaleY = scaleX
+        }
     }
     LazyColumn(
         modifier.background(MaterialTheme.colorScheme.surfaceContainerLow)
@@ -401,7 +409,7 @@ private fun Sidebar(model: Main, screen: Screen, view: View, modifier: Modifier,
                             close()
                         },
                         colors = heldColors(moving?.key == place.key),
-                        modifier = Modifier.movable(place.key, among).padding(horizontal = 12.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp).movable(place.key, among),
                     )
                 }
             }
@@ -425,7 +433,7 @@ private fun Sidebar(model: Main, screen: Screen, view: View, modifier: Modifier,
                     selected = false,
                     onClick = { model.setShown(c.href, !c.shown) },
                     colors = heldColors(moving?.key == c.href),
-                    modifier = Modifier.movable(c.href, among).padding(horizontal = 12.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp).movable(c.href, among),
                 )
                 }
             }
