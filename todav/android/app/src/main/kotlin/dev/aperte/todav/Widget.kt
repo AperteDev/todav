@@ -295,9 +295,12 @@ fun weekendColor(c: Context, variant: Boolean, dim: Boolean = false): androidx.g
     return ColorProvider(tint(light, Color(0xFFBA1A1A)), tint(dark, Color(0xFFFFB4AB)))
 }
 
-/** A widget's background in the system's colours or its own, with the opacity and corners set for all. */
+/**
+ * A widget's background in the system's colours or its own, with the opacity and corners set for
+ * all; `onClick` for a tap where nothing else in it takes one.
+ */
 @Composable
-fun WidgetFrame(context: Context, content: @Composable ColumnScope.() -> Unit) {
+fun WidgetFrame(context: Context, onClick: Action? = null, content: @Composable ColumnScope.() -> Unit) {
     val alpha = WidgetPrefs.opacity(context) / 100f
     val (day, night) = when {
         !WidgetPrefs.dynamic(context) -> Color(WidgetPrefs.color(context, "bg_light")) to Color(WidgetPrefs.color(context, "bg_dark"))
@@ -306,7 +309,7 @@ fun WidgetFrame(context: Context, content: @Composable ColumnScope.() -> Unit) {
     }
     Column(
         GlanceModifier.fillMaxSize().background(ColorProvider(day.copy(alpha = alpha), night.copy(alpha = alpha)))
-            .cornerRadius(WidgetPrefs.radius(context).dp).padding(10.dp),
+            .cornerRadius(WidgetPrefs.radius(context).dp).let { m -> onClick?.let { m.clickable(it) } ?: m }.padding(10.dp),
         content = content,
     )
 }
@@ -455,10 +458,12 @@ class TasksWidget : TodavWidget() {
         val add = Intent(context, MainActivity::class.java).setAction(MainActivity.NEW_TASK)
             .apply { if (href != UPCOMING && href != IMPORTANT) putExtra("list", href) }
             .setData(Uri.parse("todav-add://$widget"))
-        WidgetFrame(context) {
+        // Anywhere but a task or a button: the list in the app, as its name.
+        val list = actionStartActivity(openList(context, href))
+        WidgetFrame(context, list.takeIf { href != null }) {
             Row(GlanceModifier.fillMaxWidth().padding(start = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Row(
-                    GlanceModifier.defaultWeight().clickable(actionStartActivity(openList(context, href))),
+                    GlanceModifier.defaultWeight().clickable(list),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (color != null) {
