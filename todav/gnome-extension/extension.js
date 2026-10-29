@@ -165,7 +165,8 @@ class TodavIndicator extends PanelMenu.Button {
         if (!calendar?.get_parent() || !events?.get_parent())
             return;
         this._dateMenu = dateMenu;
-        this._clockMonth = new St.Bin({style_class: 'todav-clock-month', x_expand: true, visible: false});
+        // A box: the month takes all its width (a bin keeps it at its own).
+        this._clockMonth = new St.BoxLayout({style_class: 'todav-clock-month', orientation: VERTICAL, x_expand: true, visible: false});
         calendar.get_parent().insert_child_above(this._clockMonth, calendar);
         this._clockBox = new St.BoxLayout({orientation: VERTICAL, x_expand: true});
         events.get_parent().insert_child_above(this._clockBox, events);
@@ -211,7 +212,16 @@ class TodavIndicator extends PanelMenu.Button {
         if (clock('tasks') || clock('add_task'))
             cards.push(card([await this._tasksColumn(data, clock)]));
         this._month = null;
-        this._clockMonth.child = clock('month') ? this._monthView(on('month_dots')) : null;
+        this._clockMonth.destroy_all_children();
+        if (clock('month')) {
+            // As wide as the calendar, the column too: measured shown, as hidden (or at Shell
+            // start) it says less.
+            const calendar = this._dateMenu._calendar;
+            calendar.show();
+            this._clockMonth.min_width = calendar.get_preferred_width(-1)[1];
+            calendar.hide();
+            this._clockMonth.add_child(this._monthView(on('month_dots')));
+        }
         this._clockBox.destroy_all_children();
         cards.forEach(c => this._clockBox.add_child(c));
     }
@@ -374,11 +384,16 @@ class TodavIndicator extends PanelMenu.Button {
         };
         if (has('tasks')) {
             const arrow = new St.Icon({icon_name: 'pan-down-symbolic', style_class: 'todav-arrow'});
-            const header = row([dot(color), label(name, 'todav-header-name', {x_expand: true}), arrow], 'todav-row todav-header');
+            const mark = dot(color);
+            const title = label(name, 'todav-header-name', {x_expand: true});
+            const header = row([mark, title, arrow], 'todav-row todav-header');
             header.accessible_name = _('%s, choose another list').replace('%s', name);
+            // While the lists show, it says what they are for rather than the list they replace.
             header.connect('clicked', () => {
                 this._choosing = !this._choosing;
                 arrow.icon_name = this._choosing ? 'pan-up-symbolic' : 'pan-down-symbolic';
+                title.text = this._choosing ? _('Choose a list') : name;
+                mark.visible = !this._choosing;
                 fill().catch(e => logError(e, 'Todav: cannot show the list'));
             });
             col.add_child(header);
