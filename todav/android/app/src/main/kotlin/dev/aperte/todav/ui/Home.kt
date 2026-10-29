@@ -351,9 +351,14 @@ private fun Sidebar(model: Main, screen: Screen, view: View, modifier: Modifier,
     @Composable
     fun Modifier.movable(key: String, among: List<String>?): Modifier {
         val held = moving?.key == key
-        val aside by animateFloatAsState(if (held) 0f else moving?.offset(key, row) ?: 0f, label = "aside")
-        // Held, it rises off the drawer: a shadow in its pill's shape, a little larger.
-        val lift by animateFloatAsState(if (held) 1f else 0f, label = "lift")
+        // Out of the way of the held row, eased; dropped, in its new place at once, where the
+        // lists take their new order (easing back from there would draw it over the next one).
+        val easing by animateFloatAsState(if (held) 0f else moving?.offset(key, row) ?: 0f, label = "aside")
+        val aside = if (moving != null) easing else 0f
+        // Held, it rises off the drawer: a shadow in its pill's shape, a little larger. Dropped,
+        // it lands at once: a shadow fading under the rows it went back among flickers dark.
+        val rising by animateFloatAsState(if (held) 1f else 0f, label = "lift")
+        val lift = if (held) rising else 0f
         return holdToMove(
             among != null,
             onMove = { dy ->
