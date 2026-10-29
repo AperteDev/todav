@@ -440,6 +440,12 @@ Adw.PreferencesDialog dialog {
         model: Gtk.StringList { strings [_("Next to the clock"), _("On the right")] };
       }
 
+      Adw.ComboRow ext_count {
+        title: _("Number by the icon");
+        // Open tasks: of the list its menu shows.
+        model: Gtk.StringList { strings [_("Open tasks"), _("Due today or earlier"), _("Important tasks"), _("Today’s events"), _("None")] };
+      }
+
       Adw.SwitchRow ext_open {
         title: _("“Open Todav” button");
       }

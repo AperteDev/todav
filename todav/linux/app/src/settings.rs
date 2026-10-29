@@ -28,10 +28,11 @@ pub fn apply_color_scheme() {
 /// The GNOME extension's options (Preferences → Extension, synced like the rest) with their
 /// defaults; it reads them over D-Bus. `ext_list` is the list it shows (empty: the first). A part
 /// (`EXTENSION_PARTS`) is in its own menu (`true`), the clock menu (`clock`) or not shown.
-pub const EXTENSION: [(&str, &str); 12] = [
+pub const EXTENSION: [(&str, &str); 13] = [
     ("ext_columns", "double"),
     ("ext_order", "tasks"),
     ("ext_icon", "center"),
+    ("ext_count", "list"),
     ("ext_tasks", "true"),
     ("ext_subtasks", "true"),
     ("ext_add_task", "true"),
@@ -307,6 +308,12 @@ pub fn present(parent: &adw::ApplicationWindow, page: Option<&str>) -> adw::Pref
     connect_choice(&b, "ext_columns", &["double", "single"]);
     connect_choice(&b, "ext_order", &["tasks", "calendar"]);
     connect_choice(&b, "ext_icon", &["center", "right"]);
+    connect_choice(
+        &b,
+        "ext_count",
+        &["list", "due", "important", "events", "none"],
+    );
+    get::<adw::ComboRow>(&b, "ext_count").connect_selected_notify(move |_| ext_changed());
     for key in EXTENSION_PARTS {
         connect_choice(&b, key, &["true", "clock", "false"]);
         get::<adw::ComboRow>(&b, key).connect_selected_notify(move |_| ext_changed());

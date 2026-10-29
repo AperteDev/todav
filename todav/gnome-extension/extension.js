@@ -86,6 +86,7 @@ class TodavIndicator extends PanelMenu.Button {
         super._init(0.5, 'Todav');
         this.add_style_class_name('todav-button');
         this._proxy = null;
+        this._midnight();
 
         const box = new St.BoxLayout({style_class: 'todav-panel'});
         // Its own copy of the app's symbolic icon (linux/data), found whether or not the app is installed.
@@ -250,6 +251,18 @@ class TodavIndicator extends PanelMenu.Button {
         box.insert_child_at_index(this.container, center ? clock + 1 : 0);
     }
 
+    /// What is due today, today's events and the agenda's days change at midnight: the number
+    /// read again then (the menus, on open).
+    _midnight() {
+        const now = GLib.DateTime.new_now_local();
+        const next = GLib.DateTime.new_local(now.get_year(), now.get_month(), now.get_day_of_month(), 0, 0, 1).add_days(1);
+        this._midnightId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, Math.ceil(next.difference(now) / 1e6), () => {
+            this._refreshCount();
+            this._midnight();
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
     _updateState() {
         const state = this._proxy?.g_name_owner ? this._proxy.SyncState ?? '' : '';
         this._warning.visible = state.startsWith('error:');
@@ -263,7 +276,17 @@ class TodavIndicator extends PanelMenu.Button {
             this._proxy.GetListsAsync(),
         ]);
         const pinned = lists.find(l => l[0] === settings.ext_list) ?? lists[0];
-        this._count.text = pinned && pinned[2] > 0 ? `${pinned[2]}` : '';
+        // The number by the icon (`ext_count`): the list's open tasks, or one of GetCounts'.
+        const kind = settings.ext_count ?? 'list';
+        let count = kind === 'list' ? pinned?.[2] ?? 0 : 0;
+        if (kind !== 'list' && kind !== 'none') {
+            const [counts] = await this._proxy.GetCountsAsync().catch(e => {
+                logError(e, 'Todav: cannot read the counts');
+                return [{}];
+            });
+            count = counts[kind] ?? 0;
+        }
+        this._count.text = count > 0 ? `${count}` : '';
         this._pinned = pinned?.[0];
         // Without a clock menu to go in, its parts stay here.
         const at = key => settings[`ext_${key}`];
@@ -606,6 +629,7 @@ class TodavIndicator extends PanelMenu.Button {
 
     destroy() {
         this._destroyed = true;
+        GLib.source_remove(this._midnightId);
         this._context.destroy();
         if (this._dateMenu) {
             this._clockPlace(() => false);

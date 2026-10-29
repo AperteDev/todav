@@ -15,6 +15,7 @@ const XML = `<node>
   <method name="ShowTask"><arg direction="in" name="uid" type="s"/></method>
   <method name="GetDays"><arg direction="in" name="from" type="x"/><arg direction="in" name="days" type="u"/><arg direction="out" type="aas"/></method>
   <method name="GetAgenda"><arg direction="in" name="days" type="u"/><arg direction="out" type="a(xsssbb)"/></method>
+  <method name="GetCounts"><arg direction="out" type="a{su}"/></method>
   <method name="ShowDay"><arg direction="in" name="at" type="x"/></method>
   <method name="NewEvent"><arg direction="in" name="summary" type="s"/></method>
   <method name="GetSettings"><arg direction="out" type="a{ss}"/></method>

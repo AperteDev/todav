@@ -17,6 +17,7 @@ const XML: &str = r#"<node>
   <method name="ShowTask"><arg direction="in" name="uid" type="s"/></method>
   <method name="GetDays"><arg direction="in" name="from" type="x"/><arg direction="in" name="days" type="u"/><arg direction="out" type="aas"/></method>
   <method name="GetAgenda"><arg direction="in" name="days" type="u"/><arg direction="out" type="a(xsssbb)"/></method>
+  <method name="GetCounts"><arg direction="out" type="a{su}"/></method>
   <method name="ShowDay"><arg direction="in" name="at" type="x"/></method>
   <method name="NewEvent"><arg direction="in" name="summary" type="s"/></method>
   <method name="GetSettings"><arg direction="out" type="a{ss}"/></method>
@@ -163,6 +164,25 @@ fn call(method: &str, params: &glib::Variant) -> Result<Option<glib::Variant>, S
             let (days,) = params.get::<(u32,)>().ok_or_else(bad)?;
             let items = crate::calendar::agenda(i64::from(days.min(31)));
             Some((items,).to_variant())
+        }
+        // What the number by the extension's icon can count (`ext_count`, besides a list's open
+        // tasks): tasks due today or earlier (Upcoming's count), important tasks, today's events.
+        "GetCounts" => {
+            let now = c.local_now();
+            let due = c
+                .upcoming()
+                .iter()
+                .filter(|t| todav_app::dates::pressing(t, now))
+                .count();
+            let counts = HashMap::from([
+                ("due".to_string(), due as u32),
+                ("important".to_string(), c.important().len() as u32),
+                (
+                    "events".to_string(),
+                    todav_app::calendar::today_events(c).len() as u32,
+                ),
+            ]);
+            Some((counts,).to_variant())
         }
         "ShowDay" => {
             let (at,) = params.get::<(i64,)>().ok_or_else(bad)?;

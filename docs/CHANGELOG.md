@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fields for adding), and Custom for each part (the task list, the month, the agenda, the
   fields for adding a task and an event) in either menu or nowhere. The icon shows only with
   something in its menu.
+- Extension: Preferences → Extension → Number by the icon: the open tasks of the list shown
+  (as before), tasks due today or earlier, important tasks, today's events, or none.
 - Extension: Preferences → Extension → Order puts the calendar before the tasks in its own menu
   (on the left in two columns, on top in one).
 - Extension: a right click on its icon opens a menu with Open Todav and Preferences (Todav's,
