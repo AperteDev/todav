@@ -293,15 +293,16 @@ class TodavIndicator extends PanelMenu.Button {
         const calendar = on('month') || on('agenda') || on('add_event') ? await this._calendarColumn(on) : null;
         this.menu.removeAll();
 
-        // Side by side (tasks left), or one under the other.
+        // Side by side, or one under the other; tasks first unless `ext_order` says otherwise.
         const double = settings.ext_columns !== 'single';
         const columns = new St.BoxLayout({style_class: 'todav-columns', orientation: double ? HORIZONTAL : VERTICAL});
-        if (tasks)
-            columns.add_child(tasks);
-        if (tasks && calendar)
+        const [first, second] = settings.ext_order === 'calendar' ? [calendar, tasks] : [tasks, calendar];
+        if (first)
+            columns.add_child(first);
+        if (first && second)
             columns.add_child(new St.Widget({style_class: double ? 'todav-vsep' : 'todav-hsep'}));
-        if (calendar)
-            columns.add_child(calendar);
+        if (second)
+            columns.add_child(second);
         if (tasks || calendar)
             this.menu.addMenuItem(holder(columns, 'todav-item'));
         if (on('open')) {

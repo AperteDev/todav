@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   place of its events, with the task list under them; Preferences → Extension says where. Its
   icon can sit in the middle of the top bar, after the clock; with nothing left in its own
   menu, it opens the clock menu.
+- Extension: Preferences → Extension → Order puts the calendar before the tasks in its own menu
+  (on the left in two columns, on top in one).
 
 ## [2.1.0] - 2026-10-28
 

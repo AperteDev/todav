@@ -306,8 +306,13 @@ Adw.PreferencesDialog dialog {
 
       Adw.ComboRow ext_columns {
         title: _("Layout");
-        subtitle: _("Two columns: tasks on the left, calendar on the right");
         model: Gtk.StringList { strings [_("Two columns"), _("One column")] };
+      }
+
+      Adw.ComboRow ext_order {
+        title: _("Order");
+        subtitle: _("Left in two columns, on top in one");
+        model: Gtk.StringList { strings [_("Tasks first"), _("Calendar first")] };
       }
 
       Adw.ComboRow ext_icon {
