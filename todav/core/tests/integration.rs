@@ -557,3 +557,121 @@ fn events_sync_with_their_zone_and_recurrence() {
             .all(|e| e.list_href != f.href)
     );
 }
+
+/// Against a Google account: `TODAV_GOOGLE_URL` (its CalDAV principal) and a fresh access
+/// token with the `tasks` scope in `TODAV_GOOGLE_TOKEN`; skipped without them.
+#[test]
+fn google_tasks_round_trip() {
+    let (Some(url), Some(token)) = (get("TODAV_GOOGLE_URL"), get("TODAV_GOOGLE_TOKEN")) else {
+        eprintln!("no TODAV_GOOGLE_URL and TODAV_GOOGLE_TOKEN: skipped");
+        return;
+    };
+    let device = |dev: &str| {
+        let dir = std::env::temp_dir().join(format!("todav-it-google-{dev}-{}", now()));
+        let c = Client::open(dir.to_string_lossy().to_string()).unwrap();
+        let id = c
+            .add_account(AccountKind::Google, url.clone(), "it".into(), "".into())
+            .unwrap();
+        c.connect(id, token.clone()).unwrap();
+        c.sync().into_result().unwrap();
+        (c, id)
+    };
+    let ((a, id), (b, _)) = (device("a"), device("b"));
+    let list = a
+        .create_list(id, "it-google".into(), "#B6469D".into(), false)
+        .unwrap();
+    assert!(list.starts_with(todav_core::gtasks::API));
+    assert!(a.calendars().iter().all(|l| l.href != list), "tasks only");
+    let add = |s: &str, parent: Option<String>| {
+        a.add_task(list.clone(), s.into(), None, parent, false)
+            .unwrap()
+            .uid
+    };
+    let parent = add("Parent", None);
+    let child = add("Child", Some(parent.clone()));
+    let second = add("Second", None);
+    let day = todav_core::ical::parse_time("20261102").unwrap();
+    let patch = todav_core::TaskPatch {
+        description: Some("Notes".into()),
+        due: Some(Some(todav_core::Due {
+            at: day,
+            all_day: true,
+        })),
+        ..Default::default()
+    };
+    a.update_task(parent.clone(), patch).unwrap();
+    a.sync().into_result().unwrap();
+    assert!(!a.pending(None), "all uploaded");
+
+    // Google keeps no UID: b knows them by Google's ids.
+    b.sync().into_result().unwrap();
+    let tree = |c: &Client| -> Vec<(String, Option<String>)> {
+        let all = c.tasks(list.clone(), true);
+        let title = |uid: &String| all.iter().find(|t| t.uid == *uid).unwrap().summary.clone();
+        all.iter()
+            .map(|t| (t.summary.clone(), t.parent_uid.as_ref().map(title)))
+            .collect()
+    };
+    let uid = |c: &Client, s: &str| {
+        let all = c.tasks(list.clone(), true);
+        all.into_iter().find(|t| t.summary == s).unwrap().uid
+    };
+    // Siblings in order; Google numbers each level apart.
+    let roots = |c: &Client| -> Vec<String> {
+        let t = tree(c).into_iter().filter(|(_, p)| p.is_none());
+        t.map(|(s, _)| s).collect()
+    };
+    assert_eq!(roots(&b), ["Parent", "Second"]);
+    assert!(tree(&b).contains(&("Child".into(), Some("Parent".into()))));
+    let p = b.task(uid(&b, "Parent")).unwrap();
+    assert_eq!(
+        (p.description.as_deref(), p.due, p.due_all_day),
+        (Some("Notes"), Some(day), true)
+    );
+
+    // Reordered on b: a follows.
+    b.reorder(uid(&b, "Second"), Some(uid(&b, "Parent")))
+        .unwrap();
+    b.sync().into_result().unwrap();
+    a.sync().into_result().unwrap();
+    assert_eq!(roots(&a), ["Second", "Parent"]);
+    assert_eq!(uid(&a, "Second"), second, "a keeps its own");
+
+    // Done on a, then renamed on b from the copy before: done sticks, the newer title wins
+    // (Google's copy is as new as its upload).
+    let b_child = uid(&b, "Child");
+    a.set_done(child.clone(), true).unwrap();
+    a.sync().into_result().unwrap();
+    std::thread::sleep(Duration::from_secs(1));
+    let rename = todav_core::TaskPatch {
+        summary: Some("Child renamed".into()),
+        ..Default::default()
+    };
+    b.update_task(b_child.clone(), rename).unwrap();
+    b.sync().into_result().unwrap();
+    a.sync().into_result().unwrap();
+    for (c, u) in [(&a, &child), (&b, &b_child)] {
+        let t = c.task(u.clone()).unwrap();
+        assert_eq!((t.summary.as_str(), t.done), ("Child renamed", true));
+    }
+
+    // Deleted on a with its subtask: gone on b.
+    a.delete_task(child.clone()).unwrap();
+    a.delete_task(parent.clone()).unwrap();
+    a.sync().into_result().unwrap();
+    b.sync().into_result().unwrap();
+    assert_eq!(tree(&b), [("Second".into(), None)]);
+
+    b.edit_list(list.clone(), "it-google renamed".into(), "#0082C9".into())
+        .unwrap();
+    a.sync().into_result().unwrap();
+    let l = a.lists().into_iter().find(|l| l.href == list).unwrap();
+    assert_eq!(
+        (l.display_name.as_str(), l.color.as_deref()),
+        ("it-google renamed", Some("#B6469D")),
+        "the name goes through Google, the colour stays on each device"
+    );
+    a.delete_list(list.clone()).unwrap();
+    b.sync().into_result().unwrap();
+    assert!(b.lists().iter().all(|l| l.href != list));
+}

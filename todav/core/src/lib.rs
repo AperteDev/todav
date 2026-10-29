@@ -2,6 +2,7 @@ mod account;
 pub mod caldav;
 mod config;
 mod event;
+pub mod gtasks;
 pub mod ical;
 mod import;
 pub mod json;

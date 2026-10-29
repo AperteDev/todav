@@ -8,12 +8,15 @@ Planned work, not yet done. The README lists it publicly; the order is not fixed
   iCloud…), which mostly means login without Login Flow v2, settings and categories without
   Nextcloud Files, and polling where there is no WebDAV-Push. Each would be another
   `AccountKind`.
-- **Google Tasks** in the Google account (events only now): Google keeps tasks out of CalDAV, so
-  they come over the Tasks REST API (`tasks.googleapis.com`), polled. The token GNOME Online
-  Accounts gives already has the `tasks` scope; Android has no Google account of its own yet,
-  so it needs its own OAuth sign-in first. The API knows title, notes, done, a due date
-  without time, subtasks and order only: no priority, categories, reminders or repeats, so the
-  app hides or disables those for Google lists.
+- **Google Tasks on Android** (Linux has them, `core/src/gtasks.rs`): Android has no Google
+  account of its own yet, so it needs a sign-in first. Google gives a token for the `tasks`
+  scope only to an app registered in a Google Cloud project: an OAuth client for the package
+  and the SHA-1 of each signing key (release and debug), the Tasks and CalDAV APIs enabled, and
+  Google's verification of the app for its sensitive scopes (until then at most 100 test users,
+  behind a warning). Then AppAuth or Credential Manager for the token, the account added as
+  `AccountKind::Google`, and the task page hiding what Google does not keep, as Linux does
+  (`gtasks::is_list`). Open: whether to ask for the calendar scope too, or keep calendars to
+  System Calendars.
 - **Advanced notifications**, configurable, beyond the reminder notifications shown now; details
   to be specified.
 - **Advanced search, filtering and sorting**; details to be specified.
@@ -41,6 +44,11 @@ Smaller items:
 - Key tasks by list and UID, as events are: a task in a calendar two accounts share shows once
   now, in the account that had it first (`store::task_elsewhere`).
 - Show the conflict log (`kv:conflict_log`) in the app's settings.
+- Google Tasks keeps no UID: a task made here keeps its own, on other devices it has Google's
+  id, so a `todav://task/` link to it opens only where it was made. Taking Google's id after
+  the first upload would mean renaming the UID everywhere it is used (subtasks, alarms, undo).
+- Google's copy of a task is as new as its upload, not its edit: an edit uploaded late (made
+  offline) beats a newer one made meanwhile on another device and uploaded after it.
 
 ## Android
 

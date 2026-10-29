@@ -870,7 +870,7 @@ fn account_state(a: &Account) -> String {
         AccountKind::Local => gettext("Lists and calendars that stay on this computer"),
         AccountKind::System => gettext("Calendars of the accounts on this device"),
         _ if !core().connected(a.id) => gettext("Not connected"),
-        AccountKind::Google => gettext("Google Calendar"),
+        AccountKind::Google => gettext("Google Calendar and Tasks"),
         AccountKind::Nextcloud if !a.source.is_empty() => gettext("GNOME Online Accounts"),
         AccountKind::Nextcloud => gettext("Nextcloud server"),
     }

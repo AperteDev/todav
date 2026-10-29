@@ -317,7 +317,11 @@ pub fn local_stamp(db: &Connection, cal: &Calendar, s: &Stamp) -> Result<i64> {
 }
 
 /// A DATE / DATE-TIME value as local time, and whether it is a date only.
-fn local_time(db: &Connection, cal: &Calendar, l: Option<&Line>) -> Result<Option<(i64, bool)>> {
+pub(crate) fn local_time(
+    db: &Connection,
+    cal: &Calendar,
+    l: Option<&Line>,
+) -> Result<Option<(i64, bool)>> {
     let Some(s) = l.and_then(tz::stamp) else {
         return Ok(None);
     };
@@ -516,16 +520,17 @@ pub fn scheduled(db: &Connection, from: i64, to: i64) -> Result<Vec<Task>> {
 }
 
 /// Open tasks with no time slot yet, to plan: undated, or due by a date before `until`
-/// (overdue included); dated ones first, soonest first.
+/// (overdue included); dated ones first, soonest first. A Google task takes no slot: a date is
+/// all its plan.
 pub fn unscheduled(db: &Connection, until: i64) -> Result<Vec<Task>> {
     let mut st = db.prepare(&format!(
         "SELECT {TASK_COLS} FROM tasks WHERE dirty != 2
            AND status NOT IN ('COMPLETED', 'CANCELLED')
            AND (start IS NULL OR start_all_day)
-           AND (due IS NULL OR (due_all_day AND due < ?1))
+           AND (due IS NULL OR (due_all_day AND due < ?1 AND substr(list_href, 1, length(?2)) != ?2))
          ORDER BY due IS NULL, due, list_href, COALESCE(sort_order, created, 0), uid"
     ))?;
-    let rows = st.query_map([until], task_row)?;
+    let rows = st.query_map(params![until, crate::gtasks::API], task_row)?;
     Ok(rows.collect::<rusqlite::Result<_>>()?)
 }
 

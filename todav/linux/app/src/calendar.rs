@@ -1499,7 +1499,9 @@ fn event_tasks(e: &Event) -> gtk::Box {
     let uid = e.uid.clone();
     let ev = e.clone();
     let add = move |text: String| {
-        let lists = core().lists();
+        // Not to Google Tasks, which keeps no link to the event.
+        let mut lists = core().lists();
+        lists.retain(|l| !todav_core::gtasks::is_list(&l.href));
         let last = core().setting("last_list".into());
         let list_href = lists
             .iter()

@@ -302,9 +302,12 @@ impl Dav {
     }
 
     /// The full URL of a path on this server: how lists are keyed, so two servers' lists
-    /// with the same path stay apart.
+    /// with the same path stay apart. A full URL (Google Tasks') stays as it is.
     pub fn absolute(&self, path: &str) -> String {
-        format!("{}{}", self.origin, self.path(path))
+        match self.path(path) {
+            p if p.starts_with("http") => p.to_string(),
+            p => format!("{}{p}", self.origin),
+        }
     }
 
     pub fn request(

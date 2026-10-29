@@ -446,7 +446,7 @@ private fun Sidebar(model: Main, screen: Screen, view: View, modifier: Modifier,
         item(key = "end") {
             HorizontalDivider(Modifier.padding(vertical = 8.dp, horizontal = 28.dp))
             // Nowhere to make one (only the system's calendars, say): not offered.
-            if (model.core.places().isNotEmpty()) {
+            if (model.core.places(view == View.CALENDAR).isNotEmpty()) {
                 NavigationDrawerItem(
                     label = { Text(if (view == View.CALENDAR) tr("New Calendar…") else tr("New List…")) },
                     icon = { Icon(Icons.Outlined.Add, null) },

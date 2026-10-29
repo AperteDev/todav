@@ -339,9 +339,10 @@ pub fn place(account: i64) -> String {
         .unwrap_or_default()
 }
 
-/// Where new lists can go, as (heading, account), in the user's order of the accounts.
-pub fn places() -> Vec<(String, i64)> {
-    todav_app::lists::places(core())
+/// Where new task lists, or calendars (`events`), can go, as (heading, account), in the user's
+/// order of the accounts.
+pub fn places(events: bool) -> Vec<(String, i64)> {
+    todav_app::lists::places(core(), events)
         .into_iter()
         .map(|id| (place(id), id))
         .collect()
@@ -563,7 +564,7 @@ pub fn open(parent: &gtk::Widget, list: Option<List>, events: bool) {
     }
 
     // A new one: in which account, picked when there is a choice.
-    let places = places();
+    let places = places(events);
     let place: adw::ComboRow = get(&b, "place");
     let names: gtk::StringList = get(&b, "places");
     for (heading, _) in &places {
@@ -646,11 +647,12 @@ pub fn open(parent: &gtk::Widget, list: Option<List>, events: bool) {
         gettext("Delete List")
     });
     let delete_box: gtk::ListBox = get(&b, "delete_box");
-    // Google's calendars are deleted in Google Calendar.
+    // Google's calendars are deleted in Google Calendar (its task lists here).
     let google = |l: &List| {
-        core()
-            .account(l.account)
-            .is_some_and(|a| a.kind == AccountKind::Google)
+        l.holds_events
+            && core()
+                .account(l.account)
+                .is_some_and(|a| a.kind == AccountKind::Google)
     };
     match list {
         Some(l) if l.writable && !google(&l) => {

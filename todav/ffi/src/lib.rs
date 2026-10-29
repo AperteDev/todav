@@ -276,9 +276,9 @@ impl Todav {
         todav_app::lists::by_place(self.c(), lists)
     }
 
-    /// The accounts new lists can go to now.
-    pub fn places(&self) -> Vec<i64> {
-        todav_app::lists::places(self.c())
+    /// The accounts new task lists, or calendars (`events`), can go to now.
+    pub fn places(&self, events: bool) -> Vec<i64> {
+        todav_app::lists::places(self.c(), events)
     }
 
     /// Returns the new list's href.

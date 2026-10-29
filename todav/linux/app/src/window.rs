@@ -396,10 +396,11 @@ pub fn present(app: &adw::Application) {
 fn welcome(ui: &Rc<Ui>) {
     let add = crate::add_account::new(true, |id| {
         account_changed();
-        // Google's calendars hold no tasks: the calendar, not an empty task list.
+        // No task lists (Google gave no access to them): the calendar, not an empty task list.
         if core()
             .account(id)
             .is_some_and(|a| a.kind == AccountKind::Google)
+            && core().lists().iter().all(|l| l.account != id)
         {
             crate::calendar::show_day(core().local_now());
         }
@@ -1249,14 +1250,13 @@ fn refresh_lists(ui: &Rc<Ui>) {
         sync.set_enabled(crate::can_sync());
     }
     // Nowhere to make lists (e.g. only Google's calendars): no "New List" or "New Calendar".
-    let places = !crate::lists::places().is_empty();
-    for name in ["new-list", "new-calendar"] {
+    for (name, events) in [("new-list", false), ("new-calendar", true)] {
         if let Some(a) = ui
             .window
             .lookup_action(name)
             .and_downcast::<gio::SimpleAction>()
         {
-            a.set_enabled(places);
+            a.set_enabled(!crate::lists::places(events).is_empty());
         }
     }
     update_banners();
@@ -1567,7 +1567,9 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
         .filter(|(h, c)| *h == href && ui.cat_rows.borrow().contains(c))
         .map(|(_, c)| c);
     *ui.filter.borrow_mut() = filter.clone().map(|c| (href.clone(), c));
-    ui.cat.set_visible(filter.is_none());
+    // Google Tasks keeps no categories.
+    ui.cat
+        .set_visible(filter.is_none() && !todav_core::gtasks::is_list(&href));
     let pos = filter
         .as_ref()
         .and_then(|f| ui.cat_rows.borrow().iter().position(|c| c == f));
@@ -1941,10 +1943,12 @@ fn task_row(ui: &Rc<Ui>, t: &Task, indent: usize, slot: Option<Slot>) -> adw::Ac
     if let Some(tag) = tag(ui, t).filter(|_| indent == 0) {
         row.add_suffix(&tag);
     }
-    if pinnable {
+    // Google Tasks keeps neither pins nor priorities.
+    let google = todav_core::gtasks::is_list(&t.list_href);
+    if pinnable && !google {
         row.add_suffix(&pin_button(t));
     }
-    if prefs::stars(core()) {
+    if prefs::stars(core()) && !google {
         row.add_suffix(&star_button(t));
     }
     row.add_suffix(&delete_button(t));
@@ -2144,11 +2148,13 @@ fn tree_row(
     });
     row.add_suffix(&edit);
     row.add_suffix(&delete_button(root));
-    // ExpanderRow puts each new suffix to the left of the previous ones.
-    if prefs::stars(core()) {
+    // ExpanderRow puts each new suffix to the left of the previous ones. Google Tasks keeps
+    // neither priorities nor pins.
+    let google = todav_core::gtasks::is_list(&root.list_href);
+    if prefs::stars(core()) && !google {
         row.add_suffix(&star_button(root));
     }
-    if prefs::pins(core()) {
+    if prefs::pins(core()) && !google {
         row.add_suffix(&pin_button(root));
     }
     if let Some(tag) = tag(ui, root) {
@@ -2960,6 +2966,22 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
     check();
     for name in ["start", "due"] {
         on_date_change(&b, name, check.clone());
+    }
+    // Google Tasks keeps a due date without a time, and no category, priority, start or
+    // reminders.
+    let reminders: gtk::Widget = get(&b, "reminders");
+    if todav_core::gtasks::is_list(&t.list_href) {
+        for id in ["category", "priority", "start", "due_time_row"] {
+            get::<gtk::Widget>(&b, id).set_visible(false);
+        }
+        get::<adw::ExpanderRow>(&b, "start").set_enable_expansion(false);
+        due_time.set_active(false);
+        reminders.set_visible(false);
+    } else {
+        get::<adw::ExpanderRow>(&b, "due")
+            .bind_property("enable-expansion", &reminders, "visible")
+            .sync_create()
+            .build();
     }
 
     let cancel: gtk::Button = get(&b, "cancel");

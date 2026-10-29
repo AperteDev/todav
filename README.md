@@ -97,8 +97,9 @@ development:
 
 - Sign in through **GNOME Online Accounts**, in the browser (Nextcloud Login Flow) or with a login
   name and app password. Passwords stay in the system keyring.
-- **Several accounts** side by side: Nextcloud accounts on one server or more, and lists kept on
-  this device. Each can be switched off (its lists are hidden, nothing is deleted) and the
+- **Several accounts** side by side: Nextcloud accounts on one server or more, a Google account
+  from GNOME Online Accounts (its calendars' events and its **Google Tasks**, which keep a
+  title, notes, a due date and subtasks), and lists kept on this device. Each can be switched off (its lists are hidden, nothing is deleted) and the
   sidebar groups lists by account, in the order you drag them into.
 - Runs in the background: closing the window hides it, and reminders and sync keep working.
   Starts with your session.
@@ -213,7 +214,7 @@ Todav is under active development. Planned (details in [ROADMAP.md](docs/ROADMAP
 - **Settings per list and calendar**, such as how its completed tasks show
 - **Export** of lists and calendars to iCalendar files
 - **More services** besides Nextcloud
-- **Google Tasks** in the Google account
+- **Google Tasks on Android**, with a Google sign-in of its own
 - **Google Play and F-Droid** for the Android app
 - **Pebble app**, through the Android app
 - **Windows app**

@@ -256,10 +256,10 @@ Adw.Dialog dialog {
             }
           }
 
-          // Reminders (ui/reminder.blp) go above the button; they count from the due date.
+          // Reminders (ui/reminder.blp) go above the button; they count from the due date,
+          // shown with it (in code: not for Google Tasks).
           Gtk.ListBox reminders {
             selection-mode: none;
-            visible: bind due.enable-expansion;
             styles ["boxed-list"]
 
             Adw.ButtonRow add_reminder {

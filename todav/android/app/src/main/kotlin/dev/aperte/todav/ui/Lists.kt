@@ -51,7 +51,7 @@ fun ListDialog(model: Main, href: String?, events: Boolean, onDismiss: () -> Uni
     if (href != null && list == null) return onDismiss()
     val presets = remember { colorPresets() }
     val accounts = remember { core.accounts().associateBy { it.id } }
-    val places = remember { core.places().filter { accounts[it]?.enabled == true } }
+    val places = remember { core.places(events).filter { accounts[it]?.enabled == true } }
     var name by rememberSaveable { mutableStateOf(list?.displayName ?: "") }
     var color by rememberSaveable { mutableStateOf(list?.let { listColor(it) } ?: presets.first()) }
     var calendar by rememberSaveable { mutableStateOf(list?.holdsEvents ?: events) }

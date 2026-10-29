@@ -2,8 +2,9 @@
 
 use crate::caldav::{Dav, RemoteList, SyncResult};
 use crate::ical::Calendar;
+use crate::json::Json;
 use crate::store::Kind;
-use crate::{AccountKind, Client, Error, Result, store};
+use crate::{AccountKind, Client, Error, Result, gtasks, store};
 use rusqlite::params;
 use std::collections::HashSet;
 
@@ -82,7 +83,7 @@ impl Client {
         let _guard = self.sync_lock.lock().unwrap();
         let dav = self.dav(id)?;
         let mut report = self.push_dirty(id, &dav)?;
-        let remote = dav.discover()?;
+        let remote = self.remote_lists(id, &dav)?;
         self.save_lists(id, &dav, &remote)?;
         for l in &remote {
             self.pull(&dav, &dav.absolute(&l.href), &mut report)?;
@@ -102,6 +103,18 @@ impl Client {
         // ponytail: a failure waits for the listener's hourly registration, which reports it.
         let _ = self.register_new(id);
         Ok(report)
+    }
+
+    /// The account's calendars, and for a Google account its task lists too.
+    fn remote_lists(&self, id: i64, dav: &Dav) -> Result<Vec<RemoteList>> {
+        let mut remote = dav.discover()?;
+        if self
+            .account(id)
+            .is_some_and(|a| a.kind == AccountKind::Google)
+        {
+            remote.extend(gtasks::lists(dav)?);
+        }
+        Ok(remote)
     }
 
     /// When a sync of account `id` last went through (Unix time).
@@ -171,7 +184,7 @@ impl Client {
         events: bool,
     ) -> Result<String> {
         let kind = self.account(account).ok_or(Error::NoAccount)?.kind;
-        if kind == AccountKind::Google {
+        if kind == AccountKind::Google && events {
             return Err(Error::Http(
                 405,
                 "Google calendars are made in Google Calendar".into(),
@@ -189,6 +202,17 @@ impl Client {
         }
         let _guard = self.sync_lock.lock().unwrap();
         let dav = self.dav(account)?;
+        // Google keeps no colour of a task list: it stays here.
+        if kind == AccountKind::Google {
+            let href = gtasks::create_list(&dav, &name)?;
+            self.save_lists(account, &dav, &self.remote_lists(account, &dav)?)?;
+            self.db.lock().unwrap().execute(
+                "UPDATE lists SET color = ?2 WHERE href = ?1",
+                params![href, color],
+            )?;
+            self.emit(&href, Vec::new());
+            return Ok(href);
+        }
         let path = format!(
             "{}/{}/",
             dav.home()?.trim_end_matches('/'),
@@ -211,7 +235,9 @@ impl Client {
         {
             return Err(Error::ReadOnly); // named and coloured where they come from
         }
-        if !href.starts_with(store::LOCAL) {
+        if gtasks::is_list(&href) {
+            gtasks::rename_list(&*self.list_dav(&href)?, &href, &name)?;
+        } else if !href.starts_with(store::LOCAL) {
             self.list_dav(&href)?.rename(&href, &name, &color)?;
         }
         self.db.lock().unwrap().execute(
@@ -250,7 +276,9 @@ impl Client {
     pub fn delete_list(&self, href: String) -> Result<()> {
         let _guard = self.sync_lock.lock().unwrap();
         let account = store::list_account(&self.db.lock().unwrap(), &href)?;
-        if self
+        if gtasks::is_list(&href) {
+            gtasks::delete_list(&*self.list_dav(&href)?, &href)?;
+        } else if self
             .account(account)
             .is_some_and(|a| a.kind == AccountKind::Google)
         {
@@ -258,8 +286,7 @@ impl Client {
                 405,
                 "Google calendars are deleted in Google Calendar".into(),
             ));
-        }
-        if !href.starts_with(store::LOCAL) {
+        } else if !href.starts_with(store::LOCAL) {
             self.list_dav(&href)?.delete(&href, None, None)?;
         }
         {
@@ -278,11 +305,12 @@ impl Client {
         let tx = db.unchecked_transaction()?;
         let keep: HashSet<String> = remote.iter().map(|l| dav.absolute(&l.href)).collect();
         for l in remote {
-            // An order not sent yet stays ours, as ours does where the server keeps none.
+            // An order not sent yet stays ours, as ours does where the server keeps none; so
+            // does a colour (Google Tasks keeps none).
             tx.execute(
                 "INSERT INTO lists (href, display_name, color, ctag, push_topic, has_tasks, has_events, writable, account, position)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, COALESCE(?10, 0))
-                 ON CONFLICT(href) DO UPDATE SET display_name = ?2, color = ?3, ctag = ?4, push_topic = ?5,
+                 ON CONFLICT(href) DO UPDATE SET display_name = ?2, color = COALESCE(?3, color), ctag = ?4, push_topic = ?5,
                    has_tasks = ?6, has_events = ?7, writable = ?8, account = ?9,
                    position = CASE WHEN position_dirty OR ?10 IS NULL THEN position ELSE ?10 END",
                 params![
@@ -355,7 +383,21 @@ impl Client {
                 params![href, position],
             )?;
         }
-        let dirty = store::dirty(&self.db.lock().unwrap(), Some(account))?;
+        let mut dirty = store::dirty(&self.db.lock().unwrap(), Some(account))?;
+        // Parents before their subtasks, and siblings in their order: Google places a task
+        // under its parent after the one before it, which it must have by then.
+        dirty.sort_by_cached_key(|t| {
+            let db = self.db.lock().unwrap();
+            let task = |uid: &str| store::task(&db, uid).ok().flatten();
+            let order = task(&t.uid).and_then(|t| t.sort_order);
+            let mut depth = 0;
+            let mut up = task(&t.uid).and_then(|t| t.parent_uid);
+            while let Some(p) = up.filter(|_| depth < 64) {
+                depth += 1;
+                up = task(&p).and_then(|t| t.parent_uid);
+            }
+            (depth, order)
+        });
         for t in dirty {
             let reg = self.registration(&t.list_href);
             if t.dirty == store::DELETED {
@@ -398,8 +440,14 @@ impl Client {
                 .href
                 .clone()
                 .unwrap_or_else(|| format!("{}{}.ics", dav.path(&t.list_href), t.uid));
-            let etag = match dav.put(&href, &t.raw_ics, t.etag.as_deref(), reg.as_deref()) {
-                Ok(etag) => etag,
+            let put = if gtasks::is_list(&t.list_href) {
+                self.put_google(dav, &t)
+            } else {
+                let etag = dav.put(&href, &t.raw_ics, t.etag.as_deref(), reg.as_deref());
+                etag.map(|e| (href.clone(), e, None))
+            };
+            let (href, etag, server) = match put {
+                Ok(put) => put,
                 Err(Error::Conflict) => {
                     report.conflicts += 1;
                     self.resolve_conflict(dav, &t, &href, reg.as_deref())?;
@@ -423,9 +471,9 @@ impl Client {
                 },
             };
             // No ETag: the server stored something else than it was sent. Its copy gives one, so
-            // a later pull can tell it from edits made elsewhere.
+            // a later pull can tell it from edits made elsewhere. Google's comes with its copy.
             let (etag, server) = match etag {
-                Some(e) => (Some(e), None),
+                Some(e) => (Some(e), server),
                 None => match dav.get(&href)? {
                     Some((e, ics)) => (e, Calendar::parse(&ics)),
                     None => (None, None),
@@ -468,6 +516,101 @@ impl Client {
             |r| r.get(0),
         )
         .ok()?
+    }
+
+    /// Write task `o` to Google: anew, or over Google's copy (merged by the conflict rule when
+    /// it changed there too), then where it is here when it was moved. Returns its href, ETag
+    /// and Google's copy.
+    fn put_google(
+        &self,
+        dav: &Dav,
+        o: &store::RawObject,
+    ) -> Result<(String, Option<String>, Option<Calendar>)> {
+        let mut cal = Calendar::parse(&o.raw_ics).ok_or_else(|| Error::Parse(o.uid.clone()))?;
+        // Where it is here: Google's ids of its parent and of the sibling before it.
+        let (parent, previous, place) = {
+            let db = self.db.lock().unwrap();
+            let gid = |uid: &str| {
+                let href = store::raw(&db, Kind::Task, "", uid).ok()??.href?;
+                Some(gtasks::id(&href).to_string())
+            };
+            let task = store::task(&db, &o.uid)?.ok_or_else(|| Error::NotFound(o.uid.clone()))?;
+            let siblings: Vec<_> = store::tasks(&db, &o.list_href, true)?
+                .into_iter()
+                .filter(|s| s.parent_uid == task.parent_uid)
+                .collect();
+            let at = siblings.iter().position(|s| s.uid == o.uid).unwrap_or(0);
+            let previous = siblings[..at].iter().rev().find_map(|s| gid(&s.uid));
+            let place = gtasks::place(task.sort_order, task.parent_uid.as_deref());
+            (task.parent_uid.as_deref().and_then(gid), previous, place)
+        };
+        let moved = cal.text(gtasks::PLACE).is_some_and(|p| p != place);
+        let body = |cal: &Calendar| -> Result<Json> {
+            let due = store::local_time(&self.db.lock().unwrap(), cal, cal.prop("DUE"))?;
+            Ok(gtasks::body(cal, due.map(|(d, _)| d)))
+        };
+        let new = |b: Json| {
+            gtasks::insert(
+                dav,
+                &o.list_href,
+                &b,
+                parent.as_deref(),
+                previous.as_deref(),
+            )
+        };
+        let (mut j, placed) = match o.href.as_deref() {
+            None => (new(body(&cal)?)?, true),
+            Some(href) => match gtasks::update(dav, href, &body(&cal)?, o.etag.as_deref()) {
+                // Deleted there: anew.
+                Err(Error::NotFound(_)) => (new(body(&cal)?)?, true),
+                Err(Error::Conflict) => match gtasks::get(dav, href)? {
+                    None => (new(body(&cal)?)?, true),
+                    Some(s) => {
+                        let server = self.google_cal(&o.list_href, &s, Some(&o.uid))?;
+                        let merged = resolve(&cal, &server);
+                        self.log_conflict(&o.uid, &cal, &server)?;
+                        let etag = s.get("etag").and_then(Json::str).map(str::to_string);
+                        cal = merged;
+                        (
+                            gtasks::update(dav, href, &body(&cal)?, etag.as_deref())?,
+                            false,
+                        )
+                    }
+                },
+                r => (r?, false),
+            },
+        };
+        if moved && !placed {
+            let href = gtasks::task_href(&o.list_href, &j);
+            j = gtasks::move_to(dav, &href, parent.as_deref(), previous.as_deref())?;
+        }
+        let server = self.google_cal(&o.list_href, &j, Some(&o.uid))?;
+        let etag = j.get("etag").and_then(Json::str).map(str::to_string);
+        Ok((gtasks::task_href(&o.list_href, &j), etag, Some(server)))
+    }
+
+    /// Google's task `j` in list `list` as a VTODO: with UID `uid`, else that of the task here
+    /// at its href, else Google's id; its parent's likewise.
+    fn google_cal(&self, list: &str, j: &Json, uid: Option<&str>) -> Result<Calendar> {
+        let db = self.db.lock().unwrap();
+        let here = |id: &str| store::raw_by_href(&db, list, &format!("{list}tasks/{id}"));
+        let id = j.get("id").and_then(Json::str).unwrap_or_default();
+        let mine = match uid {
+            Some(u) => store::raw(&db, Kind::Task, "", u)?,
+            None => here(id)?,
+        };
+        let parent = match j.get("parent").and_then(Json::str) {
+            Some(p) => Some(here(p)?.map_or_else(|| p.to_string(), |r| r.uid)),
+            None => None,
+        };
+        let created = mine
+            .as_ref()
+            .and_then(|r| Calendar::parse(&r.raw_ics)?.time("CREATED"));
+        let uid = uid
+            .map(str::to_string)
+            .or(mine.map(|r| r.uid))
+            .unwrap_or_else(|| id.to_string());
+        Ok(gtasks::to_ics(j, &uid, parent.as_deref(), created))
     }
 
     /// 412 on PUT: fetch the server copy, merge by the conflict rule, upload the result once.
@@ -530,6 +673,9 @@ impl Client {
             )
             .map_err(|_| Error::NotFound(list_href.into()))?
         };
+        if gtasks::is_list(list_href) {
+            return self.pull_google(dav, list_href, &token, report);
+        }
         let (full, res) = match dav.sync_collection(list_href, &token)? {
             SyncResult::InvalidToken => (true, dav.sync_collection(list_href, "")?),
             // Nextcloud answers a token it never issued (calendar recreated under the same URL)
@@ -555,6 +701,35 @@ impl Client {
         self.db.lock().unwrap().execute(
             "UPDATE lists SET sync_token = ? WHERE href = ?",
             params![new_token, list_href],
+        )?;
+        Ok(())
+    }
+
+    /// Pull a Google task list: what changed since `since` (its sync token), all of it the
+    /// first time.
+    fn pull_google(
+        &self,
+        dav: &Dav,
+        list_href: &str,
+        since: &str,
+        report: &mut SyncReport,
+    ) -> Result<()> {
+        let (items, next) = gtasks::changes(dav, list_href, since)?;
+        let (mut changed, mut removed) = (Vec::new(), Vec::new());
+        for j in &items {
+            let href = gtasks::task_href(list_href, j);
+            if j.get("deleted") == Some(&Json::Bool(true)) {
+                removed.push(href);
+            } else {
+                let etag = j.get("etag").and_then(Json::str).unwrap_or_default();
+                let cal = self.google_cal(list_href, j, None)?;
+                changed.push((href, etag.to_string(), cal.to_ics()));
+            }
+        }
+        self.apply(list_href, changed, removed, since.is_empty(), report)?;
+        self.db.lock().unwrap().execute(
+            "UPDATE lists SET sync_token = ? WHERE href = ?",
+            params![next, list_href],
         )?;
         Ok(())
     }

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Google Tasks in the Google account (Linux, through GNOME Online Accounts): its task lists show
+  next to its calendars and sync with Google, checked every minute while the window is focused
+  and every 30 minutes otherwise. Task lists can be added, renamed and deleted there; their
+  colours stay on each device. Google keeps a task's title, notes, done, a due date without a
+  time, subtasks and order only, so the edit dialog offers just those, rows have no star or
+  pin, and the calendar plans these tasks onto days, not into hours.
+
 ## [2.2.0] - 2026-10-29
 
 ### Added

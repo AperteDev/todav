@@ -234,10 +234,14 @@ pub fn day_drop(i: &Item, day: i64, all_day: bool) -> Change {
     }
 }
 
-/// `i` dropped on the hour slot starting at `at`: a task is planned there, an event moves there
-/// (as long as it was, or the default length).
+/// `i` dropped on the hour slot starting at `at`: a task is planned there (a Google task, which
+/// keeps no time, is due that day), an event moves there (as long as it was, or the default
+/// length).
 pub fn slot_drop(c: &Client, i: &Item, at: i64) -> Change {
     match i {
+        Item::Task(t) if todav_core::gtasks::is_list(&t.list_href) => {
+            Change::Task(move_to_day(t, at - at.rem_euclid(DAY)))
+        }
         Item::Task(t) => Change::Task(plan_at(c, t, at)),
         Item::Event(_) => Change::Event(EventTime {
             start: at,
