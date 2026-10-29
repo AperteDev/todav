@@ -33,7 +33,9 @@ def edit(path: str, pattern: str, replacement: str) -> None:
 
 
 def inline(text: str) -> str:
-    """Changelog Markdown within a line as AppStream markup: `code` kept, links as their text."""
+    """Changelog Markdown within a line as AppStream markup: `code` kept, links as their text,
+    images left out (AppStream has none in release notes)."""
+    text = re.sub(r"!\[[^\]]*\]\([^)]+\)", "", text).strip()
     text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
     return re.sub(r"`([^`]+)`", r"<code>\1</code>", html.escape(text, quote=False))
 
@@ -175,7 +177,9 @@ def main() -> None:
     entry = f"* {day} {last[1]} - {version}-1\n- See CHANGELOG.md\n\n"
     file.write_text(text[:at] + entry + text[at:])
 
-    print(notes)
+    # The GitHub release's notes: images (relative to docs/ in the changelog) from the new tag.
+    raw = repo.replace("https://github.com/", "https://raw.githubusercontent.com/")
+    print(notes.replace("](screenshots/", f"]({raw}/v{version}/docs/screenshots/"))
     print(f"Prepared release {version}", file=sys.stderr)
 
 

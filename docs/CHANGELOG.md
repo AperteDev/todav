@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the two ways with pictures, Todav's icon with its own menu (with fields for adding) or the
   clock menu (with buttons), and Custom for each part (the task list, the month, the agenda) in
   either menu or nowhere. The icon shows only with something in its menu.
+
+  ![Preferences → Extension: the Todav icon and the clock menu, each with a picture, and Custom](screenshots/extension-presets.png)
+
 - Extension: Preferences → Extension → Adding tasks and Adding events: a field (as before), a
   button opening Todav (in the list's field for adding a task, or on a new event on the day
   picked), or none; with the task list, and with the agenda (else the month).
