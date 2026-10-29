@@ -74,20 +74,20 @@ fn connect_duration(b: &gtk::Builder, key: &'static str) {
     });
 }
 
-/// Preferences → Extension's choice of where its parts go: all in its own menu (`panel`), all
-/// in the clock menu (`clock`), or each where its row says (`custom`: the rows shown, as they
-/// were). Stored in `ext_preset`; unset, it is what the parts say.
+/// Where the two ways of Preferences → Extension put `EXTENSION_PARTS`, as their rows' entries
+/// (0 its own menu, 1 the clock menu, 2 nowhere): all in its menu (`panel`), or the list, the
+/// month and the agenda in the clock menu, without the fields for adding (`clock`).
+const EXTENSION_PRESETS: [(&str, [u32; 5]); 2] = [("panel", [0; 5]), ("clock", [1, 2, 1, 1, 2])];
+
+/// Preferences → Extension's choice of where its parts go: one of `EXTENSION_PRESETS`, or each
+/// where its row says (`custom`: the rows shown, as they were). Stored in `ext_preset`; unset,
+/// the one the parts match.
 fn connect_ext_preset(b: &gtk::Builder) {
     let parts: Vec<adw::ComboRow> = EXTENSION_PARTS.iter().map(|k| get(b, k)).collect();
     let current = core().setting("ext_preset".into()).unwrap_or_else(|| {
-        let first = parts[0].selected();
-        match first {
-            0 | 1 if parts.iter().all(|p| p.selected() == first) => {
-                ["panel", "clock"][first as usize]
-            }
-            _ => "custom",
-        }
-        .into()
+        let at: Vec<u32> = parts.iter().map(|p| p.selected()).collect();
+        let preset = EXTENSION_PRESETS.iter().find(|(_, places)| at == places);
+        preset.map_or("custom", |(name, _)| name).into()
     });
     let panel: adw::PreferencesGroup = get(b, "ext_panel_group");
     // The groups' notes on the clock menu, only where the rows choosing it are shown.
@@ -112,7 +112,8 @@ fn connect_ext_preset(b: &gtk::Builder) {
         }
     });
     show(&current);
-    for (name, place) in [("panel", Some(0)), ("clock", Some(1)), ("custom", None)] {
+    let choices = EXTENSION_PRESETS.iter().map(|(n, p)| (*n, Some(*p)));
+    for (name, places) in choices.chain([("custom", None)]) {
         let check: gtk::CheckButton = get(b, &format!("ext_preset_{name}"));
         check.set_active(name == current);
         let (parts, show) = (parts.clone(), show.clone());
@@ -121,12 +122,12 @@ fn connect_ext_preset(b: &gtk::Builder) {
                 return;
             }
             let _ = core().set_setting("ext_preset".into(), name.into());
-            if let Some(i) = place {
-                parts.iter().for_each(|p| p.set_selected(i));
+            for (part, place) in parts.iter().zip(places.iter().flatten()) {
+                part.set_selected(*place);
             }
             show(name);
         });
-        if place.is_some() {
+        if places.is_some() {
             let picture: gtk::Button = get(b, &format!("ext_preset_{name}_picture"));
             picture.connect_clicked(move |_| check.set_active(true));
         }
