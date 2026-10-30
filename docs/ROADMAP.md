@@ -1,6 +1,6 @@
 # Todav — Roadmap
 
-Planned work, not yet done. The README lists it publicly; the order is not fixed.
+Planned work, not yet done. [FEATURES.md](FEATURES.md) lists it publicly; the order is not fixed.
 
 ## Planned features
 

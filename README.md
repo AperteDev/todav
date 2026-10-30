@@ -55,103 +55,20 @@ development:
 
 ## Features
 
-**Tasks**
+- Task lists from your Nextcloud calendars, with categories, subtasks, priorities, due and start
+  dates, and reminders as notifications with "Mark as Done".
+- A calendar with Month, Week and Agenda views; plan a task by dropping it on an hour or a day.
+- Works offline from a local copy; with WebDAV Push and ntfy, changes from other devices show up
+  within seconds.
+- Several accounts side by side: Nextcloud, Google (its calendars and Google Tasks) and lists
+  kept on this device only, with no server at all.
+- Sign-in through GNOME Online Accounts, the browser, or a login name and app password.
+- A GNOME Shell extension: your tasks, the month and the agenda by the clock, or in GNOME's
+  clock menu.
+- An Android app with home-screen widgets and push through UnifiedPush, without Google services.
+- Preferences synced between your devices.
 
-- Task lists from your Nextcloud calendars; create, rename, recolour and delete lists.
-- Categories (CalDAV `CATEGORIES`), shown as groups or tags, with a category filter in the
-  sidebar.
-- Subtasks, nested to any depth, manual order by drag and drop (the same order Nextcloud Tasks uses), sorting by
-  creation date, due date or priority from the task page, and notes.
-- Priority on a star, coloured by its level and set from its menu, as Nextcloud Tasks stars
-  tasks; an Important page with the high-priority tasks of every list.
-- Pinned tasks stay at the top of their list.
-- Move a task, with its subtasks, to another list: drop it on the list in the sidebar or pick
-  the list in the task dialog.
-- Due dates with optional times, start times, and several reminders per task, before or after
-  its due date or its start, delivered as desktop notifications with "Mark as Done".
-- An Upcoming page across all lists: Overdue, Today, Tomorrow, the coming days and later.
-- Search across all lists (ignores accents) and undo with Ctrl+Z.
-
-**Calendar**
-
-- Month, Week and Agenda views of your Nextcloud calendars, with a sidebar month and show/hide per
-  calendar.
-- Create, edit, move and delete events, including recurring ones (this occurrence, this and the
-  following, or all), with reminders.
-- Drag and drop:
-  - **Plan** a task from the "To Plan" list in the sidebar by dropping it on an hour of the week
-    view (it gets a time slot) or on a day (it becomes due that day). A preview shows where it
-    lands and the times, in 15-minute steps.
-  - **Move** events and planned tasks to another hour or day; for a repeating event Todav asks
-    whether to move this occurrence, the following ones or all of them.
-  - **Resize** a block in the week view by dragging its top or bottom edge to change when it
-    starts or ends.
-  - **Unplan** a task by dropping it back on "To Plan".
-  - **Change calendar** by dropping an event on another calendar in the sidebar (a task on
-    another list).
-- Click an event or task for its details (a task's subtasks, an event's tasks, both addable
-  there); double-click to edit it.
-- Tasks linked to events: an event lists its tasks, and a task shows its event.
-
-**GNOME integration**
-
-- Sign in through **GNOME Online Accounts**, in the browser (Nextcloud Login Flow) or with a login
-  name and app password. Passwords stay in the system keyring.
-- **Several accounts** side by side: Nextcloud accounts on one server or more, a Google account
-  from GNOME Online Accounts (its calendars' events and its **Google Tasks**, which keep a
-  title, notes, a due date and subtasks), and lists kept on this device. Each can be switched off (its lists are hidden, nothing is deleted) and the
-  sidebar groups lists by account, in the order you drag them into.
-- Runs in the background: closing the window hides it, and reminders and sync keep working.
-  Starts with your session.
-- A **GNOME Shell extension**: an icon by the clock, with a count of your choice (open tasks,
-  tasks due, important tasks or today's events), and a menu showing a task list, a month calendar
-  and the agenda of the coming days (or of a day clicked in the month); it can add tasks and
-  events and opens the app where you click. Or put it all in GNOME's clock menu, in place of its
-  calendar and events, with one click in Preferences → Extension, or each part where you like.
-- Can be the system's calendar app (Preferences → General), which the date in GNOME's clock menu
-  opens.
-- Follows the system style (light/dark), adaptive layout for narrow windows and touchscreens,
-  keyboard shortcuts.
-
-**Sync**
-
-- Local-first: everything reads and writes a local database, so the app never waits for the
-  network and keeps working offline; changes are sent when the server is reachable again.
-- Push: with WebDAV Push and ntfy, changes made elsewhere show up within seconds. Without them,
-  Todav checks every minute while its window is focused and every 30 minutes otherwise.
-- Conflicts resolve per task, and a task ticked done on any device stays done.
-- Properties Todav does not understand are kept as they are, so other clients' data survives.
-- Your preferences sync between devices through `.config/todav/settings.json` in the Nextcloud
-  Files of the account you pick (or none; accounts and server addresses stay on each device).
-  The order of each list's categories is kept next to it, in each account's `todav/config.json`.
-
-**On this device only**
-
-- Use Todav without a server: choose "On This Device Only" when it starts, and your task lists
-  and calendars stay on this computer.
-- With a Nextcloud account too, add "On This Device" in Preferences → Accounts to keep some
-  lists and calendars off the server, next to the synced ones.
-
-**Android**
-
-- The same tasks and calendar as on the desktop, in Material 3 Expressive: a navigation bar on
-  phones, a rail and a resizable sidebar on unfolded foldables and tablets.
-- Swipe actions of your choice (complete, star, pin or delete with Undo), drag and drop to
-  reorder tasks, make subtasks or change a category, and to plan tasks into the hours of the
-  calendar.
-- Month, Week, Work Week, 3 Days, Day and Agenda views.
-- Home-screen widgets: a task list, the month, the agenda, a day's hours and a month planner,
-  each with an add button and colours of your choice.
-- Push through [UnifiedPush](https://unifiedpush.org) (with the ntfy app, for instance), no
-  Google services; reminders with "Mark as Done", "New Task" from the launcher, sharing text as
-  a task, and keyboard shortcuts.
-- Signs in with the browser or an app password; with the Nextcloud app installed, its accounts
-  fill in the server and login name.
-- Syncs with your Nextcloud by itself: it does not need DAVx⁵ (or the Nextcloud app). If you
-  keep DAVx⁵ for other apps, both can sync the same Nextcloud side by side.
-- System Calendars shows the calendars of the phone's other accounts (Google, Exchange,
-  DAVx⁵…) read-only. It marks the ones Todav already syncs itself, such as DAVx⁵'s copies of
-  your Nextcloud calendars; turned on, their events would show twice.
+All of what Todav does, and what it will, is listed in [FEATURES.md](docs/FEATURES.md).
 
 ## Getting started
 
@@ -214,17 +131,8 @@ Todav from source. Then:
 
 ## Roadmap
 
-Todav is under active development. Planned (details in [ROADMAP.md](docs/ROADMAP.md)):
-
-- **Advanced notifications**, configurable
-- **Advanced search, filtering and sorting**
-- **Settings per list and calendar**, such as how its completed tasks show
-- **Export** of lists and calendars to iCalendar files
-- **More services** besides Nextcloud
-- **Google Tasks on Android**, with a Google sign-in of its own
-- **Google Play and F-Droid** for the Android app
-- **Pebble app**, through the Android app
-- **Windows app**
+Todav is under active development: what is planned is listed in
+[FEATURES.md](docs/FEATURES.md#planned), with the details in [ROADMAP.md](docs/ROADMAP.md).
 
 Ideas, questions and bug reports are welcome: open an
 [issue](https://github.com/AperteDev/todav/issues). See [CONTRIBUTING.md](docs/CONTRIBUTING.md) before

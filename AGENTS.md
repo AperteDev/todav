@@ -6,6 +6,10 @@
   what is built is described by the code. Read it before working on a planned feature, and
   update it in the same change: remove what is done, add a plan or an open question, move a
   dropped plan under "Ruled out" with why.
+- `docs/FEATURES.md` lists what Todav does, one short line each, and what is planned; the
+  README keeps only the highlights and links it. Keep it in step in the same commit: a new
+  feature goes under "Now" and leaves "Planned"; a new plan in `docs/ROADMAP.md` gets its line
+  under "Planned".
 - Notav (`AperteDev/notav`, cloned next to this repository) started from copies of some of this
   code, listed in its `AGENTS.md` (under "Todav"). A fix to one of those
   probably applies there too: port it or say so. Notav keeps its own configuration and
