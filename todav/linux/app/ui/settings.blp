@@ -67,6 +67,17 @@ Adw.PreferencesDialog dialog {
         }
       }
     }
+
+    // Reminders of tasks and events; a page of its own once there is more.
+    Adw.PreferencesGroup {
+      title: _("Notifications");
+
+      // Off: only important tasks' and events' (high priority) are urgent.
+      Adw.SwitchRow urgent_reminders {
+        title: _("Urgent reminders for all");
+        subtitle: _("Kept on screen until dismissed, as those of important tasks and events are");
+      }
+    }
   }
 
   Adw.PreferencesPage {
@@ -240,12 +251,6 @@ Adw.PreferencesDialog dialog {
             step-increment: 5;
           };
         }
-      }
-
-      // Off: only important tasks' and events' (high priority) are urgent.
-      Adw.SwitchRow urgent_reminders {
-        title: _("Urgent reminders for all");
-        subtitle: _("Kept on screen until dismissed, as those of important tasks and events are");
       }
     }
 

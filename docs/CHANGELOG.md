@@ -25,8 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Urgent reminders for important tasks and events (high priority): on Linux they stay on
   screen until dismissed, on Android they come on a channel of their own ("Urgent reminders"),
   which can have its own sound or get through Do Not Disturb. "Urgent reminders for all" in
-  Preferences → Tasks (Settings → Tasks on Android), off by default, makes every reminder
-  urgent.
+  Preferences → General → Notifications (Settings → General on Android), off by default, makes
+  every reminder urgent.
 
 ### Fixed
 
