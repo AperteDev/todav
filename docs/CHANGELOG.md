@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   by default the last opened list, as before.
 - Linux: an event's edit dialog lists its tasks, to tick or add one, as its details do.
 
+### Changed
+
+- Android: On This Device Only comes last among the accounts to add, after System Calendars.
+
 ## [2.3.0] - 2026-10-30
 
 ### Added

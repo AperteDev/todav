@@ -168,18 +168,18 @@ fun AccountChoice(model: Main, welcome: Boolean) {
             Choice(tr("Nextcloud Server"), tr("Sign in to your Nextcloud; Todav gets an app password of its own"), Icons.Outlined.Cloud) {
                 server = ""
             }
-            if (model.core.accounts().none { it.kind == dev.aperte.todav.core.AccountKind.LOCAL }) {
-                Choice(tr("On This Device Only"), tr("Lists and calendars that stay on this device"), Icons.Outlined.PhoneAndroid) {
-                    model.useLocally()
-                    if (!welcome) model.back()
-                }
-            }
             if (model.core.accounts().none { it.kind == AccountKind.SYSTEM }) {
                 Choice(
                     tr("System Calendars"),
                     tr("Calendars of the accounts on this device, such as Google, shown read-only"),
                     Icons.Outlined.CalendarMonth,
                 ) { readCalendars.launch(Manifest.permission.READ_CALENDAR) }
+            }
+            if (model.core.accounts().none { it.kind == AccountKind.LOCAL }) {
+                Choice(tr("On This Device Only"), tr("Lists and calendars that stay on this device"), Icons.Outlined.PhoneAndroid) {
+                    model.useLocally()
+                    if (!welcome) model.back()
+                }
             }
         }
         if (welcome) {
