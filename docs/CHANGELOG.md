@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A task reminder whose time had already passed when it was set (a task due in 10 minutes,
   reminded 15 minutes before) now goes off at once, instead of never, while the task is still
   ahead.
+- Linux: reminders go off on time, not up to 30 seconds later.
 - Android: the task page showed a task's reminders as a long custom time span, and saving the
   task moved them years ahead; it shows and keeps them as set now.
 

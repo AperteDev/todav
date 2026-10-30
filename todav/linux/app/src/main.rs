@@ -77,6 +77,9 @@ fn post(ev: Event) {
         if let Event::SyncState(s) = &ev {
             *SYNC_STATE.lock().unwrap() = s.clone();
         }
+        if let Event::Changed(_) = &ev {
+            reschedule_reminder();
+        }
         window::on_event(&ev);
         dbus::on_event(&ev);
         if let Event::SyncState(_) = &ev {
@@ -421,15 +424,53 @@ pub fn start_background() {
     if !service().start(true) {
         return;
     }
-    notify_reminders();
+    remind();
+    // A timer runs late after a suspend: this catches up meanwhile.
     glib::timeout_add_seconds_local(30, || {
-        notify_reminders();
+        remind();
         glib::ControlFlow::Continue
     });
     glib::timeout_add_seconds_local(60, || {
         renew_tokens();
         service().tick(window::is_active());
         glib::ControlFlow::Continue
+    });
+}
+
+thread_local! {
+    /// The timer for the next reminder (`remind`), and whether setting it again waits (`Changed`).
+    static NEXT_REMINDER: std::cell::RefCell<Option<glib::SourceId>> = const { std::cell::RefCell::new(None) };
+    static RESCHEDULE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Notify about reminders that went off, then wake for the next one on time.
+fn remind() {
+    notify_reminders();
+    let now = core().local_now();
+    let next = todav_app::service::next_reminder(core(), now);
+    NEXT_REMINDER.with(|n| {
+        if let Some(id) = n.borrow_mut().take() {
+            id.remove();
+        }
+        // Local times count whole seconds, so this never wakes before it.
+        *n.borrow_mut() = next.map(|at| {
+            let wait = std::time::Duration::from_secs((at - now).max(0) as u64);
+            glib::timeout_add_local_once(wait, || {
+                NEXT_REMINDER.with(|n| n.borrow_mut().take());
+                remind();
+            })
+        });
+    });
+}
+
+/// Tasks or events changed: the next reminder may be another, once the changes settle.
+fn reschedule_reminder() {
+    if !service().running() || RESCHEDULE.with(|r| r.replace(true)) {
+        return;
+    }
+    glib::timeout_add_local_once(std::time::Duration::from_millis(500), || {
+        RESCHEDULE.with(|r| r.set(false));
+        remind();
     });
 }
 
