@@ -65,3 +65,29 @@ jobs:
           copr-cli --config "$RUNNER_TEMP/copr" buildscm --nowait \
             --clone-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" --commit "v$VERSION" \
             --spec todav/linux/rpm/todav.spec --method make_srpm selfref/todav
+
+  # The AUR packages built from the release (scripts/aur.sh), pushed by the AURomatic account, a
+  # co-maintainer of each, as commits by SelfRef. AUR_SSH_KEY is that account's private key,
+  # without a passphrase. makepkg refuses root: a user of its own runs it.
+  aur:
+    name: Update the AUR packages
+    needs: publish
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    steps:
+      - uses: actions/checkout@v7
+      - name: Update and push
+        env:
+          AUR_SSH_KEY: ${{ secrets.AUR_SSH_KEY }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          pacman -Syu --noconfirm --needed git openssh pacman-contrib
+          useradd -m builder
+          key=/home/builder/aur-key
+          printf '%s\n' "$AUR_SSH_KEY" > "$key"
+          chown builder "$key"
+          chmod 600 "$key"
+          runuser -u builder -- env HOME=/home/builder AUR_KEY="$key" \
+            GIT_AUTHOR_NAME=SelfRef GIT_AUTHOR_EMAIL=git@selfref.dev \
+            GIT_COMMITTER_NAME=SelfRef GIT_COMMITTER_EMAIL=git@selfref.dev \
+            scripts/aur.sh "$VERSION"

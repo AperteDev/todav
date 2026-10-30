@@ -39,7 +39,10 @@
   metainfo gets those changes as the release's notes (untranslated) and its screenshots from
   the new tag. CI builds the packages, then it commits `chore(release): X`, tags `vX` and
   publishes them, and COPR (`selfref/todav`) builds the tag's RPMs (secret `COPR_CONFIG`, an
-  API token that expires after 180 days). Don't bump versions by hand.
+  API token that expires after 180 days). Then `scripts/aur.sh` moves the AUR packages
+  `todav`, `todav-bin`, `gnome-shell-extension-todav` and `-bin` to the release, pushed by the
+  AURomatic account (a co-maintainer; secret `AUR_SSH_KEY`) as commits by SelfRef; a packaging
+  change to them still goes in by hand. Don't bump versions by hand.
 - The Android APK of a release is signed in CI with the release key (secrets
   `ANDROID_KEYSTORE`, base64 of a PKCS#12 keystore with the alias `todav`, and
   `ANDROID_KEYSTORE_PASSWORD`). F-Droid rebuilds the tag and publishes that APK only if both
