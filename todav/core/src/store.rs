@@ -119,6 +119,10 @@ ALTER TABLE lists ADD COLUMN position_dirty INTEGER NOT NULL DEFAULT 0;
     r#"
 ALTER TABLE alarms ADD COLUMN from_start INTEGER NOT NULL DEFAULT 0;
 "#,
+    // Nextcloud's copies of calendars subscribed to by link, pulled whole (`Dav::subscription`).
+    r#"
+ALTER TABLE lists ADD COLUMN subscribed INTEGER NOT NULL DEFAULT 0;
+"#,
 ];
 
 /// `user_version` after the migration that adds accounts.

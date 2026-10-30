@@ -29,6 +29,7 @@ What Todav can do, in short. The details of each release are in the
 
 - Month, Week and Agenda views of your Nextcloud calendars, with a sidebar month and show/hide
   per calendar.
+- Calendars subscribed to by link in Nextcloud (e.g. a work Outlook calendar), read-only.
 - Create, edit, move and delete events, recurring ones too (this occurrence, this and the
   following, or all), with reminders.
 - Priority on events, as on tasks: none, low, medium or high (the one Thunderbird sets).

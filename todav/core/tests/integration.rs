@@ -273,6 +273,49 @@ fn invalid_sync_token_falls_back_to_full_resync() {
     }
 }
 
+/// Needs a calendar subscribed to by link on the test account (Nextcloud Calendar → New
+/// subscription): it comes as a read-only calendar, pulled whole when its sync token moves.
+#[test]
+fn a_subscription_is_a_read_only_calendar() {
+    let (url, user, pass) = env();
+    let dir = std::env::temp_dir().join(format!("todav-it-subscription-{}", now()));
+    let dir = dir.to_string_lossy().to_string();
+    let c = Client::open(dir.clone()).unwrap();
+    connect(&c, &url, &user, &pass);
+    c.sync().into_result().unwrap();
+    let db = rusqlite::Connection::open(format!("{dir}/core.sqlite")).unwrap();
+    let Ok(href) =
+        db.query_row::<String, _, _>("SELECT href FROM lists WHERE subscribed", [], |r| r.get(0))
+    else {
+        eprintln!("no subscription on the test account: skipped");
+        return;
+    };
+    let cal = c.calendars().into_iter().find(|l| l.href == href).unwrap();
+    assert!(cal.holds_events && !cal.holds_tasks && !cal.writable);
+    assert!(!c.lists().iter().any(|l| l.href == href), "not a task list");
+    let count = |db: &rusqlite::Connection| -> i64 {
+        db.query_row(
+            "SELECT COUNT(*) FROM events WHERE list_href = ?",
+            [&href],
+            |r| r.get(0),
+        )
+        .unwrap()
+    };
+    assert!(count(&db) > 0);
+
+    // Unchanged on the server: not pulled again.
+    sql(&format!("{dir}/core.sqlite"), "DELETE FROM events");
+    c.sync().into_result().unwrap();
+    assert_eq!(count(&db), 0);
+    // Changed: pulled whole.
+    sql(
+        &format!("{dir}/core.sqlite"),
+        "UPDATE lists SET sync_token = 'old' WHERE subscribed",
+    );
+    c.sync().into_result().unwrap();
+    assert!(count(&db) > 0);
+}
+
 /// Needs `NTFY_URL`: a web edit reaches a listening client through dav_push → ntfy, also
 /// after the registration was refreshed for being close to expiry.
 #[test]

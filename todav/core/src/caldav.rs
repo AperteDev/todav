@@ -8,6 +8,7 @@ use quick_xml::name::ResolveResult;
 pub const DAV: &str = "DAV:";
 pub const CALDAV: &str = "urn:ietf:params:xml:ns:caldav";
 pub const CS: &str = "http://calendarserver.org/ns/";
+const WEBCAL: &str = "X-NC-CalDAV-Webcal-Caching";
 pub const APPLE: &str = "http://apple.com/ns/ical/";
 pub const PUSH: &str = "https://bitfire.at/webdav-push";
 
@@ -228,6 +229,8 @@ pub struct RemoteList {
     pub writable: bool,
     /// Its place among the user's calendars (calendar-order); None: the server keeps none.
     pub order: Option<i64>,
+    /// Nextcloud's copy of a calendar subscribed to by link (read-only, events only).
+    pub subscribed: bool,
 }
 
 pub enum SyncResult {
@@ -322,6 +325,11 @@ impl Dav {
                 .method(method)
                 .uri(self.url(href))
                 .header("Authorization", &self.auth);
+            // Nextcloud lists subscriptions (webcal) only to clients asking for its cached
+            // copies: then each is a read-only calendar. Other servers ignore it.
+            if !headers.iter().any(|(k, _)| *k == WEBCAL) {
+                b = b.header(WEBCAL, "On");
+            }
             if !body.is_empty()
                 && !headers
                     .iter()
@@ -460,9 +468,59 @@ impl Dav {
                 tasks,
                 events,
                 writable,
+                subscribed: false,
             });
         }
+        // Nextcloud claims tasks for a subscription too, but keeps only its events; without
+        // the cached copies it lists one as `subscribed`. Asked only when one may be.
+        if lists.iter().any(|l| l.tasks && !l.writable) {
+            let body = r#"<?xml version="1.0" encoding="utf-8"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/></d:prop></d:propfind>"#;
+            let r = self.request("PROPFIND", &home, &[("Depth", "1"), (WEBCAL, "Off")], body)?;
+            if r.status == 207 {
+                for s in multistatus(&r.body)?.0 {
+                    let sub = s.props.child(DAV, "resourcetype").is_some_and(|t| {
+                        t.child(CS, "subscribed").is_some() && t.child(CALDAV, "calendar").is_none()
+                    });
+                    if let Some(l) = lists.iter_mut().find(|l| sub && l.href == s.href) {
+                        l.tasks = false;
+                        l.subscribed = true;
+                    }
+                }
+            }
+        }
         Ok(lists)
+    }
+
+    /// A subscription's every event, as a full sync-collection would give them, or None while
+    /// its sync token is still `token`. Nextcloud's sync-collection reads another calendar's
+    /// changes for one (`CachedSubscription` leaves out its calendar type), so not that.
+    pub fn subscription(&self, href: &str, token: &str) -> Result<Option<SyncResult>> {
+        let p = self.propfind(href, "0", "<d:sync-token/>")?;
+        let now = p.first().and_then(|r| r.props.find_text(DAV, "sync-token"));
+        if now.as_deref() == Some(token) {
+            return Ok(None);
+        }
+        let body = format!(
+            r#"<?xml version="1.0" encoding="utf-8"?><c:calendar-query xmlns:d="DAV:" xmlns:c="{CALDAV}"><d:prop><d:getetag/><c:calendar-data/></d:prop><c:filter><c:comp-filter name="VCALENDAR"/></c:filter></c:calendar-query>"#
+        );
+        let r = self.request("REPORT", href, &[("Depth", "1")], &body)?;
+        if r.status != 207 {
+            return Err(Error::Http(r.status, r.body));
+        }
+        let changed = multistatus(&r.body)?
+            .0
+            .into_iter()
+            .filter_map(|r| {
+                let etag = r.props.find_text(DAV, "getetag")?;
+                let data = r.props.find(CALDAV, "calendar-data")?.text.clone();
+                Some((r.href, etag, data))
+            })
+            .collect();
+        Ok(Some(SyncResult::Changes {
+            token: now.unwrap_or_default(),
+            changed,
+            removed: Vec::new(),
+        }))
     }
 
     /// RFC 6578 sync-collection; an empty token returns every member.

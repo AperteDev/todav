@@ -308,10 +308,10 @@ impl Client {
             // An order not sent yet stays ours, as ours does where the server keeps none; so
             // does a colour (Google Tasks keeps none).
             tx.execute(
-                "INSERT INTO lists (href, display_name, color, ctag, push_topic, has_tasks, has_events, writable, account, position)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, COALESCE(?10, 0))
+                "INSERT INTO lists (href, display_name, color, ctag, push_topic, has_tasks, has_events, writable, account, position, subscribed)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, COALESCE(?10, 0), ?11)
                  ON CONFLICT(href) DO UPDATE SET display_name = ?2, color = COALESCE(?3, color), ctag = ?4, push_topic = ?5,
-                   has_tasks = ?6, has_events = ?7, writable = ?8, account = ?9,
+                   has_tasks = ?6, has_events = ?7, writable = ?8, account = ?9, subscribed = ?11,
                    position = CASE WHEN position_dirty OR ?10 IS NULL THEN position ELSE ?10 END",
                 params![
                     dav.absolute(&l.href),
@@ -323,7 +323,8 @@ impl Client {
                     l.events,
                     l.writable,
                     account,
-                    l.order
+                    l.order,
+                    l.subscribed
                 ],
             )?;
         }
@@ -664,30 +665,41 @@ impl Client {
     }
 
     fn pull(&self, dav: &Dav, list_href: &str, report: &mut SyncReport) -> Result<()> {
-        let token: String = {
+        let (token, subscribed): (String, bool) = {
             let db = self.db.lock().unwrap();
             db.query_row(
-                "SELECT COALESCE(sync_token, '') FROM lists WHERE href = ?",
+                "SELECT COALESCE(sync_token, ''), subscribed FROM lists WHERE href = ?",
                 [list_href],
-                |r| r.get(0),
+                |r| Ok((r.get(0)?, r.get(1)?)),
             )
             .map_err(|_| Error::NotFound(list_href.into()))?
         };
         if gtasks::is_list(list_href) {
             return self.pull_google(dav, list_href, &token, report);
         }
-        let (full, res) = match dav.sync_collection(list_href, &token)? {
-            SyncResult::InvalidToken => (true, dav.sync_collection(list_href, "")?),
-            // Nextcloud answers a token it never issued (calendar recreated under the same URL)
-            // with its current token and no changes, as if nothing happened.
-            SyncResult::Changes {
-                token: t,
-                changed,
-                removed,
-            } if !token.is_empty() && t != token && changed.is_empty() && removed.is_empty() => {
-                (true, dav.sync_collection(list_href, "")?)
+        let (full, res) = if subscribed {
+            match dav.subscription(list_href, &token)? {
+                Some(r) => (true, r),
+                None => return Ok(()),
             }
-            r => (token.is_empty(), r),
+        } else {
+            match dav.sync_collection(list_href, &token)? {
+                SyncResult::InvalidToken => (true, dav.sync_collection(list_href, "")?),
+                // Nextcloud answers a token it never issued (calendar recreated under the same URL)
+                // with its current token and no changes, as if nothing happened.
+                SyncResult::Changes {
+                    token: t,
+                    changed,
+                    removed,
+                } if !token.is_empty()
+                    && t != token
+                    && changed.is_empty()
+                    && removed.is_empty() =>
+                {
+                    (true, dav.sync_collection(list_href, "")?)
+                }
+                r => (token.is_empty(), r),
+            }
         };
         let SyncResult::Changes {
             token: new_token,

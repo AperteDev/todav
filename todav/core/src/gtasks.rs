@@ -99,6 +99,7 @@ pub fn lists(dav: &Dav) -> Result<Vec<RemoteList>> {
                 events: false,
                 writable: true,
                 order: None,
+                subscribed: false,
             })
         })
         .collect())

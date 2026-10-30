@@ -299,6 +299,7 @@ mod tests {
             events: false,
             writable: true,
             order: None,
+            subscribed: false,
         }
     }
 

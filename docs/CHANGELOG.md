@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Calendars subscribed to by link in Nextcloud (New subscription from link: a published
+  Outlook or Google calendar, holidays…) show as read-only calendars, updated when Nextcloud
+  refreshes its copy.
+
 ## [2.3.0] - 2026-10-30
 
 ### Added
