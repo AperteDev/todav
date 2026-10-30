@@ -328,8 +328,8 @@ fn connect_order(b: &gtk::Builder, which: &'static str, hint: Option<&'static st
     });
 }
 
-/// The default for new reminders and the time reminders of all-day tasks go off; both apply to
-/// reminders added from now on.
+/// The default for new reminders and the time reminders of all-day tasks go off, both for
+/// reminders added from now on; whether every reminder is urgent.
 fn connect_reminders(b: &gtk::Builder) {
     let default: adw::ComboRow = get(b, "reminder_default");
     let model: gtk::StringList = get(b, "reminder_defaults");
@@ -358,6 +358,12 @@ fn connect_reminders(b: &gtk::Builder) {
             let _ = core().set_setting("reminder_time".into(), minutes.to_string());
         });
     }
+
+    let urgent: adw::SwitchRow = get(b, "urgent_reminders");
+    urgent.set_active(prefs::urgent_reminders(core()));
+    urgent.connect_active_notify(|r| {
+        let _ = core().set_setting("urgent_reminders".into(), r.is_active().to_string());
+    });
 }
 
 /// Open Preferences on `page` (a page's `name` in ui/settings.blp: "general", "accounts",

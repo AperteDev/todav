@@ -93,6 +93,18 @@ pub fn inline_edit(c: &Client) -> bool {
     c.setting("inline_edit".into()).as_deref() == Some("true")
 }
 
+/// Whether every reminder is urgent (`urgent_reminders`; off by default).
+pub fn urgent_reminders(c: &Client) -> bool {
+    c.setting("urgent_reminders".into()).as_deref() == Some("true")
+}
+
+/// Whether a reminder of a task or event of `priority` is urgent, to stay on screen until
+/// dismissed: an important one's (high priority, 1 to 4: a task's star) is, and with
+/// `urgent_reminders` every one.
+pub fn urgent_reminder(c: &Client, priority: Option<i64>) -> bool {
+    matches!(priority, Some(1..=4)) || urgent_reminders(c)
+}
+
 /// A switch that is on unless turned off.
 fn on(c: &Client, key: &str) -> bool {
     c.setting(key.into()).as_deref() != Some("false")
@@ -281,6 +293,18 @@ pub fn set_expanded(c: &Client, uid: &str, open: bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn important_reminders_are_urgent_and_all_with_the_setting() {
+        let dir = std::env::temp_dir().join(format!("todav-app-urgent-{}", std::process::id()));
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        assert!(urgent_reminder(&c, Some(1)) && urgent_reminder(&c, Some(4)));
+        assert!(!urgent_reminder(&c, Some(5)) && !urgent_reminder(&c, None));
+        c.set_setting("urgent_reminders".into(), "true".into())
+            .unwrap();
+        assert!(urgent_reminder(&c, Some(9)) && urgent_reminder(&c, None));
+        let _ = std::fs::remove_dir_all(dir);
+    }
 
     #[test]
     fn sort_at_start_keeps_the_last_used_unless_one_is_picked() {

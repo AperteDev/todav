@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of as the due date's.
 - Priority on events, as on tasks (none, low, medium or high), set in the event dialog (Linux)
   or page (Android) and shown in its details; the same iCalendar priority Thunderbird sets.
+- Urgent reminders for important tasks and events (high priority): on Linux they stay on
+  screen until dismissed, on Android they come on a channel of their own ("Urgent reminders"),
+  which can have its own sound or get through Do Not Disturb. "Urgent reminders for all" in
+  Preferences → Tasks (Settings → Tasks on Android), off by default, makes every reminder
+  urgent.
 
 ### Fixed
 

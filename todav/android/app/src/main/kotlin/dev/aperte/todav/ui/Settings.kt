@@ -603,7 +603,7 @@ private fun OrderRows(model: Main, which: String, sortTitle: String, newTitle: S
     )
 }
 
-/** The default for new reminders and when reminders of all-day tasks go off. */
+/** The default for new reminders, when reminders of all-day tasks go off, which are urgent. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReminderRows(model: Main) {
@@ -629,6 +629,10 @@ private fun ReminderRows(model: Main) {
             model.setSetting("reminder_time", "${s / 60}")
         }
     }
+    SwitchRow(
+        model, tr("Urgent reminders for all"), "urgent_reminders",
+        tr("On the Urgent reminders channel, as those of important tasks and events are"), default = false,
+    )
 }
 
 @Composable

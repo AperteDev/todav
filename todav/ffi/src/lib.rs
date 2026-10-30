@@ -710,6 +710,12 @@ impl Todav {
         todav_app::prefs::stars(self.c())
     }
 
+    /// Whether a reminder of a task or event of `priority` is urgent (an important one's, or
+    /// every one with the setting on).
+    pub fn urgent_reminder(&self, priority: Option<i64>) -> bool {
+        todav_app::prefs::urgent_reminder(self.c(), priority)
+    }
+
     pub fn pins(&self) -> bool {
         todav_app::prefs::pins(self.c())
     }

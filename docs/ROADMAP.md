@@ -17,8 +17,10 @@ Planned work, not yet done. [FEATURES.md](FEATURES.md) lists it publicly; the or
   `AccountKind::Google`, and the task page hiding what Google does not keep, as Linux does
   (`gtasks::is_list`). Open: whether to ask for the calendar scope too, or keep calendars to
   System Calendars.
-- **Advanced notifications**, configurable, beyond the reminder notifications shown now; details
-  to be specified.
+- **Advanced notifications**, configurable, beyond the reminder notifications shown now
+  (urgent ones for important tasks and events, or for all, exist); details to be specified.
+  Open: on Android an urgent reminder that stays on screen needs a full-screen intent
+  (`USE_FULL_SCREEN_INTENT`), which Android 14+ and Google Play keep for alarm and calling apps.
 - **Advanced search, filtering and sorting**; details to be specified.
 - **Settings per list and per calendar**, overriding Preferences for that one: for a task list
   how completed tasks show (`done_tasks`, `done_subtasks`), its sort and where new tasks go,

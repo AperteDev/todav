@@ -19,6 +19,8 @@ What Todav can do, in short. The details of each release are in the
 - Due dates and start dates, with or without a time.
 - Several reminders per task, before or after its due date or its start, as notifications with
   "Mark as Done"; one already past when set goes off at once.
+- Urgent reminders for important tasks and events (high priority), for all with a setting:
+  they stay on screen until dismissed (on Android: a channel of their own).
 - An Upcoming page across all lists: Overdue, Today, Tomorrow, the coming days and later.
 - Search across all lists, ignoring accents.
 - Undo with Ctrl+Z or a toast's Undo.

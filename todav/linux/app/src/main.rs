@@ -481,8 +481,17 @@ fn notify_reminders() {
     };
     let now = core().local_now();
     let (tasks, events) = service().due_reminders();
+    // Urgent: GNOME Shell keeps it on screen until dismissed (and shows it through fullscreen
+    // and with banners off).
+    let notification = |summary: &str, priority| {
+        let n = gio::Notification::new(summary);
+        if todav_app::prefs::urgent_reminder(core(), priority) {
+            n.set_priority(gio::NotificationPriority::Urgent);
+        }
+        n
+    };
     for t in tasks {
-        let n = gio::Notification::new(&t.summary);
+        let n = notification(&t.summary, t.priority);
         let body = match (t.start, t.due) {
             (Some(s), _) if todav_app::service::reminds_of_start(&t, now) => {
                 Some((i18n::gettext("Starts {date}"), s, t.start_all_day))
@@ -504,7 +513,7 @@ fn notify_reminders() {
         app.send_notification(Some(&format!("reminder-{}", t.uid)), &n);
     }
     for e in events {
-        let n = gio::Notification::new(&e.summary);
+        let n = notification(&e.summary, e.priority);
         let when = dates::label(e.start, e.all_day, now);
         n.set_body(Some(&match &e.location {
             Some(l) => format!("{when} · {l}"),

@@ -241,6 +241,12 @@ Adw.PreferencesDialog dialog {
           };
         }
       }
+
+      // Off: only important tasks' and events' (high priority) are urgent.
+      Adw.SwitchRow urgent_reminders {
+        title: _("Urgent reminders for all");
+        subtitle: _("Kept on screen until dismissed, as those of important tasks and events are");
+      }
     }
 
     Adw.PreferencesGroup {

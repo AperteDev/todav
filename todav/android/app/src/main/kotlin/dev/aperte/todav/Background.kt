@@ -208,12 +208,26 @@ object Reminders {
     // snoozes, if they turn out to be wanted.
     private const val SNOOZE_SECONDS = 600L
 
+    /**
+     * Those of important tasks and events (and all, with the setting on), on a channel of their
+     * own: the user can give it another sound or let it through Do Not Disturb. Android has no
+     * banner that stays without a full-screen intent, which is for alarms and calls.
+     */
+    const val URGENT = "urgent_reminders"
+
     fun channel(context: Context) {
         val m = context.getSystemService(NotificationManager::class.java)
         m.createNotificationChannel(
             NotificationChannel(CHANNEL, tr("Reminders"), NotificationManager.IMPORTANCE_HIGH),
         )
+        m.createNotificationChannel(
+            NotificationChannel(URGENT, tr("Urgent reminders"), NotificationManager.IMPORTANCE_HIGH),
+        )
     }
+
+    /** A reminder of something of `priority`, on its channel. */
+    private fun builder(app: TodavApp, priority: Long?) =
+        NotificationCompat.Builder(app, if (app.core.urgentReminder(priority)) URGENT else CHANNEL)
 
     fun schedule(app: TodavApp) {
         val alarms = app.getSystemService(AlarmManager::class.java)
@@ -300,7 +314,7 @@ object Reminders {
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 
-    private fun task(app: TodavApp, t: TodavTask, now: Long) = NotificationCompat.Builder(app, CHANNEL)
+    private fun task(app: TodavApp, t: TodavTask, now: Long) = builder(app, t.priority)
         .setSmallIcon(R.drawable.ic_notification)
         .setContentTitle(t.summary)
         .setContentText(
@@ -322,7 +336,7 @@ object Reminders {
         .addAction(snoozeAction(app, t.uid.hashCode()) { putExtra("task", t.uid) })
         .build()
 
-    private fun event(app: TodavApp, e: Event, now: Long) = NotificationCompat.Builder(app, CHANNEL)
+    private fun event(app: TodavApp, e: Event, now: Long) = builder(app, e.priority)
         .setSmallIcon(R.drawable.ic_notification)
         .setContentTitle(e.summary)
         .setContentText(listOfNotNull(dayLabel(e.start, e.allDay, now), e.location?.takeIf { it.isNotBlank() }).joinToString(" · "))
