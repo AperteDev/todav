@@ -249,14 +249,21 @@ impl Service {
 }
 
 /// Reminders of tasks and events that went off since the last call: at most a day back, so a
-/// device that was off does not replay old ones. The first call only marks the time.
+/// device that was off does not replay old ones. The first call only marks the time. Tasks a
+/// change gave a reminder already past come too (`Client::take_late_reminders`).
 pub fn due_reminders(c: &Client) -> (Vec<Task>, Vec<Event>) {
     let now = c.local_now();
     let stored = c
         .setting("reminded_until".into())
         .and_then(|v| v.parse::<i64>().ok());
     let from = stored.unwrap_or(now).max(now - 86400);
-    let due = (c.reminders(from, now), c.event_reminders(from, now));
+    let mut tasks = c.reminders(from, now);
+    for t in c.take_late_reminders() {
+        if !tasks.iter().any(|x| x.uid == t.uid) {
+            tasks.push(t);
+        }
+    }
+    let due = (tasks, c.event_reminders(from, now));
     if stored != Some(now) {
         let _ = c.set_setting("reminded_until".into(), now.to_string());
     }
@@ -269,8 +276,12 @@ pub const LOOKAHEAD: i64 = 7 * 86400;
 
 /// When the next reminder of a task or event goes off after `now` (local time), within
 /// `LOOKAHEAD`: for a platform that wakes up for it (an exact alarm on Android) instead of
-/// checking every 30 seconds. Then `Service::due_reminders` says which went off.
+/// checking every 30 seconds. Then `Service::due_reminders` says which went off. Now, when a
+/// change set a reminder already past.
 pub fn next_reminder(c: &Client, now: i64) -> Option<i64> {
+    if c.has_late_reminders() {
+        return Some(now);
+    }
     let to = now + LOOKAHEAD;
     let tasks = c.reminders(now, to).into_iter().flat_map(|t| t.reminders);
     let events = c.event_reminders(now, to).into_iter();
@@ -375,6 +386,48 @@ mod tests {
         c.update_task(task.uid, patch).unwrap();
         assert_eq!(due_reminders(&c).0.len(), 1);
         assert!(due_reminders(&c).0.is_empty());
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_reminder_set_in_the_past_goes_off_at_once_while_the_task_is_ahead() {
+        let dir = std::env::temp_dir().join(format!("todav-app-late-{}", std::process::id()));
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let account = c
+            .add_account(
+                AccountKind::Local,
+                String::new(),
+                String::new(),
+                String::new(),
+            )
+            .unwrap();
+        let list = c
+            .create_list(account, "Tasks".into(), "#0082C9".into(), false)
+            .unwrap();
+        assert!(due_reminders(&c).0.is_empty());
+        let now = c.local_now();
+        let due = |at, reminders| TaskPatch {
+            due: Some(Some(Due { at, all_day: false })),
+            reminders: Some(reminders),
+            ..Default::default()
+        };
+        // Due in ten minutes, reminded fifteen before: at once, and only once.
+        let task = c.add_task(list.clone(), "Call".into(), None, None, false);
+        let uid = task.unwrap().uid;
+        c.update_task(uid.clone(), due(now + 600, vec![-900]))
+            .unwrap();
+        assert_eq!(next_reminder(&c, now), Some(now));
+        assert_eq!(due_reminders(&c).0.len(), 1);
+        assert!(due_reminders(&c).0.is_empty());
+        // Another reminder: only a new one that is past counts, the old one went off already.
+        c.update_task(uid.clone(), due(now + 600, vec![-900, 0]))
+            .unwrap();
+        assert!(!c.has_late_reminders());
+        // A task already due is not reminded of it again.
+        let task = c.add_task(list, "Late".into(), None, None, false);
+        c.update_task(task.unwrap().uid, due(now - 600, vec![-900]))
+            .unwrap();
+        assert!(!c.has_late_reminders());
         let _ = std::fs::remove_dir_all(dir);
     }
 

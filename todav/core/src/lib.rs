@@ -78,6 +78,9 @@ impl InList for Event {
 
 /// The lists of a switched-off account and what is in them are hidden; nothing is deleted,
 /// switching it on shows them again.
+/// `kv` key of the tasks whose reminders went off before a local change set them, one UID a line.
+const LATE: &str = "late_reminders";
+
 fn shown<T: InList>(db: &Connection, mut v: Vec<T>) -> Vec<T> {
     let hidden = store::hidden(db).unwrap_or_default();
     if !hidden.is_empty() {
@@ -630,6 +633,7 @@ impl Client {
             Some(d) if d.all_day => cal.set(name, ";VALUE=DATE", Some(&ical::fmt_utc(d.at)[..8])),
             Some(_) => cal.set_time(name, utc),
         };
+        let before = self.task(uid.clone()).map(|t| t.reminders);
         self.modify(&uid, |cal| {
             if let Some(d) = patch.due {
                 set_date(cal, "DUE", d, due_utc);
@@ -678,7 +682,53 @@ impl Client {
                     Some(v.join(",").as_str()).filter(|v| !v.is_empty()),
                 );
             }
-        })
+        })?;
+        self.note_late(&uid, &before.unwrap_or_default());
+        Ok(())
+    }
+
+    /// A reminder this change set in the past, while the task is still ahead (its time, or the
+    /// rest of its day), goes off at once (`take_late_reminders`), not never; one it had before
+    /// went off already.
+    fn note_late(&self, uid: &str, before: &[i64]) {
+        let (Some(t), now) = (self.task(uid.into()), self.local_now()) else {
+            return;
+        };
+        let ahead = t
+            .due
+            .is_some_and(|d| d + if t.due_all_day { 86400 } else { 0 } > now);
+        if !ahead || !t.reminders.iter().any(|r| *r <= now && !before.contains(r)) {
+            return;
+        }
+        let db = self.db.lock().unwrap();
+        let mut late = store::kv_get(&db, LATE).ok().flatten().unwrap_or_default();
+        if !late.lines().any(|l| l == uid) {
+            late = format!("{late}{uid}\n");
+            let _ = store::kv_set(&db, LATE, &late);
+        }
+    }
+
+    /// Whether a reminder set in the past waits to go off (`take_late_reminders`).
+    pub fn has_late_reminders(&self) -> bool {
+        let db = self.db.lock().unwrap();
+        store::kv_get(&db, LATE)
+            .ok()
+            .flatten()
+            .is_some_and(|l| !l.is_empty())
+    }
+
+    /// Open tasks whose reminders were set in the past since the last call (`note_late`).
+    pub fn take_late_reminders(&self) -> Vec<Task> {
+        let late = {
+            let db = self.db.lock().unwrap();
+            let late = store::kv_get(&db, LATE).ok().flatten().unwrap_or_default();
+            let _ = store::kv_set(&db, LATE, "");
+            late
+        };
+        late.lines()
+            .filter_map(|uid| self.task(uid.into()))
+            .filter(|t| !t.done && t.status != "CANCELLED")
+            .collect()
     }
 
     pub fn delete_task(&self, uid: String) -> Result<()> {

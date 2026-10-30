@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pin, and the calendar plans these tasks onto days, not into hours.
 - Fedora packages on COPR (`selfref/todav`), built with each release.
 
+### Fixed
+
+- A task reminder whose time had already passed when it was set (a task due in 10 minutes,
+  reminded 15 minutes before) now goes off at once, instead of never, while the task is still
+  ahead.
+
 ## [2.2.0] - 2026-10-29
 
 ### Added
