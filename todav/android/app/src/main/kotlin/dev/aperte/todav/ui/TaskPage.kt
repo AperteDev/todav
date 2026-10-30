@@ -111,7 +111,9 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null, draft: 
     var due by rememberSaveable(uid) { mutableStateOf(task.due) }
     var dueAllDay by rememberSaveable(uid) { mutableStateOf(task.dueAllDay) }
     var event by rememberSaveable(uid) { mutableStateOf(task.eventUid) }
-    val reminders = remember(uid) { mutableStateListOf<Long>().apply { addAll(task.reminders) } }
+    // Offsets from the due time, as the patch takes them; the task has the times.
+    val oldReminders = remember(uid) { task.due?.let { d -> task.reminders.map { it - d } } ?: emptyList() }
+    val reminders = remember(uid) { mutableStateListOf<Long>().apply { addAll(oldReminders) } }
     var confirmDelete by remember { mutableStateOf(false) }
     var discard by remember { mutableStateOf(false) }
     val categories = remember(list) { core.categories(list).map { it.name } }
@@ -119,7 +121,7 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null, draft: 
     val changed = summary != task.summary || list != task.listHref || category != (task.category ?: "") ||
         priority != task.priority || note != (task.description ?: "") || start != task.start ||
         (start != null && startAllDay != task.startAllDay) || due != task.due ||
-        (due != null && dueAllDay != task.dueAllDay) || event != task.eventUid || reminders.toList() != task.reminders
+        (due != null && dueAllDay != task.dueAllDay) || event != task.eventUid || reminders.toList() != oldReminders
 
     fun save() {
         if (draft != null) {
@@ -146,7 +148,7 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null, draft: 
             priority = PriorityValue(priority).takeIf { priority != task.priority },
             start = DueValue(start?.let { Due(it, startAllDay) }).takeIf { start != task.start || startAllDay != task.startAllDay },
             due = DueValue(due?.let { Due(it, dueAllDay) }).takeIf { due != task.due || dueAllDay != task.dueAllDay },
-            reminders = reminders.toList().takeIf { it != task.reminders },
+            reminders = reminders.toList().takeIf { it != oldReminders },
             event = TextValue(event).takeIf { event != task.eventUid },
         )
         val to = list.takeIf { it != task.listHref }

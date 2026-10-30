@@ -963,7 +963,7 @@ fun AddSheet(model: Main, list: String, parent: TodavTask?, category: String?, i
                 TodavTask(
                     uid = "", listHref = list, summary = text.trim(), description = null, status = "NEEDS-ACTION",
                     done = false, completedAt = null, category = cat, parentUid = parent?.uid, priority = priority,
-                    due = due, dueAllDay = true, reminders = due?.let { listOf(model.core.defaultReminder(true)) } ?: emptyList(),
+                    due = due, dueAllDay = true, reminders = due?.let { listOf(it + model.core.defaultReminder(true)) } ?: emptyList(),
                     sortOrder = null, created = null, lastModified = null, start = null, startAllDay = false,
                     eventUid = null, syncError = null, pinned = false,
                 )
