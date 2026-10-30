@@ -326,6 +326,9 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
     let delete_box: gtk::ListBox = get(&b, "delete_box");
     delete_box.set_visible(e.is_some());
     if let Some(ev) = e.clone() {
+        let tasks: gtk::Box = get(&b, "tasks");
+        tasks.append(&super::event_tasks(&ev));
+        tasks.set_visible(true);
         let link = todav_app::links::event(&ev.uid);
         get::<adw::ButtonRow>(&b, "copy_link")
             .connect_activated(move |row| crate::open::copy_link(row, link.clone()));

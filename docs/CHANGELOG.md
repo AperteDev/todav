@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Preferences → Accounts → Read-only Calendars: the task list that tasks added for events of
   read-only calendars (shared ones you may only view, subscriptions, the phone's) go to;
   by default the last opened list, as before.
+- Linux: an event's edit dialog lists its tasks, to tick or add one, as its details do.
 
 ## [2.3.0] - 2026-10-30
 

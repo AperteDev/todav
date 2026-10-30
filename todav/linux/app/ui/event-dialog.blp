@@ -93,6 +93,12 @@ Adw.Dialog dialog {
               }
             }
           }
+
+          // An event's tasks (src/calendar.rs `event_tasks`), as in its details; added at once.
+          Gtk.Box tasks {
+            orientation: vertical;
+            visible: false;
+          }
         }
 
         Gtk.Box {
