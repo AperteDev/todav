@@ -3,9 +3,11 @@
 use crate::event::{self, Event};
 use crate::ical::{self, Calendar, Line};
 use crate::tz::{self, Stamp};
-use crate::{List, Result, Task};
+use crate::{Error, List, Result, Task};
 use rusqlite::{Connection, OptionalExtension, params};
 
+/// The schema, then each change to it, applied in order from the database's `user_version`.
+/// Released steps are never edited: a change is a new step (see `AGENTS.md`).
 const MIGRATIONS: &[&str] = &[
     r#"
 CREATE TABLE lists (
@@ -182,6 +184,14 @@ pub fn open(path: &str) -> Result<Connection> {
     let db = Connection::open(path)?;
     db.execute_batch("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;")?;
     let version: i64 = db.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+    // A newer Todav's: its schema may not be what this one reads and writes.
+    if version > MIGRATIONS.len() as i64 {
+        return Err(Error::Db(format!(
+            "{path} was made by a newer version of Todav (schema {version}, this one knows up to \
+             {}); update Todav to open it",
+            MIGRATIONS.len()
+        )));
+    }
     for (i, m) in MIGRATIONS.iter().enumerate().skip(version as usize) {
         let tx = db.unchecked_transaction()?;
         tx.execute_batch(m)?;
@@ -950,6 +960,62 @@ END:VCALENDAR
         ] {
             assert_eq!(kv(gone), None, "{gone}");
         }
+    }
+
+    /// A database at schema `version` (`MIGRATIONS[..version]`), at a fresh path for `name`.
+    fn at(name: &str, version: usize) -> String {
+        let path = std::env::temp_dir().join(format!("todav-test-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        let path = path.to_string_lossy().to_string();
+        let db = Connection::open(&path).unwrap();
+        for m in &MIGRATIONS[..version] {
+            db.execute_batch(m).unwrap();
+        }
+        db.pragma_update(None, "user_version", version as i64)
+            .unwrap();
+        path
+    }
+
+    #[test]
+    fn a_newer_todavs_database_is_left_alone() {
+        let path = at("newer", MIGRATIONS.len());
+        Connection::open(&path)
+            .unwrap()
+            .pragma_update(None, "user_version", MIGRATIONS.len() as i64 + 1)
+            .unwrap();
+        assert!(matches!(open(&path), Err(Error::Db(e)) if e.contains("newer version")));
+        let db = Connection::open(&path).unwrap();
+        let version: i64 = db
+            .query_row("PRAGMA user_version", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(version, MIGRATIONS.len() as i64 + 1, "not written to");
+    }
+
+    #[test]
+    fn lists_from_2_3_are_no_subscriptions_and_keep_their_names() {
+        // As Todav 2.3.0 left it: 13 steps.
+        let path = at("from-2-3", 13);
+        Connection::open(&path)
+            .unwrap()
+            .execute(
+                "INSERT INTO lists (href, display_name, color) VALUES ('/c/', 'Work', '#0082C9')",
+                [],
+            )
+            .unwrap();
+        let db = open(&path).unwrap();
+        let (subscribed, own): (bool, Option<String>) = db
+            .query_row(
+                "SELECT subscribed, COALESCE(own_name, own_color) FROM lists",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!((subscribed, own), (false, None));
+        let l = lists(&db).unwrap().remove(0);
+        assert_eq!(
+            (l.display_name.as_str(), l.color.as_deref()),
+            ("Work", Some("#0082C9"))
+        );
     }
 
     #[test]
