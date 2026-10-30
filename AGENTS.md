@@ -99,6 +99,20 @@
   welcome page sets it to the account added there unless its switch is turned off. The ntfy
   server (`ntfy_url`) syncs with them unless "Sync ntfy server" (`sync_ntfy`) is off.
 
+## Stored data
+
+- An update carries on with what the previous version kept. The database (`core.sqlite` in
+  the data folder) may change in any way, as a new step at the end of `todav/core/src/store.rs`
+  `MIGRATIONS` that converts what is there (tables, columns, `kv` keys and values); a released
+  step is never edited. Each new step gets a test that opens a database of the step before and
+  checks what the new one made of it (`store.rs` tests, `at`). A database from a newer Todav
+  is refused (`store::open`), never written to.
+- Settings change the same way: a renamed key or another value format is converted by a step
+  (device-only ones such as `last_list` too). Synced settings (`.config/todav/settings.json`)
+  and each account's `todav/config.json` are also read by other devices, which may run an
+  older version until they update: a synced key changed in meaning goes under a new name, so
+  the old versions keep theirs.
+
 ## Accounts
 
 - Lists belong to accounts (`accounts` table): Nextcloud ones and the local one, at most one.
