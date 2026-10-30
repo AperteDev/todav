@@ -738,6 +738,10 @@ fn build(app: &adw::Application) -> Rc<Ui> {
     if crate::sandbox() {
         window.set_title(Some("Todav (sandbox)"));
     }
+    // Debug builds (make broadway, sandbox, cargo run) get libadwaita's striped header bars.
+    if cfg!(debug_assertions) {
+        window.add_css_class("devel");
+    }
     restore_size(&window, app);
 
     let css = gtk::CssProvider::new();
