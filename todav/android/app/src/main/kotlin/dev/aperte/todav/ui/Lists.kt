@@ -91,6 +91,13 @@ fun ListDialog(model: Main, href: String?, events: Boolean, onDismiss: () -> Uni
                         ) { place = places[it] }
                     }
                 }
+                if (list != null && accounts[list.account]?.kind == dev.aperte.todav.core.AccountKind.SYSTEM) {
+                    Text(
+                        tr("Only in Todav: the calendar keeps its own name and color elsewhere"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Text(tr("Color"), style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     presets.forEach { c ->

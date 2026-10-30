@@ -123,6 +123,11 @@ ALTER TABLE alarms ADD COLUMN from_start INTEGER NOT NULL DEFAULT 0;
     r#"
 ALTER TABLE lists ADD COLUMN subscribed INTEGER NOT NULL DEFAULT 0;
 "#,
+    // A system calendar's name and colour as the user changed them here (NULL: the system's).
+    r#"
+ALTER TABLE lists ADD COLUMN own_name TEXT;
+ALTER TABLE lists ADD COLUMN own_color TEXT;
+"#,
 ];
 
 /// `user_version` after the migration that adds accounts.
@@ -384,11 +389,11 @@ pub fn kv_set(db: &Connection, key: &str, value: &str) -> Result<()> {
 /// server one keyed by its full URL (`Dav::absolute`).
 pub fn lists(db: &Connection) -> Result<Vec<List>> {
     let mut st = db.prepare(
-        "SELECT l.href, l.display_name, l.color,
+        "SELECT l.href, COALESCE(l.own_name, l.display_name) AS name, COALESCE(l.own_color, l.color),
            (SELECT COUNT(*) FROM tasks t WHERE t.list_href = l.href AND t.dirty != 2
               AND t.status NOT IN ('COMPLETED', 'CANCELLED')),
            l.has_tasks, l.has_events, l.writable, COALESCE(l.account, 0)
-         FROM lists l ORDER BY l.position, l.display_name COLLATE NOCASE",
+         FROM lists l ORDER BY l.position, name COLLATE NOCASE",
     )?;
     let rows = st.query_map([], |r| {
         let href: String = r.get(0)?;

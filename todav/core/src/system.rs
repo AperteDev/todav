@@ -205,4 +205,35 @@ mod tests {
         assert!(titles(&c).is_empty());
         assert_eq!(c.calendars().len(), 1);
     }
+
+    #[test]
+    fn a_system_calendar_is_renamed_and_recoloured_here_only() {
+        let dir = std::env::temp_dir().join(format!("todav-test-sysname-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let id = c
+            .add_account(AccountKind::System, "".into(), "".into(), "".into())
+            .unwrap();
+        let cal = |name: &str| SystemCalendar {
+            href: "content://com.android.calendar/calendars/1".into(),
+            name: name.into(),
+            color: "#3584e4".into(),
+        };
+        let shown = |c: &Client| {
+            let l = c.calendars().remove(0);
+            (l.display_name, l.color.unwrap_or_default())
+        };
+        c.set_system_calendars(id, vec![cal("Work")]).unwrap();
+        c.edit_list(cal("").href, "Office".into(), "#B6469D".into())
+            .unwrap();
+        assert_eq!(shown(&c), ("Office".into(), "#B6469D".into()));
+        // The system renaming it changes nothing here.
+        c.set_system_calendars(id, vec![cal("Job")]).unwrap();
+        assert_eq!(shown(&c), ("Office".into(), "#B6469D".into()));
+        // Given the system's name and colour again, it follows the system's.
+        c.edit_list(cal("").href, "Job".into(), "#3584e4".into())
+            .unwrap();
+        c.set_system_calendars(id, vec![cal("Work")]).unwrap();
+        assert_eq!(shown(&c), ("Work".into(), "#3584e4".into()));
+    }
 }

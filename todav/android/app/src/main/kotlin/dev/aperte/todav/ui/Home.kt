@@ -369,8 +369,7 @@ private fun Sidebar(model: Main, screen: Screen, view: View, modifier: Modifier,
                 val m = moving
                 moving = null
                 if (!moved) {
-                    // The system's calendars are named and coloured where they come from.
-                    if (!key.startsWith(dev.aperte.todav.SystemCalendars.PREFIX)) editing = key
+                    editing = key
                 } else if (m != null && m.target(row) != m.from) {
                     dropped = m.order(row)
                     model.reorderLists(m.order(row))

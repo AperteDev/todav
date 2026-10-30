@@ -225,7 +225,8 @@ impl Client {
         Ok(href)
     }
 
-    /// Rename and recolour list `href`, on the server and here.
+    /// Rename and recolour list `href`, on the server and here; a system calendar here only,
+    /// over the system's name and colour (back to them when given them).
     pub fn edit_list(&self, href: String, name: String, color: String) -> Result<()> {
         let _guard = self.sync_lock.lock().unwrap();
         let account = store::list_account(&self.db.lock().unwrap(), &href)?;
@@ -233,7 +234,13 @@ impl Client {
             .account(account)
             .is_some_and(|a| a.kind == AccountKind::System)
         {
-            return Err(Error::ReadOnly); // named and coloured where they come from
+            self.db.lock().unwrap().execute(
+                "UPDATE lists SET own_name = NULLIF(?2, display_name), own_color = NULLIF(?3, color)
+                 WHERE href = ?1",
+                params![href, name, color],
+            )?;
+            self.emit(&href, Vec::new());
+            return Ok(());
         }
         if gtasks::is_list(&href) {
             gtasks::rename_list(&*self.list_dav(&href)?, &href, &name)?;

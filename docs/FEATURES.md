@@ -83,7 +83,8 @@ What Todav can do, in short. The details of each release are in the
 - Reminders with "Mark as Done" and Snooze; "New Task" from the launcher; text shared as a task.
 - Syncs with Nextcloud by itself, no DAVx⁵ needed; the Nextcloud app's accounts fill in the
   sign-in.
-- System Calendars: the phone's other calendars (Google, Exchange, DAVx⁵…), read-only.
+- System Calendars: the phone's other calendars (Google, Exchange, DAVx⁵…), read-only; their
+  name and colour can be changed in Todav.
 
 **Languages**
 
