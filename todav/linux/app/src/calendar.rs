@@ -1493,22 +1493,13 @@ fn check_row(t: &Task, count: Rc<dyn Fn()>) -> gtk::CheckButton {
     check
 }
 
-/// The tasks for an event: tick them, add one (to the task list used last, due when the event
-/// starts).
+/// The tasks for an event: tick them, add one (to the list `event_task_list` picks, due when
+/// the event starts).
 fn event_tasks(e: &Event) -> gtk::Box {
     let uid = e.uid.clone();
     let ev = e.clone();
     let add = move |text: String| {
-        // Not to Google Tasks, which keeps no link to the event.
-        let mut lists = core().lists();
-        lists.retain(|l| !todav_core::gtasks::is_list(&l.href));
-        let last = core().setting("last_list".into());
-        let list_href = lists
-            .iter()
-            .find(|l| Some(&l.href) == last.as_ref())
-            .or(lists.first())?
-            .href
-            .clone();
+        let list_href = todav_app::lists::event_task_list(core(), &ev.list_href)?;
         let start = prefs::order(core()).task_start;
         let patch = TaskPatch {
             event: Some(Some(ev.uid.clone())),

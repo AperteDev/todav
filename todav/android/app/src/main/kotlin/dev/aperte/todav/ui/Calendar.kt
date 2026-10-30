@@ -1634,12 +1634,11 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
                     }
                     val tasks = remember(changes, e.uid) { core.eventTasks(e.uid) }
                     // Without a task list to add one to (only the system's calendars, say), none.
-                    val taskLists = remember(changes) { core.lists().any { it.writable } }
+                    val taskLists = remember(changes) { core.eventTaskLists().isNotEmpty() }
                     if (tasks.isNotEmpty() || taskLists) SectionTitle(tr("Tasks"))
                     tasks.forEach { t -> CheckRow(model, t) }
                     if (taskLists) AddLine(tr("Add a task for this event")) { text ->
-                        val list = core.setting("last_list")?.takeIf { l -> core.lists().any { it.href == l && it.writable } }
-                            ?: core.byPlace(core.lists()).firstOrNull { it.writable }?.href
+                        val list = core.eventTaskList(e.listHref)
                         if (list != null) {
                             model.add(list, text, patch = TaskPatch(due = DueValue(Due(e.start, e.allDay)), event = TextValue(e.uid)))
                         }

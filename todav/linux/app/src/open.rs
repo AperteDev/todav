@@ -84,7 +84,7 @@ async fn import(name: &str, ics: String) {
             .title(title)
             .subtitle(ngettext(one, many, n.into()).replace("{n}", &n.to_string()))
             .build();
-        crate::lists::picker(&row, choices);
+        crate::lists::picker(&row, choices, None);
         group.add(&row);
         row
     };

@@ -744,6 +744,7 @@ fn connect_accounts(b: &gtk::Builder, dialog: &adw::PreferencesDialog) {
     let group: adw::PreferencesGroup = get(b, "accounts");
     let rows: RefCell<Vec<adw::ActionRow>> = RefCell::default();
     let settings_sync = connect_settings_sync(b);
+    let event_tasks_list = connect_event_tasks_list(b);
     let d = dialog.downgrade();
     let show: Rc<dyn Fn()> = Rc::new(move || {
         for r in rows.borrow_mut().drain(..) {
@@ -776,6 +777,7 @@ fn connect_accounts(b: &gtk::Builder, dialog: &adw::PreferencesDialog) {
             rows.borrow_mut().push(row);
         }
         settings_sync();
+        event_tasks_list();
     });
     show();
     ACCOUNTS.set(Some(show));
@@ -919,6 +921,35 @@ fn connect_settings_sync(b: &gtk::Builder) -> impl Fn() + 'static {
         row.set_selected(v.iter().position(|i| *i == current).unwrap_or(0) as u32);
         ntfy.set_sensitive(current.is_some());
         *ids.borrow_mut() = v;
+        filling.set(false);
+    }
+}
+
+/// Where tasks for read-only calendars' events go: the last opened list (stored empty) or one
+/// picked; the returned closure fills it anew.
+fn connect_event_tasks_list(b: &gtk::Builder) -> impl Fn() + 'static {
+    let row: adw::ComboRow = get(b, "event_tasks_list");
+    let hrefs: Rc<RefCell<Vec<String>>> = Rc::default();
+    let filling = Rc::new(Cell::new(false));
+    let (h, f) = (hrefs.clone(), filling.clone());
+    row.connect_selected_notify(move |r| {
+        if f.get() {
+            return;
+        }
+        let href = h.borrow().get(r.selected() as usize).cloned();
+        let _ = core().set_setting("event_tasks_list".into(), href.unwrap_or_default());
+    });
+    move || {
+        filling.set(true);
+        let lists = todav_app::lists::event_task_lists(core());
+        crate::lists::picker(&row, &lists, Some(&gettext("Last opened list")));
+        let mut v = vec![String::new()];
+        v.extend(lists.into_iter().map(|l| l.href));
+        let current = core()
+            .setting("event_tasks_list".into())
+            .unwrap_or_default();
+        row.set_selected(v.iter().position(|h| *h == current).unwrap_or(0) as u32);
+        *hrefs.borrow_mut() = v;
         filling.set(false);
     }
 }

@@ -2935,7 +2935,7 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
             .filter(|l| l.writable || l.href == t.list_href)
             .collect(),
     );
-    crate::lists::picker(&list_row, &lists);
+    crate::lists::picker(&list_row, &lists, None);
     let at = lists.iter().position(|l| l.href == t.list_href);
     list_row.set_selected(at.unwrap_or(0) as u32);
     list_row.set_visible(!sub);

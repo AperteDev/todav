@@ -39,7 +39,8 @@ What Todav can do, in short. The details of each release are in the
 - Drop an event on another calendar in the sidebar to move it there.
 - An event's or a task's details on a click (subtasks, an event's tasks), editing on a
   double-click.
-- Tasks linked to events: an event lists its tasks, a task shows its event.
+- Tasks linked to events: an event lists its tasks, a task shows its event; tasks for
+  read-only calendars' events go to a list of your choice.
 - Opens iCalendar files (`.ics`), importing their events and tasks.
 - Copy Link: a `todav://` link that opens a task or an event, to paste elsewhere.
 

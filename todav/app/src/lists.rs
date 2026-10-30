@@ -49,6 +49,36 @@ pub fn places(c: &Client, events: bool) -> Vec<i64> {
         .collect()
 }
 
+/// The task lists a task for an event can go to, by place: ones we may write to, but not
+/// Google Tasks', which keep no link to the event.
+pub fn event_task_lists(c: &Client) -> Vec<List> {
+    let lists = c.lists().into_iter();
+    by_place(
+        c,
+        lists
+            .filter(|l| l.writable && !todav_core::gtasks::is_list(&l.href))
+            .collect(),
+    )
+}
+
+/// Where a task added for an event of `calendar` goes: for a read-only calendar the list picked
+/// in `event_tasks_list`; else, or if that is gone, the last opened list; else the first.
+pub fn event_task_list(c: &Client, calendar: &str) -> Option<String> {
+    let lists = event_task_lists(c);
+    let read_only = !c
+        .calendars()
+        .iter()
+        .any(|l| l.href == calendar && l.writable);
+    let picked = read_only
+        .then(|| c.setting("event_tasks_list".into()))
+        .flatten();
+    [picked, c.setting("last_list".into())]
+        .into_iter()
+        .flatten()
+        .find(|h| lists.iter().any(|l| &l.href == h))
+        .or_else(|| lists.first().map(|l| l.href.clone()))
+}
+
 /// The account heading each of `lists` (as `by_place` orders them): on the first of a group,
 /// when they are from more than one.
 pub fn headings(lists: &[List]) -> Vec<Option<i64>> {
@@ -83,4 +113,50 @@ pub fn start_local(c: &Client, account: i64, s: Starter) -> Result<()> {
     c.update_task(uid, patch)?;
     c.create_list(account, s.calendar, PRESETS[0].into(), true)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use todav_core::SystemCalendar;
+
+    #[test]
+    fn a_read_only_calendars_event_tasks_go_to_the_picked_list() {
+        let dir = std::env::temp_dir().join(format!("todav-app-event-list-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let add = |kind| {
+            c.add_account(kind, "".into(), "".into(), "".into())
+                .unwrap()
+        };
+        let (local, system) = (add(AccountKind::Local), add(AccountKind::System));
+        let a = c
+            .create_list(local, "A".into(), "#0082C9".into(), false)
+            .unwrap();
+        let b = c
+            .create_list(local, "B".into(), "#0082C9".into(), false)
+            .unwrap();
+        let mine = c
+            .create_list(local, "Mine".into(), "#B6469D".into(), true)
+            .unwrap();
+        let work = SystemCalendar {
+            href: "system:work".into(),
+            name: "Work".into(),
+            color: "#B6469D".into(),
+        };
+        c.set_system_calendars(system, vec![work]).unwrap();
+        let set = |k: &str, v: &str| c.set_setting(k.into(), v.into()).unwrap();
+
+        // Nothing picked or opened: the first list.
+        assert_eq!(event_task_list(&c, "system:work"), Some(a.clone()));
+        set("last_list", &b);
+        assert_eq!(event_task_list(&c, "system:work"), Some(b.clone()));
+        // The picked list, for read-only calendars only.
+        set("event_tasks_list", &a);
+        assert_eq!(event_task_list(&c, "system:work"), Some(a.clone()));
+        assert_eq!(event_task_list(&c, &mine), Some(b.clone()));
+        // Gone: as if none was picked.
+        set("event_tasks_list", "gone");
+        assert_eq!(event_task_list(&c, "system:work"), Some(b));
+    }
 }

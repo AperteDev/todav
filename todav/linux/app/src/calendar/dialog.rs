@@ -109,7 +109,7 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
             .cloned()
             .collect(),
     );
-    crate::lists::picker(&calendar, &writable);
+    crate::lists::picker(&calendar, &writable, None);
     let pick = e
         .as_ref()
         .map(|e| e.list_href.clone())

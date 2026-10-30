@@ -504,6 +504,22 @@ private fun Accounts(model: Main) {
         }
         Section(tr("Push")) { PushRow(model) }
     }
+    Section(tr("Read-only Calendars")) {
+        // The last opened list (stored empty), then the task lists, named with their account
+        // when from more than one.
+        val lists = remember(changes) { model.core.eventTaskLists() }
+        val mixed = lists.any { it.account != lists.firstOrNull()?.account }
+        val names = lists.map { l ->
+            val a = accounts.firstOrNull { it.id == l.account }
+            if (mixed && a != null) "${l.displayName} · ${accountName(a)}" else l.displayName
+        }
+        ChoiceRow(
+            model, tr("Add tasks for their events to"), "event_tasks_list",
+            listOf("") + lists.map { it.href },
+            listOf(tr("Last opened list")) + names,
+            subtitle = tr("Shared calendars you may only view, subscriptions and the like"),
+        )
+    }
 }
 
 /** How an account connects, under its name. */

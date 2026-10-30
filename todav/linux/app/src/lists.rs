@@ -384,17 +384,23 @@ pub fn set_headings(rows: &gtk::ListBox, skip: usize, headings: Vec<Option<Strin
 }
 
 /// Fill `row` with the names of `lists` (as `by_place` orders them), a section per place under
-/// its heading when they are in more than one: the task and event dialogs' list picker.
-pub fn picker(row: &adw::ComboRow, lists: &[List]) {
-    let headings = headings(lists);
+/// its heading when they are in more than one: the task and event dialogs' list picker. `first`
+/// comes before them all, under no heading.
+pub fn picker(row: &adw::ComboRow, lists: &[List], first: Option<&str>) {
+    let mut headings = headings(lists);
+    let mut items: Vec<&str> = lists.iter().map(|l| l.display_name.as_str()).collect();
+    if let Some(f) = first {
+        headings.insert(0, None);
+        items.insert(0, f);
+    }
     let sections = gio::ListStore::new::<gtk::StringList>();
     let mut names = gtk::StringList::new(&[]);
-    for (l, heading) in lists.iter().zip(&headings) {
+    for (name, heading) in items.into_iter().zip(&headings) {
         if heading.is_some() || sections.n_items() == 0 {
             names = gtk::StringList::new(&[]);
             sections.append(&names);
         }
-        names.append(&l.display_name);
+        names.append(name);
     }
     row.set_model(Some(&gtk::FlattenListModel::new(Some(sections))));
     if headings.iter().all(Option::is_none) {

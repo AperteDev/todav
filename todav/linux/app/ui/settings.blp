@@ -141,6 +141,16 @@ Adw.PreferencesDialog dialog {
         active: true;
       }
     }
+
+    Adw.PreferencesGroup {
+      title: _("Read-only Calendars");
+
+      // The last opened list, then the task lists (src/settings.rs `connect_event_tasks_list`).
+      Adw.ComboRow event_tasks_list {
+        title: _("Add tasks for their events to");
+        subtitle: _("Shared calendars you may only view, subscriptions and the like");
+      }
+    }
   }  Adw.PreferencesPage {
     name: "tasks";
     title: _("Tasks");
