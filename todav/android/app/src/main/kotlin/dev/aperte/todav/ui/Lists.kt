@@ -52,6 +52,8 @@ fun ListDialog(model: Main, href: String?, events: Boolean, onDismiss: () -> Uni
     val presets = remember { colorPresets() }
     val accounts = remember { core.accounts().associateBy { it.id } }
     val places = remember { core.places(events).filter { accounts[it]?.enabled == true } }
+    // The system's calendars: changed in Todav only, and back to the system's at will.
+    val system = list != null && accounts[list.account]?.kind == dev.aperte.todav.core.AccountKind.SYSTEM
     var name by rememberSaveable { mutableStateOf(list?.displayName ?: "") }
     var color by rememberSaveable { mutableStateOf(list?.let { listColor(it) } ?: presets.first()) }
     var calendar by rememberSaveable { mutableStateOf(list?.holdsEvents ?: events) }
@@ -91,7 +93,7 @@ fun ListDialog(model: Main, href: String?, events: Boolean, onDismiss: () -> Uni
                         ) { place = places[it] }
                     }
                 }
-                if (list != null && accounts[list.account]?.kind == dev.aperte.todav.core.AccountKind.SYSTEM) {
+                if (system) {
                     Text(
                         tr("Only in Todav: the calendar keeps its own name and color elsewhere"),
                         style = MaterialTheme.typography.bodySmall,
@@ -111,6 +113,12 @@ fun ListDialog(model: Main, href: String?, events: Boolean, onDismiss: () -> Uni
                             if (selected) Icon(Icons.Default.Check, null, tint = Color.White)
                         }
                     }
+                }
+                if (list != null && system) {
+                    TextButton(onClick = {
+                        onDismiss()
+                        model.act { core.resetList(list.href) }
+                    }) { Text(tr("Use the System's Name and Color")) }
                 }
                 if (list != null && list.writable) {
                     TextButton(onClick = { confirm = true }) {

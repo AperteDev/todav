@@ -306,6 +306,11 @@ impl Todav {
         Ok(self.c().edit_list(href, name, color)?)
     }
 
+    /// A system calendar named and coloured as the system has it again.
+    pub fn reset_list(&self, href: String) -> Result<()> {
+        Ok(self.c().reset_list(href)?)
+    }
+
     /// What iCalendar text `ics` holds.
     pub fn ics_count(&self, ics: String) -> IcsCount {
         self.c().ics_count(ics)

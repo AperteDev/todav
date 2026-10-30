@@ -235,5 +235,10 @@ mod tests {
             .unwrap();
         c.set_system_calendars(id, vec![cal("Work")]).unwrap();
         assert_eq!(shown(&c), ("Work".into(), "#3584e4".into()));
+        // Reset: both the system's again.
+        c.edit_list(cal("").href, "Office".into(), "#B6469D".into())
+            .unwrap();
+        c.reset_list(cal("").href).unwrap();
+        assert_eq!(shown(&c), ("Work".into(), "#3584e4".into()));
     }
 }

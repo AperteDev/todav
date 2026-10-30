@@ -255,6 +255,16 @@ impl Client {
         Ok(())
     }
 
+    /// A system calendar named and coloured as the system has it again (`edit_list` changed).
+    pub fn reset_list(&self, href: String) -> Result<()> {
+        self.db.lock().unwrap().execute(
+            "UPDATE lists SET own_name = NULL, own_color = NULL WHERE href = ?",
+            [&href],
+        )?;
+        self.emit(&href, Vec::new());
+        Ok(())
+    }
+
     /// Put lists in this order (hrefs, those of one account as a sidebar shows them; the
     /// others keep their place): at once here, on a Nextcloud server (its calendar-order,
     /// shared with Nextcloud's apps) at the next sync; Google keeps none.

@@ -16,8 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   read-only calendars (shared ones you may only view, subscriptions, the phone's) go to;
   by default the last opened list, as before.
 - Linux: an event's edit dialog lists its tasks, to tick or add one, as its details do.
-- Android: System Calendars can be renamed and recoloured, in Todav only; given the system's
-  name and colour again, they follow the system's.
+- Android: System Calendars can be renamed and recoloured, in Todav only; "Use the System's
+  Name and Color" in the same dialog undoes it.
 
 ### Changed
 
