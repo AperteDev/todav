@@ -36,19 +36,19 @@
   <!-- From the release tag (scripts/release.py moves them to each new one). -->
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.2.0/docs/screenshots/tasks.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.3.0/docs/screenshots/tasks.png</image>
       <caption>Tasks grouped by category, with subtasks and due dates</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.2.0/docs/screenshots/calendar-month.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.3.0/docs/screenshots/calendar-month.png</image>
       <caption>The month, with an event's details</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.2.0/docs/screenshots/calendar-week.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.3.0/docs/screenshots/calendar-week.png</image>
       <caption>Tasks planned into the week next to events</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.2.0/docs/screenshots/event-dialog.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.3.0/docs/screenshots/event-dialog.png</image>
       <caption>Editing an event</caption>
     </screenshot>
   </screenshots>
@@ -63,6 +63,25 @@
     <control>touch</control>
   </supports>
   <releases>
+    <release version="2.3.0" date="2026-10-30">
+      <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.3.0</url>
+      <description translate="no">
+        <p>Added</p>
+        <ul>
+          <li>Google Tasks in the Google account (Linux, through GNOME Online Accounts): its task lists show next to its calendars and sync with Google, checked every minute while the window is focused and every 30 minutes otherwise. Task lists can be added, renamed and deleted there; their colours stay on each device. Google keeps a task's title, notes, done, a due date without a time, subtasks and order only, so the edit dialog offers just those, rows have no star or pin, and the calendar plans these tasks onto days, not into hours.</li>
+          <li>Fedora packages on COPR (<code>selfref/todav</code>), built with each release.</li>
+          <li>Reminders for a task's start, set below its start date in the edit dialog (Linux) or the task page (Android), next to the due date's; their notification says when the task starts. Start reminders from other apps (such as Tasks.org's "when started") show there too, instead of as the due date's.</li>
+          <li>Priority on events, as on tasks (none, low, medium or high), set in the event dialog (Linux) or page (Android) and shown in its details; the same iCalendar priority Thunderbird sets.</li>
+          <li>Urgent reminders for important tasks and events (high priority): on Linux they stay on screen until dismissed, on Android they come on a channel of their own ("Urgent reminders"), which can have its own sound or get through Do Not Disturb. "Urgent reminders for all" in Preferences → General → Notifications (Settings → General on Android), off by default, makes every reminder urgent.</li>
+        </ul>
+        <p>Fixed</p>
+        <ul>
+          <li>A task reminder whose time had already passed when it was set (a task due in 10 minutes, reminded 15 minutes before) now goes off at once, instead of never, while the task is still ahead.</li>
+          <li>Linux: reminders go off on time, not up to 30 seconds later.</li>
+          <li>Android: the task page showed a task's reminders as a long custom time span, and saving the task moved them years ahead; it shows and keeps them as set now.</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.2.0" date="2026-10-29">
       <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.2.0</url>
       <description translate="no">

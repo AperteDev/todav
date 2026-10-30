@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-10-30
+
 ### Added
 
 - Google Tasks in the Google account (Linux, through GNOME Online Accounts): its task lists show
@@ -431,7 +433,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Its options are in the app's Preferences. Without the app installed, its
   menu says so and links to the download.
 
-[Unreleased]: https://github.com/AperteDev/todav/compare/v2.2.0...HEAD
+[Unreleased]: https://github.com/AperteDev/todav/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/AperteDev/todav/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/AperteDev/todav/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/AperteDev/todav/compare/v2.0.4...v2.1.0
 [2.0.4]: https://github.com/AperteDev/todav/compare/v2.0.3...v2.0.4
