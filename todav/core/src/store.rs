@@ -186,9 +186,8 @@ pub fn open(path: &str) -> Result<Connection> {
     let version: i64 = db.query_row("PRAGMA user_version", [], |r| r.get(0))?;
     // A newer Todav's: its schema may not be what this one reads and writes.
     if version > MIGRATIONS.len() as i64 {
-        return Err(Error::Db(format!(
-            "{path} was made by a newer version of Todav (schema {version}, this one knows up to \
-             {}); update Todav to open it",
+        return Err(Error::Newer(format!(
+            "{path}: schema {version}, this version knows up to {}",
             MIGRATIONS.len()
         )));
     }
@@ -983,7 +982,7 @@ END:VCALENDAR
             .unwrap()
             .pragma_update(None, "user_version", MIGRATIONS.len() as i64 + 1)
             .unwrap();
-        assert!(matches!(open(&path), Err(Error::Db(e)) if e.contains("newer version")));
+        assert!(matches!(open(&path), Err(Error::Newer(_))));
         let db = Connection::open(&path).unwrap();
         let version: i64 = db
             .query_row("PRAGMA user_version", [], |r| r.get(0))

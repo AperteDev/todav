@@ -20,7 +20,20 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -45,6 +58,10 @@ class MainActivity : ComponentActivity() {
         hours24 = android.text.format.DateFormat.is24HourFormat(this)
         enableEdgeToEdge()
         val app = application as TodavApp
+        app.failed?.let { e ->
+            setContent { TodavTheme(null) { OpenFailed(e) } }
+            return
+        }
         setContent {
             val changes by app.changes.collectAsStateWithLifecycle()
             // Light, dark or the system's, as the device-only `color_scheme` says.
@@ -91,7 +108,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        handle(intent)
+        if ((application as TodavApp).failed == null) handle(intent)
     }
 
     /** A notification's task or day, a shared text, the "New task" shortcut. */
@@ -207,7 +224,9 @@ class MainActivity : ComponentActivity() {
      * search, undo, sync, new task or event, the views; Ctrl+, settings.
      */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.action == KeyEvent.ACTION_DOWN && (event.isCtrlPressed || event.keyCode == KeyEvent.KEYCODE_F5)) {
+        if ((application as TodavApp).failed == null && event.action == KeyEvent.ACTION_DOWN &&
+            (event.isCtrlPressed || event.keyCode == KeyEvent.KEYCODE_F5)
+        ) {
             val calendar = model.view.value == View.CALENDAR
             val handled = when (event.keyCode) {
                 KeyEvent.KEYCODE_F -> model.open(Dest.Search).let { true }
@@ -284,4 +303,19 @@ class MainActivity : ComponentActivity() {
 private fun wall(ms: Long, allDay: Boolean = false): Long {
     val s = Math.floorDiv(ms, 1000L)
     return if (allDay) s else s + ZoneId.systemDefault().rules.getOffset(Instant.ofEpochMilli(ms)).totalSeconds
+}
+
+/** The data could not be opened (left by a newer Todav, say): only why. */
+@Composable
+private fun OpenFailed(e: Throwable) {
+    Surface(Modifier.fillMaxSize()) {
+        Column(
+            Modifier.fillMaxSize().safeDrawingPadding().padding(32.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(tr("Todav Cannot Open Its Data"), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+            Text(reason(e), color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+        }
+    }
 }

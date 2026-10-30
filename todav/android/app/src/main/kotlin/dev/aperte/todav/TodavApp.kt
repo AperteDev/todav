@@ -7,6 +7,7 @@ import dev.aperte.todav.core.Refused
 import dev.aperte.todav.core.ServiceShell
 import dev.aperte.todav.core.SyncState
 import dev.aperte.todav.core.Todav
+import dev.aperte.todav.core.TodavException
 import java.time.ZoneId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,6 +31,10 @@ class TodavApp : Application() {
     lateinit var passwords: Passwords
         private set
     lateinit var push: Push
+        private set
+    /** Why the data could not be opened (left by a newer Todav, say): nothing else starts, and
+     * the app shows only that. */
+    var failed: Throwable? = null
         private set
 
     /** Bumped on every change to the data, here or synced: screens read again. */
@@ -55,7 +60,12 @@ class TodavApp : Application() {
         I18n.load(this)
         passwords = Passwords(this)
         push = Push(this)
-        core = Todav.open(filesDir.resolve("todav").path)
+        core = try {
+            Todav.open(filesDir.resolve("todav").path)
+        } catch (e: TodavException) {
+            failed = e
+            return
+        }
         core.setLocalZone(ZoneId.systemDefault().id)
         core.subscribe(object : Listener {
             override fun changed(listHref: String, uids: List<String>) = changed()
@@ -98,7 +108,9 @@ class TodavApp : Application() {
 
     fun changed() = changes.update { it + 1 }
 
+    /** Fails at once when the data could not be opened: receivers, the sync worker and widgets stop there. */
     suspend fun awaitReady() {
+        failed?.let { throw IllegalStateException("data not opened", it) }
         ready.first { it }
     }
 

@@ -553,11 +553,46 @@ fn request_autostart(conn: &gio::DBusConnection) {
     );
 }
 
+/// The data could not be opened (left by a newer Todav, say): a window saying so, and nothing
+/// else runs; closing it quits.
+fn open_failed(e: &todav_core::Error) -> glib::ExitCode {
+    eprintln!("open local database: {e}");
+    let description = match e {
+        todav_core::Error::Newer(_) => i18n::gettext(
+            "It was saved by a newer version of Todav. Update Todav to open it; this version leaves it as it is.",
+        ),
+        e => e.to_string(),
+    };
+    let app = adw::Application::new(Some(APP_ID), gio::ApplicationFlags::NON_UNIQUE);
+    app.connect_activate(move |app| {
+        let page = adw::StatusPage::builder()
+            .icon_name("dialog-error-symbolic")
+            .title(i18n::gettext("Todav Cannot Open Its Data"))
+            .description(description.as_str())
+            .build();
+        let view = adw::ToolbarView::new();
+        view.add_top_bar(&adw::HeaderBar::new());
+        view.set_content(Some(&page));
+        adw::ApplicationWindow::builder()
+            .application(app)
+            .title("Todav")
+            .default_width(480)
+            .default_height(360)
+            .content(&view)
+            .build()
+            .present();
+    });
+    app.run_with_args::<&str>(&[])
+}
+
 fn main() -> glib::ExitCode {
     i18n::init();
     gio::resources_register_include!("icons.gresource").expect("register icons");
     let data = glib::user_data_dir().join("todav");
-    let client = Client::open(data.to_string_lossy().into()).expect("open local database");
+    let client = match Client::open(data.to_string_lossy().into()) {
+        Ok(c) => c,
+        Err(e) => return open_failed(&e),
+    };
     client.subscribe(Box::new(Listener));
     let client = Arc::new(client);
     let _ = SERVICE.set(Service::new(client.clone(), Box::new(Ui)));

@@ -109,6 +109,8 @@ fun reason(e: Throwable): String = when (e) {
     is TodavException.Net -> e.reason
     is TodavException.Parse -> e.reason
     is TodavException.Db -> e.reason
+    is TodavException.Newer ->
+        tr("It was saved by a newer version of Todav. Update Todav to open it; this version leaves it as it is.")
     is TodavException.SavePassword -> tr("Cannot save password: {error}").replace("{error}", e.reason)
     is TodavException.Upload ->
         tr("Cannot upload pending changes first: {error}").replace("{error}", e.reason)

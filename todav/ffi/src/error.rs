@@ -41,6 +41,10 @@ pub enum TodavError {
     NotUploaded,
     /// The list or calendar is read-only.
     ReadOnly,
+    /// The data was left by a newer Todav: update to open it.
+    Newer {
+        reason: String,
+    },
 }
 
 impl std::fmt::Display for TodavError {
@@ -60,6 +64,7 @@ impl std::fmt::Display for TodavError {
             TodavError::SavePassword { reason } => write!(f, "cannot save password: {reason}"),
             TodavError::Upload { reason } => write!(f, "cannot upload pending changes: {reason}"),
             TodavError::NotUploaded => write!(f, "changes not uploaded yet"),
+            TodavError::Newer { reason } => write!(f, "made by a newer version of Todav: {reason}"),
         }
     }
 }
@@ -87,6 +92,7 @@ impl From<todav_core::Error> for TodavError {
             E::Net(reason) => TodavError::Net { reason },
             E::Parse(reason) => TodavError::Parse { reason },
             E::Db(reason) => TodavError::Db { reason },
+            E::Newer(reason) => TodavError::Newer { reason },
         }
     }
 }

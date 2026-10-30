@@ -957,6 +957,8 @@ pub enum Error {
     Net(String),
     Parse(String),
     Db(String),
+    /// The data was left by a newer Todav, whose schema this one may not read or write.
+    Newer(String),
 }
 
 impl std::fmt::Display for Error {
@@ -980,6 +982,7 @@ impl std::fmt::Display for Error {
             Error::Net(s) => write!(f, "network: {s}"),
             Error::Parse(s) => write!(f, "parse: {s}"),
             Error::Db(s) => write!(f, "database: {s}"),
+            Error::Newer(s) => write!(f, "made by a newer version of Todav: {s}"),
         }
     }
 }
