@@ -442,10 +442,16 @@ fn notify_reminders() {
     let (tasks, events) = service().due_reminders();
     for t in tasks {
         let n = gio::Notification::new(&t.summary);
-        if let Some(d) = t.due {
+        let body = match (t.start, t.due) {
+            (Some(s), _) if todav_app::service::reminds_of_start(&t, now) => {
+                Some((i18n::gettext("Starts {date}"), s, t.start_all_day))
+            }
+            (_, Some(d)) => Some((i18n::gettext("Due {date}"), d, t.due_all_day)),
+            _ => None,
+        };
+        if let Some((text, at, all_day)) = body {
             n.set_body(Some(
-                &i18n::gettext("Due {date}")
-                    .replace("{date}", &dates::label(d, t.due_all_day, now)),
+                &text.replace("{date}", &dates::label(at, all_day, now)),
             ));
         }
         n.set_default_action_and_target_value("app.show-list", Some(&t.list_href.to_variant()));

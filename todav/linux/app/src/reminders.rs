@@ -1,5 +1,5 @@
 //! The edit dialogs' reminders: one row per reminder with a preset or a custom time span.
-//! Offsets count from a task's due time or an event's start.
+//! Offsets count from a task's due time or start, or an event's start.
 
 use crate::dates;
 use crate::i18n::{gettext, pgettext};
@@ -19,14 +19,14 @@ struct Row {
     dirs: gtk::StringList,
     /// Offsets of the presets, in choice order; "Custom…" follows them.
     presets: RefCell<Vec<i64>>,
-    /// An event's reminder (counts from its start, not a due time).
-    event: bool,
+    /// Counts from a start (an event's, a task's), not a due time.
+    from_start: bool,
 }
 
-/// Presets for a date or a time, as `dates::reminders`, worded for an event if `event`.
-fn presets(all_day: bool, event: bool) -> Vec<(String, i64)> {
+/// Presets for a date or a time, as `dates::reminders`, worded for a start if `from_start`.
+fn presets(all_day: bool, from_start: bool) -> Vec<(String, i64)> {
     let mut p = dates::reminders(all_day);
-    if event && !all_day {
+    if from_start && !all_day {
         p[0].0 = gettext("At start");
     }
     p
@@ -52,7 +52,7 @@ impl Row {
     /// Choices for the due kind, showing `offset`: its preset, else (or with `custom`) the
     /// time span.
     fn fill(&self, all_day: bool, offset: i64, custom: bool) {
-        let presets = presets(all_day, self.event);
+        let presets = presets(all_day, self.from_start);
         let custom_label = gettext("Custom…");
         let labels: Vec<&str> = presets
             .iter()
@@ -95,27 +95,38 @@ pub struct Reminders {
     add: adw::ButtonRow,
     rows: RefCell<Vec<Rc<Row>>>,
     all_day: Cell<bool>,
-    event: bool,
+    from_start: bool,
 }
 
 impl Reminders {
     /// Show `offsets` in the dialog `b`; its "Add Reminder" adds one more.
     pub fn new(b: &gtk::Builder, all_day: bool, offsets: &[i64]) -> Rc<Reminders> {
-        Reminders::with(b, all_day, offsets, false)
+        Reminders::with(b, "", all_day, offsets, false)
     }
 
     /// The same for an event's reminders, which count from its start.
     pub fn for_event(b: &gtk::Builder, all_day: bool, offsets: &[i64]) -> Rc<Reminders> {
-        Reminders::with(b, all_day, offsets, true)
+        Reminders::with(b, "", all_day, offsets, true)
     }
 
-    fn with(b: &gtk::Builder, all_day: bool, offsets: &[i64], event: bool) -> Rc<Reminders> {
+    /// The same for a task's start, in `start_reminders` and `add_start_reminder`.
+    pub fn for_start(b: &gtk::Builder, all_day: bool, offsets: &[i64]) -> Rc<Reminders> {
+        Reminders::with(b, "start_", all_day, offsets, true)
+    }
+
+    fn with(
+        b: &gtk::Builder,
+        prefix: &str,
+        all_day: bool,
+        offsets: &[i64],
+        from_start: bool,
+    ) -> Rc<Reminders> {
         let r = Rc::new(Reminders {
-            list: get(b, "reminders"),
-            add: get(b, "add_reminder"),
+            list: get(b, &format!("{prefix}reminders")),
+            add: get(b, &format!("add_{prefix}reminder")),
             rows: RefCell::default(),
             all_day: Cell::new(all_day),
-            event,
+            from_start,
         });
         for o in offsets {
             r.add(*o);
@@ -150,7 +161,7 @@ impl Reminders {
             dir: get(&b, "dir"),
             dirs: get(&b, "dirs"),
             presets: RefCell::default(),
-            event: self.event,
+            from_start: self.from_start,
         });
         crate::window::scroll_past(row.amount.upcast_ref());
         row.fill(self.all_day.get(), offset, false);
@@ -180,7 +191,7 @@ impl Reminders {
     /// preset that does not fit the new kind becomes the default one.
     pub fn set_all_day(&self, all_day: bool) {
         self.all_day.set(all_day);
-        let presets = presets(all_day, self.event);
+        let presets = presets(all_day, self.from_start);
         for row in self.rows.borrow().iter() {
             let (o, custom) = (row.offset(), row.is_custom());
             let fits = presets.iter().any(|(_, p)| *p == o);

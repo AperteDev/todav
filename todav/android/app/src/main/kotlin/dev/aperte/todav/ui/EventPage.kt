@@ -302,7 +302,7 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                     )
                 }
-                Reminders(model, reminders, allDay, event = true)
+                Reminders(model, reminders, allDay, fromStart = true)
                 if (ev != null) DeleteButton(tr("Delete Event")) { askDelete = true }
                 Spacer(Modifier.height(EDITOR_END))
             }

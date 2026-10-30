@@ -111,9 +111,15 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null, draft: 
     var due by rememberSaveable(uid) { mutableStateOf(task.due) }
     var dueAllDay by rememberSaveable(uid) { mutableStateOf(task.dueAllDay) }
     var event by rememberSaveable(uid) { mutableStateOf(task.eventUid) }
-    // Offsets from the due time, as the patch takes them; the task has the times.
-    val oldReminders = remember(uid) { task.due?.let { d -> task.reminders.map { it - d } } ?: emptyList() }
+    // Offsets from the due time and from the start, as the patch takes them; the task has the
+    // times, the start's among them.
+    val oldReminders = remember(uid) {
+        val times = task.reminders.toMutableList().apply { task.startReminders.forEach { remove(it) } }
+        task.due?.let { d -> times.map { it - d } } ?: emptyList()
+    }
     val reminders = remember(uid) { mutableStateListOf<Long>().apply { addAll(oldReminders) } }
+    val oldStartReminders = remember(uid) { task.start?.let { s -> task.startReminders.map { it - s } } ?: emptyList() }
+    val startReminders = remember(uid) { mutableStateListOf<Long>().apply { addAll(oldStartReminders) } }
     var confirmDelete by remember { mutableStateOf(false) }
     var discard by remember { mutableStateOf(false) }
     val categories = remember(list) { core.categories(list).map { it.name } }
@@ -121,7 +127,8 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null, draft: 
     val changed = summary != task.summary || list != task.listHref || category != (task.category ?: "") ||
         priority != task.priority || note != (task.description ?: "") || start != task.start ||
         (start != null && startAllDay != task.startAllDay) || due != task.due ||
-        (due != null && dueAllDay != task.dueAllDay) || event != task.eventUid || reminders.toList() != oldReminders
+        (due != null && dueAllDay != task.dueAllDay) || event != task.eventUid || reminders.toList() != oldReminders ||
+        startReminders.toList() != oldStartReminders
 
     fun save() {
         if (draft != null) {
@@ -136,6 +143,7 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null, draft: 
                     start = start?.let { DueValue(Due(it, startAllDay)) },
                     due = due?.let { DueValue(Due(it, dueAllDay)) },
                     reminders = reminders.toList().takeIf { it.isNotEmpty() },
+                    startReminders = startReminders.toList().takeIf { it.isNotEmpty() },
                 ),
             )
             done()
@@ -149,6 +157,7 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null, draft: 
             start = DueValue(start?.let { Due(it, startAllDay) }).takeIf { start != task.start || startAllDay != task.startAllDay },
             due = DueValue(due?.let { Due(it, dueAllDay) }).takeIf { due != task.due || dueAllDay != task.dueAllDay },
             reminders = reminders.toList().takeIf { it != oldReminders },
+            startReminders = startReminders.toList().takeIf { it != oldStartReminders },
             event = TextValue(event).takeIf { event != task.eventUid },
         )
         val to = list.takeIf { it != task.listHref }
@@ -237,6 +246,14 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null, draft: 
                 }
                 Section(null) {
                     DateTimeField(tr("Start"), start, startAllDay, Icons.Outlined.PlayArrow, { t, allDay ->
+                        // Its reminders go with it; a change between a date and a time takes the
+                        // other kind's default.
+                        if (t == null) {
+                            startReminders.clear()
+                        } else if (start != null && allDay != startAllDay && startReminders.isNotEmpty()) {
+                            startReminders.clear()
+                            startReminders.add(core.defaultReminder(allDay))
+                        }
                         start = t
                         startAllDay = allDay
                     })
@@ -252,8 +269,11 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null, draft: 
                         dueAllDay = allDay
                     })
                 }
+                if (start != null) {
+                    Reminders(model, startReminders, startAllDay, fromStart = true, title = tr("Start Reminders"))
+                }
                 if (due != null) {
-                    Reminders(model, reminders, dueAllDay, event = false)
+                    Reminders(model, reminders, dueAllDay, fromStart = false)
                 }
                 if (draft == null) {
                     Subtasks(model, task, sheet)
@@ -296,16 +316,23 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null, draft: 
 }
 
 /**
- * Reminders as offsets from the due time (or an event's start): each a preset or a custom
- * time span, as the Linux dialogs' rows; "Add Reminder" adds the default one.
+ * Reminders as offsets from the due time (or, `fromStart`, a task's or an event's start): each
+ * a preset or a custom time span, as the Linux dialogs' rows; "Add Reminder" adds the default
+ * one.
  */
 @Composable
-fun Reminders(model: Main, reminders: MutableList<Long>, allDay: Boolean, event: Boolean) {
+fun Reminders(
+    model: Main,
+    reminders: MutableList<Long>,
+    allDay: Boolean,
+    fromStart: Boolean,
+    title: String = tr("Reminders"),
+) {
     val core = model.core
-    val presets = reminderPresets(core.reminderPresets(allDay), allDay, event, core.allDayTime())
+    val presets = reminderPresets(core.reminderPresets(allDay), allDay, fromStart, core.allDayTime())
     // Rows whose user picked "Custom…" stay custom even when the span matches a preset.
     val custom = remember { mutableStateListOf<Int>() }
-    Section(tr("Reminders")) {
+    Section(title) {
         reminders.forEachIndexed { i, offset ->
             val preset = presets.indexOfFirst { it.second == offset }.takeIf { it >= 0 && i !in custom }
             ChoiceItem(

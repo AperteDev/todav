@@ -965,7 +965,7 @@ fun AddSheet(model: Main, list: String, parent: TodavTask?, category: String?, i
                     done = false, completedAt = null, category = cat, parentUid = parent?.uid, priority = priority,
                     due = due, dueAllDay = true, reminders = due?.let { listOf(it + model.core.defaultReminder(true)) } ?: emptyList(),
                     sortOrder = null, created = null, lastModified = null, start = null, startAllDay = false,
-                    eventUid = null, syncError = null, pinned = false,
+                    eventUid = null, syncError = null, pinned = false, startReminders = emptyList(),
                 )
             }
             TaskPage(model, "", sheet, draft)

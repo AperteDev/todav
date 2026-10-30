@@ -139,6 +139,7 @@ Adw.Dialog dialog {
           valign: start;
 
           // Start and due are both optional and independent: planned for a time, due by one.
+          // Each has its own reminders.
           Adw.PreferencesGroup {
             Adw.ExpanderRow start {
               title: _("Start");
@@ -197,7 +198,20 @@ Adw.Dialog dialog {
                 }
               }
             }
+          }
 
+          // The start's reminders, shown with it, as the due date's below.
+          Gtk.ListBox start_reminders {
+            selection-mode: none;
+            styles ["boxed-list"]
+
+            Adw.ButtonRow add_start_reminder {
+              title: _("Add Reminder");
+              start-icon-name: "list-add-symbolic";
+            }
+          }
+
+          Adw.PreferencesGroup {
             Adw.ExpanderRow due {
               title: _("Due Date");
               show-enable-switch: true;

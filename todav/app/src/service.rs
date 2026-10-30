@@ -270,6 +270,13 @@ pub fn due_reminders(c: &Client) -> (Vec<Task>, Vec<Event>) {
     due
 }
 
+/// Whether the reminder of `t` that went off by `now` was for its start (the latest of them up
+/// to then counts from it), so its notification names the start rather than the due date.
+pub fn reminds_of_start(t: &Task, now: i64) -> bool {
+    let last = t.reminders.iter().filter(|r| **r <= now).max();
+    last.is_some_and(|r| t.start_reminders.contains(r))
+}
+
 /// How far ahead `next_reminder` looks. A platform that sets an alarm for it sets it again after
 /// a sync or a change, and at least this often.
 pub const LOOKAHEAD: i64 = 7 * 86400;

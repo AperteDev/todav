@@ -45,10 +45,10 @@ fun date(t: Long): String =
     fields(t).format(DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM).withLocale(Locale.getDefault()))
 
 /** Labels of the reminder presets (`Todav.reminderPresets`), as the Linux app's (dates.rs). */
-fun reminderPresets(offsets: List<Long>, allDay: Boolean, event: Boolean, allDayTime: Long): List<Pair<String, Long>> {
+fun reminderPresets(offsets: List<Long>, allDay: Boolean, fromStart: Boolean, allDayTime: Long): List<Pair<String, Long>> {
     if (!allDay) {
         val labels = listOf(
-            if (event) tr("At start") else tr("At due time"),
+            if (fromStart) tr("At start") else tr("At due time"),
             tr("5 minutes before"),
             tr("15 minutes before"),
             tr("30 minutes before"),

@@ -125,6 +125,8 @@ pub struct Task {
     pub sync_error: Option<String>,
     /// Shown first in its list (X-PINNED, as Nextcloud Tasks pins).
     pub pinned: bool,
+    /// Those of `reminders` that count from `start`, not the due date.
+    pub start_reminders: Vec<i64>,
 }
 
 /// Fields left `None` are untouched; `Some("")` clears description/category.
@@ -135,10 +137,13 @@ pub struct TaskPatch {
     pub category: Option<String>,
     /// Some(None) clears the due date, and its reminders with it.
     pub due: Option<Option<Due>>,
-    /// Reminders, in seconds after the due time (negative: before); replaces all of them.
+    /// Reminders, in seconds after the due time (negative: before); replaces all of them but
+    /// the start's.
     pub reminders: Option<Vec<i64>>,
-    /// DTSTART, when the task is planned; Some(None) clears it.
+    /// DTSTART, when the task is planned; Some(None) clears it, and its reminders with it.
     pub start: Option<Option<Due>>,
+    /// Reminders, in seconds after the start (negative: before); replaces the start's.
+    pub start_reminders: Option<Vec<i64>>,
     /// The event (UID) the task is for; Some(None) unlinks it.
     pub event: Option<Option<String>>,
     /// PRIORITY, 1 (highest) to 9 (lowest); Some(None) clears it.
@@ -635,11 +640,45 @@ impl Client {
         };
         let before = self.task(uid.clone()).map(|t| t.reminders);
         self.modify(&uid, |cal| {
+            // The due date's reminders and the start's (params, value), as they count now. The
+            // due date's say so (RELATED=END): without it they would count from a start added.
+            let had_start = cal.prop("DTSTART").is_some();
+            let old = |from_start: bool| -> Vec<(String, String)> {
+                let triggers = cal.alarm_triggers().into_iter();
+                let mine = triggers.filter(|t| store::from_start(t, had_start) == from_start);
+                mine.map(|t| match ical::parse_duration(&t.value) {
+                    Some(_) if !from_start => (";RELATED=END".into(), t.value.clone()),
+                    _ => (t.params.clone(), t.value.clone()),
+                })
+                .collect()
+            };
+            let (mut due_alarms, mut start_alarms) = (old(false), old(true));
+            let new = |related: &str, offsets: &[i64]| -> Vec<(String, String)> {
+                let v = offsets.iter().map(|o| ical::fmt_duration(*o));
+                v.map(|v| (related.to_string(), v)).collect()
+            };
+            match (&patch.due, &patch.reminders) {
+                (Some(None), _) => due_alarms.clear(),
+                (_, Some(r)) => due_alarms = new(";RELATED=END", r),
+                _ => {}
+            }
+            match (&patch.start, &patch.start_reminders) {
+                (Some(None), _) => start_alarms.clear(),
+                (_, Some(r)) => start_alarms = new(";RELATED=START", r),
+                _ => {}
+            }
+            if patch.reminders.is_some()
+                || patch.start_reminders.is_some()
+                || patch.due == Some(None)
+                || matches!(patch.start, Some(None))
+                || (patch.start.is_some() && !had_start)
+            {
+                let all = due_alarms.iter().chain(&start_alarms);
+                let t: Vec<(&str, &str)> = all.map(|(p, v)| (p.as_str(), v.as_str())).collect();
+                cal.set_alarms(&t);
+            }
             if let Some(d) = patch.due {
                 set_date(cal, "DUE", d, due_utc);
-                if d.is_none() {
-                    cal.set_alarms(&[]);
-                }
             }
             if let Some(s) = patch.start {
                 set_date(cal, "DTSTART", s, start_utc);
@@ -652,11 +691,6 @@ impl Client {
             }
             if let Some(p) = patch.pinned {
                 cal.set("X-PINNED", "", p.then_some("true"));
-            }
-            if let Some(r) = patch.reminders.as_ref().filter(|_| patch.due != Some(None)) {
-                let v: Vec<String> = r.iter().map(|o| ical::fmt_duration(*o)).collect();
-                let t: Vec<(&str, &str)> = v.iter().map(|v| (";RELATED=END", v.as_str())).collect();
-                cal.set_alarms(&t);
             }
             if let Some(s) = &patch.summary {
                 cal.set_text("SUMMARY", Some(s));
@@ -687,17 +721,26 @@ impl Client {
         Ok(())
     }
 
-    /// A reminder this change set in the past, while the task is still ahead (its time, or the
-    /// rest of its day), goes off at once (`take_late_reminders`), not never; one it had before
-    /// went off already.
+    /// A reminder this change set in the past, while what it counts from (the due date or the
+    /// start) is still ahead (its time, or the rest of its day), goes off at once
+    /// (`take_late_reminders`), not never; one it had before went off already.
     fn note_late(&self, uid: &str, before: &[i64]) {
         let (Some(t), now) = (self.task(uid.into()), self.local_now()) else {
             return;
         };
-        let ahead = t
-            .due
-            .is_some_and(|d| d + if t.due_all_day { 86400 } else { 0 } > now);
-        if !ahead || !t.reminders.iter().any(|r| *r <= now && !before.contains(r)) {
+        let ahead = |at: Option<i64>, all_day: bool| {
+            at.is_some_and(|a| a + if all_day { 86400 } else { 0 } > now)
+        };
+        let late = t.reminders.iter().any(|r| {
+            *r <= now
+                && !before.contains(r)
+                && if t.start_reminders.contains(r) {
+                    ahead(t.start, t.start_all_day)
+                } else {
+                    ahead(t.due, t.due_all_day)
+                }
+        });
+        if !late {
             return;
         }
         let db = self.db.lock().unwrap();
@@ -1143,6 +1186,109 @@ mod tests {
         assert_eq!((t.due, t.reminders.len()), (None, 0));
         assert!(!raw().contains("VALARM"), "no due date, no reminders");
         assert!(c.upcoming().is_empty());
+    }
+
+    #[test]
+    fn start_reminders_count_from_the_start_and_go_with_it() {
+        let dir = std::env::temp_dir().join(format!("todav-test-start-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let l = "/l/".to_string();
+        c.db.lock()
+            .unwrap()
+            .execute(
+                "INSERT INTO lists (href, display_name) VALUES (?1, 'L')",
+                [&l],
+            )
+            .unwrap();
+        let uid = c
+            .add_task(l.clone(), "a".into(), None, None, false)
+            .unwrap()
+            .uid;
+        let day = ical::parse_time("20261020").unwrap();
+        let (start, due) = (day + 9 * 3600, day + 17 * 3600);
+        let at = |at| Some(Some(Due { at, all_day: false }));
+        let set = |patch: TaskPatch| {
+            c.update_task(uid.clone(), patch).unwrap();
+            c.task(uid.clone()).unwrap()
+        };
+        let raw = || {
+            store::raw(&c.db.lock().unwrap(), Kind::Task, "", &uid)
+                .unwrap()
+                .unwrap()
+                .raw_ics
+        };
+
+        let t = set(TaskPatch {
+            start: at(start),
+            due: at(due),
+            reminders: Some(vec![-900]),
+            start_reminders: Some(vec![0]),
+            ..Default::default()
+        });
+        assert_eq!(t.reminders, [start, due - 900]);
+        assert_eq!(t.start_reminders, [start]);
+        assert!(raw().contains("TRIGGER;RELATED=START:PT0S"));
+
+        // Each kind is replaced on its own; the other stays.
+        let t = set(TaskPatch {
+            reminders: Some(vec![]),
+            ..Default::default()
+        });
+        assert_eq!((t.reminders, t.start_reminders), (vec![start], vec![start]));
+        let t = set(TaskPatch {
+            reminders: Some(vec![0]),
+            start_reminders: Some(vec![-600]),
+            ..Default::default()
+        });
+        assert_eq!(t.reminders, [start - 600, due]);
+
+        // A start moved takes its reminders along; without a due date they stay.
+        let t = set(TaskPatch {
+            start: at(start + 3600),
+            due: Some(None),
+            ..Default::default()
+        });
+        assert_eq!(t.reminders, [start + 3000]);
+        assert_eq!(t.start_reminders, [start + 3000]);
+        // Without a start they go.
+        let t = set(TaskPatch {
+            start: Some(None),
+            ..Default::default()
+        });
+        assert!(t.reminders.is_empty() && !raw().contains("VALARM"));
+    }
+
+    #[test]
+    fn a_start_added_leaves_the_due_dates_reminders_counting_from_it() {
+        let dir = std::env::temp_dir().join(format!("todav-test-added-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let l = "/l/".to_string();
+        let day = ical::parse_time("20261020").unwrap();
+        // Another client's reminder without RELATED counts from DUE while there is no DTSTART.
+        let ics = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VTODO\r\nUID:x\r\nSUMMARY:x\r\nDUE;VALUE=DATE:20261020\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER:PT9H\r\nEND:VALARM\r\nEND:VTODO\r\nEND:VCALENDAR\r\n";
+        {
+            let db = c.db.lock().unwrap();
+            db.execute(
+                "INSERT INTO lists (href, display_name) VALUES (?1, 'L')",
+                [&l],
+            )
+            .unwrap();
+            store::save(&db, &l, None, None, &Calendar::parse(ics).unwrap(), 0).unwrap();
+        }
+        assert_eq!(c.task("x".into()).unwrap().reminders, [day + 9 * 3600]);
+        let patch = TaskPatch {
+            start: Some(Some(Due {
+                at: day - 86400,
+                all_day: true,
+            })),
+            ..Default::default()
+        };
+        c.update_task("x".into(), patch).unwrap();
+        let t = c.task("x".into()).unwrap();
+        assert_eq!(t.reminders, [day + 9 * 3600]);
+        assert!(t.start_reminders.is_empty());
     }
 
     #[test]

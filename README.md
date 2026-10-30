@@ -67,8 +67,8 @@ development:
 - Pinned tasks stay at the top of their list.
 - Move a task, with its subtasks, to another list: drop it on the list in the sidebar or pick
   the list in the task dialog.
-- Due dates with optional times, start times, and several reminders per task, delivered as
-  desktop notifications with "Mark as Done".
+- Due dates with optional times, start times, and several reminders per task, before or after
+  its due date or its start, delivered as desktop notifications with "Mark as Done".
 - An Upcoming page across all lists: Overdue, Today, Tomorrow, the coming days and later.
 - Search across all lists (ignores accents) and undo with Ctrl+Z.
 

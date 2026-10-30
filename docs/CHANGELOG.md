@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   time, subtasks and order only, so the edit dialog offers just those, rows have no star or
   pin, and the calendar plans these tasks onto days, not into hours.
 - Fedora packages on COPR (`selfref/todav`), built with each release.
+- Reminders for a task's start, set below its start date in the edit dialog (Linux) or the
+  task page (Android), next to the due date's; their notification says when the task starts.
+  Start reminders from other apps (such as Tasks.org's "when started") show there too, instead
+  of as the due date's.
 
 ### Fixed
 

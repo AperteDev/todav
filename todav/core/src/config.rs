@@ -393,6 +393,7 @@ mod tests {
             event_uid: None,
             sync_error: None,
             pinned: false,
+            start_reminders: Vec::new(),
         }
     }
 

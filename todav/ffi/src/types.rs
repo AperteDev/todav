@@ -86,6 +86,7 @@ pub struct TodavTask {
     pub event_uid: Option<String>,
     pub sync_error: Option<String>,
     pub pinned: bool,
+    pub start_reminders: Vec<i64>,
 }
 
 #[uniffi::remote(Record)]
@@ -386,6 +387,9 @@ pub struct TaskPatch {
     pub reminders: Option<Vec<i64>>,
     #[uniffi(default = None)]
     pub start: Option<DueValue>,
+    /// Seconds after the start (negative: before).
+    #[uniffi(default = None)]
+    pub start_reminders: Option<Vec<i64>>,
     /// The UID of the event the task is for.
     #[uniffi(default = None)]
     pub event: Option<TextValue>,
@@ -404,6 +408,7 @@ impl From<TaskPatch> for todav_core::TaskPatch {
             due: p.due.map(|v| v.due),
             reminders: p.reminders,
             start: p.start.map(|v| v.due),
+            start_reminders: p.start_reminders,
             event: p.event.map(|v| v.text),
             priority: p.priority.map(|v| v.priority),
             pinned: p.pinned,
@@ -420,6 +425,7 @@ impl From<todav_core::TaskPatch> for TaskPatch {
             due: p.due.map(|due| DueValue { due }),
             reminders: p.reminders,
             start: p.start.map(|due| DueValue { due }),
+            start_reminders: p.start_reminders,
             event: p.event.map(|text| TextValue { text }),
             priority: p.priority.map(|priority| PriorityValue { priority }),
             pinned: p.pinned,

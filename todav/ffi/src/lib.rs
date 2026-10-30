@@ -1008,6 +1008,12 @@ pub fn list_color(list: TodavList) -> String {
     todav_app::lists::color(&list)
 }
 
+/// Whether the reminder of `task` that went off by `now` was for its start, not its due date.
+#[uniffi::export]
+pub fn reminds_of_start(task: TodavTask, now: i64) -> bool {
+    todav_app::service::reminds_of_start(&task, now)
+}
+
 /// The `todav://` link to task `uid`.
 #[uniffi::export]
 pub fn link_task(uid: String) -> String {

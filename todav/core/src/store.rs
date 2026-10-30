@@ -115,6 +115,10 @@ UPDATE accounts SET position = id;
 ALTER TABLE lists ADD COLUMN position INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE lists ADD COLUMN position_dirty INTEGER NOT NULL DEFAULT 0;
 "#,
+    // Reminders counting from a task's start (`from_start`), apart from the due date's.
+    r#"
+ALTER TABLE alarms ADD COLUMN from_start INTEGER NOT NULL DEFAULT 0;
+"#,
 ];
 
 /// `user_version` after the migration that adds accounts.
@@ -331,23 +335,28 @@ pub(crate) fn local_time(
     )))
 }
 
-/// When each alarm goes off, in local time: an absolute TRIGGER, or one relative to DUE
-/// (RELATED=END) or DTSTART (the default; DUE when there is no DTSTART).
-fn alarm_times(db: &Connection, cal: &Calendar, due: Option<i64>) -> Result<Vec<i64>> {
+/// Whether a task's TRIGGER counts from its DTSTART: relative, not RELATED=END (DTSTART is the
+/// default) and the task has one; else it counts from DUE or is a time of its own.
+pub fn from_start(trigger: &Line, has_start: bool) -> bool {
+    has_start
+        && ical::parse_duration(&trigger.value).is_some()
+        && !trigger
+            .param("RELATED")
+            .is_some_and(|r| r.eq_ignore_ascii_case("END"))
+}
+
+/// When each alarm goes off, in local time, and whether it counts from DTSTART (`from_start`);
+/// else from DUE, or an absolute TRIGGER.
+fn alarm_times(db: &Connection, cal: &Calendar, due: Option<i64>) -> Result<Vec<(i64, bool)>> {
     let start = local_time(db, cal, cal.prop("DTSTART"))?.map(|(s, _)| s);
     let mut out = Vec::new();
     for t in cal.alarm_triggers() {
+        let from_start = from_start(t, start.is_some());
         let at = match ical::parse_duration(&t.value) {
-            Some(d) => {
-                let end = t
-                    .param("RELATED")
-                    .is_some_and(|r| r.eq_ignore_ascii_case("END"));
-                let base = if end { due } else { start.or(due) };
-                base.map(|b| b + d)
-            }
+            Some(d) => if from_start { start } else { due }.map(|b| b + d),
             None => local_time(db, cal, Some(t))?.map(|(t, _)| t),
         };
-        out.extend(at);
+        out.extend(at.map(|at| (at, from_start)));
     }
     out.sort();
     Ok(out)
@@ -431,7 +440,8 @@ pub fn hidden(db: &Connection) -> Result<std::collections::HashSet<String>> {
 const TASK_COLS: &str = "uid, list_href, summary, description, status, completed_at, category, parent_uid, priority, due, due_all_day,
   (SELECT group_concat(at) FROM (SELECT at FROM alarms a WHERE a.uid = tasks.uid ORDER BY at)),
   sort_order, created, last_modified, start, start_all_day, event_uid,
-  CASE WHEN refused_ics IS raw_ics THEN sync_error END, pinned";
+  CASE WHEN refused_ics IS raw_ics THEN sync_error END, pinned,
+  (SELECT group_concat(at) FROM (SELECT at FROM alarms a WHERE a.uid = tasks.uid AND from_start ORDER BY at))";
 
 fn task_row(r: &rusqlite::Row) -> rusqlite::Result<Task> {
     let status: String = r.get(4)?;
@@ -448,12 +458,7 @@ fn task_row(r: &rusqlite::Row) -> rusqlite::Result<Task> {
         priority: r.get(8)?,
         due: r.get(9)?,
         due_all_day: r.get(10)?,
-        reminders: r
-            .get::<_, Option<String>>(11)?
-            .unwrap_or_default()
-            .split(',')
-            .filter_map(|v| v.parse().ok())
-            .collect(),
+        reminders: times(r.get(11)?),
         sort_order: r.get(12)?,
         created: r.get(13)?,
         last_modified: r.get(14)?,
@@ -462,7 +467,16 @@ fn task_row(r: &rusqlite::Row) -> rusqlite::Result<Task> {
         event_uid: r.get(17)?,
         sync_error: r.get(18)?,
         pinned: r.get(19)?,
+        start_reminders: times(r.get(20)?),
     })
+}
+
+/// Times from `group_concat`.
+fn times(v: Option<String>) -> Vec<i64> {
+    v.unwrap_or_default()
+        .split(',')
+        .filter_map(|v| v.parse().ok())
+        .collect()
 }
 
 /// Tasks (done ones too) for the event with this UID.
@@ -700,10 +714,10 @@ pub fn save(
         ],
     )?;
     db.execute("DELETE FROM alarms WHERE uid = ?", [&uid])?;
-    for at in alarms {
+    for (at, from_start) in alarms {
         db.execute(
-            "INSERT INTO alarms (uid, at) VALUES (?, ?)",
-            params![uid, at],
+            "INSERT INTO alarms (uid, at, from_start) VALUES (?, ?, ?)",
+            params![uid, at, from_start],
         )?;
     }
     Ok(uid)

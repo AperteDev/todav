@@ -27,6 +27,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import dev.aperte.todav.core.Event
 import dev.aperte.todav.core.TodavTask
+import dev.aperte.todav.core.remindsOfStart
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.launch
@@ -302,7 +303,11 @@ object Reminders {
     private fun task(app: TodavApp, t: TodavTask, now: Long) = NotificationCompat.Builder(app, CHANNEL)
         .setSmallIcon(R.drawable.ic_notification)
         .setContentTitle(t.summary)
-        .setContentText(dueLabel(t, now))
+        .setContentText(
+            t.start?.takeIf { remindsOfStart(t, now) }
+                ?.let { tr("Starts {date}").replace("{date}", dayLabel(it, t.startAllDay, now)) }
+                ?: dueLabel(t, now),
+        )
         .setCategory(NotificationCompat.CATEGORY_REMINDER)
         .setAutoCancel(true)
         .setContentIntent(open(app, t.uid.hashCode()) { putExtra("task", t.uid) })

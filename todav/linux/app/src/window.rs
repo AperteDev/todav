@@ -2881,12 +2881,23 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
         get::<adw::ActionRow>(&b, "refused").set_subtitle(server_reason(e));
         get::<adw::PreferencesGroup>(&b, "refused_group").set_visible(true);
     }
-    let (due_at, due) = due_dialog(&b, t);
+    // The due date's reminders are the task's but the start's.
+    let mut due_reminders = t.reminders.clone();
+    for s in &t.start_reminders {
+        if let Some(i) = due_reminders.iter().position(|r| r == s) {
+            due_reminders.remove(i);
+        }
+    }
+    let old_due = t.due.map(|at| Due {
+        at,
+        all_day: t.due_all_day,
+    });
+    let (due_at, due) = dated_dialog(&b, "due", old_due, &due_reminders);
     let old_start = t.start.map(|at| Due {
         at,
         all_day: t.start_all_day,
     });
-    let start = date_row(&b, "start", old_start);
+    let (start_at, start) = dated_dialog(&b, "start", old_start, &t.start_reminders);
     // One time choice for both dates, as the server asks: switching either switches both. Linked
     // after loading, so a task that mixes them opens as it is (the banner says so).
     let (start_time, due_time): (gtk::Switch, gtk::Switch) =
@@ -2973,19 +2984,23 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
     }
     // Google Tasks keeps a due date without a time, and no category, priority, start or
     // reminders.
-    let reminders: gtk::Widget = get(&b, "reminders");
     if todav_core::gtasks::is_list(&t.list_href) {
         for id in ["category", "priority", "start", "due_time_row"] {
             get::<gtk::Widget>(&b, id).set_visible(false);
         }
         get::<adw::ExpanderRow>(&b, "start").set_enable_expansion(false);
         due_time.set_active(false);
-        reminders.set_visible(false);
+        for id in ["reminders", "start_reminders"] {
+            get::<gtk::Widget>(&b, id).set_visible(false);
+        }
     } else {
-        get::<adw::ExpanderRow>(&b, "due")
-            .bind_property("enable-expansion", &reminders, "visible")
-            .sync_create()
-            .build();
+        // Each date's reminders show with it.
+        for (date, list) in [("due", "reminders"), ("start", "start_reminders")] {
+            get::<adw::ExpanderRow>(&b, date)
+                .bind_property("enable-expansion", &get::<gtk::Widget>(&b, list), "visible")
+                .sync_create()
+                .build();
+        }
     }
 
     let cancel: gtk::Button = get(&b, "cancel");
@@ -3010,6 +3025,7 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
         // Only send what changed.
         let changed =
             |new: String, old: Option<&str>| (new != old.unwrap_or_default()).then_some(new);
+        let ((due, reminders), (start, start_reminders)) = (due_at(), start_at());
         let patch = TaskPatch {
             summary: changed(summary.text().trim().to_string(), Some(&task.summary))
                 .filter(|s| !s.is_empty()),
@@ -3029,11 +3045,14 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
                 description.buffer().property::<String>("text"),
                 task.description.as_deref(),
             ),
-            start: Some(start()).filter(|s| *s != old_start),
+            due,
+            reminders,
+            start,
+            start_reminders,
             priority: (priority.selected() != old_priority)
                 .then(|| priority_value(priority.selected())),
             event: unlinked.get().then_some(None),
-            ..due_at()
+            ..Default::default()
         };
         let uid = task.uid.clone();
         let to = lists
@@ -3174,31 +3193,32 @@ fn date_row(b: &gtk::Builder, name: &str, at: Option<Due>) -> Rc<dyn Fn() -> Opt
     read
 }
 
-/// Fill the dialog's due date and reminders from `t`: what reads the patch for them, and what
-/// reads the due date.
-fn due_dialog(
+/// What reads the change to a date and its reminders: the date, if changed, and the reminders'
+/// offsets, if they or the date changed.
+type DatePatch = (Option<Option<Due>>, Option<Vec<i64>>);
+
+/// Fill the dialog's date row `name` ("due" or "start") with `old` and the reminders below it
+/// (at the times `at`, counting from it): what reads the change, `DatePatch`, and what reads
+/// the date.
+fn dated_dialog(
     b: &gtk::Builder,
-    t: &Task,
+    name: &str,
+    old: Option<Due>,
+    at: &[i64],
 ) -> (
-    impl Fn() -> TaskPatch + 'static,
+    impl Fn() -> DatePatch + 'static,
     Rc<dyn Fn() -> Option<Due>>,
 ) {
-    let old_due = t.due.map(|at| Due {
-        at,
-        all_day: t.due_all_day,
-    });
-    let read = date_row(b, "due", old_due);
+    let read = date_row(b, name, old);
 
-    // Seconds after the due time, as the rows show them (whole minutes), so untouched
-    // reminders are not rewritten.
-    let old: Vec<i64> = t
-        .due
+    // Seconds after the date, as the rows show them (whole minutes), so untouched reminders are
+    // not rewritten.
+    let offsets: Vec<i64> = old
         .map(|d| {
-            let mut o: Vec<i64> = t
-                .reminders
+            let mut o: Vec<i64> = at
                 .iter()
                 .map(|r| {
-                    let (a, u, before) = dates::span(r - d);
+                    let (a, u, before) = dates::span(r - d.at);
                     dates::offset(a, u, before)
                 })
                 .collect();
@@ -3206,19 +3226,23 @@ fn due_dialog(
             o
         })
         .unwrap_or_default();
-    let reminders = crate::reminders::Reminders::new(b, t.due_all_day || t.due.is_none(), &old);
-    let has_time: gtk::Switch = get(b, "due_has_time");
+    let all_day = old.is_none_or(|d| d.all_day);
+    let reminders = if name == "start" {
+        crate::reminders::Reminders::for_start(b, all_day, &offsets)
+    } else {
+        crate::reminders::Reminders::new(b, all_day, &offsets)
+    };
+    let has_time: gtk::Switch = get(b, &format!("{name}_has_time"));
     let r = reminders.clone();
     has_time.connect_active_notify(move |h| r.set_all_day(!h.is_active()));
 
-    let due = read.clone();
+    let date = read.clone();
     let patch = move || {
-        let new_due = due();
-        TaskPatch {
-            due: (new_due != old_due).then_some(new_due),
-            reminders: Some(reminders.offsets()).filter(|r| *r != old || new_due != old_due),
-            ..Default::default()
-        }
+        let new = date();
+        (
+            (new != old).then_some(new),
+            Some(reminders.offsets()).filter(|r| *r != offsets || new != old),
+        )
     };
     (patch, read)
 }
@@ -3280,6 +3304,7 @@ pub(crate) mod tests {
             event_uid: None,
             sync_error: None,
             pinned: false,
+            start_reminders: Vec::new(),
         }
     }
 }
