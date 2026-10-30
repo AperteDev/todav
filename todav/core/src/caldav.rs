@@ -493,7 +493,8 @@ impl Dav {
 
     /// A subscription's every event, as a full sync-collection would give them, or None while
     /// its sync token is still `token`. Nextcloud's sync-collection reads another calendar's
-    /// changes for one (`CachedSubscription` leaves out its calendar type), so not that.
+    /// changes for one (`CachedSubscription` leaves out its calendar type, fixed by
+    /// nextcloud/server#66045), so not that. Servers without the fix stay around for years.
     pub fn subscription(&self, href: &str, token: &str) -> Result<Option<SyncResult>> {
         let p = self.propfind(href, "0", "<d:sync-token/>")?;
         let now = p.first().and_then(|r| r.props.find_text(DAV, "sync-token"));
