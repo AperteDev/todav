@@ -167,6 +167,7 @@ pub struct Event {
     pub cancelled: bool,
     pub reminders: Vec<i64>,
     pub rule: Option<String>,
+    pub priority: Option<i64>,
 }
 
 #[uniffi::remote(Record)]
@@ -449,6 +450,8 @@ pub struct EventPatch {
     pub reminders: Option<Vec<i64>>,
     #[uniffi(default = None)]
     pub repeat: Option<RepeatValue>,
+    #[uniffi(default = None)]
+    pub priority: Option<PriorityValue>,
 }
 
 impl From<EventPatch> for todav_core::EventPatch {
@@ -460,6 +463,7 @@ impl From<EventPatch> for todav_core::EventPatch {
             time: p.time,
             reminders: p.reminders,
             repeat: p.repeat.map(|v| v.repeat),
+            priority: p.priority.map(|v| v.priority),
         }
     }
 }

@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   task page (Android), next to the due date's; their notification says when the task starts.
   Start reminders from other apps (such as Tasks.org's "when started") show there too, instead
   of as the due date's.
+- Priority on events, as on tasks (none, low, medium or high), set in the event dialog (Linux)
+  or page (Android) and shown in its details; the same iCalendar priority Thunderbird sets.
 
 ### Fixed
 

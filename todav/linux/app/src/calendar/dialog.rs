@@ -63,6 +63,9 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
     let summary: adw::EntryRow = get(&b, "summary");
     let location: adw::EntryRow = get(&b, "location");
     let calendar: adw::ComboRow = get(&b, "calendar");
+    let priority: adw::ComboRow = get(&b, "priority");
+    let old_priority = crate::window::priority_row(e.as_ref().and_then(|e| e.priority));
+    priority.set_selected(old_priority);
     let all_day: adw::SwitchRow = get(&b, "all_day");
     let (start_row, end_row): (adw::ExpanderRow, adw::ExpanderRow) =
         (get(&b, "start"), get(&b, "end"));
@@ -379,6 +382,8 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
                 .then(|| dates::midnight(&until_cal.date())),
         });
         let offsets = reminders.offsets();
+        let new_priority = (priority.selected() != old_priority)
+            .then(|| crate::window::priority_value(priority.selected()));
         let Some(ev) = e.clone() else {
             // New: the title and time first, the rest as an edit of it.
             let title = Some(text(&summary))
@@ -390,9 +395,14 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
                     location: Some(text(&location)).filter(|s| !s.is_empty()),
                     description: Some(notes).filter(|s| !s.is_empty()),
                     repeat: new_repeat.map(Some),
+                    priority: new_priority,
                     ..Default::default()
                 };
-                if rest.location.is_some() || rest.description.is_some() || rest.repeat.is_some() {
+                if rest.location.is_some()
+                    || rest.description.is_some()
+                    || rest.repeat.is_some()
+                    || rest.priority.is_some()
+                {
                     let _ = core().update_event(list, uid, None, Scope::All, rest);
                 }
                 Ok::<_, todav_core::Error>(())
@@ -434,6 +444,7 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
             time: (new_time != old_time).then_some(new_time),
             reminders: (offsets != old_offsets).then_some(offsets),
             repeat: repeat_changed.then_some(new_repeat),
+            priority: new_priority,
         };
         let moved = list != ev.list_href;
         let nothing = patch.summary.is_none()
@@ -441,7 +452,8 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
             && patch.description.is_none()
             && patch.time.is_none()
             && patch.reminders.is_none()
-            && patch.repeat.is_none();
+            && patch.repeat.is_none()
+            && patch.priority.is_none();
         let done = d.clone();
         let save = move |scope: Scope| {
             let r = core().together(|| {

@@ -55,6 +55,7 @@ import dev.aperte.todav.core.Event
 import dev.aperte.todav.core.EventPatch
 import dev.aperte.todav.core.EventTime
 import dev.aperte.todav.core.Freq
+import dev.aperte.todav.core.PriorityValue
 import dev.aperte.todav.core.Repeat
 import dev.aperte.todav.core.RepeatValue
 import dev.aperte.todav.core.Scope
@@ -110,6 +111,7 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
             },
         )
     }
+    var priority by rememberSaveable { mutableStateOf(ev?.priority) }
     var allDay by rememberSaveable { mutableStateOf(ev?.allDay ?: dest.allDay) }
     var start by rememberSaveable { mutableStateOf(ev?.start ?: dest.start) }
     // An all-day event's end is the midnight after its last day; shown as that last day.
@@ -160,12 +162,13 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
         time = time().takeIf { it != old },
         reminders = reminders.toList().takeIf { ev == null || it != ev.reminders.map { r -> r - ev.start } },
         repeat = if (repeatChanged) RepeatValue(newRepeat) else null,
+        priority = PriorityValue(priority).takeIf { priority != ev?.priority },
     )
     val moved = ev != null && calendar != ev.listHref
     // Named through `patch`: in a `with(patch)` the page's own `summary`, `location` and
     // `reminders` would be read instead, and an untouched event would count as changed.
     val nothing = patch.summary == null && patch.location == null && patch.description == null &&
-        patch.time == null && patch.reminders == null && patch.repeat == null
+        patch.time == null && patch.reminders == null && patch.repeat == null && patch.priority == null
     val changed = if (ev == null) summary.isNotBlank() else !nothing || moved
 
     fun save() {
@@ -179,8 +182,9 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
                     location = location.trim().takeIf { it.isNotEmpty() },
                     description = notes.takeIf { it.isNotBlank() },
                     repeat = newRepeat?.let { RepeatValue(it) },
+                    priority = priority?.let { PriorityValue(it) },
                 )
-                if (rest.location != null || rest.description != null || rest.repeat != null) {
+                if (rest.location != null || rest.description != null || rest.repeat != null || rest.priority != null) {
                     core.updateEvent(list, uid, null, Scope.ALL, rest)
                 }
             }
@@ -247,6 +251,13 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
                         calendars.indexOfFirst { it.href == calendar },
                         mark = { ColorMark(calendars.getOrNull(it)?.let(::listColor)) },
                     ) { calendar = calendars[it].href }
+                    // As a task's, and as Thunderbird sets it on events.
+                    Item(
+                        leadingContent = { StarIcon(priority) },
+                        headlineContent = {
+                            Connected(PRIORITIES.map(::priorityName), priorityIndex(priority)) { priority = PRIORITIES[it] }
+                        },
+                    )
                 }
                 Section(null) {
                     Item(

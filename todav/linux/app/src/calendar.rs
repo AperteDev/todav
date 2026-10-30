@@ -1834,6 +1834,9 @@ fn details(c: &Cal, e: &Event) -> gtk::Popover {
         b.append(&line("mark-location-symbolic", l));
     }
     b.append(&which(&e.list_href, &list_name(c, &e.list_href)));
+    if let Some(p) = crate::window::priority_text(e.priority) {
+        b.append(&line("emblem-important-symbolic", &p));
+    }
     if let Some(r) = reminders_line(&e.reminders) {
         b.append(&r);
     }

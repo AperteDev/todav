@@ -29,6 +29,7 @@ What Todav can do, in short. The details of each release are in the
   per calendar.
 - Create, edit, move and delete events, recurring ones too (this occurrence, this and the
   following, or all), with reminders.
+- Priority on events, as on tasks: none, low, medium or high (the one Thunderbird sets).
 - Plan a task by dropping it from "To Plan" on an hour (a time slot) or a day (due that day),
   with a preview in 15-minute steps; drop it back to unplan it.
 - Move events and planned tasks by drag and drop; resize them in the week view by their edges.

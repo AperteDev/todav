@@ -3248,7 +3248,7 @@ fn dated_dialog(
 }
 
 /// Priority rows: None, Low, Medium, High; as stored, `priority_value`.
-fn priority_row(p: Option<i64>) -> u32 {
+pub fn priority_row(p: Option<i64>) -> u32 {
     match p {
         Some(1..=4) => 3,
         Some(5) => 2,
@@ -3267,7 +3267,7 @@ pub fn priority_text(p: Option<i64>) -> Option<String> {
     }
 }
 
-fn priority_value(row: u32) -> Option<i64> {
+pub fn priority_value(row: u32) -> Option<i64> {
     [None, Some(9), Some(5), Some(1)][row as usize]
 }
 

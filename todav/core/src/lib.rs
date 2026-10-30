@@ -1425,6 +1425,41 @@ mod tests {
     }
 
     #[test]
+    fn events_keep_a_priority_as_tasks_do() {
+        let dir = std::env::temp_dir().join(format!("todav-test-prio-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        c.db.lock()
+            .unwrap()
+            .execute(
+                "INSERT INTO lists (href, display_name, has_events) VALUES ('/c/', 'C', 1)",
+                [],
+            )
+            .unwrap();
+        let day = ical::parse_time("20261020").unwrap();
+        let time = EventTime {
+            start: day + 9 * 3600,
+            end: day + 10 * 3600,
+            all_day: false,
+        };
+        let uid = c
+            .add_event("/c/".into(), "Review".into(), time, vec![])
+            .unwrap();
+        let set = |p: Option<i64>| {
+            let patch = EventPatch {
+                priority: Some(p),
+                ..Default::default()
+            };
+            c.update_event("/c/".into(), uid.clone(), None, Scope::All, patch)
+                .unwrap();
+            c.events(day, day + 86400)[0].priority
+        };
+        assert_eq!(c.events(day, day + 86400)[0].priority, None);
+        assert_eq!(set(Some(1)), Some(1));
+        assert_eq!(set(None), None);
+    }
+
+    #[test]
     fn restore_brings_a_deleted_task_back() {
         let dir = std::env::temp_dir().join(format!("todav-test-restore-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);

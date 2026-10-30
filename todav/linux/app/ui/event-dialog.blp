@@ -65,6 +65,12 @@ Adw.Dialog dialog {
             Adw.ComboRow calendar {
               title: _("Calendar");
             }
+
+            // As a task's (edit-dialog.blp), and as Thunderbird sets it on events.
+            Adw.ComboRow priority {
+              title: _("Priority");
+              model: Gtk.StringList { strings [C_("priority", "None"), C_("priority", "Low"), C_("priority", "Medium"), C_("priority", "High")] };
+            }
           }
 
           Adw.PreferencesGroup {

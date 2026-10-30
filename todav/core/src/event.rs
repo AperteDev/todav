@@ -30,6 +30,8 @@ pub struct Event {
     pub reminders: Vec<i64>,
     /// The series' RRULE (raw), for showing and editing how it repeats.
     pub rule: Option<String>,
+    /// PRIORITY, 1 (highest) to 9 (lowest), as a task's; None when not set.
+    pub priority: Option<i64>,
 }
 
 /// Wall-clock length of a component: DTEND − DTSTART, DURATION, or else a day for a date and
@@ -110,6 +112,11 @@ fn event(c: &Comp, list_href: &str, (start, end, reminders): (i64, i64, Vec<i64>
             .is_some_and(|s| s.eq_ignore_ascii_case("CANCELLED")),
         reminders,
         rule: None,
+        // 0 = undefined
+        priority: c
+            .text("PRIORITY")
+            .and_then(|p| p.parse::<i64>().ok())
+            .filter(|&p| p != 0),
     }
 }
 
@@ -287,6 +294,8 @@ pub struct EventPatch {
     pub reminders: Option<Vec<i64>>,
     /// Some(None) stops repeating. Applies to the whole series.
     pub repeat: Option<Option<Repeat>>,
+    /// PRIORITY, 1 (highest) to 9 (lowest); Some(None) clears it.
+    pub priority: Option<Option<i64>>,
 }
 
 /// Which occurrences of a recurring event an edit or delete is for.
@@ -436,6 +445,9 @@ fn apply(
     }
     if let Some(s) = p.description.as_deref() {
         cal.set_in(comp, "DESCRIPTION", "", text(s).as_deref());
+    }
+    if let Some(v) = p.priority {
+        cal.set_in(comp, "PRIORITY", "", v.map(|v| v.to_string()).as_deref());
     }
     if let Some(t) = p.time {
         let like = cal.comps()[comp]
