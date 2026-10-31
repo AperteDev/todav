@@ -50,6 +50,8 @@ row.drop-above { box-shadow: inset 0 2px 0 0 @accent_bg_color; }
 row.drop-below { box-shadow: inset 0 -2px 0 0 @accent_bg_color; }
 @keyframes flash { from { background-color: transparent; } 50% { background-color: alpha(@accent_bg_color, 0.3); } to { background-color: transparent; } }
 row.flash { animation: flash 900ms ease-in-out 2; }
+/* A list picker's section without a heading (lists.rs `picker`). */
+listview > header.empty { padding: 0; min-height: 0; }
 ";
 
 /// Left margin per subtask level, in pixels.

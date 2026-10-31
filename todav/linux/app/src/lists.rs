@@ -407,9 +407,13 @@ pub fn picker(row: &adw::ComboRow, lists: &[List], first: Option<&str>) {
         return;
     }
     let factory = gtk::SignalListItemFactory::new();
+    // libadwaita pads list headers already: the label adds no margin above or below.
     factory.connect_setup(|_, h| {
         if let Some(h) = h.downcast_ref::<gtk::ListHeader>() {
-            h.set_child(Some(&heading_label("")));
+            let label = heading_label("");
+            label.set_margin_top(0);
+            label.set_margin_bottom(0);
+            h.set_child(Some(&label));
         }
     });
     factory.connect_bind(move |_, h| {
@@ -417,9 +421,19 @@ pub fn picker(row: &adw::ComboRow, lists: &[List], first: Option<&str>) {
             return;
         };
         let text = headings.get(h.start() as usize).cloned().flatten();
-        if let Some(label) = h.child().and_downcast::<gtk::Label>() {
-            label.set_label(&text.unwrap_or_default());
+        let Some(label) = h.child().and_downcast::<gtk::Label>() else {
+            return;
+        };
+        // A section without a heading (`first`'s) gets no gap above it either (window.rs CSS).
+        if let Some(header) = label.parent() {
+            if text.is_some() {
+                header.remove_css_class("empty");
+            } else {
+                header.add_css_class("empty");
+            }
         }
+        label.set_visible(text.is_some());
+        label.set_label(&text.unwrap_or_default());
     });
     row.set_header_factory(Some(&factory));
 }
