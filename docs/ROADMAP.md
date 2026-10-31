@@ -4,6 +4,54 @@ Planned work, not yet done. [FEATURES.md](FEATURES.md) lists it publicly; the or
 
 ## Planned features
 
+- **Plan view**, a third view next to Tasks and Calendar for planning the day and the week (see
+  [Plan view](#plan-view)). Tasks and Calendar stay as they are.
+- **Repeating tasks**: an RRULE on a VTODO, set in the task dialog as events are (daily, weekly
+  on some weekdays, monthly including its last day, yearly, every n of them; ending never, on a
+  date or after n times), from the due date or from when it was done. Ticking one moves its due
+  and start dates to the next occurrence, as other CalDAV clients do, and reopens its subtasks;
+  its reminders follow, being relative. Now a repeating task made elsewhere is ticked done as a
+  whole series, its RRULE kept but not acted on. Open: whether a done occurrence leaves a done
+  copy behind (for history and the Plan view's progress); how "from when it was done" is stored
+  (no standard property).
+- **Quick add in plain words**: the date, time, repeat, list, category and priority read from
+  the title as it is typed ("tomorrow 17:00", "every monday", `#category`, `!` for priority),
+  shown as chips before adding and removable. In `todav-app`, so Linux, Android and the
+  extension parse alike; the words are translatable per language. Open: what to do with a
+  title that only looks like a date.
+- **Quick add from anywhere**: a system-wide shortcut (the GlobalShortcuts portal, or a key
+  binding in the extension) opening a small window for one task, with the list picked and quick
+  add's parsing; the window does not show.
+- **Task status and progress**: in progress and cancelled next to open and done (`STATUS`
+  `IN-PROCESS`, `CANCELLED`), and percent complete (`PERCENT-COMPLETE`), shown on the task row and
+  set in the task dialog; cancelled tasks show with done ones. The Plan view's board uses it.
+- **Meeting links**: video call links (Meet, Zoom, Teams, Jitsi and the like) found in an
+  event's location, description, URL or `CONFERENCE`, with a Join button in its details, its
+  reminder and the extension's agenda.
+- **Markdown in notes** of tasks and events: links clickable, checkboxes tickable, light
+  formatting; `DESCRIPTION` stays plain text, so other clients show it as written.
+- **Selecting several tasks** (Ctrl+click, Shift+click, a selection mode on touch and Android) to
+  set their date, list, category or priority, tick or delete them at once, as one undo step
+  (`Client::together`).
+- **Duplicating** a task (with its subtasks) or an event, from its menu or Ctrl+drag; later
+  **templates**: a task with subtasks, or a list, kept to copy from.
+- **More of the calendar**: a Year view, week numbers, night hours folded away in the week
+  views.
+- **More of an event**: a time zone for its start and end, a colour of its own (`COLOR`),
+  declined and cancelled events hidden by a setting; the weather of the coming days in the
+  calendar's views (open: its source).
+- **Attachments** to tasks and events (`ATTACH`): links, and files uploaded to the account's
+  Nextcloud Files; shown and opened from the task dialog and the event's details.
+- **Invitations**: attendees on an event, invitations sent and answered through the server's
+  scheduling (iTIP), replies shown per attendee. A large piece; after the rest.
+- **GNOME extension**: the task list showing only some groups (overdue, today, the next 7 days,
+  started), done tasks hidden after a while, several lists merged; a place beside GNOME's
+  calendar and events as well as in place of them. GNOME's designers propose moving
+  notifications out of the clock menu into Quick Settings: follow it if it lands.
+- **Scripting**: adding, listing and ticking tasks from a shell or other apps through the
+  running app's D-Bus interface (`todav/cli` is a debugging tool with data of its own).
+- **Nextcloud Deck** boards as task lists. Open: whether it is worth it next to the Plan view's
+  board.
 - **More services** besides Nextcloud: other CalDAV servers first (Radicale, Baïkal, Fastmail,
   iCloud…), which mostly means login without Login Flow v2, settings and categories without
   Nextcloud Files, and polling where there is no WebDAV-Push. Each would be another
@@ -18,10 +66,15 @@ Planned work, not yet done. [FEATURES.md](FEATURES.md) lists it publicly; the or
   (`gtasks::is_list`). Open: whether to ask for the calendar scope too, or keep calendars to
   System Calendars.
 - **Advanced notifications**, configurable, beyond the reminder notifications shown now
-  (urgent ones for important tasks and events, or for all, exist); details to be specified.
+  (urgent ones for important tasks and events, or for all, exist): Snooze on Linux too (Android
+  has it), a reminder repeating until the task is done (every n minutes, n times), notifications
+  on or off per list and per calendar (with the settings per list), the event's Join button
+  (meeting links); the rest to be specified.
   Open: on Android an urgent reminder that stays on screen needs a full-screen intent
   (`USE_FULL_SCREEN_INTENT`), which Android 14+ and Google Play keep for alarm and calling apps.
-- **Advanced search, filtering and sorting**; details to be specified.
+- **Advanced search, filtering and sorting**: saved filters (smart lists) combining lists,
+  categories, dates, priority and status, in the sidebar, the extension and the widgets; tasks
+  hidden until their start date, by a setting; the rest to be specified.
 - **Settings per list and per calendar**, overriding Preferences for that one: for a task list
   how completed tasks show (`done_tasks`, `done_subtasks`), its sort and where new tasks go,
   completing a task with open subtasks, the default duration and reminders; for a calendar the
@@ -34,7 +87,8 @@ Planned work, not yet done. [FEATURES.md](FEATURES.md) lists it publicly; the or
   and the widgets, which show one list, follow them.
 - **Export**, the counterpart of the iCalendar import (`core/src/import.rs`): lists and
   calendars (one, some or all) to an `.ics` file, on Linux and Android; details to be
-  specified (one file or one per list, done tasks, a date range for events).
+  specified (one file or one per list, done tasks, a date range for events). Then automatic
+  backups: all of it exported daily to a folder, the last n kept, restored by importing.
 - **Pebble app**, fed by the Android app (see [Pebble](#pebble-watchapp--companion)).
 - **Windows app**: a native WinUI 3 front-end (see [Windows](#windows-app)).
 - iOS and macOS, later: SwiftUI over UniFFI's Swift bindings from `todav-ffi`.
@@ -46,11 +100,48 @@ Smaller items:
 - Key tasks by list and UID, as events are: a task in a calendar two accounts share shows once
   now, in the account that had it first (`store::task_elsewhere`).
 - Show the conflict log (`kv:conflict_log`) in the app's settings.
+- Keys for the first nine lists (Ctrl+1 to Ctrl+6 pick the calendar's view there; which keys is
+  open).
+- Check memory use over a long run (the window open, many syncs and pushes) for widgets kept
+  alive by their signal handlers' closures; it stayed near 48 MB in the background so far.
 - Google Tasks keeps no UID: a task made here keeps its own, on other devices it has Google's
   id, so a `todav://task/` link to it opens only where it was made. Taking Google's id after
   the first upload would mean renaming the UID everywhere it is used (subtasks, alarms, undo).
 - Google's copy of a task is as new as its upload, not its edit: an edit uploaded late (made
   offline) beats a newer one made meanwhile on another device and uploaded after it.
+
+## Plan view
+
+A third view on Linux (next to Tasks and Calendar in the view switcher) and Android (a third
+destination in the bar and the rail), for deciding what to do when. Tasks stays the place for
+keeping lists, Calendar the one for time; the calendar's "To Plan" pane stays as it is. Plan
+reads and writes the same tasks and events, so all it does syncs as usual.
+
+- **Today**: overdue tasks, tasks due or starting today and the ones planned for today, next to
+  the day's events and planned tasks in time order; from there a task is ticked, moved to
+  tomorrow or a day picked, or dropped on a free hour to plan it.
+- **Week**: the coming days side by side, each with its events, its tasks and how much of its
+  free time their estimates fill; dragging a task to another day moves its due date, onto
+  "Later" clears it.
+- **Review**: overdue tasks and tasks without a date, one at a time, to move, plan, tick or
+  delete, with keys for each; for starting or ending the day.
+- **Board**: the tasks of a list, a category or a saved filter in columns by status, category or
+  priority; dragging a task to another column changes it (status from Task status and progress).
+- **Estimates**: how long a task takes, set in the task dialog, filling the Week's days and used
+  as the length of its slot when planned (instead of `task_duration`). Open: where it is stored
+  (no standard VTODO property; `DURATION` means the span from its start).
+- **Dependencies**: a task waiting for others (`RELATED-TO;RELTYPE=DEPENDS-ON`, RFC 9253), shown
+  as blocked until they are done; Today, Week and the board put blocked tasks aside.
+- **Focus**: a timer on a task (work and break intervals, a notification at each end), Today's
+  task at hand shown in the extension while it runs. Open: whether the time spent is kept on the
+  task, and where.
+- **Progress**: tasks done per day and per week against a goal one sets, and the past weeks at a
+  glance. Needs the completion times (`COMPLETED`) of done tasks, and of repeating tasks' done
+  occurrences.
+
+Open questions: picking a task for today without changing its due date needs a property other
+clients ignore (or a category); whether the extension and the widgets get a Today of their own;
+on a phone, whether Week shows as a list of days.
 
 ## Android
 

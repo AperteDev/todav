@@ -27,7 +27,7 @@ What Todav can do, in short. The details of each release are in the
 
 **Calendar**
 
-- Month, Week and Agenda views of your Nextcloud calendars, with a sidebar month and show/hide
+- Month, Week, Work Week, 3 Days, Day and Agenda views of your Nextcloud calendars, with a sidebar month and show/hide
   per calendar.
 - Calendars subscribed to by link in Nextcloud (e.g. a work Outlook calendar), read-only.
 - Create, edit, move and delete events, recurring ones too (this occurrence, this and the
@@ -93,10 +93,27 @@ What Todav can do, in short. The details of each release are in the
 
 ## Planned
 
-- Advanced notifications, configurable.
-- Advanced search, filtering and sorting.
+- A Plan view next to Tasks and Calendar: Today, the Week ahead, a Review of overdue and undated
+  tasks, a board, estimates, dependencies, a focus timer and progress.
+- Repeating tasks.
+- Quick add in plain words ("tomorrow 17:00 #work"), and from anywhere with a system-wide
+  shortcut.
+- Task status (in progress, cancelled) and percent complete.
+- Advanced notifications, configurable: Snooze on Linux too, repeating until done, per list.
+- Advanced search, filtering and sorting: saved filters, tasks hidden until they start.
+- Join buttons for meeting links in events.
+- Markdown in notes.
+- Selecting several tasks to change them at once.
+- Duplicating tasks and events; templates.
+- A Year view, week numbers and folded night hours in the calendar.
+- An event's own time zone and colour; declined events hidden; the weather in the calendar.
+- Attachments to tasks and events.
+- Invitations: attendees, sending and answering.
+- More choices for the GNOME extension's task list, and a place beside GNOME's calendar.
+- Scripting through the running app.
+- Nextcloud Deck boards as task lists.
 - Settings per list and per calendar, such as how its completed tasks show.
-- Export of lists and calendars to iCalendar files.
+- Export of lists and calendars to iCalendar files, and automatic backups.
 - More services besides Nextcloud: other CalDAV servers first.
 - Google Tasks on Android, with a Google sign-in of its own.
 - Google Play and F-Droid for the Android app; Flathub for the Linux one.
