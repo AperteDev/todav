@@ -94,7 +94,7 @@ What Todav can do, in short. The details of each release are in the
 ## Planned
 
 - A Plan view next to Tasks and Calendar: Today, the Week ahead, a Review of overdue and undated
-  tasks, a board, estimates, dependencies, a focus timer and progress.
+  tasks, a board, estimates, dependencies, a focus timer, progress, and Notav's notes.
 - Repeating tasks.
 - Quick add in plain words ("tomorrow 17:00 #work"), and from anywhere with a system-wide
   shortcut.

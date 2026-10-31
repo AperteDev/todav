@@ -138,6 +138,8 @@ reads and writes the same tasks and events, so all it does syncs as usual.
 - **Progress**: tasks done per day and per week against a goal one sets, and the past weeks at a
   glance. Needs the completion times (`COMPLETED`) of done tasks, and of repeating tasks' done
   occurrences.
+- **Notav**: its notes and journal next to the plan, above all notes; details to be specified
+  (see [Notav integration](#notav-integration)).
 
 Open questions: picking a task for today without changing its due date needs a property other
 clients ignore (or a category); whether the extension and the widgets get a Today of their own;
