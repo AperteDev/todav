@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -175,6 +176,7 @@ import dev.aperte.todav.core.Time
 import dev.aperte.todav.core.TodavTask
 import dev.aperte.todav.core.columns
 import dev.aperte.todav.core.daysOfWeek
+import dev.aperte.todav.core.lanes
 import dev.aperte.todav.core.midnight
 import dev.aperte.todav.core.monthFirst
 import dev.aperte.todav.core.onDay
@@ -515,16 +517,12 @@ private fun MonthGrid(
 ) {
     val changes by model.todav.changes.collectAsStateWithLifecycle()
     val weekAt = { row: Int -> base + (row - MIDDLE) * 7 * DAY }
-    // What is on each day from six weeks before the month to twelve after, sorted out off the
-    // main thread (`onDay` is a call into the core: a week at a time, each item only tried on the
-    // days of its week); until loaded, what the last month had.
+    // What is on each week from six weeks before the month to twelve after, sorted out off the
+    // main thread (`onDay` is a call into the core: each item only tried on the days of its
+    // week); until loaded, what the last month had.
     val from = weekStart(month, firstWeekday()) - 42 * DAY
-    val days = load(changes, from, initial = emptyMap<Long, List<Item>>()) {
-        (0 until 18).flatMap { w ->
-            val start = from + w * 7 * DAY
-            val items = model.core.items(start, start + 7 * DAY, null)
-            (0 until 7).map { n -> (start + n * DAY).let { d -> d to items.filter { onDay(it, d) } } }
-        }.toMap()
+    val rows = load(changes, from, initial = emptyMap<Long, RowItems>()) {
+        (0 until 18).associate { w -> (from + w * 7 * DAY).let { it to rowItems(model, it) } }
     }
     val today = midnight(model.core.localNow())
     val thisMonth = fields(month).monthValue
@@ -576,42 +574,38 @@ private fun MonthGrid(
             ) {
                 items(PAGES, key = { it }) { row ->
                     val start = weekAt(row)
-                    Row(Modifier.fillMaxWidth().height(rowHeight)) {
-                        for (d in 0 until 7) {
-                            val at = start + d * DAY
-                            val here = days[at].orEmpty()
-                            DayCell(
-                                at, here, colors, at == today, at == picked || at == target || at == planDay, fields(at).monthValue == thisMonth,
-                                Modifier.weight(1f).fillMaxHeight().gridLines(left = d > 0).pointerInput(at, here) {
-                                    // Held on a chip and moved: to the day it is let go over.
-                                    var held: Item? = null
-                                    var total = Offset.Zero
-                                    detectDragGesturesAfterLongPress(
-                                        onDragStart = { p ->
-                                            // Under the day's number (2 dp in, 22 dp), chips 13 sp and 1 dp apart.
-                                            held = here.getOrNull(((p.y - 24.dp.toPx()) / (13.sp.toPx() + 1.dp.toPx())).toInt())
-                                            total = Offset.Zero
-                                            target = held?.let { at }
-                                        },
-                                        onDrag = { change, amount ->
-                                            if (held != null) {
-                                                change.consume()
-                                                total += amount
-                                                val rows = Math.round(total.y / size.height)
-                                                val cols = Math.round(total.x / size.width)
-                                                target = at + (rows * 7L + cols) * DAY
-                                            }
-                                        },
-                                        onDragEnd = {
-                                            val (item, day) = held to target
-                                            target = null
-                                            if (item != null && day != null && day != at) moved = item to dev.aperte.todav.core.dayDrop(item, day, false)
-                                        },
-                                        onDragCancel = { target = null },
-                                    )
-                                },
-                            ) { model.pick(at) }
-                        }
+                    WeekRow(start, rows[start] ?: RowItems.NONE, colors, Modifier.fillMaxWidth().height(rowHeight)) { d, heldAt ->
+                        val at = start + d * DAY
+                        DayCell(
+                            at, at == today, at == picked || at == target || at == planDay, fields(at).monthValue == thisMonth,
+                            Modifier.weight(1f).fillMaxHeight().gridLines(left = d > 0).pointerInput(at, heldAt) {
+                                // Held on a chip and moved: to the day it is let go over.
+                                var held: Item? = null
+                                var total = Offset.Zero
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = { p ->
+                                        held = heldAt(p.y)
+                                        total = Offset.Zero
+                                        target = held?.let { at }
+                                    },
+                                    onDrag = { change, amount ->
+                                        if (held != null) {
+                                            change.consume()
+                                            total += amount
+                                            val rows = Math.round(total.y / size.height)
+                                            val cols = Math.round(total.x / size.width)
+                                            target = at + (rows * 7L + cols) * DAY
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        val (item, day) = held to target
+                                        target = null
+                                        if (item != null && day != null && day != at) moved = item to dev.aperte.todav.core.dayDrop(item, day, false)
+                                    },
+                                    onDragCancel = { target = null },
+                                )
+                            },
+                        ) { model.pick(at) }
                     }
                 }
             }
@@ -647,19 +641,14 @@ private fun WeekdayNames(start: Long) {
 private fun WeekStrip(model: Main, day: Long, colors: Map<String, String>) {
     val changes by model.todav.changes.collectAsStateWithLifecycle()
     val start = weekStart(day, firstWeekday())
-    val days = load(changes, start, initial = List(7) { emptyList<Item>() }) {
-        val items = model.core.items(start, start + 7 * DAY, null)
-        List(7) { n -> items.filter { onDay(it, start + n * DAY) } }
-    }
+    val week = load(changes, start, initial = RowItems.NONE) { rowItems(model, start) }
     val today = midnight(model.core.localNow())
     Column(Modifier.fillMaxWidth()) {
         WeekdayNames(start)
-        Row(Modifier.fillMaxWidth().height(76.dp)) {
-            for (d in 0 until 7) {
-                val at = start + d * DAY
-                DayCell(at, days[d], colors, at == today, at == day, true, Modifier.weight(1f).fillMaxHeight().gridLines(left = d > 0)) {
-                    model.pick(at)
-                }
+        WeekRow(start, week, colors, Modifier.fillMaxWidth().height(76.dp)) { d, _ ->
+            val at = start + d * DAY
+            DayCell(at, at == today, at == day, true, Modifier.weight(1f).fillMaxHeight().gridLines(left = d > 0)) {
+                model.pick(at)
             }
         }
     }
@@ -677,12 +666,91 @@ private fun Modifier.gridLines(left: Boolean): Modifier {
     }
 }
 
-/** A day of the month grid: its number (today's on the accent), as many chips as fit, then "+n". */
+/** What is on a week (`items`), and the days of it (0-6) each is on. */
+private class RowItems(val items: List<Item>, val days: List<List<UInt>>) {
+    companion object {
+        val NONE = RowItems(emptyList(), emptyList())
+    }
+}
+
+/** What is on the week from `start` (`onDay` calls into the core: off the main thread). */
+private fun rowItems(model: Main, start: Long): RowItems {
+    val all = model.core.items(start, start + 7 * DAY, null)
+    val days = all.map { i -> (0 until 7).filter { onDay(i, start + it * DAY) }.map { it.toUInt() } }
+    val on = all.indices.filter { days[it].isNotEmpty() }
+    return RowItems(on.map { all[it] }, on.map { days[it] })
+}
+
+/** Height of a lane of [WeekRow]: a chip (13 sp) and the gap under it. */
+@Composable
+private fun laneHeight() = with(LocalDensity.current) { 13.sp.toDp() } + 1.dp
+
+/**
+ * A week of the month grid (or the Day view's strip): its days' cells (`cell`, given the day of
+ * the week and what is on it at a height), and on top what is on them, each item in its lane for
+ * the whole week (`lanes` in the core, as in the Linux app), so one lasting several days is a
+ * single bar across them, broken only at the week's ends or where a day has no room left; there
+ * a day's last lane says "+n".
+ */
+@Composable
+private fun WeekRow(
+    start: Long,
+    week: RowItems,
+    colors: Map<String, String>,
+    modifier: Modifier,
+    cell: @Composable RowScope.(day: Int, heldAt: (Float) -> Item?) -> Unit,
+) {
+    BoxWithConstraints(modifier) {
+        val lane = laneHeight()
+        // Under the day's number (2 dp in, 22 dp), and 2 dp above the cell's bottom.
+        val top = 24.dp
+        val fit = ((maxHeight - top - 2.dp + 1.dp) / lane).toInt().coerceAtLeast(1)
+        val laid = remember(week, fit) { lanes(week.days, fit.toUInt()) }
+        val (topPx, lanePx) = with(LocalDensity.current) { top.toPx() to lane.toPx() }
+        Row(Modifier.fillMaxSize()) {
+            for (d in 0 until 7) {
+                val heldAt = remember(laid, d) {
+                    { y: Float ->
+                        val l = Math.floorDiv((y - topPx).toInt(), lanePx.toInt().coerceAtLeast(1))
+                        laid.pieces.firstOrNull { it.lane.toInt() == l && d in it.from.toInt()..it.to.toInt() }
+                            ?.let { week.items[it.item.toInt()] }
+                    }
+                }
+                cell(d, heldAt)
+            }
+        }
+        val col = maxWidth / 7
+        for (p in laid.pieces) {
+            val item = week.items[p.item.toInt()]
+            val (from, to) = p.from.toInt() to p.to.toInt()
+            // On the day before or after, shown or not: that end goes on, square to the cell's edge.
+            val left = onDay(item, start + (from - 1) * DAY)
+            val right = onDay(item, start + (to + 1) * DAY)
+            val x0 = col * from + if (left) 0.dp else 2.dp
+            val x1 = col * (to + 1) - if (right) 0.dp else 2.dp
+            val (l, r) = (if (left) 0.dp else 3.dp) to (if (right) 0.dp else 3.dp)
+            Box(Modifier.offset(x0, top + lane * p.lane.toInt()).width(x1 - x0)) {
+                Chip(item, colors, shape = RoundedCornerShape(l, r, r, l))
+            }
+        }
+        laid.more.forEachIndexed { d, hidden ->
+            if (hidden.isNotEmpty()) {
+                Text(
+                    "+${hidden.size}",
+                    Modifier.offset(col * d + 2.dp, top + lane * (fit - 1)),
+                    fontSize = 10.sp,
+                    lineHeight = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/** A day of the month grid under what is on it ([WeekRow]): its number, today's on the accent. */
 @Composable
 private fun DayCell(
     day: Long,
-    items: List<Item>,
-    colors: Map<String, String>,
     today: Boolean,
     picked: Boolean,
     inMonth: Boolean,
@@ -709,32 +777,12 @@ private fun DayCell(
                 },
             )
         }
-        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
-            // As many chips as fit (13 sp, 1 dp apart); when not all do, room for "+n" (12 sp) under them.
-            val (chip, more) = with(LocalDensity.current) { 13.sp.toDp() + 1.dp to 12.sp.toDp() }
-            val shown = if (items.size <= ((maxHeight + 1.dp) / chip).toInt()) {
-                items
-            } else {
-                items.take(((maxHeight - more) / chip).toInt().coerceAtLeast(0))
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                shown.forEach { i -> Chip(i, colors) }
-                if (shown.size < items.size) {
-                    Text(
-                        "+${items.size - shown.size}",
-                        fontSize = 10.sp,
-                        lineHeight = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
     }
 }
 
 /** An item in its list's colour: a small one-line chip, or `large`, a row to tap. */
 @Composable
-private fun Chip(item: Item, colors: Map<String, String>, large: Boolean = false, onClick: (() -> Unit)? = null) {
+private fun Chip(item: Item, colors: Map<String, String>, large: Boolean = false, shape: Shape? = null, onClick: (() -> Unit)? = null) {
     val color = parseColor(colors[item.list()])
     Text(
         item.title(),
@@ -744,7 +792,7 @@ private fun Chip(item: Item, colors: Map<String, String>, large: Boolean = false
         overflow = if (large) TextOverflow.Ellipsis else TextOverflow.Clip,
         color = if (item is Item.Event) Color.White else MaterialTheme.colorScheme.onSurface,
         textDecoration = if (item.done()) TextDecoration.LineThrough else null,
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(if (large) 12.dp else 3.dp))
+        modifier = Modifier.fillMaxWidth().clip(shape ?: RoundedCornerShape(if (large) 12.dp else 3.dp))
             .background(if (item is Item.Event) color else color.copy(alpha = 0.25f))
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = if (large) 12.dp else 2.dp, vertical = if (large) 14.dp else 0.dp),
