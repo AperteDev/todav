@@ -150,6 +150,7 @@ class MainActivity : ComponentActivity() {
                 intent.getLongExtra("day", 0).takeIf { intent.hasExtra("day") },
                 intent.getStringExtra("calendar"),
                 intent.getLongExtra("account", -1).takeIf { it >= 0 },
+                intent.getBooleanExtra("allDay", false),
             )
         }
     }
@@ -189,7 +190,7 @@ class MainActivity : ComponentActivity() {
         val time = { key: String -> intent.getLongExtra(key, -1).takeIf { it >= 0 }?.let { wall(it, allDay) } }
         val begin = time(CalendarContract.EXTRA_EVENT_BEGIN_TIME)
         model.showDay(begin ?: (application as TodavApp).core.localNow())
-        newEvent(model, begin?.let(::midnight))
+        newEvent(model, begin?.let(::midnight), allDay = allDay)
         val new = model.newEvent.value ?: return
         model.newEvent.value = new.copy(
             start = begin?.takeIf { allDay || it != midnight(it) } ?: new.start,

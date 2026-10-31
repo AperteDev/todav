@@ -100,11 +100,11 @@ fun widgetCalendars(context: Context, app: TodavApp, id: Int): Pair<Long?, List<
 
 /**
  * A calendar widget's add button: a new event on `day`, in the only calendar it shows that takes
- * events, else with its account picked and the calendar left to choose.
+ * events, else with its account picked and the calendar left to choose; `allDay` from a month.
  */
-private fun newEvent(context: Context, id: Int, account: Long?, shown: List<TodavList>, day: Long): Intent {
+private fun newEvent(context: Context, id: Int, account: Long?, shown: List<TodavList>, day: Long, allDay: Boolean = false): Intent {
     val calendars = shown.filter { it.holdsEvents && it.writable }
-    return Intent(context, MainActivity::class.java).setAction(MainActivity.NEW_EVENT).putExtra("day", day)
+    return Intent(context, MainActivity::class.java).setAction(MainActivity.NEW_EVENT).putExtra("day", day).putExtra("allDay", allDay)
         .setData(Uri.parse("todav-add://$id/$day"))
         .apply {
             if (calendars.size == 1) putExtra("calendar", calendars[0].href) else account?.let { putExtra("account", it) }
@@ -212,7 +212,7 @@ class MonthWidget : TodavWidget() {
         val density = context.resources.displayMetrics.density
         val images = remember { HashMap<List<String>, android.graphics.Bitmap>() }
         WidgetFrame(context) {
-            TurnHeader(context, widget, monthTitle(first), openDay(context, first, month = true), newEvent(context, widget, account, shown, today))
+            TurnHeader(context, widget, monthTitle(first), openDay(context, first, month = true), newEvent(context, widget, account, shown, today, allDay = true))
             WeekdayNames(start)
             for (w in 0 until weeks) {
                 Row(GlanceModifier.fillMaxWidth().defaultWeight()) {
@@ -539,7 +539,7 @@ class PlannerWidget : TodavWidget() {
         val bar = if (slim) 12.dp else 15.dp
         val fit = floor(room / bar).toInt().coerceIn(0, 8)
         WidgetFrame(context) {
-            TurnHeader(context, widget, monthTitle(first), openDay(context, first, month = true), newEvent(context, widget, account, shown, today))
+            TurnHeader(context, widget, monthTitle(first), openDay(context, first, month = true), newEvent(context, widget, account, shown, today, allDay = true))
             WeekdayNames(start)
             // Flat, a view for each number and bar: a widget has 500 at most.
             for (w in 0 until 6) {

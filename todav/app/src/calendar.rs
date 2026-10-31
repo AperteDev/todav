@@ -152,6 +152,30 @@ pub fn agenda(c: &Client, from: i64, days: i64, lists: Option<&[String]>) -> Vec
     out
 }
 
+/// A new event's time on `day` (a midnight): all of it when added from the month view
+/// (`all_day`), whose days have no hours; else from the next full hour when `day` is today,
+/// otherwise from 9:00, for the default duration.
+pub fn new_event_time(c: &Client, day: i64, all_day: bool) -> EventTime {
+    if all_day {
+        return EventTime {
+            start: day,
+            end: day + DAY,
+            all_day,
+        };
+    }
+    let now = c.local_now();
+    let start = if dates::midnight(now) == day {
+        (now / 3600 + 1) * 3600
+    } else {
+        day + 9 * 3600
+    };
+    EventTime {
+        start,
+        end: start + prefs::event_duration(c),
+        all_day,
+    }
+}
+
 /// Today's events in the calendars shown (not cancelled), all-day ones first.
 pub fn today_events(c: &Client) -> Vec<Event> {
     let hidden = prefs::hidden(c);
@@ -550,6 +574,20 @@ pub fn plain_repeat(rule: &str) -> Option<Repeat> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_new_event_from_the_month_view_takes_the_whole_day() {
+        let dir = std::env::temp_dir().join(format!("todav-app-new-event-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let day = dates::midnight(c.local_now()) + 3 * DAY;
+        let t = new_event_time(&c, day, true);
+        assert_eq!((t.start, t.end, t.all_day), (day, day + DAY, true));
+        // Another day than today, from another view: at 9:00, an hour long by default.
+        let t = new_event_time(&c, day, false);
+        let nine = day + 9 * 3600;
+        assert_eq!((t.start, t.end, t.all_day), (nine, nine + 3600, false));
+    }
 
     fn piece(item: usize, lane: usize, from: usize, to: usize) -> Piece {
         Piece {

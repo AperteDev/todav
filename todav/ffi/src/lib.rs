@@ -776,6 +776,11 @@ impl Todav {
         todav_app::prefs::event_duration(self.c())
     }
 
+    /// A new event's time on `day` (a midnight): all of it from the month view (`all_day`).
+    pub fn new_event_time(&self, day: i64, all_day: bool) -> EventTime {
+        todav_app::calendar::new_event_time(self.c(), day, all_day)
+    }
+
     /// When reminders of tasks without a time go off, in seconds into the day.
     pub fn all_day_time(&self) -> i64 {
         todav_app::prefs::all_day_time(self.c())

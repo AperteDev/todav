@@ -408,17 +408,19 @@ fun WorkDaysDialog(model: Main, onDismiss: () -> Unit) {
 
 /**
  * A new event on `day` (else the day the calendar shows: the add button, the shortcut), in
- * `list` or, with only `account`, in a calendar of it still to pick (a widget's add button).
+ * `list` or, with only `account`, in a calendar of it still to pick (a widget's add button);
+ * `allDay` when added from a month (by default, when the calendar shows one).
  */
-fun newEvent(model: Main, day: Long? = null, list: String? = null, account: Long? = null) {
+fun newEvent(
+    model: Main,
+    day: Long? = null,
+    list: String? = null,
+    account: Long? = null,
+    allDay: Boolean = model.calMode.value == CalMode.MONTH,
+) {
     val d = day ?: model.day.value ?: midnight(model.core.localNow())
-    model.newEvent.value = Dest.EventEdit(list, null, null, newStart(model, d), false, account)
-}
-
-/** A new event's start: the next full hour on `day` when it is today, else 9:00 there. */
-private fun newStart(model: Main, day: Long): Long {
-    val now = model.core.localNow()
-    return if (midnight(now) == day) now - Math.floorMod(now, 3600L) + 3600 else day + 9 * 3600
+    val time = model.core.newEventTime(d, allDay)
+    model.newEvent.value = Dest.EventEdit(list, null, null, time.start, time.allDay, account)
 }
 
 private fun modeName(m: CalMode) = when (m) {

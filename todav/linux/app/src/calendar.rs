@@ -599,22 +599,11 @@ pub fn new_event_titled(summary: &str, at: i64) {
     }
 }
 
-/// A new event on the selected day, at the next full hour when that is today, else at 9:00;
+/// A new event on the selected day (`calendar::new_event_time`: all of it in the month view);
 /// returns the dialog's title field.
 fn new_event() -> Option<adw::EntryRow> {
     let c = cal()?;
-    let day = c.anchor.get();
-    let now = core().local_now();
-    let start = if day == today() {
-        (now / 3600 + 1) * 3600
-    } else {
-        day + 9 * 3600
-    };
-    let time = EventTime {
-        start,
-        end: start + prefs::event_duration(core()),
-        all_day: false,
-    };
+    let time = calendar::new_event_time(core(), c.anchor.get(), c.mode.get() == Mode::Month);
     Some(dialog::open(&c, None, time))
 }
 

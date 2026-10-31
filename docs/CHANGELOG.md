@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A task added for an event goes to the event's calendar, and only calendars that hold tasks
   offer to add one, unless a list is picked for the others (before, any event took tasks,
   added to the last opened list).
+- A new event added in the month view (the add button, Ctrl+N, a month widget's add button)
+  is all-day, as one added by a double click on a day of the month already was on Linux.
 - Android: an event lasting several days is one bar across them in the month view and the Day
   view's week, as in the Linux app and the widget, instead of a chip on each day.
 - Android: On This Device Only comes last among the accounts to add, after System Calendars.
