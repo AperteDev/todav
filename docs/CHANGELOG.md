@@ -12,9 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Calendars subscribed to by link in Nextcloud (New subscription from link: a published
   Outlook or Google calendar, holidays…) show as read-only calendars, updated when Nextcloud
   refreshes its copy.
-- Preferences > Calendar > Tasks for all events: tasks also for events of calendars that hold
-  no tasks (subscriptions, shared calendars you may only view, the phone's), added to the task
-  list picked under it, by default the last opened one.
+- Preferences > Calendar > Tasks for other calendars' events: a task list for tasks of events
+  of calendars that hold no tasks (subscriptions, shared calendars you may only view, the
+  phone's); with None, the default, those events take no tasks.
 - Linux: an event's edit dialog lists its tasks, to tick or add one, as its details do.
 - Android: System Calendars can be renamed and recoloured, in Todav only; "Use the System's
   Name and Color" in the same dialog undoes it.
@@ -22,8 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - A task added for an event goes to the event's calendar, and only calendars that hold tasks
-  offer to add one, unless Tasks for all events is on (before, any event took tasks, added to
-  the last opened list).
+  offer to add one, unless a list is picked for the others (before, any event took tasks,
+  added to the last opened list).
 - Android: On This Device Only comes last among the accounts to add, after System Calendars.
 - An older Todav no longer opens data a newer one left (after a downgrade, say); it says to
   update instead of reading and writing a database it does not know.

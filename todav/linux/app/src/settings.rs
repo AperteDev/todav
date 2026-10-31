@@ -925,14 +925,9 @@ fn connect_settings_sync(b: &gtk::Builder) -> impl Fn() + 'static {
     }
 }
 
-/// Whether events of calendars without tasks take some, and where those go: the last opened
-/// list (stored empty) or one picked; the returned closure fills the lists anew.
+/// Where tasks for events of calendars without tasks go: none (stored empty, so those events
+/// take none) or a list picked; the returned closure fills the lists anew.
 fn connect_event_tasks_list(b: &gtk::Builder) -> impl Fn() + 'static {
-    let other: adw::SwitchRow = get(b, "event_tasks_other");
-    other.set_active(prefs::event_tasks_other(core()));
-    other.connect_active_notify(|s| {
-        let _ = core().set_setting("event_tasks_other".into(), s.is_active().to_string());
-    });
     let row: adw::ComboRow = get(b, "event_tasks_list");
     let hrefs: Rc<RefCell<Vec<String>>> = Rc::default();
     let filling = Rc::new(Cell::new(false));
@@ -947,7 +942,7 @@ fn connect_event_tasks_list(b: &gtk::Builder) -> impl Fn() + 'static {
     move || {
         filling.set(true);
         let lists = todav_app::lists::event_task_lists(core());
-        crate::lists::picker(&row, &lists, Some(&gettext("Last opened list")));
+        crate::lists::picker(&row, &lists, Some(&gettext("None")));
         let mut v = vec![String::new()];
         v.extend(lists.into_iter().map(|l| l.href));
         let current = core()

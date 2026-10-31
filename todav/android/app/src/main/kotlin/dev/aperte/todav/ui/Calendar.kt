@@ -1633,7 +1633,7 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
                         CopyLink(model, dev.aperte.todav.core.linkEvent(e.uid))
                     }
                     val tasks = remember(changes, e.uid) { core.eventTasks(e.uid) }
-                    // None for a calendar that holds no tasks, unless Preferences allow them.
+                    // None for a calendar that holds no tasks, unless Preferences pick a list for them.
                     val list = remember(changes, e.listHref) { core.eventTaskList(e.listHref) }
                     if (tasks.isNotEmpty() || list != null) SectionTitle(tr("Tasks"))
                     tasks.forEach { t -> CheckRow(model, t) }

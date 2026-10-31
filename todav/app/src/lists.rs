@@ -62,24 +62,15 @@ pub fn event_task_lists(c: &Client) -> Vec<List> {
 }
 
 /// Where a task added for an event of `calendar` goes, if anywhere: the calendar itself when
-/// it holds tasks we may add; else, with `event_tasks_other` on, the list picked in
-/// `event_tasks_list`, or if none or gone the last opened list, else the first.
+/// it holds tasks we may add; else the list picked in `event_tasks_list` (none by default, or
+/// when that is gone).
 pub fn event_task_list(c: &Client, calendar: &str) -> Option<String> {
     let lists = event_task_lists(c);
     if lists.iter().any(|l| l.href == calendar) {
         return Some(calendar.into());
     }
-    if !crate::prefs::event_tasks_other(c) {
-        return None;
-    }
-    [
-        c.setting("event_tasks_list".into()),
-        c.setting("last_list".into()),
-    ]
-    .into_iter()
-    .flatten()
-    .find(|h| lists.iter().any(|l| &l.href == h))
-    .or_else(|| lists.first().map(|l| l.href.clone()))
+    c.setting("event_tasks_list".into())
+        .filter(|h| lists.iter().any(|l| &l.href == h))
 }
 
 /// The account heading each of `lists` (as `by_place` orders them): on the first of a group,
@@ -154,19 +145,13 @@ mod tests {
         assert_eq!(event_task_list(&c, &a), Some(a.clone()));
         assert_eq!(event_task_list(&c, "system:work"), None);
         assert_eq!(event_task_list(&c, &mine), None);
-        set("event_tasks_other", "true");
-        // Nothing picked or opened: the first list.
-        assert_eq!(event_task_list(&c, "system:work"), Some(a.clone()));
-        set("last_list", &b);
+        // A list picked: every calendar without tasks puts its events' there.
+        set("event_tasks_list", &b);
         assert_eq!(event_task_list(&c, "system:work"), Some(b.clone()));
+        assert_eq!(event_task_list(&c, &mine), Some(b.clone()));
         assert_eq!(event_task_list(&c, &a), Some(a.clone()));
-        // The picked list, for every calendar without tasks.
-        set("event_tasks_list", &a);
-        assert_eq!(event_task_list(&c, "system:work"), Some(a.clone()));
-        assert_eq!(event_task_list(&c, &mine), Some(a.clone()));
-        assert_eq!(event_task_list(&c, &b), Some(b.clone()));
         // Gone: as if none was picked.
         set("event_tasks_list", "gone");
-        assert_eq!(event_task_list(&c, "system:work"), Some(b));
+        assert_eq!(event_task_list(&c, "system:work"), None);
     }
 }

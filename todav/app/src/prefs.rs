@@ -165,12 +165,6 @@ pub fn double_click_edit(c: &Client) -> bool {
     on(c, "double_click_edit")
 }
 
-/// Whether events of calendars that hold no tasks we may add (`lists::event_task_list`) take
-/// tasks too, in the list picked in `event_tasks_list` (`event_tasks_other`; off by default).
-pub fn event_tasks_other(c: &Client) -> bool {
-    c.setting("event_tasks_other".into()).as_deref() == Some("true")
-}
-
 /// The weekdays the Work Week view shows (`work_days`, comma-separated, 0 = Sunday): one to six
 /// of them, in order; Monday to Friday by default.
 pub fn work_days(c: &Client) -> Vec<i64> {
