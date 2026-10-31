@@ -281,7 +281,7 @@ impl Todav {
         todav_app::lists::event_task_lists(self.c())
     }
 
-    /// Where a task added for an event of `calendar` goes.
+    /// Where a task added for an event of `calendar` goes, if it may get one.
     pub fn event_task_list(&self, calendar: String) -> Option<String> {
         todav_app::lists::event_task_list(self.c(), &calendar)
     }

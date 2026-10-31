@@ -61,22 +61,25 @@ pub fn event_task_lists(c: &Client) -> Vec<List> {
     )
 }
 
-/// Where a task added for an event of `calendar` goes: for a read-only calendar the list picked
-/// in `event_tasks_list`; else, or if that is gone, the last opened list; else the first.
+/// Where a task added for an event of `calendar` goes, if anywhere: the calendar itself when
+/// it holds tasks we may add; else, with `event_tasks_other` on, the list picked in
+/// `event_tasks_list`, or if none or gone the last opened list, else the first.
 pub fn event_task_list(c: &Client, calendar: &str) -> Option<String> {
     let lists = event_task_lists(c);
-    let read_only = !c
-        .calendars()
-        .iter()
-        .any(|l| l.href == calendar && l.writable);
-    let picked = read_only
-        .then(|| c.setting("event_tasks_list".into()))
-        .flatten();
-    [picked, c.setting("last_list".into())]
-        .into_iter()
-        .flatten()
-        .find(|h| lists.iter().any(|l| &l.href == h))
-        .or_else(|| lists.first().map(|l| l.href.clone()))
+    if lists.iter().any(|l| l.href == calendar) {
+        return Some(calendar.into());
+    }
+    if !crate::prefs::event_tasks_other(c) {
+        return None;
+    }
+    [
+        c.setting("event_tasks_list".into()),
+        c.setting("last_list".into()),
+    ]
+    .into_iter()
+    .flatten()
+    .find(|h| lists.iter().any(|l| &l.href == h))
+    .or_else(|| lists.first().map(|l| l.href.clone()))
 }
 
 /// The account heading each of `lists` (as `by_place` orders them): on the first of a group,
@@ -121,7 +124,7 @@ mod tests {
     use todav_core::SystemCalendar;
 
     #[test]
-    fn a_read_only_calendars_event_tasks_go_to_the_picked_list() {
+    fn event_tasks_go_to_their_calendar_or_the_picked_list() {
         let dir = std::env::temp_dir().join(format!("todav-app-event-list-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let c = Client::open(dir.to_string_lossy().into()).unwrap();
@@ -147,14 +150,21 @@ mod tests {
         c.set_system_calendars(system, vec![work]).unwrap();
         let set = |k: &str, v: &str| c.set_setting(k.into(), v.into()).unwrap();
 
+        // A calendar that holds tasks takes its events' own; others none, by default.
+        assert_eq!(event_task_list(&c, &a), Some(a.clone()));
+        assert_eq!(event_task_list(&c, "system:work"), None);
+        assert_eq!(event_task_list(&c, &mine), None);
+        set("event_tasks_other", "true");
         // Nothing picked or opened: the first list.
         assert_eq!(event_task_list(&c, "system:work"), Some(a.clone()));
         set("last_list", &b);
         assert_eq!(event_task_list(&c, "system:work"), Some(b.clone()));
-        // The picked list, for read-only calendars only.
+        assert_eq!(event_task_list(&c, &a), Some(a.clone()));
+        // The picked list, for every calendar without tasks.
         set("event_tasks_list", &a);
         assert_eq!(event_task_list(&c, "system:work"), Some(a.clone()));
-        assert_eq!(event_task_list(&c, &mine), Some(b.clone()));
+        assert_eq!(event_task_list(&c, &mine), Some(a.clone()));
+        assert_eq!(event_task_list(&c, &b), Some(b.clone()));
         // Gone: as if none was picked.
         set("event_tasks_list", "gone");
         assert_eq!(event_task_list(&c, "system:work"), Some(b));

@@ -141,16 +141,6 @@ Adw.PreferencesDialog dialog {
         active: true;
       }
     }
-
-    Adw.PreferencesGroup {
-      title: _("Read-only Calendars");
-
-      // The last opened list, then the task lists (src/settings.rs `connect_event_tasks_list`).
-      Adw.ComboRow event_tasks_list {
-        title: _("Add tasks for their events to");
-        subtitle: _("Shared calendars you may only view, subscriptions and the like");
-      }
-    }
   }  Adw.PreferencesPage {
     name: "tasks";
     title: _("Tasks");
@@ -331,6 +321,17 @@ Adw.PreferencesDialog dialog {
         title: _("Default duration");
         subtitle: _("When an event is added at a time, or an all-day one gets a time");
         model: Gtk.StringList { strings [_("15 minutes"), _("30 minutes"), _("45 minutes"), _("1 hour"), _("1.5 hours"), _("2 hours"), _("3 hours")] };
+      }
+
+      Adw.SwitchRow event_tasks_other {
+        title: _("Tasks for all events");
+        subtitle: _("Also for calendars that hold no tasks: subscriptions, shared calendars you may only view and the like");
+      }
+
+      // The last opened list, then the task lists (src/settings.rs `connect_event_tasks_list`).
+      Adw.ComboRow event_tasks_list {
+        title: _("Add those tasks to");
+        visible: bind event_tasks_other.active;
       }
     }
   }

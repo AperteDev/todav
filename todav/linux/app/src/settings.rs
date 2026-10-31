@@ -925,9 +925,14 @@ fn connect_settings_sync(b: &gtk::Builder) -> impl Fn() + 'static {
     }
 }
 
-/// Where tasks for read-only calendars' events go: the last opened list (stored empty) or one
-/// picked; the returned closure fills it anew.
+/// Whether events of calendars without tasks take some, and where those go: the last opened
+/// list (stored empty) or one picked; the returned closure fills the lists anew.
 fn connect_event_tasks_list(b: &gtk::Builder) -> impl Fn() + 'static {
+    let other: adw::SwitchRow = get(b, "event_tasks_other");
+    other.set_active(prefs::event_tasks_other(core()));
+    other.connect_active_notify(|s| {
+        let _ = core().set_setting("event_tasks_other".into(), s.is_active().to_string());
+    });
     let row: adw::ComboRow = get(b, "event_tasks_list");
     let hrefs: Rc<RefCell<Vec<String>>> = Rc::default();
     let filling = Rc::new(Cell::new(false));

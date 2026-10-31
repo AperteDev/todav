@@ -1494,33 +1494,38 @@ fn check_row(t: &Task, count: Rc<dyn Fn()>) -> gtk::CheckButton {
 }
 
 /// The tasks for an event: tick them, add one (to the list `event_task_list` picks, due when
-/// the event starts).
-fn event_tasks(e: &Event) -> gtk::Box {
+/// the event starts). None when it has none and may get none.
+fn event_tasks(e: &Event) -> Option<gtk::Box> {
     let uid = e.uid.clone();
+    let list_href = todav_app::lists::event_task_list(core(), &e.list_href);
+    if list_href.is_none() && core().event_tasks(uid.clone()).is_empty() {
+        return None;
+    }
     let ev = e.clone();
-    let add = move |text: String| {
-        let list_href = todav_app::lists::event_task_list(core(), &ev.list_href)?;
-        let start = prefs::order(core()).task_start;
-        let patch = TaskPatch {
-            event: Some(Some(ev.uid.clone())),
-            due: Some(Some(Due {
-                at: ev.start,
-                all_day: ev.all_day,
-            })),
-            ..Default::default()
-        };
-        let added = core().together(|| {
-            let t = core().add_task(list_href, text, None, None, start)?;
-            core().update_task(t.uid.clone(), patch).map(|_| t)
-        });
-        added.ok().and_then(|t| core().task(t.uid))
-    };
-    checklist(
+    let add = list_href.map(|list_href| {
+        Box::new(move |text: String| {
+            let start = prefs::order(core()).task_start;
+            let patch = TaskPatch {
+                event: Some(Some(ev.uid.clone())),
+                due: Some(Some(Due {
+                    at: ev.start,
+                    all_day: ev.all_day,
+                })),
+                ..Default::default()
+            };
+            let added = core().together(|| {
+                let t = core().add_task(list_href.clone(), text, None, None, start)?;
+                core().update_task(t.uid.clone(), patch).map(|_| t)
+            });
+            added.ok().and_then(|t| core().task(t.uid))
+        }) as Box<dyn Fn(String) -> Option<Task>>
+    });
+    Some(checklist(
         gettext("Tasks"),
         &gettext("Add a task for this event"),
         Rc::new(move || core().event_tasks(uid.clone())),
-        Some(Box::new(add)),
-    )
+        add,
+    ))
 }
 
 /// A task's subtasks: tick them, add one.
@@ -1834,7 +1839,9 @@ fn details(c: &Cal, e: &Event) -> gtk::Popover {
     if let Some(d) = &e.description {
         b.append(&line("text-x-generic-symbolic", d));
     }
-    b.append(&event_tasks(e));
+    if let Some(tasks) = event_tasks(e) {
+        b.append(&tasks);
+    }
     let buttons = writable(c, &e.list_href).then(|| {
         let ev = e.clone();
         let on_edit = move || edit_event(&ev);

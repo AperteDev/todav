@@ -1633,15 +1633,12 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
                         CopyLink(model, dev.aperte.todav.core.linkEvent(e.uid))
                     }
                     val tasks = remember(changes, e.uid) { core.eventTasks(e.uid) }
-                    // Without a task list to add one to (only the system's calendars, say), none.
-                    val taskLists = remember(changes) { core.eventTaskLists().isNotEmpty() }
-                    if (tasks.isNotEmpty() || taskLists) SectionTitle(tr("Tasks"))
+                    // None for a calendar that holds no tasks, unless Preferences allow them.
+                    val list = remember(changes, e.listHref) { core.eventTaskList(e.listHref) }
+                    if (tasks.isNotEmpty() || list != null) SectionTitle(tr("Tasks"))
                     tasks.forEach { t -> CheckRow(model, t) }
-                    if (taskLists) AddLine(tr("Add a task for this event")) { text ->
-                        val list = core.eventTaskList(e.listHref)
-                        if (list != null) {
-                            model.add(list, text, patch = TaskPatch(due = DueValue(Due(e.start, e.allDay)), event = TextValue(e.uid)))
-                        }
+                    if (list != null) AddLine(tr("Add a task for this event")) { text ->
+                        model.add(list, text, patch = TaskPatch(due = DueValue(Due(e.start, e.allDay)), event = TextValue(e.uid)))
                     }
                 }
                 is Item.Task -> {

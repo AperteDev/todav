@@ -504,22 +504,6 @@ private fun Accounts(model: Main) {
         }
         Section(tr("Push")) { PushRow(model) }
     }
-    Section(tr("Read-only Calendars")) {
-        // The last opened list (stored empty), then the task lists, named with their account
-        // when from more than one.
-        val lists = remember(changes) { model.core.eventTaskLists() }
-        val mixed = lists.any { it.account != lists.firstOrNull()?.account }
-        val names = lists.map { l ->
-            val a = accounts.firstOrNull { it.id == l.account }
-            if (mixed && a != null) "${l.displayName} · ${accountName(a)}" else l.displayName
-        }
-        ChoiceRow(
-            model, tr("Add tasks for their events to"), "event_tasks_list",
-            listOf("") + lists.map { it.href },
-            listOf(tr("Last opened list")) + names,
-            subtitle = tr("Shared calendars you may only view, subscriptions and the like"),
-        )
-    }
 }
 
 /** How an account connects, under its name. */
@@ -670,6 +654,28 @@ private fun CalendarSettings(model: Main) {
     }
     Section(tr("Events")) {
         DurationRow(model, tr("Default duration"), tr("When an event is added at a time, or an all-day one gets a time"), "event_duration")
+        SwitchRow(
+            model, tr("Tasks for all events"), "event_tasks_other",
+            tr("Also for calendars that hold no tasks: subscriptions, shared calendars you may only view and the like"),
+            default = false,
+        )
+        if (setting(model, "event_tasks_other") == "true") {
+            // The last opened list (stored empty), then the task lists, named with their
+            // account when from more than one.
+            val changes by model.todav.changes.collectAsStateWithLifecycle()
+            val accounts = remember(changes) { model.core.accounts() }
+            val lists = remember(changes) { model.core.eventTaskLists() }
+            val mixed = lists.any { it.account != lists.firstOrNull()?.account }
+            val names = lists.map { l ->
+                val a = accounts.firstOrNull { it.id == l.account }
+                if (mixed && a != null) "${l.displayName} · ${accountName(a)}" else l.displayName
+            }
+            ChoiceRow(
+                model, tr("Add those tasks to"), "event_tasks_list",
+                listOf("") + lists.map { it.href },
+                listOf(tr("Last opened list")) + names,
+            )
+        }
     }
 }
 
