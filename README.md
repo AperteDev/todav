@@ -7,9 +7,9 @@
 <p align="center">Tasks and calendar for GNOME and Android, kept in your Nextcloud.</p>
 
 <p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue" alt="License: GPL-3.0-or-later"></a>
   <a href="https://github.com/AperteDev/todav/actions/workflows/ci.yml"><img src="https://github.com/AperteDev/todav/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/AperteDev/todav/releases/latest"><img src="https://img.shields.io/github/v/release/AperteDev/todav" alt="Latest release"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue" alt="License: GPL-3.0-or-later"></a>
   <a href="https://aur.archlinux.org/packages/todav-bin"><img src="https://img.shields.io/aur/version/todav-bin" alt="AUR version"></a>
   <a href="https://copr.fedorainfracloud.org/coprs/selfref/todav/"><img src="https://copr.fedorainfracloud.org/coprs/selfref/todav/package/todav/status_image/last_build.png" alt="COPR build status"></a>
 </p>
