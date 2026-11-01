@@ -1569,11 +1569,13 @@ fn line(icon: &str, text: &str) -> gtk::Box {
     let i = gtk::Image::from_icon_name(icon);
     i.set_valign(gtk::Align::Start);
     r.append(&i);
+    // Wrapped at about 40 characters: else a long description makes the popover as wide.
     let l = gtk::Label::builder()
         .label(text)
         .xalign(0.0)
         .wrap(true)
         .wrap_mode(gtk::pango::WrapMode::WordChar)
+        .max_width_chars(40)
         .build();
     r.append(&l);
     r
@@ -1730,6 +1732,7 @@ fn title_label(text: &str, rename: Option<Box<dyn Fn(String)>>) -> gtk::Widget {
             .label(text)
             .xalign(0.0)
             .wrap(true)
+            .max_width_chars(32)
             .hexpand(true)
             .build();
         l.add_css_class("title-4");

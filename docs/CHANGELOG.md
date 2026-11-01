@@ -91,6 +91,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the add button, instead of in the middle of the window over the rail and the sidebar.
 - Android: a new message (with Undo, say) takes the place of the one shown instead of waiting
   for it: a few actions in a row kept messages on screen for minutes.
+- Linux: a long description or title in an event's or a task's details wraps instead of
+  making the popover as wide as the window.
 - Linux: a list's Completed group stays open when a task in it is reopened or the list is
   redrawn, until it is closed.
 - Linux: every task list is as wide at a given window size; one with a long row was a little
