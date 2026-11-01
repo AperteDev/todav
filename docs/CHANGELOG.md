@@ -73,6 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   update instead of reading and writing a database it does not know.
 - Linux: the sidebar month no longer marks days with dots unless "Dots in the sidebar month"
   is turned on in Preferences.
+- Android: the keyboard starts each word of an event's location with a capital letter.
 
 ### Removed
 

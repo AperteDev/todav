@@ -260,7 +260,14 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
                             EventColorButton(color, calendarColor, enabled = true) { color = it }
                         },
                     )
-                    FieldItem(location, { location = it }, tr("Location"), icon = Icons.Outlined.Place)
+                    // A place's name: each word capitalized, as names are.
+                    FieldItem(
+                        location,
+                        { location = it },
+                        tr("Location"),
+                        icon = Icons.Outlined.Place,
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                    )
                     ChoiceItem(
                         tr("Calendar"),
                         calendars.map { it.displayName },
