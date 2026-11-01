@@ -357,7 +357,7 @@ pub(super) fn render(c: &Rc<Cal>) -> i64 {
     let title = if start == last {
         capitalized(&fmt(start, "%A %-d %B %Y"))
     } else if fmt(start, "%m") == fmt(last, "%m") {
-        format!("{} – {}", fmt(start, "%-d"), fmt(last, "%-d %OB %Y"))
+        format!("{} – {}", fmt(start, "%-d"), fmt(last, "%-d %B %Y"))
     } else {
         format!("{} – {}", fmt(start, "%-d %b"), fmt(last, "%-d %b %Y"))
     };

@@ -82,6 +82,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Linux: the week views' title names the month in the form a date takes ("16 – 22 listopada
+  2026" in Polish, not "listopad").
 - Linux: in an event's or a task's details, the text of every line starts at the same place,
   after an icon, the calendar's dot or the colour box alike.
 - Linux: an event's place shows by a map pin in every icon theme; some (Tela) drew it as a black
