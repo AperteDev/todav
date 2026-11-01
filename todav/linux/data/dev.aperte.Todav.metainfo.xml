@@ -36,19 +36,19 @@
   <!-- From the release tag (scripts/release.py moves them to each new one). -->
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.3.0/docs/screenshots/tasks.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.4.0/docs/screenshots/tasks.png</image>
       <caption>Tasks grouped by category, with subtasks and due dates</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.3.0/docs/screenshots/calendar-month.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.4.0/docs/screenshots/calendar-month.png</image>
       <caption>The month, with an event's details</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.3.0/docs/screenshots/calendar-week.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.4.0/docs/screenshots/calendar-week.png</image>
       <caption>Tasks planned into the week next to events</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.3.0/docs/screenshots/event-dialog.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.4.0/docs/screenshots/event-dialog.png</image>
       <caption>Editing an event</caption>
     </screenshot>
   </screenshots>
@@ -63,6 +63,65 @@
     <control>touch</control>
   </supports>
   <releases>
+    <release version="2.4.0" date="2026-11-01">
+      <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.4.0</url>
+      <description translate="no">
+        <p>Added</p>
+        <ul>
+          <li>Repeating tasks: Repeat in a task's dialog (daily, weekly, monthly or yearly, every n of them, until a day), counted from its start or else its due date, or from the day it is done (Repeat From Completion). Ticked, it moves on to its next date, missed ones skipped, with its reminders and its subtasks open again; at the end of its rule it is completed. Repeating tasks from other apps move on the same way (before, ticking one completed the whole series). An arrow by the due date marks them.</li>
+          <li>Calendars subscribed to by link in Nextcloud (New subscription from link: a published Outlook or Google calendar, holidays…) show as read-only calendars, updated when Nextcloud refreshes its copy.</li>
+          <li>Preferences &gt; Calendar &gt; Tasks for other calendars' events: a task list for tasks of events of calendars that hold no tasks (subscriptions, shared calendars you may only view, the phone's); with None, the default, those events take no tasks.</li>
+          <li>Linux: an event's edit dialog lists its tasks, to tick or add one, as its details do.</li>
+          <li>Linux: a click on a day of the month view, or a drag across days, offers a new all-day event over them in a popover, as GNOME Calendar does: its title, colour and calendar, then Add, or Edit… for the whole dialog with what was typed. A double click still opens the dialog.</li>
+          <li>Android: holding a day of the month opens a new all-day event on it, and holding then moving across days, on it over all of them (holding an event still moves it).</li>
+          <li>A task ticked done that leaves the list (into its Completed group, out of Upcoming or Important, a completed subtask hidden) stays where it was, struck through, for a moment, then fades out, on Linux and Android, in the GNOME extension's task list and the task widget (in steps there); ticking several in a row, they all stay until the last one's moment is over.</li>
+          <li>Android: haptic feedback where it helps: a bump when something is held to move, a tick for each day, time step or place it is moved across and when it is dropped there; when a swipe, a pull to sync or a sheet goes far enough to act; ticking a task and every switch on or off, felt as such (a task's every check box, the calendars to show, the settings); picking a priority; reaching the sidebar's narrowest or widest.</li>
+          <li>Android: System Calendars can be renamed and recoloured, in Todav only; "Use the System's Name and Color" in the same dialog undoes it.</li>
+          <li>An event's own colour, shown instead of its calendar's in every view, the widgets and the extension: one set in Nextcloud Calendar or Thunderbird (COLOR), or with the colour box by its title, in its details (saved at once) and its dialog (Linux) or page (Android): its calendar's colour, 12 colours or any other. It is saved as the closest CSS colour name, as Nextcloud Calendar saves it. On Android, a System Calendar's event shows its own colour too (Google Calendar's event colours).</li>
+          <li>Android: any colour for a list or calendar, with Custom Color after the presets, as on Linux.</li>
+        </ul>
+        <p>Changed</p>
+        <ul>
+          <li>Android: the calendar's Today button left the top bar for a small floating button above the add button, shown only while the calendar is away from today: another day picked, or today scrolled out of sight.</li>
+          <li>A task added for an event goes to the event's calendar, and only calendars that hold tasks offer to add one, unless a list is picked for the others (before, any event took tasks, added to the last opened list).</li>
+          <li>A new event added in the month view (the add button, Ctrl+N, a month widget's add button) is all-day, as one added by a double click on a day of the month already was on Linux.</li>
+          <li>Android: an event lasting several days is one bar across them in the month view and the Day view's week, as in the Linux app and the widget, instead of a chip on each day.</li>
+          <li>In the month view, what does not fit on a day is counted at its top right ("+2", which lists it on Linux) instead of taking the day's last row, so an event lasting several days shows from its first day as a whole bar even where a day is full. On Linux the day's number moved to the left for it, as on Android.</li>
+          <li>Moving an event's start in its dialog (Linux) or page (Android) leaves its end where it is, as GNOME Calendar does; only a start past the end takes it along. Before, the end moved with the start, keeping the event's length.</li>
+          <li>A sync that fails on a server's answer that is not valid XML says which request it was and where the answer broke ("Sync failed: parse: PROPFIND /remote.php/dav/...: ..., byte N of M, after ..."), to find what sent it.</li>
+          <li>Android: On This Device Only comes last among the accounts to add, after System Calendars.</li>
+          <li>An older Todav no longer opens data a newer one left (after a downgrade, say); it says to update instead of reading and writing a database it does not know.</li>
+          <li>Linux: the sidebar month no longer marks days with dots unless "Dots in the sidebar month" is turned on in Preferences.</li>
+          <li>Android: the keyboard starts each word of an event's location with a capital letter.</li>
+          <li>A green icon instead of the blue one, on Linux and Android; Android's colours without the system's own (before Android 12), the widgets' own colours and the launcher shortcuts are green with it.</li>
+        </ul>
+        <p>Removed</p>
+        <ul>
+          <li>Linux: editing an item and adding an event on a day of the month by a double click, with the "Edit on double click" setting. A click shows an item's details or a day's new event popover at once, with Edit there; a double click on a free hour of the week view still adds an event.</li>
+        </ul>
+        <p>Fixed</p>
+        <ul>
+          <li>Android: Enter in a task's or an event's title closes the keyboard instead of starting a new line, which made the title two lines.</li>
+          <li>Android: an event's or a task's block in the week views shows as many whole lines of its title as fit, the last one ending in "…", instead of a line cut in half.</li>
+          <li>Android: on wide screens a message (with Undo, say) shows at the bottom of the view, beside the add button, instead of in the middle of the window over the rail and the sidebar.</li>
+          <li>Android: a new message (with Undo, say) takes the place of the one shown instead of waiting for it: a few actions in a row kept messages on screen for minutes.</li>
+          <li>Linux: a long description or title in an event's or a task's details wraps instead of making the popover as wide as the window.</li>
+          <li>Linux: a list's Completed group stays open when a task in it is reopened or the list is redrawn, until it is closed.</li>
+          <li>Linux: every task list is as wide at a given window size; one with a long row was a little wider than the others.</li>
+          <li>Linux: the week views' title names the month in the form a date takes ("16 – 22 listopada 2026" in Polish, not "listopad").</li>
+          <li>Linux: in an event's or a task's details, the text of every line starts at the same place, after an icon, the calendar's dot or the colour box alike.</li>
+          <li>Linux: an event's place shows by a map pin in every icon theme; some (Tela) drew it as a black disc.</li>
+          <li>Linux: deleting an event or a task from its details in the month view, or editing it from there, no longer scrolls the month away.</li>
+          <li>About one push message in 256 failed with "Sync failed: parse: ill-formed document": an encrypted one that happened to start like XML was read as XML instead of being decrypted.</li>
+          <li>Android: Undo after completing a task with a swipe brought it back only to complete it again at once.</li>
+          <li>Android: on a phone, saving a new event after typing its title showed the task list under the Calendar button, until Tasks and Calendar were tapped again.</li>
+          <li>Android: saving an event saved it as it was at the first change made on its page and dropped the changes after it, such as a repeat picked after the title was edited.</li>
+          <li>Android: a message with Undo ("... saved", "... completed") stayed until swiped away, and the messages after it waited behind it; it now goes after ten seconds.</li>
+          <li>Deleting a task deletes its subtasks too, and one Undo brings them all back; before, they stayed behind, under a task that was gone.</li>
+          <li>A task's reminder goes away once the task is done, moved on to its next date or deleted, here or on another device; before, it stayed until dismissed. "Mark as Done" on a reminder that no longer applies does nothing, so a repeating task does not move on twice.</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.3.0" date="2026-10-30">
       <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.3.0</url>
       <description translate="no">
