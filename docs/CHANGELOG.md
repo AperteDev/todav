@@ -50,6 +50,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dropped the changes after it, such as a repeat picked after the title was edited.
 - Android: a message with Undo ("... saved", "... completed") stayed until swiped away, and the
   messages after it waited behind it; it now goes after ten seconds.
+- Deleting a task deletes its subtasks too, and one Undo brings them all back; before, they
+  stayed behind, under a task that was gone.
+- A task's reminder goes away once the task is done, moved on to its next date or deleted,
+  here or on another device; before, it stayed until dismissed. "Mark as Done" on a reminder
+  that no longer applies does nothing, so a repeating task does not move on twice.
 
 ## [2.3.0] - 2026-10-30
 

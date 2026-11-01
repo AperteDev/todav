@@ -451,6 +451,28 @@ impl Todav {
         )?)
     }
 
+    /// Delete the task with its subtasks at any depth, as one change for undo; gives how many
+    /// subtasks went with it.
+    pub fn delete_task_tree(&self, uid: String) -> Result<u32> {
+        Ok(todav_app::tasks::delete(self.c(), &uid)? as u32)
+    }
+
+    /// Whether a reminder of task `uid` for occurrence `at` (`reminder_occurrence`) no longer
+    /// applies: the task is done or gone, or it repeats and moved on.
+    pub fn reminder_stale(&self, uid: String, at: Option<i64>) -> bool {
+        todav_app::service::reminder_stale(self.c(), &uid, at)
+    }
+
+    /// "Mark as Done" on a reminder for occurrence `at`: completed as `set_done_unasked` does,
+    /// unless the reminder is stale.
+    pub fn complete_from_reminder(&self, uid: String, at: Option<i64>) -> Result<()> {
+        Ok(todav_app::service::complete_from_reminder(
+            self.c(),
+            &uid,
+            at,
+        )?)
+    }
+
     /// Whether completing the task now would move it on to its next occurrence rather than
     /// complete it: it repeats, and its rule has not ended.
     pub fn moves_on(&self, uid: String) -> bool {
@@ -1038,6 +1060,12 @@ pub fn account_host(account: Account) -> String {
 #[uniffi::export]
 pub fn list_color(list: TodavList) -> String {
     todav_app::lists::color(&list)
+}
+
+/// Which occurrence of `task` a reminder shown now is for, to keep with its notification.
+#[uniffi::export]
+pub fn reminder_occurrence(task: TodavTask) -> Option<i64> {
+    todav_app::service::reminder_occurrence(&task)
 }
 
 /// Whether the reminder of `task` that went off by `now` was for its start, not its due date.

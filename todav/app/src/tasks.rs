@@ -347,6 +347,21 @@ pub fn set_done(c: &Client, uid: &str, done: bool, subtasks: bool, parents: bool
     })
 }
 
+/// Delete task `uid` with its subtasks at any depth, done or open, as one change for undo (left
+/// behind, they would show as top-level tasks of a parent that is gone). Gives how many subtasks
+/// went with it.
+pub fn delete(c: &Client, uid: &str) -> Result<usize> {
+    let mut subs = subtasks(c, uid, false);
+    subs.extend(subtasks(c, uid, true));
+    c.together(|| {
+        for s in &subs {
+            c.delete_task(s.uid.clone())?;
+        }
+        c.delete_task(uid.into())
+    })?;
+    Ok(subs.len())
+}
+
 /// Complete or reopen task `uid` where nobody can be asked about its subtasks (a reminder's
 /// "Mark as Done", the extension, a widget): they follow only as Preferences complete them
 /// (`SubtaskCompletion::Complete`, its parents reopening with it too); else they stay as they are.
@@ -644,6 +659,20 @@ pub(crate) mod tests {
         assert!(!c.moves_on(a.clone()));
         set_done(&c, &a, true, true, false).unwrap();
         assert!(task(&a).done && task(&a1).done && task(&a2).done);
+        // Deleted, its subtasks go with it, and come back with one undo.
+        let a21 = add("a21", Some(&a2));
+        assert_eq!(delete(&c, &a).unwrap(), 3);
+        assert!(
+            [&a, &a1, &a2, &a21]
+                .iter()
+                .all(|u| c.task(u.to_string()).is_none())
+        );
+        c.undo(None).unwrap();
+        assert!(
+            [&a, &a1, &a2, &a21]
+                .iter()
+                .all(|u| c.task(u.to_string()).is_some())
+        );
         let _ = std::fs::remove_dir_all(dir);
     }
 }

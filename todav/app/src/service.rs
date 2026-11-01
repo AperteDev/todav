@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc::{Sender, channel};
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 use std::time::Duration;
-use todav_core::{ChangeListener, Client, Event, Refused, SyncReport, Task};
+use todav_core::{ChangeListener, Client, Event, Refused, Result, SyncReport, Task};
 
 /// What syncing is doing.
 #[derive(Debug, Clone, PartialEq)]
@@ -277,6 +277,33 @@ pub fn reminds_of_start(t: &Task, now: i64) -> bool {
     last.is_some_and(|r| t.start_reminders.contains(r))
 }
 
+/// Which occurrence of task `t` a reminder shown now is for, to keep with its notification
+/// (`reminder_stale`): the start, else the due date it counts from.
+pub fn reminder_occurrence(t: &Task) -> Option<i64> {
+    t.start.or(t.due)
+}
+
+/// Whether a reminder of task `uid` for occurrence `at` (`reminder_occurrence`) no longer
+/// applies, so its notification goes: the task is done or gone, or it repeats and moved on to
+/// another occurrence. Without `at` (a notification from before it was kept), only done or gone.
+pub fn reminder_stale(c: &Client, uid: &str, at: Option<i64>) -> bool {
+    match c.task(uid.into()) {
+        None => true,
+        Some(t) if t.done => true,
+        Some(t) => at.is_some() && t.rule.is_some() && reminder_occurrence(&t) != at,
+    }
+}
+
+/// "Mark as Done" on a reminder of task `uid` for occurrence `at`: completed as
+/// `tasks::set_done_unasked` does, unless the reminder is stale (`reminder_stale`), so an old one
+/// does not move a repeating task on again.
+pub fn complete_from_reminder(c: &Client, uid: &str, at: Option<i64>) -> Result<()> {
+    if reminder_stale(c, uid, at) {
+        return Ok(());
+    }
+    crate::tasks::set_done_unasked(c, uid, true)
+}
+
 /// How far ahead `next_reminder` looks. A platform that sets an alarm for it sets it again after
 /// a sync or a change, and at least this often.
 pub const LOOKAHEAD: i64 = 7 * 86400;
@@ -313,6 +340,69 @@ impl ChangeListener for Settings {
 mod tests {
     use super::*;
     use todav_core::{AccountKind, Due, EventTime, TaskPatch};
+
+    #[test]
+    fn a_reminder_goes_stale_when_its_task_is_done_moved_on_or_gone() {
+        use todav_core::{Repeat, rrule::Freq};
+        let dir = std::env::temp_dir().join(format!("todav-app-stale-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let account = c
+            .add_account(
+                AccountKind::Local,
+                String::new(),
+                String::new(),
+                String::new(),
+            )
+            .unwrap();
+        let list = c
+            .create_list(account, "Tasks".into(), "#0082C9".into(), false)
+            .unwrap();
+        let today = crate::dates::midnight(c.local_now());
+        let add = |repeat: Option<Repeat>| {
+            let uid = c.add_task(list.clone(), "t".into(), None, None, false);
+            let uid = uid.unwrap().uid;
+            let patch = TaskPatch {
+                due: Some(Some(Due {
+                    at: today,
+                    all_day: true,
+                })),
+                repeat: repeat.map(Some),
+                ..Default::default()
+            };
+            c.update_task(uid.clone(), patch).unwrap();
+            uid
+        };
+        let daily = Repeat {
+            freq: Freq::Daily,
+            interval: 1,
+            until: None,
+        };
+        // Repeating: done once, the reminder of today's is stale, and its "Mark as Done" does
+        // nothing more; tomorrow's applies.
+        let r = add(Some(daily));
+        let at = reminder_occurrence(&c.task(r.clone()).unwrap());
+        assert!(!reminder_stale(&c, &r, at));
+        complete_from_reminder(&c, &r, at).unwrap();
+        let moved = c.task(r.clone()).unwrap();
+        assert_eq!(moved.due, Some(today + 86400));
+        assert!(reminder_stale(&c, &r, at));
+        complete_from_reminder(&c, &r, at).unwrap();
+        assert_eq!(
+            c.task(r.clone()).unwrap().due,
+            Some(today + 86400),
+            "not again"
+        );
+        assert!(!reminder_stale(&c, &r, reminder_occurrence(&moved)));
+        // Not repeating: stale once done or deleted, whatever its dates.
+        let t = add(None);
+        assert!(!reminder_stale(&c, &t, Some(0)));
+        c.set_done(t.clone(), true).unwrap();
+        assert!(reminder_stale(&c, &t, None));
+        c.delete_task(t.clone()).unwrap();
+        assert!(reminder_stale(&c, &t, None));
+        let _ = std::fs::remove_dir_all(dir);
+    }
 
     #[test]
     fn the_next_reminder_is_the_soonest_of_tasks_and_events() {

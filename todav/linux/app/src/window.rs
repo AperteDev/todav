@@ -207,9 +207,15 @@ pub fn setup_actions(app: &adw::Application) {
     app.add_action(&prefs);
     let complete = gio::SimpleAction::new("complete", Some(glib::VariantTy::STRING));
     complete.connect_activate(|_, uid| {
-        // From a notification nobody can be asked: subtasks stay open unless set to complete.
+        // From a notification nobody can be asked: subtasks stay open unless set to complete. An
+        // old one does nothing (a repeating task already moved on).
         if let Some(uid) = uid.and_then(|u| u.str())
-            && tasks::set_done_unasked(core(), uid, true).is_ok()
+            && todav_app::service::complete_from_reminder(
+                core(),
+                uid,
+                crate::reminded_occurrence(uid),
+            )
+            .is_ok()
         {
             request_sync();
         }
@@ -2750,11 +2756,22 @@ fn delete_button(t: &Task) -> gtk::Button {
     del
 }
 
+/// Delete task `t` with its subtasks (`tasks::delete`), offering to undo it.
 pub fn delete_task(t: &Task) {
-    if core().delete_task(t.uid.clone()).is_ok() {
-        request_sync();
-        undo_toast(&gettext("“{title}” deleted").replace("{title}", &t.summary));
-    }
+    let Ok(n) = tasks::delete(core(), &t.uid) else {
+        return;
+    };
+    request_sync();
+    let text = match n {
+        0 => gettext("“{title}” deleted"),
+        n => ngettext(
+            "“{title}” deleted with {n} subtask",
+            "“{title}” deleted with {n} subtasks",
+            n as u64,
+        )
+        .replace("{n}", &n.to_string()),
+    };
+    undo_toast(&text.replace("{title}", &t.summary));
 }
 
 /// Tell that something was deleted, with a button undoing just that (the latest change).

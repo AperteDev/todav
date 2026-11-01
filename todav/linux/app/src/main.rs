@@ -441,10 +441,36 @@ thread_local! {
     /// The timer for the next reminder (`remind`), and whether setting it again waits (`Changed`).
     static NEXT_REMINDER: std::cell::RefCell<Option<glib::SourceId>> = const { std::cell::RefCell::new(None) };
     static RESCHEDULE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// Tasks whose reminder is shown, with the occurrence it is for
+    /// (`service::reminder_occurrence`), by task UID; its notification is "reminder-<UID>".
+    static SHOWN: std::cell::RefCell<std::collections::HashMap<String, Option<i64>>> =
+        std::cell::RefCell::default();
+}
+
+/// The occurrence the shown reminder of task `uid` is for, if this run showed one.
+pub fn reminded_occurrence(uid: &str) -> Option<i64> {
+    SHOWN.with(|s| s.borrow().get(uid).copied().flatten())
+}
+
+/// Take back the reminders shown of tasks done, moved on or deleted since, here or elsewhere.
+fn withdraw_stale_reminders() {
+    let Some(app) = gio::Application::default() else {
+        return;
+    };
+    SHOWN.with(|s| {
+        s.borrow_mut().retain(|uid, at| {
+            let stale = todav_app::service::reminder_stale(core(), uid, *at);
+            if stale {
+                app.withdraw_notification(&format!("reminder-{uid}"));
+            }
+            !stale
+        });
+    });
 }
 
 /// Notify about reminders that went off, then wake for the next one on time.
 fn remind() {
+    withdraw_stale_reminders();
     notify_reminders();
     let now = core().local_now();
     let next = todav_app::service::next_reminder(core(), now);
@@ -511,6 +537,8 @@ fn notify_reminders() {
             Some(&t.uid.to_variant()),
         );
         app.send_notification(Some(&format!("reminder-{}", t.uid)), &n);
+        let at = todav_app::service::reminder_occurrence(&t);
+        SHOWN.with(|s| s.borrow_mut().insert(t.uid.clone(), at));
     }
     for e in events {
         let n = notification(&e.summary, e.priority);

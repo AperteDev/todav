@@ -27,6 +27,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import dev.aperte.todav.core.Event
 import dev.aperte.todav.core.TodavTask
+import dev.aperte.todav.core.reminderOccurrence
 import dev.aperte.todav.core.remindsOfStart
 import java.util.UUID
 import java.util.concurrent.TimeUnit
@@ -229,7 +230,27 @@ object Reminders {
     private fun builder(app: TodavApp, priority: Long?) =
         NotificationCompat.Builder(app, if (app.core.urgentReminder(priority)) URGENT else CHANNEL)
 
+    /** A task reminder's task UID and the occurrence it is for (`reminderOccurrence`), in its extras. */
+    private const val EXTRA_TASK = "dev.aperte.todav.task"
+    private const val EXTRA_AT = "dev.aperte.todav.at"
+
+    /** The occurrence intent `i` of a task reminder names, if it does (older ones do not). */
+    fun at(i: Intent): Long? = if (i.hasExtra("at")) i.getLongExtra("at", 0) else null
+
+    /** Take back the reminders of tasks done, moved on or deleted since, here or elsewhere. */
+    private fun tidy(app: TodavApp) {
+        val m = app.getSystemService(NotificationManager::class.java)
+        for (n in m.activeNotifications) {
+            val extras = n.notification.extras
+            val uid = extras.getString(EXTRA_TASK) ?: continue
+            val at = if (extras.containsKey(EXTRA_AT)) extras.getLong(EXTRA_AT) else null
+            if (app.core.reminderStale(uid, at)) m.cancel(n.tag, n.id)
+        }
+    }
+
+    /** The next reminder's alarm, after the reminders shown that no longer apply are gone. */
     fun schedule(app: TodavApp) {
+        tidy(app)
         val alarms = app.getSystemService(AlarmManager::class.java)
         val intent = PendingIntent.getBroadcast(
             app, 0, Intent(app, ReminderReceiver::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
@@ -284,13 +305,13 @@ object Reminders {
         }
     }
 
-    /** A snoozed reminder again, unless its task is done or its event gone meanwhile. */
+    /** A snoozed reminder again, unless its task is done or moved on or its event gone meanwhile. */
     fun again(app: TodavApp, intent: Intent) {
         val id = intent.getIntExtra("id", 0)
         val now = app.core.localNow()
         val m = NotificationManagerCompat.from(app)
-        intent.getStringExtra("task")?.let { uid ->
-            app.core.task(uid)?.takeIf { !it.done }?.let { m.notify(id, task(app, it, now)) }
+        intent.getStringExtra("task")?.takeIf { !app.core.reminderStale(it, at(intent)) }?.let { uid ->
+            app.core.task(uid)?.let { m.notify(id, task(app, it, now)) }
         }
         intent.getStringExtra("event")?.let { uid ->
             val start = intent.getLongExtra("start", 0)
@@ -314,27 +335,37 @@ object Reminders {
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 
-    private fun task(app: TodavApp, t: TodavTask, now: Long) = builder(app, t.priority)
-        .setSmallIcon(R.drawable.ic_notification)
-        .setContentTitle(t.summary)
-        .setContentText(
-            t.start?.takeIf { remindsOfStart(t, now) }
-                ?.let { tr("Starts {date}").replace("{date}", dayLabel(it, t.startAllDay, now)) }
-                ?: dueLabel(t, now),
-        )
-        .setCategory(NotificationCompat.CATEGORY_REMINDER)
-        .setAutoCancel(true)
-        .setContentIntent(open(app, t.uid.hashCode()) { putExtra("task", t.uid) })
-        .addAction(
-            0,
-            tr("Mark as Done"),
-            PendingIntent.getBroadcast(
-                app, t.uid.hashCode(), Intent(app, ReminderReceiver::class.java).setAction(DONE).putExtra("task", t.uid),
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-            ),
-        )
-        .addAction(snoozeAction(app, t.uid.hashCode()) { putExtra("task", t.uid) })
-        .build()
+    private fun task(app: TodavApp, t: TodavTask, now: Long): android.app.Notification {
+        // The occurrence it is for, so that it goes, and "Mark as Done" does nothing, once the
+        // task has moved on to another.
+        val at = reminderOccurrence(t)
+        val occurrence: Intent.() -> Unit = {
+            putExtra("task", t.uid)
+            at?.let { putExtra("at", it) }
+        }
+        return builder(app, t.priority)
+            .addExtras(android.os.Bundle().apply { putString(EXTRA_TASK, t.uid); at?.let { putLong(EXTRA_AT, it) } })
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(t.summary)
+            .setContentText(
+                t.start?.takeIf { remindsOfStart(t, now) }
+                    ?.let { tr("Starts {date}").replace("{date}", dayLabel(it, t.startAllDay, now)) }
+                    ?: dueLabel(t, now),
+            )
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setAutoCancel(true)
+            .setContentIntent(open(app, t.uid.hashCode()) { putExtra("task", t.uid) })
+            .addAction(
+                0,
+                tr("Mark as Done"),
+                PendingIntent.getBroadcast(
+                    app, t.uid.hashCode(), Intent(app, ReminderReceiver::class.java).setAction(DONE).apply(occurrence),
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                ),
+            )
+            .addAction(snoozeAction(app, t.uid.hashCode(), occurrence))
+            .build()
+    }
 
     private fun event(app: TodavApp, e: Event, now: Long) = builder(app, e.priority)
         .setSmallIcon(R.drawable.ic_notification)
@@ -357,9 +388,10 @@ class ReminderReceiver : BroadcastReceiver() {
         if (intent.action == Reminders.DONE) {
             val uid = intent.getStringExtra("task") ?: return
             NotificationManagerCompat.from(context).cancel(uid.hashCode())
-            // As the Linux app's: it cannot ask about subtasks, so they stay open unless set to complete.
+            // As the Linux app's: it cannot ask about subtasks, so they stay open unless set to
+            // complete. An old one does nothing (a repeating task already moved on).
             background(context) {
-                it.core.setDoneUnasked(uid, true)
+                it.core.completeFromReminder(uid, Reminders.at(intent))
                 it.core.requestSync()
             }
             return

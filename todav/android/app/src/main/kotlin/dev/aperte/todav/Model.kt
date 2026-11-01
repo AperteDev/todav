@@ -523,9 +523,15 @@ class Main(app: Application) : AndroidViewModel(app) {
     }
 
     fun delete(task: TodavTask) = act {
-        core.deleteTask(task.uid)
+        // With its subtasks, as one change to undo.
+        val n = core.deleteTaskTree(task.uid).toLong()
         synced()
-        messages.tryEmit(tr("“{title}” deleted").replace("{title}", task.summary) to core.lastChange())
+        val text = if (n == 0L) {
+            tr("“{title}” deleted")
+        } else {
+            ntr("“{title}” deleted with {n} subtask", "“{title}” deleted with {n} subtasks", n).replace("{n}", "$n")
+        }
+        messages.tryEmit(text.replace("{title}", task.summary) to core.lastChange())
     }
 
     fun move(task: TodavTask, list: String) = act {
