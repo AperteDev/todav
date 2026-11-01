@@ -9,6 +9,7 @@ pub mod json;
 mod login;
 pub mod push;
 pub mod release;
+pub mod repeat;
 pub mod rrule;
 mod settings;
 pub mod store;
@@ -127,6 +128,10 @@ pub struct Task {
     pub pinned: bool,
     /// Those of `reminders` that count from `start`, not the due date.
     pub start_reminders: Vec<i64>,
+    /// How it repeats (its RRULE, raw); see `Client::set_done`.
+    pub rule: Option<String>,
+    /// It repeats from when it was done, not from its dates (`repeat::FROM`).
+    pub repeat_from_done: bool,
 }
 
 /// Fields left `None` are untouched; `Some("")` clears description/category.
@@ -149,6 +154,11 @@ pub struct TaskPatch {
     /// PRIORITY, 1 (highest) to 9 (lowest); Some(None) clears it.
     pub priority: Option<Option<i64>>,
     pub pinned: Option<bool>,
+    /// How it repeats, counted from its start or else its due date; Some(None) stops it. A task
+    /// without either date does not repeat.
+    pub repeat: Option<Option<Repeat>>,
+    /// Repeat from when it is done rather than from its dates.
+    pub repeat_from_done: Option<bool>,
 }
 
 /// A due date in local time; `all_day`: a date without a time (`at` is its midnight).
@@ -568,12 +578,24 @@ impl Client {
 
     /// Load, patch and save a task as locally modified.
     fn modify(&self, uid: &str, f: impl FnOnce(&mut Calendar)) -> Result<()> {
+        self.modify_with(uid, |_, cal| {
+            f(cal);
+            Ok(())
+        })
+    }
+
+    /// `modify` with the database at hand.
+    fn modify_with(
+        &self,
+        uid: &str,
+        f: impl FnOnce(&Connection, &mut Calendar) -> Result<()>,
+    ) -> Result<()> {
         let list = {
             let db = self.db.lock().unwrap();
             let raw =
                 store::raw(&db, Kind::Task, "", uid)?.ok_or_else(|| Error::NotFound(uid.into()))?;
             let mut cal = Calendar::parse(&raw.raw_ics).ok_or_else(|| Error::Parse(uid.into()))?;
-            f(&mut cal);
+            f(&db, &mut cal)?;
             touch(&mut cal);
             self.remember(&db, Kind::Task, "", uid)?;
             store::save(
@@ -590,8 +612,32 @@ impl Client {
         Ok(())
     }
 
+    /// Complete or reopen a task. A repeating one, completed, moves on to its next occurrence
+    /// and stays open (`repeat::advance`), unless its rule has ended.
     pub fn set_done(&self, uid: String, done: bool) -> Result<()> {
-        self.modify(&uid, |cal| set_done(cal, done, now()))
+        self.modify_with(&uid, |db, cal| {
+            let local = store::to_local(db, now())?;
+            let moved_on = done && repeat::advance(db, cal, local, repeat::from_done(cal))?;
+            // Open at its next date, whatever state it was in.
+            set_done(cal, done && !moved_on, now());
+            Ok(())
+        })
+    }
+
+    /// Whether completing task `uid` now would move it on to its next occurrence rather than
+    /// complete it (`set_done`): it repeats, and its rule has not ended.
+    pub fn moves_on(&self, uid: String) -> bool {
+        let db = self.db.lock().unwrap();
+        let Ok(Some(raw)) = store::raw(&db, Kind::Task, "", &uid) else {
+            return false;
+        };
+        let Some(mut cal) = Calendar::parse(&raw.raw_ics) else {
+            return false;
+        };
+        let from_done = repeat::from_done(&cal);
+        store::to_local(&db, now())
+            .and_then(|local| repeat::advance(&db, &mut cal, local, from_done))
+            .unwrap_or(false)
     }
 
     /// Make a subtask a top-level task (its own subtasks come along).
@@ -638,8 +684,15 @@ impl Client {
             Some(d) if d.all_day => cal.set(name, ";VALUE=DATE", Some(&ical::fmt_utc(d.at)[..8])),
             Some(_) => cal.set_time(name, utc),
         };
-        let before = self.task(uid.clone()).map(|t| t.reminders);
+        let old = self.task(uid.clone());
+        let until = repeat::Untils::new(
+            &self.db.lock().unwrap(),
+            patch.repeat.as_ref(),
+            old.as_ref().and_then(|t| t.rule.as_deref()),
+        )?;
+        let before = old.map(|t| t.reminders);
         self.modify(&uid, |cal| {
+            let dated_before = repeat::anchor(cal).map(|a| matches!(a, tz::Stamp::Date(_)));
             // The due date's reminders and the start's (params, value), as they count now. The
             // due date's say so (RELATED=END): without it they would count from a start added.
             let had_start = cal.prop("DTSTART").is_some();
@@ -683,6 +736,13 @@ impl Client {
             if let Some(s) = patch.start {
                 set_date(cal, "DTSTART", s, start_utc);
             }
+            repeat::apply(
+                cal,
+                patch.repeat.as_ref(),
+                patch.repeat_from_done,
+                dated_before,
+                &until,
+            );
             if let Some(e) = &patch.event {
                 cal.set_related(store::EVENT_LINK, e.as_deref());
             }

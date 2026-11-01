@@ -130,6 +130,12 @@ ALTER TABLE lists ADD COLUMN subscribed INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE lists ADD COLUMN own_name TEXT;
 ALTER TABLE lists ADD COLUMN own_color TEXT;
 "#,
+    // A repeating task's RRULE, and whether it repeats from when it was done (filled in from
+    // `raw_ics` by `rederive`).
+    r#"
+ALTER TABLE tasks ADD COLUMN rule TEXT;
+ALTER TABLE tasks ADD COLUMN from_done INTEGER NOT NULL DEFAULT 0;
+"#,
 ];
 
 /// `user_version` after the migration that adds accounts.
@@ -459,7 +465,8 @@ const TASK_COLS: &str = "uid, list_href, summary, description, status, completed
   (SELECT group_concat(at) FROM (SELECT at FROM alarms a WHERE a.uid = tasks.uid ORDER BY at)),
   sort_order, created, last_modified, start, start_all_day, event_uid,
   CASE WHEN refused_ics IS raw_ics THEN sync_error END, pinned,
-  (SELECT group_concat(at) FROM (SELECT at FROM alarms a WHERE a.uid = tasks.uid AND from_start ORDER BY at))";
+  (SELECT group_concat(at) FROM (SELECT at FROM alarms a WHERE a.uid = tasks.uid AND from_start ORDER BY at)),
+  rule, from_done";
 
 fn task_row(r: &rusqlite::Row) -> rusqlite::Result<Task> {
     let status: String = r.get(4)?;
@@ -486,6 +493,8 @@ fn task_row(r: &rusqlite::Row) -> rusqlite::Result<Task> {
         sync_error: r.get(18)?,
         pinned: r.get(19)?,
         start_reminders: times(r.get(20)?),
+        rule: r.get(21)?,
+        repeat_from_done: r.get(22)?,
     })
 }
 
@@ -702,8 +711,8 @@ pub fn save(
     db.execute(
         "INSERT OR REPLACE INTO tasks (uid, list_href, etag, href, raw_ics, summary, description, status,
            completed_at, category, parent_uid, priority, due, sort_order, created, last_modified, dirty,
-           due_all_day, start, start_all_day, event_uid, pinned)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
+           due_all_day, start, start_all_day, event_uid, pinned, rule, from_done)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
         params![
             uid,
             list_href,
@@ -729,6 +738,8 @@ pub fn save(
             start.is_some_and(|(_, all_day)| all_day),
             cal.related(EVENT_LINK),
             cal.text("X-PINNED").as_deref() == Some("true"),
+            cal.prop("RRULE").map(|l| l.value.clone()),
+            crate::repeat::from_done(cal),
         ],
     )?;
     db.execute("DELETE FROM alarms WHERE uid = ?", [&uid])?;
@@ -1015,6 +1026,29 @@ END:VCALENDAR
             (l.display_name.as_str(), l.color.as_deref()),
             ("Work", Some("#0082C9"))
         );
+    }
+
+    #[test]
+    fn repeating_tasks_from_before_get_their_rule() {
+        // As the step before left it: no rule column.
+        let path = at("rule", 15);
+        let ics = "BEGIN:VCALENDAR\r\nBEGIN:VTODO\r\nUID:u\r\nSUMMARY:s\r\nDUE;VALUE=DATE:20261102\r\nRRULE:FREQ=WEEKLY\r\nEND:VTODO\r\nEND:VCALENDAR\r\n";
+        let old = Connection::open(&path).unwrap();
+        old.execute(
+            "INSERT INTO lists (href, display_name) VALUES ('/l/', 'L')",
+            [],
+        )
+        .unwrap();
+        old.execute(
+            "INSERT INTO tasks (uid, list_href, raw_ics, summary, status) VALUES ('u', '/l/', ?1, 's', 'NEEDS-ACTION')",
+            [ics],
+        )
+        .unwrap();
+        drop(old);
+        let db = open(&path).unwrap();
+        let t = task(&db, "u").unwrap().unwrap();
+        assert_eq!(t.rule.as_deref(), Some("FREQ=WEEKLY"));
+        assert!(!t.repeat_from_done);
     }
 
     #[test]

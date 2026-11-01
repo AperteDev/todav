@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Repeating tasks: Repeat in a task's dialog (daily, weekly, monthly or yearly, every n of
+  them, until a day), counted from its start or else its due date, or from the day it is done
+  (Repeat From Completion). Ticked, it moves on to its next date, missed ones skipped, with its
+  reminders and its subtasks open again; at the end of its rule it is completed. Repeating
+  tasks from other apps move on the same way (before, ticking one completed the whole series).
+  An arrow by the due date marks them.
 - Calendars subscribed to by link in Nextcloud (New subscription from link: a published
   Outlook or Google calendar, holidays…) show as read-only calendars, updated when Nextcloud
   refreshes its copy.

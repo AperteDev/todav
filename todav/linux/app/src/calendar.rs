@@ -3,7 +3,7 @@
 //! Times are local wall-clock seconds, as in the core.
 
 mod days;
-mod dialog;
+pub(crate) mod dialog;
 mod mini;
 mod month;
 mod week;

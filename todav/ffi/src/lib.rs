@@ -451,6 +451,12 @@ impl Todav {
         )?)
     }
 
+    /// Whether completing the task now would move it on to its next occurrence rather than
+    /// complete it: it repeats, and its rule has not ended.
+    pub fn moves_on(&self, uid: String) -> bool {
+        self.c().moves_on(uid)
+    }
+
     /// The task's subtasks, at any depth, that are `done` or open.
     pub fn subtasks(&self, uid: String, done: bool) -> Vec<Task> {
         todav_app::tasks::subtasks(self.c(), &uid, done)

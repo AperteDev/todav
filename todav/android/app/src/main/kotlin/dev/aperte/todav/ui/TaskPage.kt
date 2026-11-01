@@ -67,10 +67,13 @@ import dev.aperte.todav.core.Due
 import dev.aperte.todav.core.DueValue
 import dev.aperte.todav.core.PriorityValue
 import dev.aperte.todav.core.ReminderSpan
+import dev.aperte.todav.core.Repeat
+import dev.aperte.todav.core.RepeatValue
 import dev.aperte.todav.core.TaskPatch
 import dev.aperte.todav.core.TextValue
 import dev.aperte.todav.core.TodavTask
 import dev.aperte.todav.core.listColor
+import dev.aperte.todav.core.plainRepeat
 import dev.aperte.todav.core.reminderOffset
 import dev.aperte.todav.core.reminderSpan
 import dev.aperte.todav.core.trees
@@ -111,6 +114,27 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null, draft: 
     var due by rememberSaveable(uid) { mutableStateOf(task.due) }
     var dueAllDay by rememberSaveable(uid) { mutableStateOf(task.dueAllDay) }
     var event by rememberSaveable(uid) { mutableStateOf(task.eventUid) }
+    // How it repeats, as on the event page: 0 none, 1–4 daily … yearly, 5 a custom rule kept.
+    val plain = remember(uid) { task.rule?.let { plainRepeat(it) } }
+    val custom = task.rule != null && plain == null
+    var repeat by rememberSaveable(uid) {
+        mutableStateOf(
+            when {
+                task.rule == null -> 0
+                plain == null -> 5
+                else -> FREQS.indexOf(plain.freq) + 1
+            },
+        )
+    }
+    var every by rememberSaveable(uid) { mutableStateOf(plain?.interval ?: 1L) }
+    var until by rememberSaveable(uid) { mutableStateOf(plain?.until) }
+    var fromDone by rememberSaveable(uid) { mutableStateOf(task.repeatFromDone) }
+    val newRepeat = if (repeat in 1..4) Repeat(FREQS[repeat - 1], every.coerceAtLeast(1), until) else null
+    val repeatChanged = when {
+        task.rule != null && repeat == 5 -> false
+        task.rule != null -> plain != newRepeat
+        else -> repeat != 0
+    }
     // Offsets from the due time and from the start, as the patch takes them; the task has the
     // times, the start's among them.
     val oldReminders = remember(uid) {
@@ -128,7 +152,7 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null, draft: 
         priority != task.priority || note != (task.description ?: "") || start != task.start ||
         (start != null && startAllDay != task.startAllDay) || due != task.due ||
         (due != null && dueAllDay != task.dueAllDay) || event != task.eventUid || reminders.toList() != oldReminders ||
-        startReminders.toList() != oldStartReminders
+        startReminders.toList() != oldStartReminders || repeatChanged || fromDone != task.repeatFromDone
 
     fun save() {
         if (draft != null) {
@@ -144,6 +168,8 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null, draft: 
                     due = due?.let { DueValue(Due(it, dueAllDay)) },
                     reminders = reminders.toList().takeIf { it.isNotEmpty() },
                     startReminders = startReminders.toList().takeIf { it.isNotEmpty() },
+                    repeat = newRepeat?.let { RepeatValue(it) },
+                    repeatFromDone = fromDone.takeIf { it },
                 ),
             )
             done()
@@ -159,6 +185,8 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null, draft: 
             reminders = reminders.toList().takeIf { it != oldReminders },
             startReminders = startReminders.toList().takeIf { it != oldStartReminders },
             event = TextValue(event).takeIf { event != task.eventUid },
+            repeat = RepeatValue(newRepeat).takeIf { repeatChanged },
+            repeatFromDone = fromDone.takeIf { it != task.repeatFromDone },
         )
         val to = list.takeIf { it != task.listHref }
         model.together(tr("“{title}” saved").replace("{title}", summary.trim())) {
@@ -173,7 +201,9 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null, draft: 
     sheet?.let { LaunchedEffect(changed) { it.locked = changed } }
 
     Scaffold(
-        floatingActionButton = { EditorButtons(summary.isNotBlank(), close, ::save) },
+        // A lambda, not `::save`: references to a local function are all equal, so Compose kept
+        // the first one, with what the page had then (`newRepeat`), and saved nothing changed since.
+        floatingActionButton = { EditorButtons(summary.isNotBlank(), close) { save() } },
         containerColor = if (sheet != null) Color.Transparent else MaterialTheme.colorScheme.background,
         contentWindowInsets = if (sheet != null) WindowInsets.navigationBars else ScaffoldDefaults.contentWindowInsets,
     ) { padding ->
@@ -274,6 +304,10 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null, draft: 
                 }
                 if (due != null) {
                     Reminders(model, reminders, dueAllDay, fromStart = false)
+                }
+                // From its start, else its due date: only with one.
+                if (start != null || due != null) {
+                    RepeatItems(repeat, custom, every, until, { repeat = it }, { every = it }, { until = it }, fromDone, { fromDone = it })
                 }
                 if (draft == null) {
                     Subtasks(model, task, sheet)

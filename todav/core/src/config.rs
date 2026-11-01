@@ -394,6 +394,8 @@ mod tests {
             sync_error: None,
             pinned: false,
             start_reminders: Vec::new(),
+            rule: None,
+            repeat_from_done: false,
         }
     }
 

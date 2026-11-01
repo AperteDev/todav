@@ -87,6 +87,8 @@ pub struct TodavTask {
     pub sync_error: Option<String>,
     pub pinned: bool,
     pub start_reminders: Vec<i64>,
+    pub rule: Option<String>,
+    pub repeat_from_done: bool,
 }
 
 #[uniffi::remote(Record)]
@@ -398,6 +400,11 @@ pub struct TaskPatch {
     pub priority: Option<PriorityValue>,
     #[uniffi(default = None)]
     pub pinned: Option<bool>,
+    /// How it repeats, from its start or else its due date.
+    #[uniffi(default = None)]
+    pub repeat: Option<RepeatValue>,
+    #[uniffi(default = None)]
+    pub repeat_from_done: Option<bool>,
 }
 
 impl From<TaskPatch> for todav_core::TaskPatch {
@@ -413,6 +420,8 @@ impl From<TaskPatch> for todav_core::TaskPatch {
             event: p.event.map(|v| v.text),
             priority: p.priority.map(|v| v.priority),
             pinned: p.pinned,
+            repeat: p.repeat.map(|v| v.repeat),
+            repeat_from_done: p.repeat_from_done,
         }
     }
 }
@@ -430,6 +439,8 @@ impl From<todav_core::TaskPatch> for TaskPatch {
             event: p.event.map(|text| TextValue { text }),
             priority: p.priority.map(|priority| PriorityValue { priority }),
             pinned: p.pinned,
+            repeat: p.repeat.map(|repeat| RepeatValue { repeat }),
+            repeat_from_done: p.repeat_from_done,
         }
     }
 }
@@ -622,6 +633,8 @@ impl From<cal::Entry> for AgendaEntry {
 
 /// What a drop does: a task's new dates, or an event's new time (for a repeating event, ask
 /// which occurrences it applies to).
+// One at a time, made by a drop; UniFFI takes no Box.
+#[allow(clippy::large_enum_variant)]
 #[derive(uniffi::Enum)]
 pub enum Change {
     Task { patch: TaskPatch },

@@ -219,6 +219,8 @@ pub fn search(c: &Client, now: i64, hit: impl Fn(&Event) -> bool) -> Vec<Event> 
 
 /// What a drop does to an item: a task's new dates, or an event's new time (for a repeating
 /// one, the front-end asks which occurrences it applies to).
+// One at a time, made by a drop: not worth a Box, which `todav-ffi` would have to unwrap.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum Change {
     Task(TaskPatch),

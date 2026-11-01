@@ -6,14 +6,12 @@ Planned work, not yet done. [FEATURES.md](FEATURES.md) lists it publicly; the or
 
 - **Plan view**, a third view next to Tasks and Calendar for planning the day and the week (see
   [Plan view](#plan-view)). Tasks and Calendar stay as they are.
-- **Repeating tasks**: an RRULE on a VTODO, set in the task dialog as events are (daily, weekly
-  on some weekdays, monthly including its last day, yearly, every n of them; ending never, on a
-  date or after n times), from the due date or from when it was done. Ticking one moves its due
-  and start dates to the next occurrence, as other CalDAV clients do, and reopens its subtasks;
-  its reminders follow, being relative. Now a repeating task made elsewhere is ticked done as a
-  whole series, its RRULE kept but not acted on. Open: whether a done occurrence leaves a done
-  copy behind (for history and the Plan view's progress); how "from when it was done" is stored
-  (no standard property).
+- **More of repeating tasks and events**: weekdays for a weekly repeat, the nth weekday or the
+  last day for a monthly one, ending after n times (a `COUNT` is followed and kept now, not
+  set), in the task and event dialogs alike (`calendar::dialog::repeat_rows`, `RepeatItems`);
+  a repeating task's coming occurrences in the calendar and Upcoming (only its next one shows
+  now). Open: whether a done occurrence leaves a done copy behind, under a UID of its own, for
+  history and the Plan view's progress (now the task only moves on).
 - **Quick add in plain words**: the date, time, repeat, list, category and priority read from
   the title as it is typed ("tomorrow 17:00", "every monday", `#category`, `!` for priority),
   shown as chips before adding and removable. In `todav-app`, so Linux, Android and the

@@ -19,6 +19,7 @@ import androidx.compose.material.icons.outlined.EventRepeat
 import androidx.compose.material.icons.outlined.Pin
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Repeat
+import androidx.compose.material.icons.outlined.Update
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Title
 import androidx.compose.material3.AlertDialog
@@ -65,7 +66,7 @@ import dev.aperte.todav.ntr
 import dev.aperte.todav.ptr
 import dev.aperte.todav.tr
 
-private val FREQS = listOf(Freq.DAILY, Freq.WEEKLY, Freq.MONTHLY, Freq.YEARLY)
+internal val FREQS = listOf(Freq.DAILY, Freq.WEEKLY, Freq.MONTHLY, Freq.YEARLY)
 
 /** The unit of "Every n …" for `freq`, in `n`'s form, as the Linux dialog's. */
 private fun unit(freq: Freq, n: Long) = when (freq) {
@@ -282,27 +283,7 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
                         clearable = false,
                     )
                 }
-                Section(null) {
-                    ChoiceItem(
-                        tr("Repeat"),
-                        listOf(tr("Does Not Repeat"), tr("Daily"), tr("Weekly"), tr("Monthly"), tr("Yearly")) +
-                            if (custom) listOf(ptr("repeat", "Custom")) else emptyList(),
-                        repeat,
-                        icon = Icons.Outlined.Repeat,
-                    ) { repeat = it }
-                    if (repeat in 1..4) {
-                        FieldItem(
-                            "$every",
-                            { v -> v.toLongOrNull()?.takeIf { it in 1..999 }?.let { every = it } },
-                            tr("Every"),
-                            icon = Icons.Outlined.Pin,
-                            trailing = { Text(unit(FREQS[repeat - 1], every), Modifier.padding(end = 16.dp)) },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        )
-                        DateTimeField(tr("Until"), until, true, Icons.Outlined.EventRepeat, { t, _ -> until = t?.let { it - Math.floorMod(it, DAY) } }, dateOnly = true)
-                    }
-                }
+                RepeatItems(repeat, custom, every, until, { repeat = it }, { every = it }, { until = it })
                 Section(null) {
                     FieldItem(
                         notes,
@@ -349,5 +330,54 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
             },
             dismissButton = { TextButton(onClick = { discard = false }) { Text(tr("Keep Editing")) } },
         )
+    }
+}
+
+/**
+ * How an event or a task repeats (`repeat`: 0 none, 1–4 daily … yearly, 5 the kept custom
+ * rule), every n of them until a day, as the Linux dialogs' rows; for a task (`fromDone` not
+ * null), whether it repeats from when it is done.
+ */
+@Composable
+internal fun RepeatItems(
+    repeat: Int,
+    custom: Boolean,
+    every: Long,
+    until: Long?,
+    onRepeat: (Int) -> Unit,
+    onEvery: (Long) -> Unit,
+    onUntil: (Long?) -> Unit,
+    fromDone: Boolean? = null,
+    onFromDone: (Boolean) -> Unit = {},
+) {
+    Section(null) {
+        ChoiceItem(
+            tr("Repeat"),
+            listOf(tr("Does Not Repeat"), tr("Daily"), tr("Weekly"), tr("Monthly"), tr("Yearly")) +
+                if (custom) listOf(ptr("repeat", "Custom")) else emptyList(),
+            repeat,
+            icon = Icons.Outlined.Repeat,
+        ) { onRepeat(it) }
+        if (repeat in 1..4) {
+            FieldItem(
+                "$every",
+                { v -> v.toLongOrNull()?.takeIf { it in 1..999 }?.let(onEvery) },
+                tr("Every"),
+                icon = Icons.Outlined.Pin,
+                trailing = { Text(unit(FREQS[repeat - 1], every), Modifier.padding(end = 16.dp)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            )
+            DateTimeField(tr("Until"), until, true, Icons.Outlined.EventRepeat, { t, _ -> onUntil(t?.let { it - Math.floorMod(it, DAY) }) }, dateOnly = true)
+        }
+        if (fromDone != null && repeat != 0) {
+            Item(
+                headlineContent = { Text(tr("Repeat From Completion")) },
+                supportingContent = { Text(tr("The next date counts from the day it is done")) },
+                leadingContent = { Icon(Icons.Outlined.Update, null) },
+                trailingContent = { Switch(fromDone, onFromDone) },
+                modifier = Modifier.clickable { onFromDone(!fromDone) },
+            )
+        }
     }
 }

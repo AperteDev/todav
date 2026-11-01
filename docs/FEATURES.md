@@ -17,6 +17,8 @@ What Todav can do, in short. The details of each release are in the
 - Pinned tasks stay at the top of their list.
 - Move a task with its subtasks to another list, by drag and drop or from the task dialog.
 - Due dates and start dates, with or without a time.
+- Repeating tasks: daily, weekly, monthly or yearly, every n, until a day, from their dates or
+  from when they are done; ticked, one moves on to its next date.
 - Several reminders per task, before or after its due date or its start, as notifications with
   "Mark as Done"; one already past when set goes off at once.
 - Urgent reminders for important tasks and events (high priority), for all with a setting:
@@ -95,7 +97,6 @@ What Todav can do, in short. The details of each release are in the
 
 - A Plan view next to Tasks and Calendar: Today, the Week ahead, a Review of overdue and undated
   tasks, a board, estimates, dependencies, a focus timer, progress, and Notav's notes.
-- Repeating tasks.
 - Quick add in plain words ("tomorrow 17:00 #work"), and from anywhere with a system-wide
   shortcut.
 - Task status (in progress, cancelled) and percent complete.

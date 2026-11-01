@@ -491,8 +491,10 @@ class Main(app: Application) : AndroidViewModel(app) {
      */
     fun setDone(task: TodavTask, done: Boolean) = act {
         val mode = core.subtaskCompletion()
-        // The subtasks left behind otherwise: open ones when completing, completed ones when reopening.
-        val n = core.subtasks(task.uid, !done).size
+        // The subtasks left behind otherwise: open ones when completing, completed ones when
+        // reopening. A repeating task moves on instead, its subtasks open again, unless its rule
+        // has ended.
+        val n = if (done && core.movesOn(task.uid)) 0 else core.subtasks(task.uid, !done).size
         if (n > 0 && (!done || mode == SubtaskCompletion.ASK)) {
             ticking.value = Ticking(task, done, n)
         } else {
@@ -512,7 +514,12 @@ class Main(app: Application) : AndroidViewModel(app) {
         val parents = !done && core.subtaskCompletion() == SubtaskCompletion.COMPLETE
         core.setDoneTree(task.uid, done, subtasks, parents)
         synced()
-        if (done) messages.tryEmit(tr("“{title}” completed").replace("{title}", task.summary) to core.lastChange())
+        if (done) {
+            // A repeating task stays open, at its next date.
+            val moved = core.task(task.uid)?.done == false
+            val text = if (moved) tr("“{title}” moved to its next date") else tr("“{title}” completed")
+            messages.tryEmit(text.replace("{title}", task.summary) to core.lastChange())
+        }
     }
 
     fun delete(task: TodavTask) = act {

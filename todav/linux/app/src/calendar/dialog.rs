@@ -25,6 +25,77 @@ fn plain(rule: &str) -> Option<(usize, i64, Option<i64>)> {
     Some((freq, r.interval, r.until))
 }
 
+/// The rows saying how an event or a task repeats (`repeat`, `interval`, `until`, `until_cal` in
+/// `b`), showing `rule`: a plain rule, or "Custom" for one they cannot show, kept unless another
+/// is picked. Until starts a month after `from` when not set. Gives the plain repeat picked
+/// (None: none, or "Custom") and whether it changes `rule`.
+pub(crate) fn repeat_rows(
+    b: &gtk::Builder,
+    rule: Option<&str>,
+    from: i64,
+) -> impl Fn() -> (Option<Repeat>, bool) + 'static {
+    let repeat: adw::ComboRow = get(b, "repeat");
+    let repeats: gtk::StringList = get(b, "repeats");
+    let interval: adw::SpinRow = get(b, "interval");
+    let until: adw::ExpanderRow = get(b, "until");
+    let until_cal: gtk::Calendar = get(b, "until_cal");
+    let rule = rule.map(String::from);
+    let shown = rule.as_deref().map(plain);
+    if matches!(shown, Some(None)) {
+        repeats.append(&pgettext("repeat", "Custom"));
+    }
+    let (freq, every, until_at) = match shown {
+        Some(Some(p)) => p,
+        Some(None) => (5, 1, None),
+        None => (0, 1, None),
+    };
+    repeat.set_selected(freq as u32);
+    interval.set_value(every as f64);
+    until.set_enable_expansion(until_at.is_some());
+    until_cal.select_day(&dates::fields(until_at.unwrap_or(from + 30 * DAY)));
+    let show = {
+        let (interval, until, repeat) = (interval.clone(), until.clone(), repeat.clone());
+        move || {
+            let i = repeat.selected();
+            let plain = (1..=4).contains(&i);
+            interval.set_visible(plain);
+            until.set_visible(plain);
+            if plain {
+                interval.set_subtitle(&unit(i, interval.value() as u64));
+            }
+        }
+    };
+    show();
+    let s = show.clone();
+    repeat.connect_selected_notify(move |_| s());
+    interval.connect_value_notify(move |_| show());
+    move || {
+        let picked = repeat.selected() as usize;
+        let new = (1..=4).contains(&picked).then(|| Repeat {
+            freq: FREQS[picked - 1],
+            interval: interval.value() as i64,
+            until: until
+                .enables_expansion()
+                .then(|| dates::midnight(&until_cal.date())),
+        });
+        let changed = match (&rule, picked) {
+            (Some(_), 5) => false, // "Custom" kept
+            (Some(r), _) => {
+                plain(r)
+                    != new.as_ref().map(|n| {
+                        (
+                            FREQS.iter().position(|f| *f == n.freq).unwrap() + 1,
+                            n.interval,
+                            n.until,
+                        )
+                    })
+            }
+            (None, p) => p != 0,
+        };
+        (new, changed)
+    }
+}
+
 /// Ask which occurrences of a repeating event a change (or delete) is for.
 pub(super) fn ask_scope(
     parent: &impl IsA<gtk::Widget>,
@@ -79,10 +150,6 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
     ];
     let (start_time, end_time): (adw::ActionRow, adw::ActionRow) =
         (get(&b, "start_time"), get(&b, "end_time"));
-    let repeat: adw::ComboRow = get(&b, "repeat");
-    let repeats: gtk::StringList = get(&b, "repeats");
-    let interval: adw::SpinRow = get(&b, "interval");
-    let until: adw::ExpanderRow = get(&b, "until");
     let until_cal: gtk::Calendar = get(&b, "until_cal");
     let description: gtk::TextView = get(&b, "description");
     dialog.set_title(&if e.is_some() {
@@ -165,39 +232,8 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
     };
     show_times(time.all_day);
 
-    // Repeat: a plain rule, or "Custom" for one this dialog cannot show.
-    let rule = e.as_ref().and_then(|e| e.rule.clone());
-    let shown = rule.as_deref().map(plain);
-    let custom = matches!(shown, Some(None));
-    if custom {
-        repeats.append(&pgettext("repeat", "Custom"));
-    }
-    let (freq, every, until_at) = match shown {
-        Some(Some(p)) => p,
-        Some(None) => (5, 1, None),
-        None => (0, 1, None),
-    };
-    repeat.set_selected(freq as u32);
-    interval.set_value(every as f64);
-    until.set_enable_expansion(until_at.is_some());
-    until_cal.select_day(&dates::fields(until_at.unwrap_or(time.start + 30 * DAY)));
-    let show_repeat = {
-        let (interval, until, repeat) = (interval.clone(), until.clone(), repeat.clone());
-        move || {
-            let i = repeat.selected();
-            let plain = (1..=4).contains(&i);
-            interval.set_visible(plain);
-            until.set_visible(plain);
-            if plain {
-                interval.set_subtitle(&unit(i, interval.value() as u64));
-            }
-        }
-    };
-    show_repeat();
     // An occurrence of a series changes how the series repeats only as a whole.
-    let s = show_repeat.clone();
-    repeat.connect_selected_notify(move |_| s());
-    interval.connect_value_notify(move |_| show_repeat());
+    let repeat = repeat_rows(&b, e.as_ref().and_then(|e| e.rule.as_deref()), time.start);
 
     // Reminders count from the start.
     let offsets: Vec<i64> = e
@@ -378,14 +414,7 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
         let new_time = read();
         let text = |w: &adw::EntryRow| w.text().trim().to_string();
         let notes = description.buffer().property::<String>("text");
-        let picked = repeat.selected() as usize;
-        let new_repeat = (1..=4).contains(&picked).then(|| Repeat {
-            freq: FREQS[picked - 1],
-            interval: interval.value() as i64,
-            until: until
-                .enables_expansion()
-                .then(|| dates::midnight(&until_cal.date())),
-        });
+        let (new_repeat, repeat_changed) = repeat();
         let offsets = reminders.offsets();
         let new_priority = (priority.selected() != old_priority)
             .then(|| crate::window::priority_value(priority.selected()));
@@ -427,20 +456,6 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
             start: ev.start,
             end: ev.end,
             all_day: ev.all_day,
-        };
-        let repeat_changed = match (&rule, picked) {
-            (Some(_), 5) => false, // "Custom" kept
-            (Some(r), _) => {
-                plain(r)
-                    != new_repeat.as_ref().map(|n| {
-                        (
-                            FREQS.iter().position(|f| *f == n.freq).unwrap() + 1,
-                            n.interval,
-                            n.until,
-                        )
-                    })
-            }
-            (None, p) => p != 0,
         };
         let patch = EventPatch {
             summary: changed(text(&summary), Some(&ev.summary)).filter(|s| !s.is_empty()),

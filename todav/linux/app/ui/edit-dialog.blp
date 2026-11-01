@@ -282,6 +282,46 @@ Adw.Dialog dialog {
             }
           }
 
+          // How it repeats, as in the event dialog: from its start, or else its due date;
+          // shown with a date (in code: not for Google Tasks).
+          Adw.PreferencesGroup repeat_group {
+            Adw.ComboRow repeat {
+              title: _("Repeat");
+              model: Gtk.StringList repeats { strings [_("Does Not Repeat"), _("Daily"), _("Weekly"), _("Monthly"), _("Yearly")] };
+            }
+
+            Adw.SpinRow interval {
+              title: _("Every");
+              adjustment: Gtk.Adjustment {
+                lower: 1;
+                upper: 99;
+                step-increment: 1;
+              };
+            }
+
+            Adw.ExpanderRow until {
+              title: _("Until");
+              show-enable-switch: true;
+              enable-expansion: false;
+
+              Gtk.ListBoxRow {
+                activatable: false;
+
+                Gtk.Calendar until_cal {
+                  margin-top: 6;
+                  margin-bottom: 6;
+                  margin-start: 6;
+                  margin-end: 6;
+                }
+              }
+            }
+
+            Adw.SwitchRow from_done {
+              title: _("Repeat From Completion");
+              subtitle: _("The next date counts from the day it is done");
+            }
+          }
+
           // As in the event dialog; a toast offers to undo it.
           Gtk.ListBox {
             selection-mode: none;

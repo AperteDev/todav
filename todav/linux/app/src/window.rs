@@ -2607,8 +2607,9 @@ pub fn tick(check: &gtk::CheckButton, uid: &str, after: impl Fn() + 'static) {
         }
     };
     // The subtasks left behind otherwise: open ones when completing, completed ones when reopening.
+    // A repeating task moves on instead, its subtasks open again (`tasks::set_done`).
     let n = tasks::subtasks(core(), uid, !done).len();
-    if n == 0 {
+    if n == 0 || (done && core().moves_on(uid.into())) {
         return finish(false);
     }
     if done && mode != Ask {
@@ -2984,8 +2985,31 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
     for name in ["start", "due"] {
         on_date_change(&b, name, check.clone());
     }
-    // Google Tasks keeps a due date without a time, and no category, priority, start or
-    // reminders.
+    // How it repeats, shown with a date (counted from the start, else the due date).
+    let from = t.start.or(t.due).unwrap_or_else(|| core().local_now());
+    let repeat = crate::calendar::dialog::repeat_rows(&b, t.rule.as_deref(), from);
+    let from_done: adw::SwitchRow = get(&b, "from_done");
+    from_done.set_active(t.repeat_from_done);
+    let repeat_row: adw::ComboRow = get(&b, "repeat");
+    repeat_row
+        .bind_property("selected", &from_done, "visible")
+        .transform_to(|_, i: u32| Some(i != 0))
+        .sync_create()
+        .build();
+    let repeat_group: gtk::Widget = get(&b, "repeat_group");
+    let google = todav_core::gtasks::is_list(&t.list_href);
+    let show_repeat = {
+        let rows: [adw::ExpanderRow; 2] = [get(&b, "start"), get(&b, "due")];
+        let group = repeat_group.clone();
+        move || group.set_visible(!google && rows.iter().any(|r| r.enables_expansion()))
+    };
+    show_repeat();
+    for name in ["start", "due"] {
+        let s = show_repeat.clone();
+        get::<adw::ExpanderRow>(&b, name).connect_enable_expansion_notify(move |_| s());
+    }
+    // Google Tasks keeps a due date without a time, and no category, priority, start,
+    // reminders or repeat.
     if todav_core::gtasks::is_list(&t.list_href) {
         for id in ["category", "priority", "start", "due_time_row"] {
             get::<gtk::Widget>(&b, id).set_visible(false);
@@ -3054,6 +3078,12 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
             priority: (priority.selected() != old_priority)
                 .then(|| priority_value(priority.selected())),
             event: unlinked.get().then_some(None),
+            repeat: match repeat() {
+                (new, true) => Some(new),
+                _ => None,
+            },
+            repeat_from_done: (from_done.is_active() != task.repeat_from_done)
+                .then(|| from_done.is_active()),
             ..Default::default()
         };
         let uid = task.uid.clone();
@@ -3307,6 +3337,8 @@ pub(crate) mod tests {
             sync_error: None,
             pinned: false,
             start_reminders: Vec::new(),
+            rule: None,
+            repeat_from_done: false,
         }
     }
 }

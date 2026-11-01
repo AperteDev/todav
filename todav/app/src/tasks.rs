@@ -309,7 +309,8 @@ pub fn set_done(c: &Client, uid: &str, done: bool, subtasks: bool, parents: bool
         return Ok(());
     };
     let mut also: Vec<String> = Vec::new();
-    if subtasks {
+    // A repeating task that moves on takes its subtasks along, open (below).
+    if subtasks && !(done && c.moves_on(uid.into())) {
         also.extend(self::subtasks(c, uid, !done).into_iter().map(|t| t.uid));
     }
     if parents && !done {
@@ -331,6 +332,13 @@ pub fn set_done(c: &Client, uid: &str, done: bool, subtasks: bool, parents: bool
     c.together(|| {
         if t.done != done {
             c.set_done(t.uid.clone(), done)?;
+        }
+        // A repeating task moved on and stays open: its next time starts with its subtasks open.
+        if done && c.task(uid.into()).is_some_and(|n| !n.done) {
+            for s in self::subtasks(c, uid, true) {
+                c.set_done(s.uid, false)?;
+            }
+            return Ok(());
         }
         for u in also {
             c.set_done(u, done)?;
@@ -375,6 +383,8 @@ pub(crate) mod tests {
             sync_error: None,
             pinned: false,
             start_reminders: Vec::new(),
+            rule: None,
+            repeat_from_done: false,
         }
     }
 
@@ -565,6 +575,75 @@ pub(crate) mod tests {
             set_done_unasked(&c, &a1, false).unwrap();
             assert!(done(&a) && !done(&a1), "{mode}: its parent stays done");
         }
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_repeating_task_done_moves_on_with_its_subtasks_open() {
+        use todav_core::rrule::Freq;
+        use todav_core::{AccountKind, Due, Repeat, TaskPatch};
+        let dir = std::env::temp_dir().join(format!("todav-app-repeat-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let account = c
+            .add_account(
+                AccountKind::Local,
+                String::new(),
+                String::new(),
+                String::new(),
+            )
+            .unwrap();
+        let list = c
+            .create_list(account, "Tasks".into(), "#0082C9".into(), false)
+            .unwrap();
+        let add = |name: &str, parent: Option<&str>| {
+            let t = c.add_task(
+                list.clone(),
+                name.into(),
+                None,
+                parent.map(Into::into),
+                false,
+            );
+            t.unwrap().uid
+        };
+        let a = add("a", None);
+        let (a1, a2) = (add("a1", Some(&a)), add("a2", Some(&a)));
+        let today = crate::dates::midnight(c.local_now());
+        let patch = TaskPatch {
+            due: Some(Some(Due {
+                at: today,
+                all_day: true,
+            })),
+            repeat: Some(Some(Repeat {
+                freq: Freq::Daily,
+                interval: 1,
+                until: None,
+            })),
+            ..Default::default()
+        };
+        c.update_task(a.clone(), patch).unwrap();
+        c.set_done(a1.clone(), true).unwrap();
+        let task = |uid: &str| c.task(uid.into()).unwrap();
+        // Asked to complete its subtasks too: they start open again with it instead.
+        set_done(&c, &a, true, true, false).unwrap();
+        assert!(!task(&a).done && !task(&a1).done && !task(&a2).done);
+        assert_eq!(task(&a).due, Some(today + 86400));
+        c.undo(None).unwrap();
+        assert_eq!(task(&a).due, Some(today), "one undo");
+        assert!(task(&a1).done);
+        // Its rule ended: completed, its subtasks as any task's.
+        let patch = TaskPatch {
+            repeat: Some(Some(Repeat {
+                freq: Freq::Daily,
+                interval: 1,
+                until: Some(today),
+            })),
+            ..Default::default()
+        };
+        c.update_task(a.clone(), patch).unwrap();
+        assert!(!c.moves_on(a.clone()));
+        set_done(&c, &a, true, true, false).unwrap();
+        assert!(task(&a).done && task(&a1).done && task(&a2).done);
         let _ = std::fs::remove_dir_all(dir);
     }
 }

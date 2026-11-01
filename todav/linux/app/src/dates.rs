@@ -78,7 +78,8 @@ pub fn section(t: &Task, now: i64) -> String {
     }
 }
 
-/// Due date pill for a task row: red when overdue, with a bell when a reminder is set.
+/// Due date pill for a task row: red when overdue, with a bell when a reminder is set and arrows
+/// when it repeats.
 pub fn tag(t: &Task, now: i64) -> Option<gtk::Box> {
     let at = t.due?;
     let b = gtk::Box::builder()
@@ -88,6 +89,11 @@ pub fn tag(t: &Task, now: i64) -> Option<gtk::Box> {
     b.add_css_class("tag");
     if !t.reminders.is_empty() {
         b.append(&gtk::Image::from_icon_name("alarm-symbolic"));
+    }
+    if t.rule.is_some() {
+        b.append(&gtk::Image::from_icon_name(
+            "media-playlist-repeat-symbolic",
+        ));
     }
     b.append(&gtk::Label::new(Some(&label(at, t.due_all_day, now))));
     if overdue(t, now) {

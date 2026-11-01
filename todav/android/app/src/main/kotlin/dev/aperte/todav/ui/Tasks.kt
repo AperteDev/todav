@@ -36,6 +36,7 @@ import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DatePicker
@@ -780,6 +781,9 @@ private fun Meta(model: Main, task: TodavTask, row: TaskRow, now: Long) {
             if (task.reminders.isNotEmpty()) {
                 Icon(Icons.Outlined.Notifications, tr("Reminder"), Modifier.size(14.dp), tint = color)
             }
+            if (task.rule != null) {
+                Icon(Icons.Outlined.Repeat, tr("Repeats"), Modifier.size(14.dp), tint = color)
+            }
         }
         event?.let {
             Icon(Icons.Outlined.Event, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.tertiary)
@@ -965,7 +969,8 @@ fun AddSheet(model: Main, list: String, parent: TodavTask?, category: String?, i
                     done = false, completedAt = null, category = cat, parentUid = parent?.uid, priority = priority,
                     due = due, dueAllDay = true, reminders = due?.let { listOf(it + model.core.defaultReminder(true)) } ?: emptyList(),
                     sortOrder = null, created = null, lastModified = null, start = null, startAllDay = false,
-                    eventUid = null, syncError = null, pinned = false, startReminders = emptyList(),
+                    eventUid = null, syncError = null, pinned = false, startReminders = emptyList(), rule = null,
+                    repeatFromDone = false,
                 )
             }
             TaskPage(model, "", sheet, draft)
