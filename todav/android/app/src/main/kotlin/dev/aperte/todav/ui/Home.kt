@@ -146,7 +146,8 @@ fun Home(model: Main) {
         }
         BackHandler(enabled = !wide && page) { page = false }
         Scaffold(
-            snackbarHost = { SnackbarHost(snackbar) },
+            // Wide, in the view (below), not across the rail and the sidebar.
+            snackbarHost = { if (!wide) SnackbarHost(snackbar) },
             bottomBar = { if (!wide) Switcher(view, page, menu, show, add.takeIf { canAdd }) },
             floatingActionButton = {
                 // Neither over the calendar's "To Plan" sheet, which is under this layer.
@@ -208,6 +209,14 @@ fun Home(model: Main) {
                     }
                     Box(Modifier.weight(1f).fillMaxHeight()) {
                         Panes(model, screen, view, Modifier.fillMaxSize())
+                        // At the view's bottom start, beside the floating buttons (56 dp and their
+                        // margins).
+                        if (wide) {
+                            SnackbarHost(
+                                snackbar,
+                                Modifier.align(Alignment.BottomStart).navigationBarsPadding().padding(end = 88.dp),
+                            )
+                        }
                         if (!wide) {
                             androidx.compose.animation.AnimatedVisibility(
                                 sidebar,
