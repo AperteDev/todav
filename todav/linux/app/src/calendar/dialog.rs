@@ -260,7 +260,7 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
         r.set_all_day(a.is_active());
     });
 
-    // Moving the start keeps the length.
+    // The time set; an end not after the start is a day after it (all day) or the default length.
     let read = {
         let (all_day, start_cal, end_cal, spins) = (
             all_day.clone(),
@@ -293,13 +293,13 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
             }
         }
     };
-    let len = Rc::new(Cell::new(time.end - time.start));
-    let keep_length = {
-        let (read, end_cal, spins, len, busy) = (
+    // Moving the start leaves the end where it is, as GNOME Calendar does; only a start past it
+    // takes it along (as `read` puts it), shown in its rows.
+    let push_end = {
+        let (read, end_cal, spins, busy) = (
             read.clone(),
             end_cal.clone(),
             spins.clone(),
-            len.clone(),
             Rc::new(Cell::new(false)),
         );
         move || {
@@ -307,38 +307,20 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
                 return;
             }
             let t = read();
-            let end = t.start + len.get();
-            end_cal.select_day(&dates::fields(if t.all_day { end - DAY } else { end }));
-            spins[2].set_value((end.rem_euclid(DAY) / 3600) as f64);
-            spins[3].set_value((end.rem_euclid(3600) / 60) as f64);
+            end_cal.select_day(&dates::fields(if t.all_day { t.end - DAY } else { t.end }));
+            if !t.all_day {
+                spins[2].set_value((t.end.rem_euclid(DAY) / 3600) as f64);
+                spins[3].set_value((t.end.rem_euclid(3600) / 60) as f64);
+            }
             busy.set(false);
         }
     };
-    let k = keep_length.clone();
-    start_cal.connect_day_selected(move |_| k());
+    let p = push_end.clone();
+    start_cal.connect_day_selected(move |_| p());
     for s in &spins[..2] {
-        let k = keep_length.clone();
-        s.connect_value_changed(move |_| k());
+        let p = push_end.clone();
+        s.connect_value_changed(move |_| p());
     }
-    // Changing the end changes the length kept.
-    for s in &spins[2..] {
-        let (read, len) = (read.clone(), len.clone());
-        s.connect_value_changed(move |_| {
-            let t = read();
-            len.set(t.end - t.start);
-        });
-    }
-    let (read2, len2) = (read.clone(), len.clone());
-    end_cal.connect_day_selected(move |_| {
-        let t = read2();
-        len2.set(t.end - t.start);
-    });
-    // So does turning "All day" off or on: its days or times are what is kept then.
-    let (read2, len2) = (read.clone(), len.clone());
-    all_day.connect_active_notify(move |_| {
-        let t = read2();
-        len2.set(t.end - t.start);
-    });
 
     // The rows say when it starts and ends, as the task dialog's dates; connected last, so they
     // show the end moved with the start.

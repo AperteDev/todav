@@ -298,9 +298,10 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
                     )
                     DateTimeField(tr("Starts"), start, allDay, Icons.Outlined.Event, { t, _ ->
                         if (t != null) {
-                            // The end moves along, keeping the length.
-                            end += t - start
+                            // The end stays where it is, as in GNOME Calendar; only a start past it
+                            // takes it along: to the day's end (all day) or the default length.
                             start = t
+                            if (end <= t) end = t + if (allDay) DAY else duration
                         }
                     }, clearable = false)
                     DateTimeField(

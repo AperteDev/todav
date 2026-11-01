@@ -43,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - In the month view, what does not fit on a day is counted by its number ("+2", which lists it
   on Linux) instead of taking the day's last row, so an event lasting several days shows from
   its first day as a whole bar even where a day is full.
+- Moving an event's start in its dialog (Linux) or page (Android) leaves its end where it is,
+  as GNOME Calendar does; only a start past the end takes it along. Before, the end moved with
+  the start, keeping the event's length.
 - Android: On This Device Only comes last among the accounts to add, after System Calendars.
 - An older Todav no longer opens data a newer one left (after a downgrade, say); it says to
   update instead of reading and writing a database it does not know.
