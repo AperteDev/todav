@@ -1,6 +1,6 @@
 //! A week as one row: the day cells, with the items on top. An item keeps its lane (row) for the
 //! whole week, so one lasting several days is a single bar across them, broken only at the
-//! week's ends or where a day has no room left.
+//! week's ends; what has no lane left is counted by the day's number.
 
 use super::*;
 
@@ -25,12 +25,7 @@ pub(super) fn row(
         .map(|i| (0..n).filter(|&d| on_day(i, week[d])).collect())
         .collect();
     let (pieces, more) = calendar::lanes(&days, max);
-    let lanes = pieces
-        .iter()
-        .map(|p| p.lane + 1)
-        .chain(more.iter().filter(|m| !m.is_empty()).map(|_| max))
-        .max()
-        .unwrap_or(0);
+    let lanes = pieces.iter().map(|p| p.lane + 1).max().unwrap_or(0);
 
     // Each cell ends with room for the lanes; the first one's tells where they start.
     let base = gtk::Box::builder().homogeneous(true).build();
@@ -47,8 +42,9 @@ pub(super) fn row(
     let top = top.unwrap();
     let overlay = gtk::Overlay::builder().child(&base).build();
 
-    // (widget, lane, first and last column, whether it goes on left and right)
-    let mut placed: Vec<(gtk::Widget, usize, usize, usize, bool, bool)> = Vec::new();
+    // (widget, lane, first and last column, whether it goes on left and right); lane None: by
+    // the day's number, at the top of its cell.
+    let mut placed: Vec<(gtk::Widget, Option<usize>, usize, usize, bool, bool)> = Vec::new();
     for p in &pieces {
         let i = items[p.item];
         // On the day before or after, shown or not.
@@ -61,17 +57,30 @@ pub(super) fn row(
             w.add_css_class("goes-on");
         }
         overlay.add_overlay(&w);
-        placed.push((w, p.lane, p.from, p.to, left, right));
+        placed.push((w, Some(p.lane), p.from, p.to, left, right));
     }
+    // What has no lane left: counted by the day's number (which is on the right), so no bar is
+    // cut short where a day is full.
     for (d, hidden) in more.iter().enumerate().filter(|(_, m)| !m.is_empty()) {
         let rest = hidden.iter().map(|&n| items[n].clone()).collect();
         let w = more_button(c, week[d], rest).upcast::<gtk::Widget>();
         overlay.add_overlay(&w);
-        placed.push((w, max - 1, d, d, false, false));
+        placed.push((w, None, d, d, false, false));
     }
     overlay.connect_get_child_position(move |o, w| {
-        let &(_, lane, from, to, left, right) = placed.iter().find(|p| &p.0 == w)?;
+        let &(ref w, lane, from, to, left, right) = placed.iter().find(|p| &p.0 == w)?;
         let col = o.width() as f64 / n as f64;
+        let Some(lane) = lane else {
+            // At most half the cell, to leave the number room.
+            let x = (from as f64 * col) as i32 + 3;
+            let width = w.measure(gtk::Orientation::Horizontal, -1).1;
+            return Some(gdk::Rectangle::new(
+                x,
+                4,
+                width.min((col / 2.0) as i32),
+                LANE - 2,
+            ));
+        };
         let y = top.compute_bounds(o)?.y() as i32 + lane as i32 * LANE;
         // Ends that go on reach the cell's edge, to meet the next piece.
         let x0 = (from as f64 * col) as i32 + if left { 0 } else { 3 };

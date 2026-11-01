@@ -1198,19 +1198,20 @@ fn new_event_on(
     w.add_controller(hold);
 }
 
-/// "+N more": a popover with the rest of the day.
+/// "+N" by a day's number: a popover with the rest of the day.
 fn more_button(c: &Rc<Cal>, day: i64, rest: Vec<Item>) -> gtk::MenuButton {
+    // Only the count, by the day's number; said whole in its tooltip.
     let label = gtk::Label::builder()
-        .label(
-            ngettext("+{n} more", "+{n} more", rest.len() as u64)
-                .replace("{n}", &rest.len().to_string()),
-        )
+        .label(format!("+{}", rest.len()))
         .xalign(0.0)
-        .ellipsize(gtk::pango::EllipsizeMode::End)
         .build();
     let b = gtk::MenuButton::builder()
         .child(&label)
         .has_frame(false)
+        .tooltip_text(
+            ngettext("+{n} more", "+{n} more", rest.len() as u64)
+                .replace("{n}", &rest.len().to_string()),
+        )
         .build();
     b.add_css_class("more");
     let weak = Rc::downgrade(c);

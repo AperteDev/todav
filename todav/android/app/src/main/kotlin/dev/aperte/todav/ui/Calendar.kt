@@ -694,8 +694,8 @@ private fun laneHeight() = with(LocalDensity.current) { 13.sp.toDp() } + 1.dp
  * A week of the month grid (or the Day view's strip): its days' cells (`cell`, given the day of
  * the week and what is on it at a height), and on top what is on them, each item in its lane for
  * the whole week (`lanes` in the core, as in the Linux app), so one lasting several days is a
- * single bar across them, broken only at the week's ends or where a day has no room left; there
- * a day's last lane says "+n".
+ * single bar across them, broken only at the week's ends. What has no lane left is counted by
+ * the day's number ("+n"), so no bar is cut short where a day is full.
  */
 @Composable
 private fun WeekRow(
@@ -738,15 +738,17 @@ private fun WeekRow(
                 Chip(item, colors, shape = RoundedCornerShape(l, r, r, l))
             }
         }
+        // In the corner across from the centred number, level with it.
         laid.more.forEachIndexed { d, hidden ->
             if (hidden.isNotEmpty()) {
-                Text(
-                    "+${hidden.size}",
-                    Modifier.offset(col * d + 2.dp, top + lane * (fit - 1)),
-                    fontSize = 10.sp,
-                    lineHeight = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Box(Modifier.offset(col * d, 2.dp).width(col).height(22.dp).padding(end = 4.dp), Alignment.CenterEnd) {
+                    Text(
+                        "+${hidden.size}",
+                        fontSize = 10.sp,
+                        lineHeight = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }

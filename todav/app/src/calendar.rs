@@ -495,8 +495,10 @@ pub struct Piece {
 
 /// Lanes for items covering the days `days[i]` of a week's row (ascending, contiguous): the
 /// earliest first, then the longest, each in the lowest lane free on all its days, so one
-/// lasting several days is a single bar. At most `max` lanes show: a day with an item past them
-/// keeps its last lane for "+N more", listing what it hides there.
+/// lasting several days is a single bar. At most `max` lanes show, all of them items: what goes
+/// past them is listed for each day it is on, for a count by the day's number ("+N"). (A lane
+/// kept for the count instead cut a bar short on the days that overflowed, as if it started
+/// later.)
 pub fn lanes(days: &[Vec<usize>], max: usize) -> (Vec<Piece>, [Vec<usize>; 7]) {
     let mut order: Vec<usize> = (0..days.len()).filter(|&i| !days[i].is_empty()).collect();
     order.sort_by_key(|&i| (days[i][0], std::cmp::Reverse(days[i].len()), i));
@@ -513,40 +515,21 @@ pub fn lanes(days: &[Vec<usize>], max: usize) -> (Vec<Piece>, [Vec<usize>; 7]) {
         }
         lane[i] = l;
     }
-    let limit: Vec<usize> = (0..7)
-        .map(|d| {
-            let over = order
-                .iter()
-                .any(|&i| days[i].contains(&d) && lane[i] >= max);
-            if over { max - 1 } else { max }
-        })
-        .collect();
     let mut pieces = Vec::new();
     let mut more: [Vec<usize>; 7] = Default::default();
     for &i in &order {
-        let mut run: Option<(usize, usize)> = None;
-        for &d in &days[i] {
-            if lane[i] < limit[d] {
-                run = Some(run.map_or((d, d), |(from, _)| (from, d)));
-            } else {
-                more[d].push(i);
-                if let Some((from, to)) = run.take() {
-                    pieces.push(Piece {
-                        item: i,
-                        lane: lane[i],
-                        from,
-                        to,
-                    });
-                }
-            }
-        }
-        if let Some((from, to)) = run {
+        if lane[i] < max {
+            let d = &days[i];
             pieces.push(Piece {
                 item: i,
                 lane: lane[i],
-                from,
-                to,
+                from: d[0],
+                to: d[d.len() - 1],
             });
+        } else {
+            for &d in &days[i] {
+                more[d].push(i);
+            }
         }
     }
     for m in &mut more {
@@ -626,16 +609,24 @@ mod tests {
                 // The longer one first on Tuesday, under the bar from Monday.
                 piece(2, 1, 1, 6),
                 piece(1, 2, 1, 1),
+                piece(3, 2, 2, 2),
             ]
         );
-        // Wednesday has four: its third lane shows "+2 more" for the two singles.
-        assert_eq!(more[2], vec![3, 4]);
+        // Wednesday has four for three lanes: the last single goes to "+1" by its number; the
+        // bar from Tuesday stays whole.
+        assert_eq!(more[2], vec![4]);
         assert!(more.iter().enumerate().all(|(d, m)| d == 2 || m.is_empty()));
 
         // Without a limit everything gets a lane.
         let (pieces, more) = lanes(&days, usize::MAX);
         assert_eq!(pieces.len(), 5);
         assert!(more.iter().all(Vec::is_empty));
+
+        // Two lanes, a trip from Wednesday, a journey from Thursday and a task on Thursday: the
+        // journey starts on Thursday still, the task is counted there.
+        let (pieces, more) = lanes(&[vec![2, 3, 4, 5, 6], vec![3, 4, 5, 6], vec![3]], 2);
+        assert_eq!(pieces, vec![piece(0, 0, 2, 6), piece(1, 1, 3, 6)]);
+        assert_eq!(more[3], vec![2]);
     }
 
     #[test]

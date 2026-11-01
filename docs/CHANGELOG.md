@@ -40,6 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is all-day, as one added by a double click on a day of the month already was on Linux.
 - Android: an event lasting several days is one bar across them in the month view and the Day
   view's week, as in the Linux app and the widget, instead of a chip on each day.
+- In the month view, what does not fit on a day is counted by its number ("+2", which lists it
+  on Linux) instead of taking the day's last row, so an event lasting several days shows from
+  its first day as a whole bar even where a day is full.
 - Android: On This Device Only comes last among the accounts to add, after System Calendars.
 - An older Todav no longer opens data a newer one left (after a downgrade, say); it says to
   update instead of reading and writing a database it does not know.
