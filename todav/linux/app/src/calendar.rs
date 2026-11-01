@@ -1647,14 +1647,14 @@ fn details_popover(b: &gtk::Box, link: String, buttons: Option<Buttons>) -> gtk:
         let p = pop.downgrade();
         delete.connect_clicked(move |_| {
             if let Some(p) = p.upgrade() {
-                p.popdown();
+                close_for_change(&p);
             }
             on_delete();
         });
         let p = pop.downgrade();
         edit.connect_clicked(move |_| {
             if let Some(p) = p.upgrade() {
-                p.popdown();
+                close_for_change(&p);
             }
             on_edit();
         });
@@ -1665,6 +1665,16 @@ fn details_popover(b: &gtk::Box, link: String, buttons: Option<Buttons>) -> gtk:
         row.append(&copy);
     }
     pop
+}
+
+/// Close popover `p` before what it is about changes, leaving nothing focused: the focus would go
+/// back to the item it came from, which is drawn anew, then to the grid's first one, scrolling
+/// the month view there.
+fn close_for_change(p: &gtk::Popover) {
+    p.popdown();
+    if let Some(w) = p.parent().and_then(|w| w.root()) {
+        w.set_focus(None::<&gtk::Widget>);
+    }
 }
 
 /// Clicks on `w`, an item on the calendar: one shows its `details`, two open `edit`. The details

@@ -63,6 +63,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   after an icon, the calendar's dot or the colour box alike.
 - Linux: an event's place shows by a map pin in every icon theme; some (Tela) drew it as a black
   disc.
+- Linux: deleting an event or a task from its details in the month view, or editing it from
+  there, no longer scrolls the month away.
 - About one push message in 256 failed with "Sync failed: parse: ill-formed document": an
   encrypted one that happened to start like XML was read as XML instead of being decrypted.
 - Android: on a phone, saving a new event after typing its title showed the task list under the
