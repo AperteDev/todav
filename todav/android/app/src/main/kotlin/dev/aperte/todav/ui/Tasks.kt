@@ -85,6 +85,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -688,6 +689,36 @@ private fun TaskItem(
     LaunchedEffect(dismiss.targetValue) {
         if (dismiss.targetValue != SwipeToDismissBoxValue.Settled) haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
     }
+    // The box calls `onDismiss` again whenever it is a new lambda while still swiped: one made
+    // once, acting on the row as it is now, so a task completed and lingering (redrawn done)
+    // is not reopened by it.
+    val swiped = rememberUpdatedState { it: SwipeToDismissBoxValue ->
+        val action = when (it) {
+            SwipeToDismissBoxValue.StartToEnd -> screen.swipeRight
+            SwipeToDismissBoxValue.EndToStart -> screen.swipeLeft
+            SwipeToDismissBoxValue.Settled -> SwipeAction.OFF
+        }
+        when (action) {
+            SwipeAction.COMPLETE -> {
+                haptics.toggle(!task.done)
+                model.setDone(task, !task.done)
+            }
+            SwipeAction.STAR -> {
+                val star = priorityColor(task.priority) == null
+                haptics.toggle(star)
+                model.update(task.uid, TaskPatch(priority = PriorityValue(if (star) 1 else null)))
+            }
+            SwipeAction.PIN -> {
+                haptics.toggle(!task.pinned)
+                model.update(task.uid, TaskPatch(pinned = !task.pinned))
+            }
+            SwipeAction.DELETE -> model.delete(task)
+            SwipeAction.OFF -> {}
+        }
+        // Deleted, it goes (Undo brings it back); else it slides back into place.
+        if (action != SwipeAction.DELETE) scope.launch { dismiss.reset() }
+    }
+    val onDismiss = remember(dismiss) { { it: SwipeToDismissBoxValue -> swiped.value(it) } }
     SwipeToDismissBox(
         state = dismiss,
         enableDismissFromStartToEnd = usable(screen.swipeRight),
@@ -706,32 +737,7 @@ private fun TaskItem(
                     translationY = dy
                 }
             },
-        onDismiss = {
-            val action = when (it) {
-                SwipeToDismissBoxValue.StartToEnd -> screen.swipeRight
-                SwipeToDismissBoxValue.EndToStart -> screen.swipeLeft
-                SwipeToDismissBoxValue.Settled -> SwipeAction.OFF
-            }
-            when (action) {
-                SwipeAction.COMPLETE -> {
-                    haptics.toggle(!task.done)
-                    model.setDone(task, !task.done)
-                }
-                SwipeAction.STAR -> {
-                    val star = priorityColor(task.priority) == null
-                    haptics.toggle(star)
-                    model.update(task.uid, TaskPatch(priority = PriorityValue(if (star) 1 else null)))
-                }
-                SwipeAction.PIN -> {
-                    haptics.toggle(!task.pinned)
-                    model.update(task.uid, TaskPatch(pinned = !task.pinned))
-                }
-                SwipeAction.DELETE -> model.delete(task)
-                SwipeAction.OFF -> {}
-            }
-            // Deleted, it goes (Undo brings it back); else it slides back into place.
-            if (action != SwipeAction.DELETE) scope.launch { dismiss.reset() }
-        },
+        onDismiss = onDismiss,
         backgroundContent = {
             val start = dismiss.dismissDirection == SwipeToDismissBoxValue.StartToEnd
             SwipeBackground(if (start) screen.swipeRight else screen.swipeLeft, task, start)
