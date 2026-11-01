@@ -159,12 +159,6 @@ pub fn mini_dots(c: &Client) -> bool {
     on(c, "mini_dots")
 }
 
-/// Whether a double click on a calendar item edits it (`double_click_edit`). Off, a click shows
-/// its details at once.
-pub fn double_click_edit(c: &Client) -> bool {
-    on(c, "double_click_edit")
-}
-
 /// The weekdays the Work Week view shows (`work_days`, comma-separated, 0 = Sunday): one to six
 /// of them, in order; Monday to Friday by default.
 pub fn work_days(c: &Client) -> Vec<i64> {

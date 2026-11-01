@@ -444,11 +444,6 @@ pub fn present(parent: &adw::ApplicationWindow, page: Option<&str>) -> adw::Pref
         let _ = core().set_setting("mini_dots".into(), d.is_active().to_string());
         crate::calendar::refresh();
     });
-    let double: adw::SwitchRow = get(&b, "double_click_edit");
-    double.set_active(prefs::double_click_edit(core()));
-    double.connect_active_notify(|d| {
-        let _ = core().set_setting("double_click_edit".into(), d.is_active().to_string());
-    });
     // The extension: its rows carry the setting's name as their id. It hears of a change at
     // once, to put its parts and icon where they now go.
     let ext_changed = || crate::dbus::on_event(&crate::Event::Changed(String::new()));

@@ -72,6 +72,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An older Todav no longer opens data a newer one left (after a downgrade, say); it says to
   update instead of reading and writing a database it does not know.
 
+### Removed
+
+- Linux: editing an item and adding an event on a day of the month by a double click, with the
+  "Edit on double click" setting. A click shows an item's details or a day's new event popover
+  at once, with Edit there; a double click on a free hour of the week view still adds an event.
+
 ### Fixed
 
 - Linux: in an event's or a task's details, the text of every line starts at the same place,

@@ -163,8 +163,6 @@ struct Cal {
     /// An event's details are open: redraws wait (`pending`) until it closes.
     holding: Cell<bool>,
     pending: Cell<bool>,
-    /// A day of the month clicked once: its new event's popover, waiting out a double click.
-    quick: RefCell<Option<glib::SourceId>>,
     /// The day `show_day` went to, pulsing until then (as the Tasks page pulses a task).
     flash: Cell<Option<(i64, std::time::Instant)>>,
     /// Midnight of the day the views are around (the selected day).
@@ -291,7 +289,6 @@ pub fn build(views: &adw::ViewStack, tasks: &adw::OverlaySplitView) {
         scrolled: Cell::new(false),
         holding: Cell::new(false),
         pending: Cell::new(false),
-        quick: RefCell::default(),
         flash: Cell::new(None),
         anchor: Cell::new(today()),
         browsed: Cell::new(false),
@@ -1146,8 +1143,7 @@ fn clear(w: &impl IsA<gtk::Widget>) {
 }
 
 /// A day of the month grid: its number (dimmer when `other`, from another month), today and the
-/// selected day marked. Clicking it calls `select`, a double click or a long press adds an
-/// event that day; what is dropped on it moves there.
+/// selected day marked. Clicking it calls `select`; what is dropped on it moves there.
 fn day_cell(c: &Rc<Cal>, day: i64, other: bool, select: fn(i64)) -> gtk::Box {
     let cell = gtk::Box::new(gtk::Orientation::Vertical, 2);
     cell.add_css_class("day");
@@ -1174,13 +1170,6 @@ fn day_cell(c: &Rc<Cal>, day: i64, other: bool, select: fn(i64)) -> gtk::Box {
         }
     });
     cell.add_controller(click);
-    new_event_on(&cell, move |_, _, _| {
-        Some(EventTime {
-            start: day,
-            end: day + DAY,
-            all_day: true,
-        })
-    });
     day_drop(&cell, day, false);
     flash_if(c, &cell, day);
     cell
@@ -1194,10 +1183,6 @@ fn new_event_on(
 ) {
     let open = Rc::new(move |g: &gtk::Gesture, x, y| {
         let Some(c) = cal() else { return };
-        // The first click's popover, for a new event too, does not come.
-        if let Some(id) = c.quick.take() {
-            id.remove();
-        }
         if let Some(time) = at(&c, x, y) {
             g.set_state(gtk::EventSequenceState::Claimed);
             dialog::open(&c, None, time);
@@ -1339,13 +1324,8 @@ fn task_chip(c: &Rc<Cal>, t: &Task, label: &gtk::Widget, check_align: gtk::Align
             g.set_propagation_phase(gtk::PropagationPhase::Bubble);
         }
     }
-    // After the above, which would move its gesture to the bubble phase too.
-    let (task, task2) = (t.clone(), t.clone());
-    let open = on_clicks(
-        &b,
-        move || cal().map(|c| task_details(&c, &task)),
-        move || crate::window::edit_task(&task2),
-    );
+    let task = t.clone();
+    let open = on_clicks(&b, move || cal().map(|c| task_details(&c, &task)));
     b.connect_clicked(move |_| open());
     drag_task(&b, t);
     b
@@ -1697,75 +1677,24 @@ fn close_for_change(p: &gtk::Popover) {
     }
 }
 
-/// Clicks on `w`, an item on the calendar: one shows its `details`, two open `edit`. The details
-/// wait out the double-click time, as their popover's grab would take a second click; with
-/// "Edit on double click" off they show at once and two clicks do nothing more. Returns
-/// what `w`'s clicked (or activated) signal does; a check in `w` ticks however fast.
+/// A click on `w`, an item on the calendar, shows its `details` at once. Returns what `w`'s
+/// clicked (or activated) signal does.
 fn on_clicks(
     w: &impl IsA<gtk::Widget>,
     details: impl Fn() -> Option<gtk::Popover> + 'static,
-    edit: impl Fn() + 'static,
 ) -> impl Fn() + 'static {
-    let pending: Rc<RefCell<Option<glib::SourceId>>> = Rc::default();
-    // The second click's own clicked signal, after `edit`.
-    let skip = Rc::new(Cell::new(false));
-    let click = gtk::GestureClick::new();
-    click.set_propagation_phase(gtk::PropagationPhase::Capture);
-    let (p, s) = (pending.clone(), skip.clone());
-    click.connect_pressed(move |g, n, x, y| {
-        let on_check = g
-            .widget()
-            .and_then(|w| w.pick(x, y, gtk::PickFlags::DEFAULT))
-            .is_some_and(|t| t.ancestor(gtk::CheckButton::static_type()).is_some());
-        if n != 2 || on_check || !prefs::double_click_edit(core()) {
-            s.set(false);
-            return;
-        }
-        if let Some(id) = p.take() {
-            id.remove();
-        }
-        s.set(true);
-        edit();
-    });
-    w.add_controller(click);
     let w = w.upcast_ref::<gtk::Widget>().downgrade();
-    let details = Rc::new(details);
     move || {
-        if skip.replace(false) {
-            return;
-        }
-        // Without editing on a double click there is nothing to wait for.
-        if !prefs::double_click_edit(core()) {
-            if let (Some(w), Some(pop)) = (w.upgrade(), details()) {
-                pop_up(pop, &w);
-            }
-            return;
-        }
-        let wait = gtk::Settings::default().map_or(400, |s| s.gtk_double_click_time());
-        let (w, details, p) = (w.clone(), details.clone(), pending.clone());
-        let id = glib::timeout_add_local_once(
-            std::time::Duration::from_millis(wait.max(0) as u64),
-            move || {
-                p.take();
-                if let (Some(w), Some(pop)) = (w.upgrade(), details()) {
-                    pop_up(pop, &w);
-                }
-            },
-        );
-        if let Some(old) = pending.replace(Some(id)) {
-            old.remove();
+        if let (Some(w), Some(pop)) = (w.upgrade(), details()) {
+            pop_up(pop, &w);
         }
     }
 }
 
-/// An event's button: a click shows its details, a double click edits it.
+/// An event's button: a click shows its details.
 fn event_clicks(b: &gtk::Button, e: &Event) {
-    let (ev, ev2) = (e.clone(), e.clone());
-    let open = on_clicks(
-        b,
-        move || cal().map(|c| details(&c, &ev)),
-        move || edit_event(&ev2),
-    );
+    let ev = e.clone();
+    let open = on_clicks(b, move || cal().map(|c| details(&c, &ev)));
     b.connect_clicked(move |_| open());
 }
 
@@ -2150,12 +2079,8 @@ fn agenda_row(i: &Item) -> adw::ActionRow {
             };
             row.set_subtitle(&sub);
             row.add_prefix(&mark(&event_class(e), None));
-            let (ev, ev2) = (e.clone(), e.clone());
-            let open = on_clicks(
-                &row,
-                move || cal().map(|c| details(&c, &ev)),
-                move || edit_event(&ev2),
-            );
+            let ev = e.clone();
+            let open = on_clicks(&row, move || cal().map(|c| details(&c, &ev)));
             row.connect_activated(move |_| open());
         }
         Item::Task(t) => {
@@ -2171,12 +2096,8 @@ fn agenda_row(i: &Item) -> adw::ActionRow {
             if t.done {
                 row.add_css_class("done");
             }
-            let (task, task2) = (t.clone(), t.clone());
-            let open = on_clicks(
-                &row,
-                move || cal().map(|c| task_details(&c, &task)),
-                move || crate::window::edit_task(&task2),
-            );
+            let task = t.clone();
+            let open = on_clicks(&row, move || cal().map(|c| task_details(&c, &task)));
             row.connect_activated(move |_| open());
         }
     }

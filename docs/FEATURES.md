@@ -45,8 +45,7 @@ What Todav can do, in short. The details of each release are in the
   with a preview in 15-minute steps; drop it back to unplan it.
 - Move events and planned tasks by drag and drop; resize them in the week view by their edges.
 - Drop an event on another calendar in the sidebar to move it there.
-- An event's or a task's details on a click (subtasks, an event's tasks), editing on a
-  double-click.
+- An event's or a task's details on a click (subtasks, an event's tasks), with Edit there.
 - Tasks linked to events: an event lists its tasks, a task shows its event; a task added for
   an event goes to its calendar, or, for calendars without tasks, to a list you pick (none by
   default).

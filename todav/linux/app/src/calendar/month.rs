@@ -184,9 +184,8 @@ pub(super) fn render(c: &Rc<Cal>) -> i64 {
     top + 42 * DAY
 }
 
-/// Select a day of the month grid, then offer a new event on it, as GNOME Calendar does: after
-/// the double-click time, as a double click opens the whole dialog instead. In the month shown
-/// only the highlight moves: a rebuilt grid would lose the second click of a double click. A
+/// Select a day of the month grid and offer a new event on it, as GNOME Calendar does. In the
+/// month shown only the highlight moves: a rebuilt grid would take the popover's day away. A
 /// day of another month goes there.
 fn select(day: i64) {
     let Some(c) = cal() else { return };
@@ -197,19 +196,7 @@ fn select(day: i64) {
     c.browsed.set(false);
     mark(&c, "selected", |d| d == day);
     mini::refresh(&c);
-    let wait = gtk::Settings::default().map_or(400, |s| s.gtk_double_click_time());
-    let id = glib::timeout_add_local_once(
-        std::time::Duration::from_millis(wait.max(0) as u64),
-        move || {
-            if let Some(c) = cal() {
-                c.quick.take();
-                quick_add(&c, day, day);
-            }
-        },
-    );
-    if let Some(old) = c.quick.replace(Some(id)) {
-        old.remove();
-    }
+    quick_add(&c, day, day);
 }
 
 /// The grid's days, each with its cell.

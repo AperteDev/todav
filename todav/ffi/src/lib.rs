@@ -787,10 +787,6 @@ impl Todav {
         todav_app::prefs::inline_edit(self.c())
     }
 
-    pub fn double_click_edit(&self) -> bool {
-        todav_app::prefs::double_click_edit(self.c())
-    }
-
     /// The weekdays the Work Week view shows (0 Sunday), one to six.
     pub fn work_days(&self) -> Vec<i64> {
         todav_app::prefs::work_days(self.c())
