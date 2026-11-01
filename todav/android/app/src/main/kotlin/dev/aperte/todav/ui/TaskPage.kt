@@ -449,7 +449,7 @@ private fun Subtasks(model: Main, task: TodavTask, sheet: DetailsSheetState?) {
     Section(tr("Subtasks")) {
         subtasks.forEach { s ->
             Item(
-                leadingContent = { Checkbox(checked = s.done, onCheckedChange = { model.setDone(s, it) }) },
+                leadingContent = { DoneCheck(s.done) { model.setDone(s, it) } },
                 headlineContent = { Text(s.summary, textDecoration = if (s.done) TextDecoration.LineThrough else null) },
                 modifier = Modifier.clickable { model.open(dev.aperte.todav.Dest.Task(s.uid)) },
             )

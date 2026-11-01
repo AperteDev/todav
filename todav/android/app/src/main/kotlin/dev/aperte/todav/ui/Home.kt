@@ -74,6 +74,8 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -120,6 +122,7 @@ fun Home(model: Main) {
     val view by model.view.collectAsStateWithLifecycle()
     val ticking by model.ticking.collectAsStateWithLifecycle()
     val toPlan by model.toPlan.collectAsStateWithLifecycle()
+    val haptics = LocalHapticFeedback.current
     ticking?.let { SubtasksDialog(it, model::answer) }
     Messages(model, screen, snackbar)
     // Each its own: turning a phone doesn't cover its view with a page left open in the pane.
@@ -190,7 +193,14 @@ fun Home(model: Main) {
                             Row(Modifier.fillMaxHeight()) {
                                 Sidebar(model, screen, view, Modifier.width(width.coerceIn(200f, most).dp).fillMaxHeight()) {}
                                 Edge(
-                                    onDrag = { width = (width.coerceIn(200f, most) + it).coerceIn(200f, most) },
+                                    onDrag = {
+                                        val was = width.coerceIn(200f, most)
+                                        width = (was + it).coerceIn(200f, most)
+                                        // Felt as it stops at its narrowest or widest.
+                                        if (width != was && (width == 200f || width == most)) {
+                                            haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                                        }
+                                    },
                                     onDone = { model.setSidebarWidth(width.coerceIn(200f, most)) },
                                 )
                             }
@@ -387,6 +397,14 @@ private fun Sidebar(model: Main, screen: Screen, view: View, modifier: Modifier,
     var dropped by remember { mutableStateOf<List<String>?>(null) }
     LaunchedEffect(screen.places, calendars) { dropped = null }
     val row = with(LocalDensity.current) { 56.dp.toPx() }
+    // A tick each time the held list's landing place changes, as the others make room.
+    val haptics = LocalHapticFeedback.current
+    val landing = moving?.target(row)
+    var landed by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(landing) {
+        if (landing != null && landed != null) haptics.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
+        landed = landing
+    }
     /** Drawer row `key` (one of `among`, its account's lists) moves when held and dragged; held alone, it is edited. */
     @Composable
     fun Modifier.movable(key: String, among: List<String>?): Modifier {
@@ -411,6 +429,7 @@ private fun Sidebar(model: Main, screen: Screen, view: View, modifier: Modifier,
                 if (!moved) {
                     editing = key
                 } else if (m != null && m.target(row) != m.from) {
+                    haptics.performHapticFeedback(HapticFeedbackType.GestureEnd)
                     dropped = m.order(row)
                     model.reorderLists(m.order(row))
                 }
@@ -464,18 +483,19 @@ private fun Sidebar(model: Main, screen: Screen, view: View, modifier: Modifier,
                 c.heading?.let { item(key = "ch:" + c.href) { DrawerHeading(it) } }
                 item(key = "c:" + c.href) {
                 val among = rows.filter { it.account == c.account }.map { it.href }
+                val show = felt { model.setShown(c.href, it) }
                 NavigationDrawerItem(
                     label = { Text(c.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     icon = {
                         Checkbox(
                             checked = c.shown,
-                            onCheckedChange = { model.setShown(c.href, it) },
+                            onCheckedChange = show,
                             colors = CheckboxDefaults.colors(checkedColor = parseColor(c.color)),
                             modifier = Modifier.size(24.dp),
                         )
                     },
                     selected = false,
-                    onClick = { model.setShown(c.href, !c.shown) },
+                    onClick = { show(!c.shown) },
                     colors = heldColors(moving?.key == c.href),
                     modifier = Modifier.padding(horizontal = 12.dp).movable(c.href, among),
                 )

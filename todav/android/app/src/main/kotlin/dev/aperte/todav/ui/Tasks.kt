@@ -79,6 +79,7 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -181,6 +182,12 @@ fun TasksPane(model: Main, screen: Screen) {
     // Pull to refresh only from a gesture that starts with the list at its top and pulls straight
     // down: one that scrolled the list on its way (down, then back up to the top) stops there.
     var fromTop by remember { mutableStateOf(true) }
+    // Felt as it is pulled far enough to sync once let go.
+    val haptics = LocalHapticFeedback.current
+    val armed by remember { derivedStateOf { pull.distanceFraction >= 1f } }
+    LaunchedEffect(armed) {
+        if (armed && !pulling) haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
+    }
 
     Scaffold(
         modifier = Modifier.nestedScroll(bar.nestedScrollConnection),
@@ -521,9 +528,12 @@ private fun TaskList(model: Main, screen: Screen, state: LazyListState, padding:
                     val t = d.target
                     val ds = d.row.slot
                     if (t == null || ds == null) {
+                        // Let go where it can't go: it goes back.
+                        haptics.performHapticFeedback(HapticFeedbackType.Reject)
                         drag = null
                         return@detectDragGesturesAfterLongPress
                     }
+                    haptics.performHapticFeedback(HapticFeedbackType.GestureEnd)
                     // Kept until the list comes back moved: the row glides into its gap meanwhile.
                     d.landing = true
                     gapTop(d)?.let { top ->
@@ -663,6 +673,10 @@ private fun TaskItem(
     val dismiss = rememberSwipeToDismissBoxState()
     // Each way it is swiped as Settings say, if this task can take that: pinning only top-level ones.
     val usable = { a: SwipeAction -> a != SwipeAction.OFF && (a != SwipeAction.PIN || pinnable(screen, task, row.depth)) }
+    // Felt as a swipe goes far enough to act once let go.
+    LaunchedEffect(dismiss.targetValue) {
+        if (dismiss.targetValue != SwipeToDismissBoxValue.Settled) haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
+    }
     SwipeToDismissBox(
         state = dismiss,
         enableDismissFromStartToEnd = usable(screen.swipeRight),
@@ -688,11 +702,18 @@ private fun TaskItem(
             }
             when (action) {
                 SwipeAction.COMPLETE -> {
-                    haptics.performHapticFeedback(HapticFeedbackType.ToggleOn)
+                    haptics.toggle(!task.done)
                     model.setDone(task, !task.done)
                 }
-                SwipeAction.STAR -> model.update(task.uid, TaskPatch(priority = PriorityValue(if (priorityColor(task.priority) == null) 1 else null)))
-                SwipeAction.PIN -> model.update(task.uid, TaskPatch(pinned = !task.pinned))
+                SwipeAction.STAR -> {
+                    val star = priorityColor(task.priority) == null
+                    haptics.toggle(star)
+                    model.update(task.uid, TaskPatch(priority = PriorityValue(if (star) 1 else null)))
+                }
+                SwipeAction.PIN -> {
+                    haptics.toggle(!task.pinned)
+                    model.update(task.uid, TaskPatch(pinned = !task.pinned))
+                }
                 SwipeAction.DELETE -> model.delete(task)
                 SwipeAction.OFF -> {}
             }
@@ -711,10 +732,7 @@ private fun TaskItem(
                 .padding(start = (8 + 24 * row.depth).dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Checkbox(checked = task.done, onCheckedChange = {
-                haptics.performHapticFeedback(if (it) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
-                model.setDone(task, it)
-            })
+            DoneCheck(task.done) { model.setDone(task, it) }
             Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
                 Text(
                     task.summary,

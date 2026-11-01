@@ -28,6 +28,12 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxColors
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.ui.hapticfeedback.HapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.material3.DropdownMenuGroup
 import androidx.compose.material3.DropdownMenuPopup
 import androidx.compose.material3.FilledTonalButton
@@ -117,6 +123,7 @@ fun Modifier.holdToMove(enabled: Boolean, onMove: (Float) -> Unit, onEnd: (moved
     // The gesture outlives recompositions: it calls the latest of these.
     val move by rememberUpdatedState(onMove)
     val end by rememberUpdatedState(onEnd)
+    val haptics = LocalHapticFeedback.current
     return if (!enabled) this else pointerInput(Unit) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -129,6 +136,7 @@ fun Modifier.holdToMove(enabled: Boolean, onMove: (Float) -> Unit, onEnd: (moved
                 }
             } == null
             if (!held) return@awaitEachGesture
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
             // The rest of the gesture is ours: the item underneath sees no click.
             var moved = false
             do {
@@ -145,6 +153,29 @@ fun Modifier.holdToMove(enabled: Boolean, onMove: (Float) -> Unit, onEnd: (moved
             } while (e.changes.any { it.pressed })
             end(moved)
         }
+    }
+}
+
+/** The feel of turning something on (a task done, a switch) or off. */
+fun HapticFeedback.toggle(on: Boolean) =
+    performHapticFeedback(if (on) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
+
+/** A task's check box, felt as it is ticked or unticked, wherever a task is ticked. */
+@Composable
+fun DoneCheck(
+    done: Boolean,
+    modifier: Modifier = Modifier,
+    colors: CheckboxColors = CheckboxDefaults.colors(),
+    onChange: (Boolean) -> Unit,
+) = Checkbox(done, felt(onChange), modifier, colors = colors)
+
+/** `onChange`, felt as it turns something on or off: for a switch, and the row it is in. */
+@Composable
+fun felt(onChange: (Boolean) -> Unit): (Boolean) -> Unit {
+    val haptics = LocalHapticFeedback.current
+    return { on ->
+        haptics.toggle(on)
+        onChange(on)
     }
 }
 
@@ -380,10 +411,15 @@ fun Connected(options: List<String>, selected: Int, modifier: Modifier = Modifie
     modifier,
     horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
 ) {
+    val haptics = LocalHapticFeedback.current
     options.forEachIndexed { i, o ->
         ToggleButton(
             checked = i == selected,
-            onCheckedChange = { onSelect(i) },
+            onCheckedChange = {
+                // A tick as another one is picked.
+                if (i != selected) haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                onSelect(i)
+            },
             shapes = when (i) {
                 0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
                 options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()

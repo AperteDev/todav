@@ -52,7 +52,9 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Velocity
@@ -146,6 +148,13 @@ fun DetailsSheet(
         // A finger on it: scrolling a field into view moves the content, not the sheet.
         var touched by remember { mutableStateOf(false) }
         val connection = remember(drag) { sheetScroll(drag, { touched }) { !state.locked } }
+        // Felt as a finger takes it past where it settles elsewhere: up into the editor, down to go.
+        val haptics = LocalHapticFeedback.current
+        LaunchedEffect(drag) {
+            snapshotFlow { drag.targetValue }.drop(1).collect {
+                if (touched) haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
+            }
+        }
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val height = constraints.maxHeight.toFloat()
             val top = WindowInsets.statusBars.getTop(density).toFloat()

@@ -286,11 +286,12 @@ fun Choose(title: String, names: List<String>, current: Int, onDismiss: () -> Un
 private fun SwitchRow(model: Main, title: String, key: String, subtitle: String? = null, default: Boolean = true) {
     val value = setting(model, key)
     val on = if (default) value != "false" else value == "true"
+    val turn = felt { model.setSetting(key, it.toString()) }
     Item(
         headlineContent = { Text(title) },
         supportingContent = subtitle?.let { { Text(it) } },
-        trailingContent = { Switch(on, { model.setSetting(key, it.toString()) }) },
-        modifier = Modifier.clickable { model.setSetting(key, (!on).toString()) },
+        trailingContent = { Switch(on, turn) },
+        modifier = Modifier.clickable { turn(!on) },
     )
 }
 
@@ -754,7 +755,7 @@ fun AccountPage(model: Main, id: Long) {
                 headlineContent = { Text(tr("Use This Account")) },
                 supportingContent = { Text(tr("Off hides its lists and calendars and stops syncing them; nothing is deleted")) },
                 trailingContent = {
-                    Switch(account.enabled, { on ->
+                    Switch(account.enabled, felt { on ->
                         model.act {
                             core.setAccountEnabled(id, on)
                             model.todav.changed()
@@ -939,7 +940,7 @@ private fun SystemCalendarRows(model: Main) {
                     },
                     leadingContent = { Box(Modifier.size(14.dp).background(Color(c.color or 0xFF000000.toInt()), CircleShape)) },
                     trailingContent = {
-                        Switch(c.id in on, { v ->
+                        Switch(c.id in on, felt { v ->
                             model.act {
                                 SystemCalendars.setEnabled(model.core, c.id, v)
                                 model.todav.changed()

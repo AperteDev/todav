@@ -274,11 +274,12 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
                     )
                 }
                 Section(null) {
+                    val turn = felt { setAllDay(it) }
                     Item(
                         headlineContent = { Text(tr("All Day")) },
                         leadingContent = { Icon(Icons.Outlined.Schedule, null) },
-                        trailingContent = { Switch(allDay, ::setAllDay) },
-                        modifier = Modifier.clickable { setAllDay(!allDay) },
+                        trailingContent = { Switch(allDay, turn) },
+                        modifier = Modifier.clickable { turn(!allDay) },
                     )
                     DateTimeField(tr("Starts"), start, allDay, Icons.Outlined.Event, { t, _ ->
                         if (t != null) {
@@ -385,12 +386,13 @@ internal fun RepeatItems(
             DateTimeField(tr("Until"), until, true, Icons.Outlined.EventRepeat, { t, _ -> onUntil(t?.let { it - Math.floorMod(it, DAY) }) }, dateOnly = true)
         }
         if (fromDone != null && repeat != 0) {
+            val turn = felt(onFromDone)
             Item(
                 headlineContent = { Text(tr("Repeat From Completion")) },
                 supportingContent = { Text(tr("The next date counts from the day it is done")) },
                 leadingContent = { Icon(Icons.Outlined.Update, null) },
-                trailingContent = { Switch(fromDone, onFromDone) },
-                modifier = Modifier.clickable { onFromDone(!fromDone) },
+                trailingContent = { Switch(fromDone, turn) },
+                modifier = Modifier.clickable { turn(!fromDone) },
             )
         }
     }

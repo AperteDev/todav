@@ -255,6 +255,20 @@ fun CalendarPane(model: Main) {
     LaunchedEffect(mode) { if (mode == CalMode.AGENDA) model.toPlan.value = false }
     // A task from "To Plan" held and dragged over the hours or days.
     var plan by remember { mutableStateOf<Planning?>(null) }
+    // Felt as it moves: a tick onto another hour slot or day, a bump onto the cancel target.
+    val haptics = LocalHapticFeedback.current
+    val planOver by remember(plan) { derivedStateOf { plan?.let { it.target() to it.overCancel() } } }
+    var planWas by remember { mutableStateOf<Pair<PlanDrop?, Boolean>?>(null) }
+    LaunchedEffect(planOver) {
+        val (now, was) = planOver to planWas
+        if (now != null && was != null) {
+            when {
+                now.second && !was.second -> haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
+                !now.second && now.first != null && now.first != was.first -> haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+            }
+        }
+        planWas = planOver
+    }
     // A task from "To Plan" opened in its editor.
     var editing by remember { mutableStateOf<String?>(null) }
     val changes by model.todav.changes.collectAsStateWithLifecycle()
@@ -335,6 +349,7 @@ fun CalendarPane(model: Main) {
                         // Onto an hour or a day: planned there, as on Linux. Onto the cancel
                         // target or anywhere else: back in the sheet.
                         val to = p.target().takeIf { !p.overCancel() } ?: return@ToPlanSheet
+                        haptics.performHapticFeedback(HapticFeedbackType.GestureEnd)
                         model.toPlan.value = false
                         val patch = if (to.day) {
                             (dev.aperte.todav.core.dayDrop(Item.Task(p.task), to.at, false) as? Change.Task)?.patch
@@ -393,10 +408,9 @@ fun WorkDaysDialog(model: Main, onDismiss: () -> Unit) {
                     val on = d in days
                     // The last day left can't be turned off, nor a seventh on.
                     val enabled = if (on) days.size > 1 else days.size < 6
+                    val turn = felt { model.setWorkDays(if (it) (days + d).sorted() else days - d) }
                     Row(
-                        Modifier.fillMaxWidth().toggleable(on, enabled, Role.Checkbox) {
-                            model.setWorkDays(if (on) days - d else (days + d).sorted())
-                        },
+                        Modifier.fillMaxWidth().toggleable(on, enabled, Role.Checkbox, onValueChange = turn),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Checkbox(on, null, enabled = enabled)
@@ -552,6 +566,13 @@ private fun MonthGrid(
     var span by remember { mutableStateOf<Pair<Long, Long>?>(null) }
     val spanned = { t: Long -> span?.let { (a, b) -> t in minOf(a, b)..maxOf(a, b) } == true }
     val haptics = LocalHapticFeedback.current
+    // A tick each time the finger holding a chip or days moves onto another day.
+    val under = target ?: span?.second
+    var wasUnder by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(under) {
+        if (under != null && wasUnder != null) haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+        wasUnder = under
+    }
     // A task from "To Plan" dragged over: the day under the finger, if on the weeks in sight.
     val plan = LocalPlanning.current
     val weeks = remember { arrayOfNulls<LayoutCoordinates>(1) }
@@ -613,10 +634,8 @@ private fun MonthGrid(
                                         from = p
                                         total = Offset.Zero
                                         target = held?.let { at }
-                                        if (held == null) {
-                                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            span = at to at
-                                        }
+                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        if (held == null) span = at to at
                                     },
                                     onDrag = { change, amount ->
                                         change.consume()
@@ -636,7 +655,10 @@ private fun MonthGrid(
                                     onDragEnd = {
                                         val (item, day) = held to target
                                         target = null
-                                        if (item != null && day != null && day != at) moved = item to dev.aperte.todav.core.dayDrop(item, day, false)
+                                        if (item != null && day != null && day != at) {
+                                            haptics.performHapticFeedback(HapticFeedbackType.GestureEnd)
+                                            moved = item to dev.aperte.todav.core.dayDrop(item, day, false)
+                                        }
                                         span?.let { (a, b) ->
                                             span = null
                                             newEvent(model, minOf(a, b), allDay = true, end = maxOf(a, b) + DAY)
@@ -1226,6 +1248,7 @@ private fun Week(
     val fullest = week.top.maxOfOrNull { it.size } ?: 0
     LaunchedEffect(fullest) { onTop?.invoke(fullest) }
     var drag by remember { mutableStateOf<Held?>(null) }
+    val haptics = LocalHapticFeedback.current
     // A drop to apply: the item and where its start goes.
     var moved by remember { mutableStateOf<Pair<Item, Long>?>(null) }
     moved?.let { (item, at) ->
@@ -1344,22 +1367,36 @@ private fun Week(
                                     .clickable { onItem(item) }
                                     // Held and moved: to another hour (15-minute steps) or day.
                                     .pointerInput(item, start, cols, n) {
+                                        // Where a held block lands, moved by `o`: (minute of the
+                                        // day, in 15-minute steps; columns over).
+                                        val landing = { o: Offset ->
+                                            val minutes = s.from + (o.y / HOUR.toPx() * 60).toLong()
+                                            (Math.round(minutes / 15.0) * 15).coerceIn(0, 24 * 60 - 15) to Math.round(o.x / w.toPx())
+                                        }
                                         detectDragGesturesAfterLongPress(
-                                            onDragStart = { drag = Held(i, d, Offset.Zero) },
+                                            onDragStart = {
+                                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                drag = Held(i, d, Offset.Zero)
+                                            },
                                             onDrag = { change, amount ->
                                                 change.consume()
-                                                drag = drag?.let { it.copy(offset = it.offset + amount) }
+                                                val was = drag ?: return@detectDragGesturesAfterLongPress
+                                                val now = was.copy(offset = was.offset + amount)
+                                                drag = now
+                                                // A tick for each step or day it moves on to.
+                                                if (landing(now.offset) != landing(was.offset)) {
+                                                    haptics.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
+                                                }
                                             },
                                             onDragEnd = {
                                                 val h = drag ?: return@detectDragGesturesAfterLongPress
                                                 drag = null
-                                                val minutes = s.from + (h.offset.y / HOUR.toPx() * 60).toLong()
-                                                val stepped = (Math.round(minutes / 15.0) * 15).coerceIn(0, 24 * 60 - 15)
+                                                val (stepped, over) = landing(h.offset)
                                                 // Columns over: a shown day, or past the last, the
                                                 // days next to it.
-                                                val over = Math.round(h.offset.x / w.toPx())
                                                 val to = cols.getOrNull(n + over) ?: (d + over)
                                                 if (stepped != s.from || to != d) {
+                                                    haptics.performHapticFeedback(HapticFeedbackType.GestureEnd)
                                                     moved = Pair(item, start + to * DAY + stepped * 60)
                                                 }
                                             },
@@ -1569,6 +1606,10 @@ private fun ToPlanSheet(
     BackHandler(enabled = !hidden) { close() }
     var pull by remember { mutableFloatStateOf(0f) }
     val density = LocalDensity.current
+    // Felt as it is pulled down far enough to go once let go.
+    val haptics = LocalHapticFeedback.current
+    val goes by remember(density) { derivedStateOf { pull > with(density) { 96.dp.toPx() } } }
+    LaunchedEffect(goes) { if (goes) haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate) }
     val hint = tr("Hold a task and drag it onto the calendar")
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val height = maxHeight
@@ -1591,7 +1632,7 @@ private fun ToPlanSheet(
                             Modifier.fillMaxWidth().draggable(
                                 rememberDraggableState { pull += it },
                                 Orientation.Vertical,
-                                onDragStopped = { if (pull > with(density) { 96.dp.toPx() }) close() else pull = 0f },
+                                onDragStopped = { if (goes) close() else pull = 0f },
                             ),
                         ) {
                             Box(Modifier.fillMaxWidth(), Alignment.Center) { BottomSheetDefaults.DragHandle() }
@@ -1758,7 +1799,7 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
                 }
                 is Item.Task -> {
                     val t = remember(changes) { core.task(item.task.uid) } ?: item.task
-                    Line({ Checkbox(t.done, { model.setDone(t, it) }) }) {
+                    Line({ DoneCheck(t.done) { model.setDone(t, it) } }) {
                         TitleField(t.summary, done = t.done) { model.update(t.uid, TaskPatch(summary = it)) }
                     }
                     // Its slot or due date, if any (from the task list it may have none).
@@ -1866,7 +1907,7 @@ private fun TitleField(title: String, editable: Boolean = true, done: Boolean = 
 }
 
 @Composable
-private fun CheckRow(model: Main, t: TodavTask) = Line({ Checkbox(t.done, { model.setDone(t, it) }) }, Modifier.clickable { model.open(Dest.Task(t.uid)) }) {
+private fun CheckRow(model: Main, t: TodavTask) = Line({ DoneCheck(t.done) { model.setDone(t, it) } },Modifier.clickable { model.open(Dest.Task(t.uid)) }) {
     Text(t.summary, textDecoration = if (t.done) TextDecoration.LineThrough else null)
 }
 

@@ -127,7 +127,7 @@ fun SearchPage(model: Main) {
                     ListItem(
                         onClick = { model.open(Dest.Task(t.uid)) },
                         supportingContent = dueLabel(t, now)?.let { { Text(it) } },
-                        leadingContent = { Checkbox(t.done, { model.setDone(t, it) }) },
+                        leadingContent = { DoneCheck(t.done) { model.setDone(t, it) } },
                     ) {
                         Text(
                             t.summary,
