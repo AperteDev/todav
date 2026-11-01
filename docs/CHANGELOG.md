@@ -58,9 +58,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is all-day, as one added by a double click on a day of the month already was on Linux.
 - Android: an event lasting several days is one bar across them in the month view and the Day
   view's week, as in the Linux app and the widget, instead of a chip on each day.
-- In the month view, what does not fit on a day is counted by its number ("+2", which lists it
-  on Linux) instead of taking the day's last row, so an event lasting several days shows from
-  its first day as a whole bar even where a day is full.
+- In the month view, what does not fit on a day is counted at its top right ("+2", which lists
+  it on Linux) instead of taking the day's last row, so an event lasting several days shows
+  from its first day as a whole bar even where a day is full. On Linux the day's number moved
+  to the left for it, as on Android.
 - Moving an event's start in its dialog (Linux) or page (Android) leaves its end where it is,
   as GNOME Calendar does; only a start past the end takes it along. Before, the end moved with
   the start, keeping the event's length.

@@ -1162,7 +1162,7 @@ fn day_cell(c: &Rc<Cal>, day: i64, other: bool, select: fn(i64)) -> gtk::Box {
     }
     let num = gtk::Label::builder()
         .label(fmt(day, "%-d"))
-        .halign(gtk::Align::End)
+        .halign(gtk::Align::Start)
         .build();
     num.add_css_class("num");
     weekend(&num, day);

@@ -59,8 +59,8 @@ pub(super) fn row(
         overlay.add_overlay(&w);
         placed.push((w, Some(p.lane), p.from, p.to, left, right));
     }
-    // What has no lane left: counted by the day's number (which is on the right), so no bar is
-    // cut short where a day is full.
+    // What has no lane left: counted across from the day's number (which is on the left), so
+    // no bar is cut short where a day is full.
     for (d, hidden) in more.iter().enumerate().filter(|(_, m)| !m.is_empty()) {
         let rest = hidden.iter().map(|&n| items[n].clone()).collect();
         let w = more_button(c, week[d], rest).upcast::<gtk::Widget>();
@@ -71,15 +71,13 @@ pub(super) fn row(
         let &(ref w, lane, from, to, left, right) = placed.iter().find(|p| &p.0 == w)?;
         let col = o.width() as f64 / n as f64;
         let Some(lane) = lane else {
-            // At most half the cell, to leave the number room.
-            let x = (from as f64 * col) as i32 + 3;
-            let width = w.measure(gtk::Orientation::Horizontal, -1).1;
-            return Some(gdk::Rectangle::new(
-                x,
-                4,
-                width.min((col / 2.0) as i32),
-                LANE - 2,
-            ));
+            // At the cell's right, in at most half of it, to leave the number room.
+            let width = w
+                .measure(gtk::Orientation::Horizontal, -1)
+                .1
+                .min((col / 2.0) as i32);
+            let x = ((from + 1) as f64 * col) as i32 - 3 - width;
+            return Some(gdk::Rectangle::new(x, 4, width, LANE - 2));
         };
         let y = top.compute_bounds(o)?.y() as i32 + lane as i32 * LANE;
         // Ends that go on reach the cell's edge, to meet the next piece.
