@@ -35,7 +35,7 @@ What Todav can do, in short. The details of each release are in the
 - Create, edit, move and delete events, recurring ones too (this occurrence, this and the
   following, or all), with reminders.
 - Add an event from the month: click a day, or drag across days, for a popover with its title,
-  colour and calendar.
+  colour and calendar; on Android, hold a day, or hold and move across days.
 - Priority on events, as on tasks: none, low, medium or high (the one Thunderbird sets).
 - An event's own colour instead of its calendar's, as Nextcloud Calendar sets it: click the
   colour box by its title, in its details or its editor, to pick another.

@@ -412,7 +412,8 @@ fun WorkDaysDialog(model: Main, onDismiss: () -> Unit) {
 /**
  * A new event on `day` (else the day the calendar shows: the add button, the shortcut), in
  * `list` or, with only `account`, in a calendar of it still to pick (a widget's add button);
- * `allDay` when added from a month (by default, when the calendar shows one).
+ * `allDay` when added from a month (by default, when the calendar shows one); until `end`, if
+ * given (days held in a month).
  */
 fun newEvent(
     model: Main,
@@ -420,10 +421,11 @@ fun newEvent(
     list: String? = null,
     account: Long? = null,
     allDay: Boolean = model.calMode.value == CalMode.MONTH,
+    end: Long? = null,
 ) {
     val d = day ?: model.day.value ?: midnight(model.core.localNow())
     val time = model.core.newEventTime(d, allDay)
-    model.newEvent.value = Dest.EventEdit(list, null, null, time.start, time.allDay, account)
+    model.newEvent.value = Dest.EventEdit(list, null, null, time.start, time.allDay, account, end = end)
 }
 
 private fun modeName(m: CalMode) = when (m) {
@@ -546,6 +548,10 @@ private fun MonthGrid(
     var target by remember { mutableStateOf<Long?>(null) }
     var moved by remember { mutableStateOf<Pair<Item, Change>?>(null) }
     moved?.let { (item, change) -> Reschedule(model, item, change) { moved = null } }
+    // A day held where no chip is, and the one the finger is over now: a new event over them.
+    var span by remember { mutableStateOf<Pair<Long, Long>?>(null) }
+    val spanned = { t: Long -> span?.let { (a, b) -> t in minOf(a, b)..maxOf(a, b) } == true }
+    val haptics = LocalHapticFeedback.current
     // A task from "To Plan" dragged over: the day under the finger, if on the weeks in sight.
     val plan = LocalPlanning.current
     val weeks = remember { arrayOfNulls<LayoutCoordinates>(1) }
@@ -593,32 +599,53 @@ private fun MonthGrid(
                     WeekRow(start, rows[start] ?: RowItems.NONE, colors, Modifier.fillMaxWidth().height(rowHeight)) { d, heldAt ->
                         val at = start + d * DAY
                         DayCell(
-                            at, at == today, at == picked || at == target || at == planDay, fields(at).monthValue == thisMonth,
-                            Modifier.weight(1f).fillMaxHeight().gridLines(left = d > 0).pointerInput(at, heldAt) {
-                                // Held on a chip and moved: to the day it is let go over.
+                            at, at == today, at == picked || at == target || at == planDay || spanned(at), fields(at).monthValue == thisMonth,
+                            Modifier.weight(1f).fillMaxHeight().gridLines(left = d > 0),
+                            Modifier.pointerInput(at, heldAt) {
+                                // Held on a chip and moved: to the day it is let go over. Held
+                                // elsewhere: a new event on that day, or on the days moved across.
                                 var held: Item? = null
+                                var from = Offset.Zero
                                 var total = Offset.Zero
                                 detectDragGesturesAfterLongPress(
                                     onDragStart = { p ->
                                         held = heldAt(p.y)
+                                        from = p
                                         total = Offset.Zero
                                         target = held?.let { at }
+                                        if (held == null) {
+                                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            span = at to at
+                                        }
                                     },
                                     onDrag = { change, amount ->
+                                        change.consume()
+                                        total += amount
                                         if (held != null) {
-                                            change.consume()
-                                            total += amount
                                             val rows = Math.round(total.y / size.height)
                                             val cols = Math.round(total.x / size.width)
                                             target = at + (rows * 7L + cols) * DAY
+                                        } else {
+                                            // The cell under the finger, counted from this one.
+                                            val p = from + total
+                                            val rows = Math.floorDiv(p.y.toInt(), size.height)
+                                            val cols = Math.floorDiv(p.x.toInt(), size.width).coerceIn(-d, 6 - d)
+                                            span = at to at + (rows * 7L + cols) * DAY
                                         }
                                     },
                                     onDragEnd = {
                                         val (item, day) = held to target
                                         target = null
                                         if (item != null && day != null && day != at) moved = item to dev.aperte.todav.core.dayDrop(item, day, false)
+                                        span?.let { (a, b) ->
+                                            span = null
+                                            newEvent(model, minOf(a, b), allDay = true, end = maxOf(a, b) + DAY)
+                                        }
                                     },
-                                    onDragCancel = { target = null },
+                                    onDragCancel = {
+                                        target = null
+                                        span = null
+                                    },
                                 )
                             },
                         ) { model.pick(at) }
@@ -773,11 +800,14 @@ private fun DayCell(
     picked: Boolean,
     inMonth: Boolean,
     modifier: Modifier,
+    // Inside the tap, so a hold let go without moving ends there, not taken as a tap.
+    held: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     Column(
         modifier.background(if (picked) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent)
             .clickable(onClick = onClick)
+            .then(held)
             .padding(2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
