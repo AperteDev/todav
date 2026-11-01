@@ -1405,13 +1405,16 @@ private fun Week(
                                     }
                                     .padding(2.dp),
                             ) {
+                                // As many whole lines as the block holds, the last one cut with "…".
+                                val lines = with(LocalDensity.current) { ((height - 4.dp) / 12.sp.toDp()).toInt() }
                                 Text(
                                     item.title(),
                                     fontSize = 10.sp,
                                     lineHeight = 12.sp,
                                     color = if (item is Item.Event) Color.White else MaterialTheme.colorScheme.onSurface,
                                     textDecoration = if (item.done()) TextDecoration.LineThrough else null,
-                                    overflow = TextOverflow.Clip,
+                                    maxLines = lines.coerceAtLeast(1),
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                             }
                         }
