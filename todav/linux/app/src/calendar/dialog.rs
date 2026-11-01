@@ -126,7 +126,10 @@ pub(super) fn color_button(
         let (state, mark) = (state.clone(), mark.clone());
         Rc::new(move || {
             let mut s = state.borrow_mut();
-            mark.remove_css_class(&s.2);
+            // None yet the first time.
+            if !s.2.is_empty() {
+                mark.remove_css_class(&s.2);
+            }
             s.2 = crate::lists::color_class(s.0.as_deref(), &s.1);
             mark.add_css_class(&s.2);
         })
