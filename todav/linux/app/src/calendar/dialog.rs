@@ -99,12 +99,15 @@ pub(crate) fn repeat_rows(
 /// Shows another calendar's colour in a `color_button`.
 pub(super) type SetList = Rc<dyn Fn(&str)>;
 
-/// A box in an event's colour, `own` else its calendar `list`'s, by its title in its details and
-/// its dialog: clicked, it offers another (`pick_color`), shows it and gives it to `then`. Also
-/// gives a way to show another calendar's colour (its dialog's calendar changed).
+/// A box in an event's colour, `own` else its calendar `list`'s, by its title in its details,
+/// its dialog and a new one's popover: clicked, it offers another (`pick_color`), shows it and
+/// gives it to `then`. Also gives a way to show another calendar's colour (its dialog's
+/// calendar changed). In a popover it closes it first; with `away`, the popover comes back once
+/// a colour is picked, `away` true meanwhile.
 pub(super) fn color_button(
     own: Option<String>,
     list: String,
+    away: Option<Rc<Cell<bool>>>,
     then: impl Fn(Option<String>) + 'static,
 ) -> (gtk::Button, SetList) {
     let mark = gtk::Box::builder().valign(gtk::Align::Center).build();
@@ -137,21 +140,40 @@ pub(super) fn color_button(
             (s.0.clone(), s.1.clone())
         };
         let (st, sh, then) = (st.clone(), sh.clone(), then.clone());
-        // Over the window, out of the details first: a popover stays over a dialog, and its
+        // Over the window, out of the popover first: a popover stays over a dialog, and its
         // content goes with it.
         let Some(window) = b.root() else { return };
-        if let Some(p) = b.ancestor(gtk::Popover::static_type()) {
-            p.downcast_ref::<gtk::Popover>().unwrap().popdown();
+        let pop = b
+            .ancestor(gtk::Popover::static_type())
+            .and_downcast::<gtk::Popover>();
+        if let Some(p) = &pop {
+            if let Some(a) = &away {
+                a.set(true);
+            }
+            p.popdown();
             // Nothing to give the focus back to when it closes: the chip the details came from
             // is drawn anew by then, and the focus would go to the grid's first one, scrolling
             // the month view there.
             window.set_focus(None::<&gtk::Widget>);
         }
-        pick_color(&window, own, &list, move |c| {
-            st.borrow_mut().0 = c.clone();
-            sh();
-            then(c);
-        });
+        let away = away.clone();
+        let back = move || {
+            if let (Some(a), Some(p)) = (&away, &pop) {
+                a.set(false);
+                p.popup();
+            }
+        };
+        pick_color(
+            &window,
+            own,
+            &list,
+            move |c| {
+                st.borrow_mut().0 = c.clone();
+                sh();
+                then(c);
+            },
+            back,
+        );
     });
     let set_list = move |list: &str| {
         state.borrow_mut().1 = list.to_string();
@@ -161,12 +183,14 @@ pub(super) fn color_button(
 }
 
 /// Pick an event's colour: its calendar `list`'s (None), one of the event colours or any other,
-/// as the closest CSS name's (`color::snapped`); `own` is the one it has. Picking one closes it.
+/// as the closest CSS name's (`color::snapped`); `own` is the one it has. Picking one closes it;
+/// `closed` runs once it is closed, a colour picked or not.
 fn pick_color(
     parent: &impl IsA<gtk::Widget>,
     own: Option<String>,
     list: &str,
     then: impl Fn(Option<String>) + 'static,
+    closed: impl Fn() + 'static,
 ) {
     crate::lists::paint(); // the swatches' look, the calendar's colour
     let b = view!("color-dialog");
@@ -191,6 +215,7 @@ fn pick_color(
         d.close();
         then(None);
     });
+    dialog.connect_closed(move |_| closed());
     dialog.present(Some(parent));
 }
 
@@ -224,9 +249,33 @@ pub(super) fn ask_scope(
     d.present(Some(parent));
 }
 
+/// What a new event's popover had when its Edit… was clicked: its title, calendar and colour.
+pub(super) struct Draft {
+    pub title: String,
+    pub list: String,
+    pub color: Option<String>,
+}
+
 /// Open the dialog on an existing occurrence (`Some(e)`) or a new event at `time`; returns its
 /// title field.
 pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::EntryRow {
+    open_with(c, e, time, None)
+}
+
+/// Open it on a new event at `time` with what `draft` has.
+pub(super) fn open_draft(c: &Rc<Cal>, time: EventTime, draft: Draft) {
+    let title = draft.title.clone();
+    let summary = open_with(c, None, time, Some(draft));
+    summary.set_text(&title);
+    summary.set_position(-1);
+}
+
+fn open_with(
+    c: &Rc<Cal>,
+    e: Option<Event>,
+    time: EventTime,
+    draft: Option<Draft>,
+) -> adw::EntryRow {
     let b = view!("event-dialog");
     let dialog: adw::Dialog = get(&b, "dialog");
     let summary: adw::EntryRow = get(&b, "summary");
@@ -278,6 +327,7 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
     let pick = e
         .as_ref()
         .map(|e| e.list_href.clone())
+        .or_else(|| draft.as_ref().map(|d| d.list.clone()))
         .or_else(|| core().setting("last_calendar".into()));
     calendar.set_selected(
         writable
@@ -289,12 +339,15 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
     // Its own colour (None: its calendar's), picked with the box by its title as in its details;
     // kept until saved.
     let old_color = e.as_ref().and_then(|e| e.color.clone());
-    let color = Rc::new(RefCell::new(old_color.clone()));
+    let color = Rc::new(RefCell::new(
+        old_color.clone().or(draft.and_then(|d| d.color)),
+    ));
     let href = |i: u32| writable.get(i as usize).map(|l| l.href.clone());
     let c2 = color.clone();
     let (color_box, color_list) = color_button(
-        old_color,
+        color.borrow().clone(),
         href(calendar.selected()).unwrap_or_default(),
+        None,
         move |c| *c2.borrow_mut() = c,
     );
     summary.add_prefix(&color_box);

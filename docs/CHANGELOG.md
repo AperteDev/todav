@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of calendars that hold no tasks (subscriptions, shared calendars you may only view, the
   phone's); with None, the default, those events take no tasks.
 - Linux: an event's edit dialog lists its tasks, to tick or add one, as its details do.
+- Linux: a click on a day of the month view, or a drag across days, offers a new all-day event
+  over them in a popover, as GNOME Calendar does: its title, colour and calendar, then Add, or
+  Edit… for the whole dialog with what was typed. A double click still opens the dialog.
 - Android: System Calendars can be renamed and recoloured, in Todav only; "Use the System's
   Name and Color" in the same dialog undoes it.
 - An event's own colour, shown instead of its calendar's in every view, the widgets and the

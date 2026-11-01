@@ -77,6 +77,7 @@ pub(super) fn setup(c: &Rc<Cal>) {
         glib::Propagation::Stop
     });
     c.month_scroll.add_controller(wheel);
+    drag_days(c);
 }
 
 fn animating(c: &Cal) -> bool {
@@ -183,8 +184,10 @@ pub(super) fn render(c: &Rc<Cal>) -> i64 {
     top + 42 * DAY
 }
 
-/// Select a day of the month grid. In the month shown only the highlight moves: a rebuilt
-/// grid would lose the second click of a double click.
+/// Select a day of the month grid, then offer a new event on it, as GNOME Calendar does: after
+/// the double-click time, as a double click opens the whole dialog instead. In the month shown
+/// only the highlight moves: a rebuilt grid would lose the second click of a double click. A
+/// day of another month goes there.
 fn select(day: i64) {
     let Some(c) = cal() else { return };
     if month_first(day) != month_first(c.anchor.get()) {
@@ -192,18 +195,129 @@ fn select(day: i64) {
     }
     c.anchor.set(day);
     c.browsed.set(false);
+    mark(&c, "selected", |d| d == day);
+    mini::refresh(&c);
+    let wait = gtk::Settings::default().map_or(400, |s| s.gtk_double_click_time());
+    let id = glib::timeout_add_local_once(
+        std::time::Duration::from_millis(wait.max(0) as u64),
+        move || {
+            if let Some(c) = cal() {
+                c.quick.take();
+                quick_add(&c, day, day);
+            }
+        },
+    );
+    if let Some(old) = c.quick.replace(Some(id)) {
+        old.remove();
+    }
+}
+
+/// The grid's days, each with its cell.
+fn cells(c: &Cal) -> Vec<(i64, gtk::Widget)> {
+    let mut out = Vec::new();
     let mut d = c.month_start.get();
     let mut row = c.month.first_child();
     while let Some(r) = row {
         for w in days::cells(&r) {
-            if d == day {
-                w.add_css_class("selected");
-            } else {
-                w.remove_css_class("selected");
-            }
+            out.push((d, w));
             d += DAY;
         }
         row = r.next_sibling();
     }
-    mini::refresh(&c);
+    out
+}
+
+/// Give the grid's days for which `on` holds the class `cls`, and take it from the others.
+fn mark(c: &Cal, cls: &str, on: impl Fn(i64) -> bool) {
+    for (d, w) in cells(c) {
+        if on(d) {
+            w.add_css_class(cls);
+        } else {
+            w.remove_css_class(cls);
+        }
+    }
+}
+
+/// The day under `(x, y)` in the grid.
+fn day_at(c: &Cal, x: f64, y: f64) -> Option<i64> {
+    let p = gtk::graphene::Point::new(x as f32, y as f32);
+    cells(c)
+        .into_iter()
+        .find(|(_, w)| {
+            w.compute_bounds(&c.month)
+                .is_some_and(|b| b.contains_point(&p))
+        })
+        .map(|(d, _)| d)
+}
+
+/// Days dragged across, with the mouse, from an empty spot of a day (not an item, which is
+/// dragged or clicked itself): marked as it goes, then a new event over them is offered.
+fn drag_days(c: &Rc<Cal>) {
+    let drag = gtk::GestureDrag::new();
+    // The first and the last day so far, once past the first.
+    let span: Rc<Cell<Option<(i64, i64)>>> = Rc::default();
+    let start: Rc<Cell<Option<i64>>> = Rc::default();
+    let (s, sp) = (start.clone(), span.clone());
+    drag.connect_drag_begin(move |g, x, y| {
+        sp.set(None);
+        s.set(None);
+        let Some(c) = cal() else { return };
+        let touch = g
+            .device()
+            .is_some_and(|d| d.source() == gdk::InputSource::Touchscreen);
+        let on_item = c
+            .month
+            .pick(x, y, gtk::PickFlags::DEFAULT)
+            .is_some_and(|w| w.ancestor(gtk::Button::static_type()).is_some());
+        match day_at(&c, x, y) {
+            // A finger scrolls the grid instead.
+            Some(d) if !touch && !on_item => s.set(Some(d)),
+            _ => {
+                g.set_state(gtk::EventSequenceState::Denied);
+            }
+        }
+    });
+    let sp = span.clone();
+    drag.connect_drag_update(move |g, dx, dy| {
+        let (Some(c), Some(from), Some((x, y))) = (cal(), start.get(), g.start_point()) else {
+            return;
+        };
+        let Some(at) = day_at(&c, x + dx, y + dy) else {
+            return;
+        };
+        let last = sp.get().map_or(from, |(_, to)| to);
+        if at == last {
+            return;
+        }
+        // Past the first day: no longer a click (the cell's, which selects it).
+        g.set_state(gtk::EventSequenceState::Claimed);
+        sp.set(Some((from, at)));
+        let (a, b) = (from.min(at), from.max(at));
+        mark(&c, "range", |d| (a..=b).contains(&d));
+    });
+    drag.connect_drag_end(move |_, _, _| {
+        if let (Some(c), Some((from, to))) = (cal(), span.take()) {
+            quick_add(&c, from.min(to), from.max(to));
+        }
+    });
+    c.month.add_controller(drag);
+}
+
+/// Offer a new all-day event from `from` to `to` (midnights of its first and last days), from
+/// the cell of its last day, the days marked meanwhile.
+fn quick_add(c: &Rc<Cal>, from: i64, to: i64) {
+    let Some((_, cell)) = cells(c).into_iter().find(|(d, _)| *d == to) else {
+        return;
+    };
+    mark(c, "range", |d| (from..=to).contains(&d));
+    let time = EventTime {
+        start: from,
+        end: to + DAY,
+        all_day: true,
+    };
+    quick::open(c, &cell, time, || {
+        if let Some(c) = cal() {
+            mark(&c, "range", |_| false);
+        }
+    });
 }

@@ -6,6 +6,7 @@ mod days;
 pub(crate) mod dialog;
 mod mini;
 mod month;
+mod quick;
 mod week;
 
 use crate::i18n::{gettext, ngettext, pgettext};
@@ -41,6 +42,8 @@ const CSS: &str = "
 .day.other .num { opacity: 0.4; }
 .day.today .num { background: @accent_bg_color; color: @accent_fg_color; border-radius: 9999px; font-weight: bold; }
 .day.selected { background: alpha(@accent_bg_color, 0.08); }
+/* The days a new event's popover is for (month::quick_add). */
+.month .day.range { background: alpha(@accent_bg_color, 0.2); }
 /* Saturdays' and Sundays' names and numbers, tinted red a little (not today's or the selected). */
 label.weekend { color: color-mix(in srgb, currentColor 55%, @error_color); }
 .mini button.day.selected label { color: inherit; }
@@ -85,8 +88,9 @@ button.block.task { padding-left: 4px; }
 button.color-button { padding: 6px; min-width: 0; min-height: 0; }
 /* What leads a details line (an icon, a dot, the colour box, a check) takes the icons' 16px, so
    the text after it starts at the same place on every line. */
-.details .dot:not(.color-box) { margin: 0 3px; }
+.details > box > .dot:not(.color-box), .details dropdown > button .dot { margin: 0 3px; }
 .details button.color-button { margin: 0 -6px; }
+.details dropdown > button { padding-left: 6px; padding-right: 6px; margin: 0 -6px; font-weight: normal; }
 .ring { min-width: 12px; min-height: 12px; border: 2px solid; border-radius: 9999px; }
 .ring image { -gtk-icon-size: 10px; }
 row.done label.title { text-decoration-line: line-through; opacity: 0.55; }
@@ -159,6 +163,8 @@ struct Cal {
     /// An event's details are open: redraws wait (`pending`) until it closes.
     holding: Cell<bool>,
     pending: Cell<bool>,
+    /// A day of the month clicked once: its new event's popover, waiting out a double click.
+    quick: RefCell<Option<glib::SourceId>>,
     /// The day `show_day` went to, pulsing until then (as the Tasks page pulses a task).
     flash: Cell<Option<(i64, std::time::Instant)>>,
     /// Midnight of the day the views are around (the selected day).
@@ -285,6 +291,7 @@ pub fn build(views: &adw::ViewStack, tasks: &adw::OverlaySplitView) {
         scrolled: Cell::new(false),
         holding: Cell::new(false),
         pending: Cell::new(false),
+        quick: RefCell::default(),
         flash: Cell::new(None),
         anchor: Cell::new(today()),
         browsed: Cell::new(false),
@@ -1187,6 +1194,10 @@ fn new_event_on(
 ) {
     let open = Rc::new(move |g: &gtk::Gesture, x, y| {
         let Some(c) = cal() else { return };
+        // The first click's popover, for a new event too, does not come.
+        if let Some(id) = c.quick.take() {
+            id.remove();
+        }
         if let Some(time) = at(&c, x, y) {
             g.set_state(gtk::EventSequenceState::Claimed);
             dialog::open(&c, None, time);
@@ -1342,28 +1353,37 @@ fn task_chip(c: &Rc<Cal>, t: &Task, label: &gtk::Widget, check_align: gtk::Align
 
 /// When an event is, in words: "Tuesday 20 October, 09:00 – 10:00", or its days.
 fn span_text(e: &Event) -> String {
+    span(&EventTime {
+        start: e.start,
+        end: e.end,
+        all_day: e.all_day,
+    })
+}
+
+/// When `t` is, as an event's details say it.
+fn span(t: &EventTime) -> String {
     let date = |t| fmt(t, "%A %-d %B %Y");
-    if e.all_day {
-        let last = e.end - DAY;
-        if last <= e.start {
-            date(e.start)
+    if t.all_day {
+        let last = t.end - DAY;
+        if last <= t.start {
+            date(t.start)
         } else {
-            format!("{} – {}", date(e.start), date(last))
+            format!("{} – {}", date(t.start), date(last))
         }
-    } else if e.end - e.start < DAY && fmt(e.start, "%F") == fmt(e.end - 1, "%F") {
+    } else if t.end - t.start < DAY && fmt(t.start, "%F") == fmt(t.end - 1, "%F") {
         format!(
             "{}, {} – {}",
-            date(e.start),
-            fmt(e.start, "%H:%M"),
-            fmt(e.end, "%H:%M")
+            date(t.start),
+            fmt(t.start, "%H:%M"),
+            fmt(t.end, "%H:%M")
         )
     } else {
         format!(
             "{} {} – {} {}",
-            date(e.start),
-            fmt(e.start, "%H:%M"),
-            date(e.end),
-            fmt(e.end, "%H:%M")
+            date(t.start),
+            fmt(t.start, "%H:%M"),
+            date(t.end),
+            fmt(t.end, "%H:%M")
         )
     }
 }
@@ -1857,7 +1877,7 @@ fn details(c: &Cal, e: &Event) -> gtk::Popover {
                 _ => apply(Scope::All),
             }
         };
-        let (button, _) = dialog::color_button(e.color.clone(), e.list_href.clone(), recolor);
+        let (button, _) = dialog::color_button(e.color.clone(), e.list_href.clone(), None, recolor);
         title.append(&button);
     } else {
         let mark = gtk::Box::builder().valign(gtk::Align::Center).build();
