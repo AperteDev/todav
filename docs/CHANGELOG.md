@@ -42,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Android: saving an event saved it as it was at the first change made on its page and
   dropped the changes after it, such as a repeat picked after the title was edited.
+- Android: a message with Undo ("... saved", "... completed") stayed until swiped away, and the
+  messages after it waited behind it; it now goes after ten seconds.
 
 ## [2.3.0] - 2026-10-30
 

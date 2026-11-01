@@ -54,6 +54,7 @@ import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -259,7 +260,9 @@ private fun Messages(model: Main, screen: Screen, snackbar: SnackbarHostState) {
     LaunchedEffect(Unit) {
         model.messages.collect { (text, change) ->
             val action = if (change != null) tr("Undo") else null
-            if (snackbar.showSnackbar(text, action) == SnackbarResult.ActionPerformed) model.undo(change)
+            // With an action it would stay until dismissed, and hold back the messages after it.
+            val shown = snackbar.showSnackbar(text, action, duration = SnackbarDuration.Long)
+            if (shown == SnackbarResult.ActionPerformed) model.undo(change)
         }
     }
     LaunchedEffect(Unit) {
