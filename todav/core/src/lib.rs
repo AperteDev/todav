@@ -1,5 +1,6 @@
 mod account;
 pub mod caldav;
+pub mod color;
 mod config;
 mod event;
 pub mod gtasks;
@@ -1520,6 +1521,53 @@ mod tests {
         assert_eq!(c.events(day, day + 86400)[0].priority, None);
         assert_eq!(set(Some(1)), Some(1));
         assert_eq!(set(None), None);
+    }
+
+    #[test]
+    fn events_keep_a_colour_of_their_own_as_a_css_name() {
+        let dir = std::env::temp_dir().join(format!("todav-test-color-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        c.db.lock()
+            .unwrap()
+            .execute(
+                "INSERT INTO lists (href, display_name, has_events) VALUES ('/c/', 'C', 1)",
+                [],
+            )
+            .unwrap();
+        let day = ical::parse_time("20261020").unwrap();
+        let time = EventTime {
+            start: day + 9 * 3600,
+            end: day + 10 * 3600,
+            all_day: false,
+        };
+        let uid = c
+            .add_event("/c/".into(), "Review".into(), time, vec![])
+            .unwrap();
+        let set = |color: Option<&str>| {
+            let patch = EventPatch {
+                color: Some(color.map(String::from)),
+                ..Default::default()
+            };
+            c.update_event("/c/".into(), uid.clone(), None, Scope::All, patch)
+                .unwrap();
+            c.events(day, day + 86400)[0].color.clone()
+        };
+        let raw = || {
+            let db = c.db.lock().unwrap();
+            store::raw(&db, Kind::Event, "/c/", &uid)
+                .unwrap()
+                .unwrap()
+                .raw_ics
+        };
+        assert_eq!(c.events(day, day + 86400)[0].color, None);
+        assert_eq!(set(Some("#d2691e")).as_deref(), Some("#D2691E"));
+        assert!(raw().contains("COLOR:chocolate\r\n"));
+        // Another colour comes back as its CSS name's.
+        assert_eq!(set(Some("#0082C9")), color::snapped("#0082C9"));
+        assert_eq!(set(None), None);
+        assert!(!raw().contains("COLOR"));
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]

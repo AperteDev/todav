@@ -144,7 +144,7 @@ fun SearchPage(model: Main) {
                     ListItem(
                         onClick = { details = Item.Event(e) },
                         supportingContent = { Text(eventWhen(e, now)) },
-                        leadingContent = { Icon(Icons.Outlined.Event, null, tint = parseColor(colors[e.listHref])) },
+                        leadingContent = { Icon(Icons.Outlined.Event, null, tint = parseColor(e.color ?: colors[e.listHref])) },
                     ) { Text(e.summary, maxLines = 2, overflow = TextOverflow.Ellipsis) }
                 }
             }

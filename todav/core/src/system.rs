@@ -29,6 +29,8 @@ pub struct SystemEvent {
     pub title: String,
     pub description: String,
     pub location: String,
+    /// Its own colour ("#rrggbb"; empty: its calendar's).
+    pub color: String,
 }
 
 impl Client {
@@ -118,7 +120,12 @@ fn to_ics(e: &SystemEvent) -> String {
     s += &time("DTSTART", e.start);
     s += &time("DTEND", e.end.max(e.start));
     s += &format!("SUMMARY:{}\r\n", escape(&e.title));
-    for (name, v) in [("LOCATION", &e.location), ("DESCRIPTION", &e.description)] {
+    // Its colour as is: the system's events are read only here, and COLOR is read in hex too.
+    for (name, v) in [
+        ("LOCATION", &e.location),
+        ("DESCRIPTION", &e.description),
+        ("COLOR", &e.color),
+    ] {
         if !v.is_empty() {
             s += &format!("{name}:{}\r\n", escape(v));
         }
@@ -162,6 +169,7 @@ mod tests {
             title: title.into(),
             description: String::new(),
             location: "Kraków; room 2".into(),
+            color: String::new(),
         };
         c.set_system_events(href.clone(), vec![ev("a", "One"), ev("b", "Two")])
             .unwrap();

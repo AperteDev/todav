@@ -29,6 +29,14 @@ impl Item {
         }
     }
 
+    /// Its colour: an event's own, else its collection's in `colors` (`colors`).
+    pub fn color(&self, colors: &HashMap<String, String>) -> String {
+        match self {
+            Item::Event(Event { color: Some(c), .. }) => c.clone(),
+            _ => colors.get(self.list()).cloned().unwrap_or_default(),
+        }
+    }
+
     /// When it is, for sorting within a day: all-day things first.
     fn key(&self) -> (bool, i64) {
         match self {
@@ -145,7 +153,7 @@ pub fn agenda(c: &Client, from: i64, days: i64, lists: Option<&[String]>) -> Vec
                 day,
                 time,
                 item: i.clone(),
-                color: colors.get(i.list()).cloned().unwrap_or_default(),
+                color: i.color(&colors),
             });
         }
     }

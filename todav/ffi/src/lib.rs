@@ -1077,6 +1077,18 @@ pub fn color_presets() -> Vec<String> {
         .collect()
 }
 
+/// The colours offered for an event's own ("#RRGGBB").
+#[uniffi::export]
+pub fn event_color_presets() -> Vec<String> {
+    todav_app::lists::event_presets()
+}
+
+/// `color` ("#rrggbb") as an event keeps it: the colour of its closest CSS name.
+#[uniffi::export]
+pub fn event_color(color: String) -> Option<String> {
+    todav_core::color::snapped(&color)
+}
+
 /// The account heading each of `lists` (as `Todav::by_place` orders them), when they are from
 /// more than one.
 #[uniffi::export]

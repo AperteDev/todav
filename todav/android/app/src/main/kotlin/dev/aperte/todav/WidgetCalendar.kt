@@ -58,9 +58,9 @@ import dev.aperte.todav.core.monthFirst
 import dev.aperte.todav.core.sameList
 import dev.aperte.todav.core.weekStart
 import dev.aperte.todav.ui.DAY
+import dev.aperte.todav.ui.color
 import dev.aperte.todav.ui.done
 import dev.aperte.todav.ui.firstWeekday
-import dev.aperte.todav.ui.list
 import dev.aperte.todav.ui.parseColor
 import dev.aperte.todav.ui.title
 import dev.aperte.todav.ui.weekend
@@ -392,9 +392,9 @@ class DayWidget : TodavWidget() {
             val colors = core.colors()
             val items = core.items(day, day + DAY, shown.map { it.href })
             val blocks = items.mapNotNull { i ->
-                core.hours(i)?.let { h -> Block(i, maxOf(h.from, day), minOf(h.to, day + DAY), colors[i.list()]) }
+                core.hours(i)?.let { h -> Block(i, maxOf(h.from, day), minOf(h.to, day + DAY), i.color(colors)) }
             }
-            items.filter { core.hours(it) == null }.map { it to colors[it.list()] } to blocks
+            items.filter { core.hours(it) == null }.map { it to it.color(colors) } to blocks
         }
         val title = when (offset) {
             0 -> tr("Today")
@@ -597,7 +597,7 @@ class PlannerWidget : TodavWidget() {
         }
         val first = ((midnight(from) - monday) / DAY).toInt()
         val last = ((midnight(to) - monday) / DAY).toInt()
-        if (last < 0 || first > 6) null else Bar(i, first.coerceAtLeast(0), last.coerceAtMost(6), colors[i.list()])
+        if (last < 0 || first > 6) null else Bar(i, first.coerceAtLeast(0), last.coerceAtMost(6), i.color(colors))
     }.sortedWith(compareBy<Bar>({ it.first }, { -(it.last - it.first) }))
 
     /** Bars in lanes: each in the first where it fits after the last one. */

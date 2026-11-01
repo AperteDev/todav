@@ -24,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Linux: an event's edit dialog lists its tasks, to tick or add one, as its details do.
 - Android: System Calendars can be renamed and recoloured, in Todav only; "Use the System's
   Name and Color" in the same dialog undoes it.
+- An event's own colour, shown instead of its calendar's in every view, the widgets and the
+  extension: one set in Nextcloud Calendar or Thunderbird (COLOR), or with Own Color in the
+  event dialog (Linux) or page (Android), from 12 colours or any other. It is saved as the
+  closest CSS colour name, as Nextcloud Calendar saves it. On Android, a System Calendar's
+  event shows its own colour too (Google Calendar's event colours).
+- Android: any colour for a list or calendar, with Custom Color after the presets, as on Linux.
 
 ### Changed
 

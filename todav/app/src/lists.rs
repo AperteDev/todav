@@ -8,6 +8,31 @@ pub const PRESETS: [&str; 12] = [
     "#0082C9", "#2D73BE", "#5B64B3", "#8855A8",
 ];
 
+/// The colours offered for an event's own: CSS names, as an event keeps its colour (COLOR), so
+/// each shows as it is saved (the list presets' closest names would be few and alike).
+const EVENT_COLORS: [&str; 12] = [
+    "crimson",
+    "tomato",
+    "darkorange",
+    "goldenrod",
+    "olivedrab",
+    "seagreen",
+    "lightseagreen",
+    "steelblue",
+    "royalblue",
+    "slateblue",
+    "mediumorchid",
+    "palevioletred",
+];
+
+/// `EVENT_COLORS` as "#RRGGBB", in a rainbow's order.
+pub fn event_presets() -> Vec<String> {
+    EVENT_COLORS
+        .iter()
+        .filter_map(|n| todav_core::color::parse(n))
+        .collect()
+}
+
 /// A list's colour from the server when it is one ("#rrggbb", maybe with alpha), else blue.
 pub fn color(l: &List) -> String {
     l.color

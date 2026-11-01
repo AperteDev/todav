@@ -40,6 +40,7 @@ pub struct SystemEvent {
     pub title: String,
     pub description: String,
     pub location: String,
+    pub color: String,
 }
 
 // --- mirrored from the core --------------------------------------------------------
@@ -170,6 +171,7 @@ pub struct Event {
     pub reminders: Vec<i64>,
     pub rule: Option<String>,
     pub priority: Option<i64>,
+    pub color: Option<String>,
 }
 
 #[uniffi::remote(Record)]
@@ -463,6 +465,9 @@ pub struct EventPatch {
     pub repeat: Option<RepeatValue>,
     #[uniffi(default = None)]
     pub priority: Option<PriorityValue>,
+    /// Its own colour ("#rrggbb"), or none for its calendar's (`text: None`).
+    #[uniffi(default = None)]
+    pub color: Option<TextValue>,
 }
 
 impl From<EventPatch> for todav_core::EventPatch {
@@ -475,6 +480,7 @@ impl From<EventPatch> for todav_core::EventPatch {
             reminders: p.reminders,
             repeat: p.repeat.map(|v| v.repeat),
             priority: p.priority.map(|v| v.priority),
+            color: p.color.map(|v| v.text),
         }
     }
 }

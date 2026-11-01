@@ -218,6 +218,9 @@ fun Item.list(): String = when (this) {
     is Item.Task -> task.listHref
 }
 
+/** Its colour: an event's own, else its list's in `colors` (`core.colors()`). */
+fun Item.color(colors: Map<String, String>): String? = (this as? Item.Event)?.event?.color ?: colors[list()]
+
 fun Item.done(): Boolean = this is Item.Task && task.done
 
 /** When an event happens, in words: its days, or its day and times. */
@@ -785,7 +788,7 @@ private fun DayCell(
 /** An item in its list's colour: a small one-line chip, or `large`, a row to tap. */
 @Composable
 private fun Chip(item: Item, colors: Map<String, String>, large: Boolean = false, shape: Shape? = null, onClick: (() -> Unit)? = null) {
-    val color = parseColor(colors[item.list()])
+    val color = parseColor(item.color(colors))
     Text(
         item.title(),
         fontSize = if (large) 14.sp else 10.sp,
@@ -1265,7 +1268,7 @@ private fun Week(
                         week.blocks.getOrElse(n) { emptyList() }.forEach { b ->
                             val (i, s, c) = Triple(b.item, b.piece, b.column)
                             val item = items[i]
-                            val color = parseColor(colors[item.list()])
+                            val color = parseColor(item.color(colors))
                             val height = (HOUR * ((s.to - s.from).coerceAtLeast(20) / 60f)) - 1.dp
                             val held = drag?.takeIf { it.item == i && it.day == d }
                             Box(
@@ -1662,7 +1665,7 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
             when (item) {
                 is Item.Event -> {
                     val e = item.event
-                    Line({ Box(Modifier.size(18.dp).background(parseColor(colors[e.listHref]), RoundedCornerShape(4.dp))) }) {
+                    Line({ Box(Modifier.size(18.dp).background(parseColor(e.color ?: colors[e.listHref]), RoundedCornerShape(4.dp))) }) {
                         TitleField(e.summary, editable = lists[e.listHref]?.writable == true) { renamed = it }
                     }
                     Line({ Icon(Icons.Outlined.Schedule, null) }) { Text(eventWhen(e, now)) }

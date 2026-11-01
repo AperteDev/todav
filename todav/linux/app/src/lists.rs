@@ -26,9 +26,13 @@ const CSS: &str = "
 .custom-ring > button:hover { filter: brightness(1.1); }
 ";
 
+/// The classes of events' own colours loaded so far (`event_class`), with their colours.
+type Own = (gtk::CssProvider, Vec<(String, String)>);
+
 thread_local! {
     /// The colour classes, and the CSS they were last loaded from.
     static COLORS: RefCell<Option<(gtk::CssProvider, String)>> = const { RefCell::new(None) };
+    static OWN: RefCell<Option<Own>> = const { RefCell::new(None) };
 }
 
 /// The CSS class showing list `href` in its colour (see `paint`).
@@ -39,26 +43,55 @@ pub fn class(href: &str) -> String {
     format!("cal-{:x}", h.finish())
 }
 
+/// The CSS showing what has class `cls` in colour `col`.
+fn rules(cls: &str, col: &str) -> String {
+    format!(
+        ".dot.{cls}, .chip.all-day.{cls} {{ background-color: {col}; }}
+         .ring.{cls} {{ color: {col}; }}
+         .chip.all-day.{cls} {{ color: white; }}
+         .chip.{cls}:not(.all-day) {{ background-color: alpha({col}, 0.18); }}\n"
+    )
+}
+
+/// The CSS class showing event `e` in its colour: its own, else its calendar's (`class`).
+pub fn event_class(e: &todav_core::Event) -> String {
+    let Some(col) = e.color.as_deref() else {
+        return class(&e.list_href);
+    };
+    let cls = format!("own-{}", col.trim_start_matches('#').to_ascii_lowercase());
+    let Some(display) = gdk::Display::default() else {
+        return cls;
+    };
+    // A class for each colour of its own seen so far, loaded with the first event in it.
+    OWN.with(|o| {
+        let mut o = o.borrow_mut();
+        let (provider, seen) = o.get_or_insert_with(|| {
+            let p = gtk::CssProvider::new();
+            gtk::style_context_add_provider_for_display(
+                &display,
+                &p,
+                gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+            );
+            (p, Vec::new())
+        });
+        if !seen.iter().any(|(c, _)| *c == cls) {
+            seen.push((cls.clone(), col.to_string()));
+            let css: String = seen.iter().map(|(c, col)| rules(c, col)).collect();
+            provider.load_from_string(&css);
+        }
+    });
+    cls
+}
+
 /// Load every list's colour class as it is now; both pages call this before drawing.
 pub fn paint() {
     let mut all = core().calendars();
     all.extend(core().lists());
     let mut css: String = all
         .iter()
-        .map(|l| {
-            let (cls, col) = (class(&l.href), color(l));
-            format!(
-                ".dot.{cls}, .chip.all-day.{cls} {{ background-color: {col}; }}
-                 .ring.{cls} {{ color: {col}; }}
-                 .chip.all-day.{cls} {{ color: white; }}
-                 .chip.{cls}:not(.all-day) {{ background-color: alpha({col}, 0.18); }}\n"
-            )
-        })
+        .map(|l| rules(&class(&l.href), &color(l)))
         .collect();
     css += CSS;
-    for (i, p) in PRESETS.iter().enumerate() {
-        css += &format!(".swatch.preset-{i} {{ background-color: {p}; }}\n");
-    }
     let Some(display) = gdk::Display::default() else {
         return;
     };
@@ -443,9 +476,136 @@ fn normal(c: &str) -> String {
     c.get(..7).unwrap_or(c).to_ascii_uppercase()
 }
 
+/// Colour swatches in `grid` of `dialog`: `presets` ("#RRGGBB"), then any colour in a rainbow
+/// ring, which shows one that is no preset. Gives the colour chosen, `start` until one is;
+/// `snap` makes a custom one what it will be saved as.
+pub fn swatches(
+    dialog: &adw::Dialog,
+    grid: &gtk::Grid,
+    presets: &[String],
+    start: String,
+    snap: fn(String) -> String,
+) -> Rc<RefCell<String>> {
+    let chosen = Rc::new(RefCell::new(start));
+    // The swatches' colours, while the dialog is open.
+    let css = gtk::CssProvider::new();
+    gtk::style_context_add_provider_for_display(
+        &dialog.display(),
+        &css,
+        gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+    );
+    let c = css.clone();
+    dialog.connect_closed(move |d| {
+        gtk::style_context_remove_provider_for_display(&d.display(), &c);
+    });
+    let preset_css: String = presets
+        .iter()
+        .enumerate()
+        .map(|(i, p)| format!(".swatch.preset-{i} {{ background-color: {p}; }}\n"))
+        .collect();
+
+    let swatch = |tip: &str| {
+        let b = gtk::Button::builder()
+            .child(&gtk::Image::from_icon_name("object-select-symbolic"))
+            .tooltip_text(tip)
+            .valign(gtk::Align::Center)
+            .halign(gtk::Align::Center)
+            .build();
+        b.add_css_class("circular");
+        b
+    };
+    let buttons: Vec<gtk::Button> = presets
+        .iter()
+        .enumerate()
+        .map(|(i, p)| {
+            let b = swatch(p);
+            b.add_css_class("swatch");
+            b.add_css_class(&format!("preset-{i}"));
+            grid.attach(&b, i as i32 % COLUMNS, i as i32 / COLUMNS, 1, 1);
+            b
+        })
+        .collect();
+    // In a rainbow ring: any colour, set apart from the presets.
+    let custom = swatch(&gettext("Custom Color…"));
+    let ring = gtk::Box::builder()
+        .valign(gtk::Align::Center)
+        .halign(gtk::Align::Center)
+        .css_classes(["custom-ring"])
+        .build();
+    ring.append(&custom);
+    let n = presets.len() as i32;
+    grid.attach(&ring, n % COLUMNS, n / COLUMNS, 1, 1);
+
+    // The chosen swatch has a check; a colour that is no preset shows in the last one.
+    let render = {
+        let (chosen, buttons, custom) = (chosen.clone(), buttons.clone(), custom.clone());
+        let presets = presets.to_vec();
+        Rc::new(move || {
+            let c = chosen.borrow();
+            let at = presets.iter().position(|p| *p == *c);
+            for (i, b) in buttons.iter().enumerate() {
+                if at == Some(i) {
+                    b.add_css_class("chosen");
+                } else {
+                    b.remove_css_class("chosen");
+                }
+            }
+            let icon = if at.is_none() {
+                css.load_from_string(&format!(
+                    "{preset_css}.custom-ring > button.custom {{ background-color: {c}; }}"
+                ));
+                custom.set_css_classes(&["circular", "custom"]);
+                "object-select-symbolic"
+            } else {
+                css.load_from_string(&preset_css);
+                custom.set_css_classes(&["circular"]);
+                "view-more-horizontal-symbolic"
+            };
+            custom.set_child(Some(&gtk::Image::from_icon_name(icon)));
+        })
+    };
+    render();
+    for (b, p) in buttons.iter().zip(presets) {
+        let (chosen, render, p) = (chosen.clone(), render.clone(), p.clone());
+        b.connect_clicked(move |_| {
+            *chosen.borrow_mut() = p.clone();
+            render();
+        });
+    }
+    {
+        let (chosen, render, d) = (chosen.clone(), render.clone(), dialog.clone());
+        custom.connect_clicked(move |_| {
+            let (chosen, render) = (chosen.clone(), render.clone());
+            let window = d.root().and_downcast::<gtk::Window>();
+            let initial = gdk::RGBA::parse(chosen.borrow().as_str()).ok();
+            glib::spawn_future_local(async move {
+                let picker = gtk::ColorDialog::builder()
+                    .title(gettext("Custom Color"))
+                    .with_alpha(false)
+                    .build();
+                let Ok(c) = picker
+                    .choose_rgba_future(window.as_ref(), initial.as_ref())
+                    .await
+                else {
+                    return; // cancelled
+                };
+                let hex = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
+                *chosen.borrow_mut() = snap(format!(
+                    "#{:02X}{:02X}{:02X}",
+                    hex(c.red()),
+                    hex(c.green()),
+                    hex(c.blue())
+                ));
+                render();
+            });
+        });
+    }
+    chosen
+}
+
 /// Add a task list, or a calendar of events (`events`); or edit `list` (its kind decides).
 pub fn open(parent: &gtk::Widget, list: Option<List>, events: bool) {
-    paint(); // the swatches' colours
+    paint(); // the swatches' look
     let b = view!("list-dialog");
     let dialog: adw::Dialog = get(&b, "dialog");
     let (name, save, error): (adw::EntryRow, gtk::Button, adw::Banner) =
@@ -475,113 +635,8 @@ pub fn open(parent: &gtk::Widget, list: Option<List>, events: bool) {
             .unwrap_or(&PRESETS[0])
             .to_string(),
     };
-    let chosen = Rc::new(RefCell::new(start));
-
-    // The custom swatch's colour, while the dialog is open.
-    let custom_css = gtk::CssProvider::new();
-    gtk::style_context_add_provider_for_display(
-        &dialog.display(),
-        &custom_css,
-        gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
-    );
-    let css = custom_css.clone();
-    dialog.connect_closed(move |d| {
-        gtk::style_context_remove_provider_for_display(&d.display(), &css);
-    });
-
-    let grid: gtk::Grid = get(&b, "colors");
-    let swatch = |tip: &str| {
-        let b = gtk::Button::builder()
-            .child(&gtk::Image::from_icon_name("object-select-symbolic"))
-            .tooltip_text(tip)
-            .valign(gtk::Align::Center)
-            .halign(gtk::Align::Center)
-            .build();
-        b.add_css_class("circular");
-        b
-    };
-    let presets: Vec<gtk::Button> = (0..PRESETS.len())
-        .map(|i| {
-            let b = swatch(PRESETS[i]);
-            b.add_css_class("swatch");
-            b.add_css_class(&format!("preset-{i}"));
-            grid.attach(&b, i as i32 % COLUMNS, i as i32 / COLUMNS, 1, 1);
-            b
-        })
-        .collect();
-    // In a rainbow ring: any colour, set apart from the presets.
-    let custom = swatch(&gettext("Custom Color…"));
-    let ring = gtk::Box::builder()
-        .valign(gtk::Align::Center)
-        .halign(gtk::Align::Center)
-        .css_classes(["custom-ring"])
-        .build();
-    ring.append(&custom);
-    let n = PRESETS.len() as i32;
-    grid.attach(&ring, n % COLUMNS, n / COLUMNS, 1, 1);
-
-    // The chosen swatch has a check; a colour that is no preset shows in the last one.
-    let render = {
-        let (chosen, presets, custom) = (chosen.clone(), presets.clone(), custom.clone());
-        Rc::new(move || {
-            let c = chosen.borrow();
-            let at = PRESETS.iter().position(|p| *p == *c);
-            for (i, b) in presets.iter().enumerate() {
-                if at == Some(i) {
-                    b.add_css_class("chosen");
-                } else {
-                    b.remove_css_class("chosen");
-                }
-            }
-            let icon = if at.is_none() {
-                custom_css.load_from_string(&format!(
-                    ".custom-ring > button.custom {{ background-color: {c}; }}"
-                ));
-                custom.set_css_classes(&["circular", "custom"]);
-                "object-select-symbolic"
-            } else {
-                custom.set_css_classes(&["circular"]);
-                "view-more-horizontal-symbolic"
-            };
-            custom.set_child(Some(&gtk::Image::from_icon_name(icon)));
-        })
-    };
-    render();
-    for (i, b) in presets.iter().enumerate() {
-        let (chosen, render) = (chosen.clone(), render.clone());
-        b.connect_clicked(move |_| {
-            *chosen.borrow_mut() = PRESETS[i].to_string();
-            render();
-        });
-    }
-    {
-        let (chosen, render, d) = (chosen.clone(), render.clone(), dialog.clone());
-        custom.connect_clicked(move |_| {
-            let (chosen, render) = (chosen.clone(), render.clone());
-            let window = d.root().and_downcast::<gtk::Window>();
-            let initial = gdk::RGBA::parse(chosen.borrow().as_str()).ok();
-            glib::spawn_future_local(async move {
-                let picker = gtk::ColorDialog::builder()
-                    .title(gettext("Custom Color"))
-                    .with_alpha(false)
-                    .build();
-                let Ok(c) = picker
-                    .choose_rgba_future(window.as_ref(), initial.as_ref())
-                    .await
-                else {
-                    return; // cancelled
-                };
-                let hex = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
-                *chosen.borrow_mut() = format!(
-                    "#{:02X}{:02X}{:02X}",
-                    hex(c.red()),
-                    hex(c.green()),
-                    hex(c.blue())
-                );
-                render();
-            });
-        });
-    }
+    let presets: Vec<String> = PRESETS.iter().map(|p| p.to_string()).collect();
+    let chosen = swatches(&dialog, &get(&b, "colors"), &presets, start, |c| c);
 
     // A new one: in which account, picked when there is a choice.
     let places = places(events);

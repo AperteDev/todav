@@ -9,7 +9,7 @@ mod month;
 mod week;
 
 use crate::i18n::{gettext, ngettext, pgettext};
-use crate::lists::class;
+use crate::lists::{class, event_class};
 use crate::window::{get, tick, view};
 use crate::{core, dates, request_sync};
 use adw::prelude::*;
@@ -1263,7 +1263,7 @@ fn chip(c: &Rc<Cal>, i: &Item) -> gtk::Widget {
                 .has_frame(false)
                 .build();
             b.add_css_class("chip");
-            b.add_css_class(&class(&e.list_href));
+            b.add_css_class(&event_class(e));
             b.set_tooltip_markup(Some(&tooltip(c, i)));
             if e.all_day {
                 b.add_css_class("all-day");
@@ -2028,10 +2028,10 @@ fn render_search(c: &Rc<Cal>) {
     }
 }
 
-/// An agenda row's mark in its list's colour, as the extension's and Android's: an event's dot
-/// (`done` None) or a task's larger ring, a tick in it when done, in a slot as wide either way so
-/// the titles line up. Only a mark: a task is ticked in its details.
-fn mark(list: &str, done: Option<bool>) -> gtk::Box {
+/// An agenda row's mark in its colour (class `cls`), as the extension's and Android's: an event's
+/// dot (`done` None) or a task's larger ring, a tick in it when done, in a slot as wide either way
+/// so the titles line up. Only a mark: a task is ticked in its details.
+fn mark(cls: &str, done: Option<bool>) -> gtk::Box {
     let slot = gtk::Box::builder()
         .width_request(18)
         .valign(gtk::Align::Center)
@@ -2043,7 +2043,7 @@ fn mark(list: &str, done: Option<bool>) -> gtk::Box {
         .valign(gtk::Align::Center)
         .build();
     m.add_css_class(if done.is_some() { "ring" } else { "dot" });
-    m.add_css_class(&class(list));
+    m.add_css_class(cls);
     if done == Some(true) {
         let tick = gtk::Image::from_icon_name("object-select-symbolic");
         tick.set_hexpand(true);
@@ -2072,7 +2072,7 @@ fn agenda_row(i: &Item) -> adw::ActionRow {
                 None => time,
             };
             row.set_subtitle(&sub);
-            row.add_prefix(&mark(&e.list_href, None));
+            row.add_prefix(&mark(&event_class(e), None));
             let (ev, ev2) = (e.clone(), e.clone());
             let open = on_clicks(
                 &row,
@@ -2090,7 +2090,7 @@ fn agenda_row(i: &Item) -> adw::ActionRow {
             } else {
                 format!("{task} · {}", fmt(at, "%H:%M"))
             });
-            row.add_prefix(&mark(&t.list_href, Some(t.done)));
+            row.add_prefix(&mark(&class(&t.list_href), Some(t.done)));
             if t.done {
                 row.add_css_class("done");
             }

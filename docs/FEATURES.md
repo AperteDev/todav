@@ -35,6 +35,7 @@ What Todav can do, in short. The details of each release are in the
 - Create, edit, move and delete events, recurring ones too (this occurrence, this and the
   following, or all), with reminders.
 - Priority on events, as on tasks: none, low, medium or high (the one Thunderbird sets).
+- An event's own colour instead of its calendar's, as Nextcloud Calendar sets it.
 - Plan a task by dropping it from "To Plan" on an hour (a time slot) or a day (due that day),
   with a preview in 15-minute steps; drop it back to unplan it.
 - Move events and planned tasks by drag and drop; resize them in the week view by their edges.
@@ -107,7 +108,7 @@ What Todav can do, in short. The details of each release are in the
 - Selecting several tasks to change them at once.
 - Duplicating tasks and events; templates.
 - A Year view, week numbers and folded night hours in the calendar.
-- An event's own time zone and colour; declined events hidden; the weather in the calendar.
+- An event's own time zone; declined events hidden; the weather in the calendar.
 - Attachments to tasks and events.
 - Invitations: attendees, sending and answering.
 - More choices for the GNOME extension's task list, and a place beside GNOME's calendar.

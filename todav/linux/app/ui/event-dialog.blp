@@ -71,6 +71,26 @@ Adw.Dialog dialog {
               title: _("Priority");
               model: Gtk.StringList { strings [C_("priority", "None"), C_("priority", "Low"), C_("priority", "Medium"), C_("priority", "High")] };
             }
+
+            // Off: its calendar's colour. The swatches are filled in code (`lists::swatches`).
+            Adw.ExpanderRow own_color {
+              title: _("Own Color");
+              subtitle: _("Instead of its calendar's");
+              show-enable-switch: true;
+              enable-expansion: false;
+
+              Gtk.ListBoxRow {
+                activatable: false;
+
+                Gtk.Grid colors {
+                  halign: center;
+                  column-spacing: 8;
+                  row-spacing: 8;
+                  margin-top: 12;
+                  margin-bottom: 12;
+                }
+              }
+            }
           }
 
           Adw.PreferencesGroup {

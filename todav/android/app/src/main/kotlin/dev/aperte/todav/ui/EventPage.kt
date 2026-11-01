@@ -16,6 +16,7 @@ import androidx.compose.material.icons.automirrored.outlined.Notes
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.EventRepeat
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Pin
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Repeat
@@ -60,6 +61,9 @@ import dev.aperte.todav.core.PriorityValue
 import dev.aperte.todav.core.Repeat
 import dev.aperte.todav.core.RepeatValue
 import dev.aperte.todav.core.Scope
+import dev.aperte.todav.core.TextValue
+import dev.aperte.todav.core.eventColor
+import dev.aperte.todav.core.eventColorPresets
 import dev.aperte.todav.core.listColor
 import dev.aperte.todav.core.plainRepeat
 import dev.aperte.todav.ntr
@@ -113,6 +117,9 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
         )
     }
     var priority by rememberSaveable { mutableStateOf(ev?.priority) }
+    // Its own colour, else (null) its calendar's.
+    var color by rememberSaveable { mutableStateOf(ev?.color) }
+    val colorPresets = remember { eventColorPresets() }
     var allDay by rememberSaveable { mutableStateOf(ev?.allDay ?: dest.allDay) }
     var start by rememberSaveable { mutableStateOf(ev?.start ?: dest.start) }
     // An all-day event's end is the midnight after its last day; shown as that last day.
@@ -164,12 +171,14 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
         reminders = reminders.toList().takeIf { ev == null || it != ev.reminders.map { r -> r - ev.start } },
         repeat = if (repeatChanged) RepeatValue(newRepeat) else null,
         priority = PriorityValue(priority).takeIf { priority != ev?.priority },
+        color = TextValue(color).takeIf { color != ev?.color },
     )
     val moved = ev != null && calendar != ev.listHref
     // Named through `patch`: in a `with(patch)` the page's own `summary`, `location` and
     // `reminders` would be read instead, and an untouched event would count as changed.
     val nothing = patch.summary == null && patch.location == null && patch.description == null &&
-        patch.time == null && patch.reminders == null && patch.repeat == null && patch.priority == null
+        patch.time == null && patch.reminders == null && patch.repeat == null && patch.priority == null &&
+        patch.color == null
     val changed = if (ev == null) summary.isNotBlank() else !nothing || moved
 
     fun save() {
@@ -184,8 +193,11 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
                     description = notes.takeIf { it.isNotBlank() },
                     repeat = newRepeat?.let { RepeatValue(it) },
                     priority = priority?.let { PriorityValue(it) },
+                    color = color?.let { TextValue(it) },
                 )
-                if (rest.location != null || rest.description != null || rest.repeat != null || rest.priority != null) {
+                if (rest.location != null || rest.description != null || rest.repeat != null || rest.priority != null ||
+                    rest.color != null
+                ) {
                     core.updateEvent(list, uid, null, Scope.ALL, rest)
                 }
             }
@@ -261,6 +273,21 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
                             Connected(PRIORITIES.map(::priorityName), priorityIndex(priority)) { priority = PRIORITIES[it] }
                         },
                     )
+                    // Off: its calendar's colour. One picked shows as it is saved, a CSS name's.
+                    Item(
+                        headlineContent = { Text(tr("Own Color")) },
+                        supportingContent = { Text(tr("Instead of its calendar's")) },
+                        leadingContent = { Icon(Icons.Outlined.Palette, null) },
+                        trailingContent = { Switch(color != null, { color = if (it) colorPresets.first() else null }) },
+                        modifier = Modifier.clickable { color = if (color == null) colorPresets.first() else null },
+                    )
+                    color?.let { c ->
+                        Item(
+                            headlineContent = {
+                                ColorSwatches(colorPresets, c, { color = it }) { eventColor(it) ?: it }
+                            },
+                        )
+                    }
                 }
                 Section(null) {
                     Item(

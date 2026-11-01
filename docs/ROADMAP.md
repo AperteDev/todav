@@ -35,9 +35,9 @@ Planned work, not yet done. [FEATURES.md](FEATURES.md) lists it publicly; the or
   **templates**: a task with subtasks, or a list, kept to copy from.
 - **More of the calendar**: a Year view, week numbers, night hours folded away in the week
   views.
-- **More of an event**: a time zone for its start and end, a colour of its own (`COLOR`),
-  declined and cancelled events hidden by a setting; the weather of the coming days in the
-  calendar's views (open: its source).
+- **More of an event**: a time zone for its start and end, declined and cancelled events
+  hidden by a setting; the weather of the coming days in the calendar's views (open: its
+  source).
 - **Attachments** to tasks and events (`ATTACH`): links, and files uploaded to the account's
   Nextcloud Files; shown and opened from the task dialog and the event's details.
 - **Invitations**: attendees on an event, invitations sent and answered through the server's

@@ -32,6 +32,8 @@ pub struct Event {
     pub rule: Option<String>,
     /// PRIORITY, 1 (highest) to 9 (lowest), as a task's; None when not set.
     pub priority: Option<i64>,
+    /// Its own colour ("#RRGGBB", from COLOR), shown instead of its calendar's; None when not set.
+    pub color: Option<String>,
 }
 
 /// Wall-clock length of a component: DTEND − DTSTART, DURATION, or else a day for a date and
@@ -117,6 +119,7 @@ fn event(c: &Comp, list_href: &str, (start, end, reminders): (i64, i64, Vec<i64>
             .text("PRIORITY")
             .and_then(|p| p.parse::<i64>().ok())
             .filter(|&p| p != 0),
+        color: c.text("COLOR").as_deref().and_then(crate::color::parse),
     }
 }
 
@@ -296,6 +299,9 @@ pub struct EventPatch {
     pub repeat: Option<Option<Repeat>>,
     /// PRIORITY, 1 (highest) to 9 (lowest); Some(None) clears it.
     pub priority: Option<Option<i64>>,
+    /// Its own colour ("#rrggbb"), written as the closest CSS name (`color::name`); Some(None)
+    /// clears it, for its calendar's.
+    pub color: Option<Option<String>>,
 }
 
 /// Which occurrences of a recurring event an edit or delete is for.
@@ -448,6 +454,10 @@ fn apply(
     }
     if let Some(v) = p.priority {
         cal.set_in(comp, "PRIORITY", "", v.map(|v| v.to_string()).as_deref());
+    }
+    if let Some(c) = &p.color {
+        let name = c.as_deref().and_then(crate::color::name);
+        cal.set_in(comp, "COLOR", "", name);
     }
     if let Some(t) = p.time {
         let like = cal.comps()[comp]

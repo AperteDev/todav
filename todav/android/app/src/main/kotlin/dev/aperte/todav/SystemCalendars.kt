@@ -98,7 +98,7 @@ object SystemCalendars {
         }.build()
         val columns = arrayOf(
             Instances.EVENT_ID, Instances.BEGIN, Instances.END, Instances.ALL_DAY, Instances.TITLE,
-            Instances.DESCRIPTION, Instances.EVENT_LOCATION, Instances.STATUS,
+            Instances.DESCRIPTION, Instances.EVENT_LOCATION, Instances.STATUS, Instances.EVENT_COLOR,
         )
         val out = mutableListOf<SystemEvent>()
         context.contentResolver.query(uri, columns, "${Instances.CALENDAR_ID} = ?", arrayOf("$calendar"), null)?.use { c ->
@@ -113,6 +113,8 @@ object SystemCalendars {
                     title = c.getString(4) ?: "",
                     description = c.getString(5) ?: "",
                     location = c.getString(6) ?: "",
+                    // Its own colour, when it has one (Google Calendar's event colours).
+                    color = if (c.isNull(8) || c.getInt(8) == 0) "" else hex(c.getInt(8)),
                 )
             }
         }

@@ -137,6 +137,18 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
     let priority: adw::ComboRow = get(&b, "priority");
     let old_priority = crate::window::priority_row(e.as_ref().and_then(|e| e.priority));
     priority.set_selected(old_priority);
+    // Its own colour, else its calendar's; one picked shows as it is saved, a CSS name's.
+    let own_color: adw::ExpanderRow = get(&b, "own_color");
+    let old_color = e.as_ref().and_then(|e| e.color.clone());
+    own_color.set_enable_expansion(old_color.is_some());
+    let presets = todav_app::lists::event_presets();
+    let color = crate::lists::swatches(
+        &dialog,
+        &get(&b, "colors"),
+        &presets,
+        old_color.clone().unwrap_or_else(|| presets[0].clone()),
+        |c| todav_core::color::snapped(&c).unwrap_or(c),
+    );
     let all_day: adw::SwitchRow = get(&b, "all_day");
     let (start_row, end_row): (adw::ExpanderRow, adw::ExpanderRow) =
         (get(&b, "start"), get(&b, "end"));
@@ -418,6 +430,9 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
         let offsets = reminders.offsets();
         let new_priority = (priority.selected() != old_priority)
             .then(|| crate::window::priority_value(priority.selected()));
+        let new_color = own_color
+            .enables_expansion()
+            .then(|| color.borrow().clone());
         let Some(ev) = e.clone() else {
             // New: the title and time first, the rest as an edit of it.
             let title = Some(text(&summary))
@@ -430,12 +445,14 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
                     description: Some(notes).filter(|s| !s.is_empty()),
                     repeat: new_repeat.map(Some),
                     priority: new_priority,
+                    color: new_color.map(Some),
                     ..Default::default()
                 };
                 if rest.location.is_some()
                     || rest.description.is_some()
                     || rest.repeat.is_some()
                     || rest.priority.is_some()
+                    || rest.color.is_some()
                 {
                     let _ = core().update_event(list, uid, None, Scope::All, rest);
                 }
@@ -465,6 +482,7 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
             reminders: (offsets != old_offsets).then_some(offsets),
             repeat: repeat_changed.then_some(new_repeat),
             priority: new_priority,
+            color: (new_color != ev.color).then_some(new_color),
         };
         let moved = list != ev.list_href;
         let nothing = patch.summary.is_none()
@@ -473,7 +491,8 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
             && patch.time.is_none()
             && patch.reminders.is_none()
             && patch.repeat.is_none()
-            && patch.priority.is_none();
+            && patch.priority.is_none()
+            && patch.color.is_none();
         let done = d.clone();
         let save = move |scope: Scope| {
             let r = core().together(|| {
