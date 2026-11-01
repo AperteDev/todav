@@ -1863,7 +1863,7 @@ fn details(c: &Cal, e: &Event) -> gtk::Popover {
         b.append(&line("media-playlist-repeat-symbolic", &gettext("Repeats")));
     }
     if let Some(l) = &e.location {
-        b.append(&line("mark-location-symbolic", l));
+        b.append(&line("todav-location-symbolic", l));
     }
     b.append(&which(&e.list_href, &list_name(c, &e.list_href)));
     if let Some(p) = crate::window::priority_text(e.priority) {
