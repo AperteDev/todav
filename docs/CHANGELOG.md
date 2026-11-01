@@ -88,6 +88,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   title as fit, the last one ending in "…", instead of a line cut in half.
 - Android: on wide screens a message (with Undo, say) shows at the bottom of the view, beside
   the add button, instead of in the middle of the window over the rail and the sidebar.
+- Linux: a list's Completed group stays open when a task in it is reopened or the list is
+  redrawn, until it is closed.
 - Linux: the week views' title names the month in the form a date takes ("16 – 22 listopada
   2026" in Polish, not "listopad").
 - Linux: in an event's or a task's details, the text of every line starts at the same place,

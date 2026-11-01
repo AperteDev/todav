@@ -140,6 +140,8 @@ struct Ui {
     /// the page (list, search) it is for: another one shown ends it.
     lingering: RefCell<Vec<(gtk::Widget, String)>>,
     linger: RefCell<Option<(glib::SourceId, Shown)>>,
+    /// The list whose Completed group is open: it stays so as the page is rebuilt.
+    done_open: RefCell<Option<String>>,
     /// The task being dragged and where it came from.
     dragging: RefCell<Option<(Task, Slot)>>,
     /// This drag was told that reordering needs manual sort (once a drag).
@@ -802,6 +804,7 @@ fn build(app: &adw::Application) -> Rc<Ui> {
         stale: Cell::new(false),
         lingering: RefCell::default(),
         linger: RefCell::default(),
+        done_open: RefCell::default(),
         dragging: RefCell::new(None),
         told_sort: Cell::new(false),
         drop_mark: RefCell::new(None),
@@ -1699,17 +1702,28 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
     }
 
     let mut done: Vec<Task> = core()
-        .finished(href, done_view)
+        .finished(href.clone(), done_view)
         .into_iter()
         .filter(|t| shown(t.category.as_ref()))
         .collect();
     if !done.is_empty() {
         done.sort_by_key(|t| std::cmp::Reverse(t.completed_at));
         let flash = ui.flash.borrow().clone().map(|(uid, _)| uid);
+        let open = ui.done_open.borrow().as_ref() == Some(&href);
         let exp = adw::ExpanderRow::builder()
             .title(gettext("Completed ({n})").replace("{n}", &done.len().to_string()))
-            .expanded(done.iter().any(|t| Some(&t.uid) == flash.as_ref()))
+            .expanded(open || done.iter().any(|t| Some(&t.uid) == flash.as_ref()))
             .build();
+        let weak = Rc::downgrade(ui);
+        exp.connect_expanded_notify(move |e| {
+            let Some(ui) = weak.upgrade() else { return };
+            let mut open = ui.done_open.borrow_mut();
+            if e.is_expanded() {
+                *open = Some(href.clone());
+            } else if open.as_ref() == Some(&href) {
+                *open = None;
+            }
+        });
         for t in done.iter().take(DONE_SHOWN) {
             exp.add_row(&task_row(ui, t, 0, None));
         }
