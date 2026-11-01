@@ -77,6 +77,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   there, no longer scrolls the month away.
 - About one push message in 256 failed with "Sync failed: parse: ill-formed document": an
   encrypted one that happened to start like XML was read as XML instead of being decrypted.
+- Android: Undo after completing a task with a swipe brought it back only to complete it again
+  at once.
 - Android: on a phone, saving a new event after typing its title showed the task list under the
   Calendar button, until Tasks and Calendar were tapped again.
 - Android: saving an event saved it as it was at the first change made on its page and

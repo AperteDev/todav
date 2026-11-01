@@ -65,6 +65,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxDefaults
+import androidx.compose.material3.SwipeToDismissBoxState
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -76,7 +78,6 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -670,7 +671,10 @@ private fun TaskItem(
     // Held: indented as deep as it would land (beside a row: that row's depth; into it: one deeper).
     val depth = target?.takeIf { dragged }?.let { t -> t.row?.let { it.depth + (if (t.mode == 0) 1 else 0) - row.depth } } ?: 0
     val dx by animateFloatAsState(depth * 24f, label = "depth")
-    val dismiss = rememberSwipeToDismissBoxState()
+    // Kept only while the row is shown: a saved one came back swiped with the row (its task
+    // reopened by Undo, say) and did it again.
+    val threshold = SwipeToDismissBoxDefaults.positionalThreshold
+    val dismiss = remember { SwipeToDismissBoxState(SwipeToDismissBoxValue.Settled, threshold) }
     // Each way it is swiped as Settings say, if this task can take that: pinning only top-level ones.
     val usable = { a: SwipeAction -> a != SwipeAction.OFF && (a != SwipeAction.PIN || pinnable(screen, task, row.depth)) }
     // Felt as a swipe goes far enough to act once let go.
