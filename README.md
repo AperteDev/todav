@@ -8,6 +8,10 @@
 
 <p align="center">
   <a href="https://github.com/AperteDev/todav/actions/workflows/ci.yml"><img src="https://github.com/AperteDev/todav/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/AperteDev/todav/releases/latest"><img src="https://img.shields.io/github/v/release/AperteDev/todav" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue" alt="License: GPL-3.0-or-later"></a>
+  <a href="https://aur.archlinux.org/packages/todav"><img src="https://img.shields.io/aur/version/todav" alt="AUR version"></a>
+  <a href="https://copr.fedorainfracloud.org/coprs/selfref/todav/"><img src="https://copr.fedorainfracloud.org/coprs/selfref/todav/package/todav/status_image/last_build.png" alt="COPR build status"></a>
 </p>
 
 Todav is a task list and calendar app for the GNOME desktop and Android. Your tasks and events
@@ -79,7 +83,13 @@ Todav needs GNOME 49 or newer, or Android 10 or newer. The GNOME Shell extension
 (allow your browser or file manager to install apps when asked). Later versions install over it.
 Coming from 2.0.1 or earlier, which were test builds signed differently each release, uninstall
 that one first (lists on the device only are lost; your Nextcloud's sync back). Todav syncs with
-your Nextcloud itself; you don't need DAVx⁵ for it.
+your Nextcloud itself; you don't need DAVx⁵ for it. With [Obtainium](https://obtainium.imranr.dev/)
+it updates itself from the releases.
+
+<p>
+  <a href="https://github.com/AperteDev/todav/releases/latest"><img src="https://raw.githubusercontent.com/Kunzisoft/Github-badge/main/get-it-on-github.png" alt="Get it on GitHub" height="60"></a>
+  <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/AperteDev/todav"><img src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" alt="Get it on Obtainium" height="60"></a>
+</p>
 
 **Arch Linux and derivatives** (Manjaro, EndeavourOS, CachyOS…): install from the
 [AUR](https://aur.archlinux.org/packages?K=todav) with an AUR helper:
