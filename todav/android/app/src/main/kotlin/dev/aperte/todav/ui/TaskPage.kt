@@ -227,11 +227,12 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null, draft: 
                 Section(null) {
                     FieldItem(
                         summary,
-                        { summary = it },
+                        // One line, wrapped as long as it takes: Enter closes the keyboard.
+                        { summary = it.replace('\n', ' ') },
                         tr("Title"),
                         icon = Icons.Outlined.Title,
                         textStyle = MaterialTheme.typography.titleLarge,
-                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
                     )
                     ChoiceItem(
                         tr("List"),

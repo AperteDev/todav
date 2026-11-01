@@ -82,6 +82,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Android: Enter in a task's or an event's title closes the keyboard instead of starting a new
+  line, which made the title two lines.
 - Linux: the week views' title names the month in the form a date takes ("16 – 22 listopada
   2026" in Polish, not "listopad").
 - Linux: in an event's or a task's details, the text of every line starts at the same place,

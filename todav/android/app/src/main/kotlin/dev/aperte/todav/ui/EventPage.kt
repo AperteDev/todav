@@ -46,6 +46,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -248,10 +249,11 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
                 Section(null) {
                     FieldItem(
                         summary,
-                        { summary = it },
+                        // One line, wrapped as long as it takes: Enter closes the keyboard.
+                        { summary = it.replace('\n', ' ') },
                         tr("Title"),
                         textStyle = MaterialTheme.typography.titleLarge,
-                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
                         // Its colour, picked as in its details; its calendar's until then.
                         leading = {
                             val calendarColor = calendars.firstOrNull { it.href == calendar }?.let(::listColor)
