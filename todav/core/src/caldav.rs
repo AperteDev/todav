@@ -18,6 +18,17 @@ pub const PUSH: &str = "https://bitfire.at/webdav-push";
 const CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(4);
 const CONNECT_TRIES: u32 = 3;
 
+/// Where in `xml` byte `at` is, with a little of what comes before it, on one line.
+fn around(xml: &str, at: usize) -> String {
+    let at = at.min(xml.len());
+    let from = xml.floor_char_boundary(at.saturating_sub(60));
+    let before: String = xml[from..xml.floor_char_boundary(at)]
+        .chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect();
+    format!("byte {at} of {}, after \"{before}\"", xml.len())
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct Element {
     pub ns: String,
@@ -32,9 +43,17 @@ impl Element {
         let mut r = quick_xml::NsReader::from_str(xml);
         let mut stack = vec![Element::default()];
         loop {
-            let (ns, ev) = r
-                .read_resolved_event()
-                .map_err(|e| Error::Parse(e.to_string()))?;
+            let res = r.read_resolved_event();
+            let (ns, ev) = match res {
+                Ok(v) => v,
+                // Where, and what is around it, to find what the server sent.
+                Err(e) => {
+                    return Err(Error::Parse(format!(
+                        "{e} ({})",
+                        around(xml, r.error_position() as usize)
+                    )));
+                }
+            };
             let ns = match ns {
                 ResolveResult::Bound(n) => n.as_ref().to_string(),
                 _ => String::new(),
@@ -203,6 +222,27 @@ pub struct HttpResponse {
     pub etag: Option<String>,
     pub location: Option<String>,
     pub body: String,
+    /// The request it answers ("PROPFIND /remote.php/dav/…"), for errors.
+    pub request: String,
+}
+
+impl HttpResponse {
+    /// Its body as a multistatus; one that is not valid XML says which request it answered.
+    pub fn multistatus(&self) -> Result<(Vec<DavResponse>, Option<String>)> {
+        multistatus(&self.body).map_err(|e| self.context(e))
+    }
+
+    /// Its body as XML, as `multistatus`.
+    fn xml(&self) -> Result<Element> {
+        Element::parse(&self.body).map_err(|e| self.context(e))
+    }
+
+    fn context(&self, e: Error) -> Error {
+        match e {
+            Error::Parse(m) => Error::Parse(format!("{}: {m}", self.request)),
+            e => e,
+        }
+    }
 }
 
 pub struct Dav {
@@ -381,6 +421,7 @@ impl Dav {
             etag,
             location,
             body,
+            request: format!("{method} {}", self.path(href)),
         })
     }
 
@@ -402,7 +443,7 @@ impl Dav {
         if r.status != 207 {
             return Err(Error::Http(r.status, r.body));
         }
-        Ok(multistatus(&r.body)?.0)
+        Ok(r.multistatus()?.0)
     }
 
     /// The user's principal; without one named, the root is (Google's is given as the root).
@@ -477,7 +518,7 @@ impl Dav {
             let body = r#"<?xml version="1.0" encoding="utf-8"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/></d:prop></d:propfind>"#;
             let r = self.request("PROPFIND", &home, &[("Depth", "1"), (WEBCAL, "Off")], body)?;
             if r.status == 207 {
-                for s in multistatus(&r.body)?.0 {
+                for s in r.multistatus()?.0 {
                     let sub = s.props.child(DAV, "resourcetype").is_some_and(|t| {
                         t.child(CS, "subscribed").is_some() && t.child(CALDAV, "calendar").is_none()
                     });
@@ -508,7 +549,8 @@ impl Dav {
         if r.status != 207 {
             return Err(Error::Http(r.status, r.body));
         }
-        let changed = multistatus(&r.body)?
+        let changed = r
+            .multistatus()?
             .0
             .into_iter()
             .filter_map(|r| {
@@ -537,7 +579,7 @@ impl Dav {
         if r.status != 207 {
             return Err(Error::Http(r.status, r.body));
         }
-        let (resps, token) = multistatus(&r.body)?;
+        let (resps, token) = r.multistatus()?;
         let mut changed = Vec::new();
         let mut removed = Vec::new();
         // Google's sync-collection leaves calendar-data out: fetched after.
@@ -578,7 +620,7 @@ impl Dav {
         if r.status != 207 {
             return Err(Error::Http(r.status, r.body));
         }
-        Ok(multistatus(&r.body)?
+        Ok(r.multistatus()?
             .0
             .into_iter()
             .filter_map(|r| {
@@ -665,7 +707,7 @@ impl Dav {
             return Err(Error::Http(r.status, r.body));
         }
         // Each property has its own status: the first that is not 200 is the answer.
-        let root = Element::parse(&r.body)?;
+        let root = r.xml()?;
         let refused = root
             .children(DAV, "response")
             .flat_map(|r| r.children(DAV, "propstat"))
@@ -745,6 +787,30 @@ mod tests {
             })
         );
         assert_eq!(server_info("<html>not found</html>"), None);
+    }
+
+    #[test]
+    fn a_body_that_is_not_xml_says_which_request_and_where() {
+        let r = HttpResponse {
+            status: 207,
+            etag: None,
+            location: None,
+            body: "<d:multistatus xmlns:d=\"DAV:\">\r\n<d:href>/a?b=1&c".into(),
+            request: "PROPFIND /remote.php/dav/calendars/Test/".into(),
+        };
+        let Err(Error::Parse(m)) = r.multistatus() else {
+            panic!("parsed");
+        };
+        assert!(
+            m.starts_with("PROPFIND /remote.php/dav/calendars/Test/: "),
+            "{m}"
+        );
+        assert!(
+            m.ends_with(
+                "byte 46 of 48, after \"<d:multistatus xmlns:d=\"DAV:\">  <d:href>/a?b=1\")"
+            ),
+            "{m}"
+        );
     }
 
     #[test]

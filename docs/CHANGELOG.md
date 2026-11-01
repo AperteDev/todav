@@ -46,6 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Moving an event's start in its dialog (Linux) or page (Android) leaves its end where it is,
   as GNOME Calendar does; only a start past the end takes it along. Before, the end moved with
   the start, keeping the event's length.
+- A sync that fails on a server's answer that is not valid XML says which request it was and
+  where the answer broke ("Sync failed: parse: PROPFIND /remote.php/dav/...: ..., byte N of M,
+  after ..."), to find what sent it.
 - Android: On This Device Only comes last among the accounts to add, after System Calendars.
 - An older Todav no longer opens data a newer one left (after a downgrade, say); it says to
   update instead of reading and writing a database it does not know.

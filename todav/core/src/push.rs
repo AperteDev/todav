@@ -216,7 +216,10 @@ impl Client {
                 store::kv_get(&db, "push_auth")?.ok_or(Error::NotFound("push keys".into()))?;
             decrypt(&b64decode(&key)?, &b64decode(&auth)?, &body)?
         };
-        let xml = Element::parse(&String::from_utf8_lossy(&plain))?;
+        let xml = Element::parse(&String::from_utf8_lossy(&plain)).map_err(|e| match e {
+            Error::Parse(m) => Error::Parse(format!("push message: {m}")),
+            e => e,
+        })?;
         Ok(xml
             .children(PUSH, "topic")
             .map(|t| t.text.trim().to_string())
