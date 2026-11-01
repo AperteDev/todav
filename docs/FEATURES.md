@@ -35,7 +35,8 @@ What Todav can do, in short. The details of each release are in the
 - Create, edit, move and delete events, recurring ones too (this occurrence, this and the
   following, or all), with reminders.
 - Priority on events, as on tasks: none, low, medium or high (the one Thunderbird sets).
-- An event's own colour instead of its calendar's, as Nextcloud Calendar sets it.
+- An event's own colour instead of its calendar's, as Nextcloud Calendar sets it: click the
+  colour box by its title, in its details or its editor, to pick another.
 - Plan a task by dropping it from "To Plan" on an hour (a time slot) or a day (due that day),
   with a preview in 15-minute steps; drop it back to unplan it.
 - Move events and planned tasks by drag and drop; resize them in the week view by their edges.
