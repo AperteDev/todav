@@ -253,7 +253,7 @@ abstract class TodavWidget : GlanceAppWidget() {
 
 /**
  * The widgets' theme from their own colours: text and background for light and dark, with the
- * app's blue (as without the system's colours) for today and the add button.
+ * app's green (as without the system's colours) for today and the add button.
  */
 private fun ownColors(c: Context): androidx.glance.color.ColorProviders {
     fun scheme(dark: Boolean): androidx.compose.material3.ColorScheme {
@@ -261,13 +261,13 @@ private fun ownColors(c: Context): androidx.glance.color.ColorProviders {
         val text = Color(WidgetPrefs.color(c, if (dark) "text_dark" else "text_light"))
         val base = if (dark) {
             androidx.compose.material3.darkColorScheme(
-                primary = Color(0xFF8EC4EE), onPrimary = Color(0xFF00325A),
-                primaryContainer = Color(0xFF00468A), onPrimaryContainer = Color(0xFFD5E3FF),
+                primary = Color(0xFF7FD8A6), onPrimary = Color(0xFF00391C),
+                primaryContainer = Color(0xFF00522A), onPrimaryContainer = Color(0xFF9CF5BF),
             )
         } else {
             androidx.compose.material3.lightColorScheme(
-                primary = Color(0xFF2F6CB6), onPrimary = Color.White,
-                primaryContainer = Color(0xFFD5E3FF), onPrimaryContainer = Color(0xFF001B3C),
+                primary = Color(0xFF1A7A48), onPrimary = Color.White,
+                primaryContainer = Color(0xFFB4F1C8), onPrimaryContainer = Color(0xFF00210F),
             )
         }
         return base.copy(

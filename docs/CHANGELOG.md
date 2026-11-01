@@ -74,6 +74,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Linux: the sidebar month no longer marks days with dots unless "Dots in the sidebar month"
   is turned on in Preferences.
 - Android: the keyboard starts each word of an event's location with a capital letter.
+- A green icon instead of the blue one, on Linux and Android; Android's colours without the
+  system's own (before Android 12), the widgets' own colours and the launcher shortcuts are
+  green with it.
 
 ### Removed
 

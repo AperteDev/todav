@@ -14,7 +14,7 @@ import androidx.compose.ui.platform.LocalContext
 
 /**
  * Light or dark as `scheme` says ("light", "dark", else the system's); the wallpaper's colours
- * where Android has them (12 and later), else the icon's blue and teal.
+ * where Android has them (12 and later), else the icon's greens.
  */
 @Composable
 fun TodavTheme(scheme: String?, content: @Composable () -> Unit) {
@@ -27,8 +27,9 @@ fun TodavTheme(scheme: String?, content: @Composable () -> Unit) {
     val colors = when {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
             if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        dark -> darkColorScheme(primary = Color(0xFF8EC4EE), secondary = Color(0xFFA5E1D0))
-        else -> lightColorScheme(primary = Color(0xFF2F6CB6), secondary = Color(0xFF1B7275))
+        // The icon's greens, where the system gives no colours of its own.
+        dark -> darkColorScheme(primary = Color(0xFF7FD8A6), secondary = Color(0xFFA5E1D0))
+        else -> lightColorScheme(primary = Color(0xFF1A7A48), secondary = Color(0xFF1F6B57))
     }
     MaterialExpressiveTheme(colorScheme = colors, motionScheme = MotionScheme.expressive(), content = content)
 }
