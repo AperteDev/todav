@@ -71,6 +71,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Android: On This Device Only comes last among the accounts to add, after System Calendars.
 - An older Todav no longer opens data a newer one left (after a downgrade, say); it says to
   update instead of reading and writing a database it does not know.
+- Linux: the sidebar month no longer marks days with dots unless "Dots in the sidebar month"
+  is turned on in Preferences.
 
 ### Removed
 

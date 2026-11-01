@@ -154,9 +154,9 @@ pub fn swipe(c: &Client, right: bool) -> SwipeAction {
         .map_or(SwipeAction::Off, |(_, a)| *a)
 }
 
-/// Whether the calendar's small month marks days with dots (`mini_dots`).
+/// Whether the calendar's small month marks days with dots (`mini_dots`; off by default).
 pub fn mini_dots(c: &Client) -> bool {
-    on(c, "mini_dots")
+    c.setting("mini_dots".into()).as_deref() == Some("true")
 }
 
 /// The weekdays the Work Week view shows (`work_days`, comma-separated, 0 = Sunday): one to six
