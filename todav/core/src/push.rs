@@ -205,8 +205,10 @@ impl Client {
     }
 
     /// Topics from a push message body: plaintext `<push-message>` XML or an aes128gcm-encrypted one.
+    /// Plaintext is text from its first byte on: an encrypted body starts with a random salt,
+    /// whose first byte is a `<` once in 256 messages.
     pub fn push_decode(&self, body: Vec<u8>) -> Result<Vec<String>> {
-        let plain = if body.first() == Some(&b'<') {
+        let plain = if body.first() == Some(&b'<') && std::str::from_utf8(&body).is_ok() {
             body
         } else {
             let db = self.db.lock().unwrap();
@@ -502,6 +504,31 @@ mod tests {
         );
         let plain = decrypt(&ua_private, &auth, &body).unwrap();
         assert_eq!(plain, b"When I grow up, I want to be a watermelon");
+    }
+
+    #[test]
+    fn an_encrypted_push_starting_with_a_bracket_is_not_read_as_xml() {
+        let dir = std::env::temp_dir().join(format!("todav-test-push-lt-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        {
+            let db = c.db.lock().unwrap();
+            store::kv_set(
+                &db,
+                "push_private",
+                "q1dXpw3UpT5VOmu_cf_v6ih07Aems3njxI-JWgLcM94",
+            )
+            .unwrap();
+            store::kv_set(&db, "push_auth", "BTBZMqHH6r4Tts7J_aSIgg").unwrap();
+        }
+        let xml = format!(r#"<push-message xmlns="{PUSH}"><topic>t1</topic></push-message>"#);
+        assert_eq!(c.push_decode(xml.into_bytes()).unwrap(), ["t1"]);
+        // The RFC 8291 message with a salt starting with '<': decrypted, so it fails as an
+        // encrypted body does whose salt was changed, not as XML.
+        let mut body = b64decode("DGv6ra1nlYgDCS1FRnbzlwAAEABBBP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A_yl95bQpu6cVPTpK4Mqgkf1CXztLVBSt2Ks3oZwbuwXPXLWyouBWLVWGNWQexSgSxsj_Qulcy4a-fN").unwrap();
+        body[0] = b'<';
+        let err = c.push_decode(body).unwrap_err().to_string();
+        assert!(!err.contains("push message"), "{err}");
     }
 
     #[test]
