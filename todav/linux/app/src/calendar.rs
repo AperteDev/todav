@@ -83,6 +83,10 @@ button.block.task { padding-left: 4px; }
 /* An event's colour by its title, a button where it can be changed (dialog::color_button). */
 .dot.color-box { min-width: 16px; min-height: 16px; border-radius: 4px; }
 button.color-button { padding: 6px; min-width: 0; min-height: 0; }
+/* What leads a details line (an icon, a dot, the colour box, a check) takes the icons' 16px, so
+   the text after it starts at the same place on every line. */
+.details .dot:not(.color-box) { margin: 0 3px; }
+.details button.color-button { margin: 0 -6px; }
 .ring { min-width: 12px; min-height: 12px; border: 2px solid; border-radius: 9999px; }
 .ring image { -gtk-icon-size: 10px; }
 row.done label.title { text-decoration-line: line-through; opacity: 0.55; }
@@ -1556,6 +1560,7 @@ fn details_box() -> gtk::Box {
     b.set_margin_top(6);
     b.set_margin_bottom(6);
     b.set_width_request(280);
+    b.add_css_class("details");
     b
 }
 
@@ -1816,7 +1821,7 @@ fn details(c: &Cal, e: &Event) -> gtk::Popover {
     let can_write = writable(c, &e.list_href);
     let rename = can_write.then(|| Box::new(rename) as Box<dyn Fn(String)>);
     // Its colour by its title, to change here as in its dialog.
-    let title = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    let title = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     if can_write {
         let ev = e.clone();
         let recolor = move |color: Option<String>| {

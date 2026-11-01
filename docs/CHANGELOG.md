@@ -56,6 +56,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Linux: in an event's or a task's details, the text of every line starts at the same place,
+  after an icon, the calendar's dot or the colour box alike.
 - Android: on a phone, saving a new event after typing its title showed the task list under the
   Calendar button, until Tasks and Calendar were tapped again.
 - Android: saving an event saved it as it was at the first change made on its page and
