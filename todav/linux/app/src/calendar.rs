@@ -80,6 +80,9 @@ button.block.task { padding-left: 4px; }
 .chip.cancelled label { text-decoration-line: line-through; }
 .more { padding: 0 6px; min-height: 20px; font-size: smaller; }
 .dot { min-width: 10px; min-height: 10px; border-radius: 9999px; }
+/* An event's colour by its title, a button where it can be changed (dialog::color_button). */
+.dot.color-box { min-width: 16px; min-height: 16px; border-radius: 4px; }
+button.color-button { padding: 6px; min-width: 0; min-height: 0; }
 .ring { min-width: 12px; min-height: 12px; border: 2px solid; border-radius: 9999px; }
 .ring image { -gtk-icon-size: 10px; }
 row.done label.title { text-decoration-line: line-through; opacity: 0.55; }
@@ -1810,8 +1813,46 @@ fn details(c: &Cal, e: &Event) -> gtk::Popover {
             _ => apply(Scope::All),
         }
     };
-    let rename = writable(c, &e.list_href).then(|| Box::new(rename) as Box<dyn Fn(String)>);
-    b.append(&title_label(&e.summary, rename));
+    let can_write = writable(c, &e.list_href);
+    let rename = can_write.then(|| Box::new(rename) as Box<dyn Fn(String)>);
+    // Its colour by its title, to change here as in its dialog.
+    let title = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    if can_write {
+        let ev = e.clone();
+        let recolor = move |color: Option<String>| {
+            if color == ev.color {
+                return;
+            }
+            let ev = ev.clone();
+            let apply = move |scope: Scope| {
+                let patch = EventPatch {
+                    color: Some(color.clone()),
+                    ..Default::default()
+                };
+                let (list, uid) = (ev.list_href.clone(), ev.uid.clone());
+                match core().update_event(list, uid, ev.recurrence_id, scope, patch) {
+                    Ok(()) => request_sync(),
+                    Err(err) => crate::window::toast(&err.to_string()),
+                }
+            };
+            match cal() {
+                Some(c) if ev.recurring => {
+                    dialog::ask_scope(&c.split, &gettext("Change Repeating Event?"), false, apply)
+                }
+                _ => apply(Scope::All),
+            }
+        };
+        let (button, _) = dialog::color_button(e.color.clone(), e.list_href.clone(), recolor);
+        title.append(&button);
+    } else {
+        let mark = gtk::Box::builder().valign(gtk::Align::Center).build();
+        for cls in ["dot", "color-box", &event_class(e)] {
+            mark.add_css_class(cls);
+        }
+        title.append(&mark);
+    }
+    title.append(&title_label(&e.summary, rename));
+    b.append(&title);
     b.append(&line("x-office-calendar-symbolic", &span_text(e)));
     if e.recurring {
         b.append(&line("media-playlist-repeat-symbolic", &gettext("Repeats")));

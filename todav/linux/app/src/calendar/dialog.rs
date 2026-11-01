@@ -96,6 +96,104 @@ pub(crate) fn repeat_rows(
     }
 }
 
+/// Shows another calendar's colour in a `color_button`.
+pub(super) type SetList = Rc<dyn Fn(&str)>;
+
+/// A box in an event's colour, `own` else its calendar `list`'s, by its title in its details and
+/// its dialog: clicked, it offers another (`pick_color`), shows it and gives it to `then`. Also
+/// gives a way to show another calendar's colour (its dialog's calendar changed).
+pub(super) fn color_button(
+    own: Option<String>,
+    list: String,
+    then: impl Fn(Option<String>) + 'static,
+) -> (gtk::Button, SetList) {
+    let mark = gtk::Box::builder().valign(gtk::Align::Center).build();
+    mark.add_css_class("dot");
+    mark.add_css_class("color-box");
+    let b = gtk::Button::builder()
+        .child(&mark)
+        .valign(gtk::Align::Center)
+        .tooltip_text(gettext("Color"))
+        .has_frame(false)
+        .build();
+    b.add_css_class("color-button");
+    // What it shows: (own colour, calendar, its class).
+    let state = Rc::new(RefCell::new((own, list, String::new())));
+    let show = {
+        let (state, mark) = (state.clone(), mark.clone());
+        Rc::new(move || {
+            let mut s = state.borrow_mut();
+            mark.remove_css_class(&s.2);
+            s.2 = crate::lists::color_class(s.0.as_deref(), &s.1);
+            mark.add_css_class(&s.2);
+        })
+    };
+    show();
+    let then = Rc::new(then);
+    let (st, sh) = (state.clone(), show.clone());
+    b.connect_clicked(move |b| {
+        let (own, list) = {
+            let s = st.borrow();
+            (s.0.clone(), s.1.clone())
+        };
+        let (st, sh, then) = (st.clone(), sh.clone(), then.clone());
+        // Over the window, out of the details first: a popover stays over a dialog, and its
+        // content goes with it.
+        let Some(window) = b.root() else { return };
+        if let Some(p) = b.ancestor(gtk::Popover::static_type()) {
+            p.downcast_ref::<gtk::Popover>().unwrap().popdown();
+            // Nothing to give the focus back to when it closes: the chip the details came from
+            // is drawn anew by then, and the focus would go to the grid's first one, scrolling
+            // the month view there.
+            window.set_focus(None::<&gtk::Widget>);
+        }
+        pick_color(&window, own, &list, move |c| {
+            st.borrow_mut().0 = c.clone();
+            sh();
+            then(c);
+        });
+    });
+    let set_list = move |list: &str| {
+        state.borrow_mut().1 = list.to_string();
+        show();
+    };
+    (b, Rc::new(set_list))
+}
+
+/// Pick an event's colour: its calendar `list`'s (None), one of the event colours or any other,
+/// as the closest CSS name's (`color::snapped`); `own` is the one it has. Picking one closes it.
+fn pick_color(
+    parent: &impl IsA<gtk::Widget>,
+    own: Option<String>,
+    list: &str,
+    then: impl Fn(Option<String>) + 'static,
+) {
+    crate::lists::paint(); // the swatches' look, the calendar's colour
+    let b = view!("color-dialog");
+    let dialog: adw::Dialog = get(&b, "dialog");
+    get::<gtk::Box>(&b, "calendar_dot").add_css_class(&crate::lists::class(list));
+    get::<gtk::Image>(&b, "calendar_check").set_visible(own.is_none());
+    let then = Rc::new(then);
+    let (d, t) = (dialog.clone(), then.clone());
+    crate::lists::swatches(
+        &dialog,
+        &get(&b, "colors"),
+        &todav_app::lists::event_presets(),
+        own.unwrap_or_default(),
+        |c| todav_core::color::snapped(&c).unwrap_or(c),
+        Rc::new(move |c: &str| {
+            d.close();
+            t(Some(c.to_string()));
+        }),
+    );
+    let d = dialog.clone();
+    get::<adw::ActionRow>(&b, "calendar_color").connect_activated(move |_| {
+        d.close();
+        then(None);
+    });
+    dialog.present(Some(parent));
+}
+
 /// Ask which occurrences of a repeating event a change (or delete) is for.
 pub(super) fn ask_scope(
     parent: &impl IsA<gtk::Widget>,
@@ -137,18 +235,6 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
     let priority: adw::ComboRow = get(&b, "priority");
     let old_priority = crate::window::priority_row(e.as_ref().and_then(|e| e.priority));
     priority.set_selected(old_priority);
-    // Its own colour, else its calendar's; one picked shows as it is saved, a CSS name's.
-    let own_color: adw::ExpanderRow = get(&b, "own_color");
-    let old_color = e.as_ref().and_then(|e| e.color.clone());
-    own_color.set_enable_expansion(old_color.is_some());
-    let presets = todav_app::lists::event_presets();
-    let color = crate::lists::swatches(
-        &dialog,
-        &get(&b, "colors"),
-        &presets,
-        old_color.clone().unwrap_or_else(|| presets[0].clone()),
-        |c| todav_core::color::snapped(&c).unwrap_or(c),
-    );
     let all_day: adw::SwitchRow = get(&b, "all_day");
     let (start_row, end_row): (adw::ExpanderRow, adw::ExpanderRow) =
         (get(&b, "start"), get(&b, "end"));
@@ -199,6 +285,25 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
             .position(|l| Some(&l.href) == pick.as_ref())
             .unwrap_or(0) as u32,
     );
+
+    // Its own colour (None: its calendar's), picked with the box by its title as in its details;
+    // kept until saved.
+    let old_color = e.as_ref().and_then(|e| e.color.clone());
+    let color = Rc::new(RefCell::new(old_color.clone()));
+    let href = |i: u32| writable.get(i as usize).map(|l| l.href.clone());
+    let c2 = color.clone();
+    let (color_box, color_list) = color_button(
+        old_color,
+        href(calendar.selected()).unwrap_or_default(),
+        move |c| *c2.borrow_mut() = c,
+    );
+    summary.add_prefix(&color_box);
+    let lists: Vec<String> = writable.iter().map(|l| l.href.clone()).collect();
+    calendar.connect_selected_notify(move |r| {
+        if let Some(l) = lists.get(r.selected() as usize) {
+            color_list(l);
+        }
+    });
 
     if let Some(e) = &e {
         summary.set_text(&e.summary);
@@ -412,9 +517,7 @@ pub(super) fn open(c: &Rc<Cal>, e: Option<Event>, time: EventTime) -> adw::Entry
         let offsets = reminders.offsets();
         let new_priority = (priority.selected() != old_priority)
             .then(|| crate::window::priority_value(priority.selected()));
-        let new_color = own_color
-            .enables_expansion()
-            .then(|| color.borrow().clone());
+        let new_color = color.borrow().clone();
         let Some(ev) = e.clone() else {
             // New: the title and time first, the rest as an edit of it.
             let title = Some(text(&summary))

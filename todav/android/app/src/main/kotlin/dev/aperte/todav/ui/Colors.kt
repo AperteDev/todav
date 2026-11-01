@@ -14,6 +14,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import dev.aperte.todav.core.eventColor
+import dev.aperte.todav.core.eventColorPresets
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreHoriz
@@ -52,17 +57,17 @@ private fun hex(color: Color) = "#%06X".format(color.toArgb() and 0xFFFFFF)
 
 /**
  * Colour swatches, as the Linux app's: `presets` ("#RRGGBB"), then any colour in a rainbow ring,
- * which shows `chosen` when it is no preset. `snap` makes a custom colour what it will be saved
- * as.
+ * which shows `chosen` when it is no preset (null: none chosen). `snap` makes a custom colour what
+ * it will be saved as.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ColorSwatches(presets: List<String>, chosen: String, onPick: (String) -> Unit, snap: (String) -> String = { it }) {
+fun ColorSwatches(presets: List<String>, chosen: String?, onPick: (String) -> Unit, snap: (String) -> String = { it }) {
     var custom by remember { mutableStateOf(false) }
-    val isPreset = presets.any { it.equals(chosen.take(7), ignoreCase = true) }
+    val isPreset = chosen == null || presets.any { it.equals(chosen.take(7), ignoreCase = true) }
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         presets.forEach { c ->
-            val selected = c.equals(chosen.take(7), ignoreCase = true)
+            val selected = c.equals(chosen?.take(7), ignoreCase = true)
             Box(
                 Modifier.size(36.dp).background(parseColor(c), CircleShape)
                     .border(if (selected) 3.dp else 0.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
@@ -94,11 +99,61 @@ fun ColorSwatches(presets: List<String>, chosen: String, onPick: (String) -> Uni
         }
     }
     if (custom) {
-        CustomColorDialog(chosen, { custom = false }) {
+        CustomColorDialog(chosen ?: presets.first(), { custom = false }) {
             custom = false
             onPick(snap(it))
         }
     }
+}
+
+/**
+ * An event's colour as a box to tap (by its title, in its details and its editor), picking
+ * another in [EventColorDialog]: its own `color`, else (null) its calendar's `calendarColor`.
+ * Not `enabled` (a calendar it cannot be changed in), only the box.
+ */
+@Composable
+fun EventColorButton(color: String?, calendarColor: String?, enabled: Boolean, onPick: (String?) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val name = tr("Color")
+    Box(
+        Modifier.size(32.dp).clip(CircleShape)
+            .then(if (enabled) Modifier.clickable(role = Role.Button) { open = true }.semantics { contentDescription = name } else Modifier),
+        Alignment.Center,
+    ) {
+        Box(Modifier.size(18.dp).background(parseColor(color ?: calendarColor), RoundedCornerShape(4.dp)))
+    }
+    if (open) {
+        EventColorDialog(color, calendarColor, { open = false }) {
+            open = false
+            onPick(it)
+        }
+    }
+}
+
+/**
+ * An event's colour to pick: its calendar's (null), one of the event colours, or any other, which
+ * is saved as the closest CSS name (`eventColor`). Picking one closes it.
+ */
+@Composable
+fun EventColorDialog(color: String?, calendarColor: String?, onDismiss: () -> Unit, onPick: (String?) -> Unit) {
+    val presets = remember { eventColorPresets() }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(tr("Color")) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Item(
+                    headlineContent = { Text(tr("Use the Calendar's Color")) },
+                    leadingContent = { ColorMark(calendarColor) },
+                    trailingContent = { if (color == null) Icon(Icons.Default.Check, null) },
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    modifier = Modifier.clickable { onPick(null) },
+                )
+                ColorSwatches(presets, color, { onPick(it) }) { eventColor(it) ?: it }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(tr("Cancel")) } },
+    )
 }
 
 /** Any colour, by its hue, saturation and brightness; `initial` ("#rrggbb") to start from. */

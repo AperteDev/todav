@@ -55,8 +55,13 @@ fn rules(cls: &str, col: &str) -> String {
 
 /// The CSS class showing event `e` in its colour: its own, else its calendar's (`class`).
 pub fn event_class(e: &todav_core::Event) -> String {
-    let Some(col) = e.color.as_deref() else {
-        return class(&e.list_href);
+    color_class(e.color.as_deref(), &e.list_href)
+}
+
+/// The CSS class showing colour `own` ("#RRGGBB"), else (None) list `href`'s.
+pub fn color_class(own: Option<&str>, href: &str) -> String {
+    let Some(col) = own else {
+        return class(href);
     };
     let cls = format!("own-{}", col.trim_start_matches('#').to_ascii_lowercase());
     let Some(display) = gdk::Display::default() else {
@@ -477,14 +482,15 @@ fn normal(c: &str) -> String {
 }
 
 /// Colour swatches in `grid` of `dialog`: `presets` ("#RRGGBB"), then any colour in a rainbow
-/// ring, which shows one that is no preset. Gives the colour chosen, `start` until one is;
-/// `snap` makes a custom one what it will be saved as.
+/// ring, which shows one that is no preset. Gives the colour chosen, `start` until one is (""
+/// for none); `snap` makes a custom one what it will be saved as; `picked` hears each pick.
 pub fn swatches(
     dialog: &adw::Dialog,
     grid: &gtk::Grid,
     presets: &[String],
     start: String,
     snap: fn(String) -> String,
+    picked: Rc<dyn Fn(&str)>,
 ) -> Rc<RefCell<String>> {
     let chosen = Rc::new(RefCell::new(start));
     // The swatches' colours, while the dialog is open.
@@ -550,7 +556,7 @@ pub fn swatches(
                     b.remove_css_class("chosen");
                 }
             }
-            let icon = if at.is_none() {
+            let icon = if at.is_none() && !c.is_empty() {
                 css.load_from_string(&format!(
                     "{preset_css}.custom-ring > button.custom {{ background-color: {c}; }}"
                 ));
@@ -566,16 +572,18 @@ pub fn swatches(
     };
     render();
     for (b, p) in buttons.iter().zip(presets) {
-        let (chosen, render, p) = (chosen.clone(), render.clone(), p.clone());
+        let (chosen, render, p, picked) =
+            (chosen.clone(), render.clone(), p.clone(), picked.clone());
         b.connect_clicked(move |_| {
             *chosen.borrow_mut() = p.clone();
             render();
+            picked(&p);
         });
     }
     {
         let (chosen, render, d) = (chosen.clone(), render.clone(), dialog.clone());
         custom.connect_clicked(move |_| {
-            let (chosen, render) = (chosen.clone(), render.clone());
+            let (chosen, render, picked) = (chosen.clone(), render.clone(), picked.clone());
             let window = d.root().and_downcast::<gtk::Window>();
             let initial = gdk::RGBA::parse(chosen.borrow().as_str()).ok();
             glib::spawn_future_local(async move {
@@ -597,6 +605,7 @@ pub fn swatches(
                     hex(c.blue())
                 ));
                 render();
+                picked(&chosen.borrow());
             });
         });
     }
@@ -636,7 +645,14 @@ pub fn open(parent: &gtk::Widget, list: Option<List>, events: bool) {
             .to_string(),
     };
     let presets: Vec<String> = PRESETS.iter().map(|p| p.to_string()).collect();
-    let chosen = swatches(&dialog, &get(&b, "colors"), &presets, start, |c| c);
+    let chosen = swatches(
+        &dialog,
+        &get(&b, "colors"),
+        &presets,
+        start,
+        |c| c,
+        Rc::new(|_| {}),
+    );
 
     // A new one: in which account, picked when there is a choice.
     let places = places(events);

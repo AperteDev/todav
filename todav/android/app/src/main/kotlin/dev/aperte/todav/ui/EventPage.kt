@@ -16,13 +16,11 @@ import androidx.compose.material.icons.automirrored.outlined.Notes
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.EventRepeat
-import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Pin
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material.icons.outlined.Update
 import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material.icons.outlined.Title
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -62,8 +60,6 @@ import dev.aperte.todav.core.Repeat
 import dev.aperte.todav.core.RepeatValue
 import dev.aperte.todav.core.Scope
 import dev.aperte.todav.core.TextValue
-import dev.aperte.todav.core.eventColor
-import dev.aperte.todav.core.eventColorPresets
 import dev.aperte.todav.core.listColor
 import dev.aperte.todav.core.plainRepeat
 import dev.aperte.todav.ntr
@@ -119,7 +115,6 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
     var priority by rememberSaveable { mutableStateOf(ev?.priority) }
     // Its own colour, else (null) its calendar's.
     var color by rememberSaveable { mutableStateOf(ev?.color) }
-    val colorPresets = remember { eventColorPresets() }
     var allDay by rememberSaveable { mutableStateOf(ev?.allDay ?: dest.allDay) }
     var start by rememberSaveable { mutableStateOf(ev?.start ?: dest.start) }
     // An all-day event's end is the midnight after its last day; shown as that last day.
@@ -255,9 +250,13 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
                         summary,
                         { summary = it },
                         tr("Title"),
-                        icon = Icons.Outlined.Title,
                         textStyle = MaterialTheme.typography.titleLarge,
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                        // Its colour, picked as in its details; its calendar's until then.
+                        leading = {
+                            val calendarColor = calendars.firstOrNull { it.href == calendar }?.let(::listColor)
+                            EventColorButton(color, calendarColor, enabled = true) { color = it }
+                        },
                     )
                     FieldItem(location, { location = it }, tr("Location"), icon = Icons.Outlined.Place)
                     ChoiceItem(
@@ -273,21 +272,6 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
                             Connected(PRIORITIES.map(::priorityName), priorityIndex(priority)) { priority = PRIORITIES[it] }
                         },
                     )
-                    // Off: its calendar's colour. One picked shows as it is saved, a CSS name's.
-                    Item(
-                        headlineContent = { Text(tr("Own Color")) },
-                        supportingContent = { Text(tr("Instead of its calendar's")) },
-                        leadingContent = { Icon(Icons.Outlined.Palette, null) },
-                        trailingContent = { Switch(color != null, { color = if (it) colorPresets.first() else null }) },
-                        modifier = Modifier.clickable { color = if (color == null) colorPresets.first() else null },
-                    )
-                    color?.let { c ->
-                        Item(
-                            headlineContent = {
-                                ColorSwatches(colorPresets, c, { color = it }) { eventColor(it) ?: it }
-                            },
-                        )
-                    }
                 }
                 Section(null) {
                     Item(

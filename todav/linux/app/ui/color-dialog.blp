@@ -1,0 +1,52 @@
+using Gtk 4.0;
+using Adw 1;
+
+// An event's colour, from the box by its title in its details or its dialog
+// (calendar::dialog::pick_color): its calendar's, or one of its own. Picking one closes it.
+Adw.Dialog dialog {
+  title: _("Color");
+  content-width: 340;
+
+  child: Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {}
+
+    content: Gtk.Box {
+      orientation: vertical;
+      spacing: 18;
+      margin-top: 6;
+      margin-bottom: 18;
+      margin-start: 18;
+      margin-end: 18;
+
+      Gtk.ListBox {
+        selection-mode: none;
+        styles ["boxed-list"]
+
+        Adw.ActionRow calendar_color {
+          title: _("Use the Calendar's Color");
+          activatable: true;
+
+          // In its calendar's colour (a class set in code), checked while it is the one shown.
+          [prefix]
+          Gtk.Box calendar_dot {
+            valign: center;
+            styles ["dot"]
+          }
+
+          [suffix]
+          Gtk.Image calendar_check {
+            icon-name: "object-select-symbolic";
+          }
+        }
+      }
+
+      // The event colours, then a custom one (lists::swatches).
+      Gtk.Grid colors {
+        halign: center;
+        column-spacing: 8;
+        row-spacing: 8;
+      }
+    };
+  };
+}

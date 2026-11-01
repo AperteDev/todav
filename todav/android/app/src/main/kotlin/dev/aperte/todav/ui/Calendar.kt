@@ -1637,6 +1637,9 @@ private fun PlanRow(
  * task's) with a field adding one. As tall as that; pulled all the way up (or by Edit…), the
  * same sheet becomes its editor.
  */
+/** A colour picked for an event: its own, or (null) its calendar's. */
+private data class Recolor(val color: String?)
+
 @Composable
 fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
     val core = model.core
@@ -1645,6 +1648,9 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
     var askDelete by remember { mutableStateOf(false) }
     // A repeating event's new title, waiting for which occurrences it is for.
     var renamed by remember { mutableStateOf<String?>(null) }
+    // Its new colour, likewise; shown at once.
+    var recolored by remember { mutableStateOf<Recolor?>(null) }
+    var shownColor by remember { mutableStateOf((item as? Item.Event)?.event?.color) }
     val lists = load(initial = emptyMap<String, TodavList>()) { (core.calendars() + core.lists()).associateBy { it.href } }
     val colors = load(changes, initial = emptyMap<String, String>()) { core.colors() }
     DetailsSheet(
@@ -1667,8 +1673,10 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
             when (item) {
                 is Item.Event -> {
                     val e = item.event
-                    Line({ Box(Modifier.size(18.dp).background(parseColor(e.color ?: colors[e.listHref]), RoundedCornerShape(4.dp))) }) {
-                        TitleField(e.summary, editable = lists[e.listHref]?.writable == true) { renamed = it }
+                    val writable = lists[e.listHref]?.writable == true
+                    // Its colour, to change here as in the editor.
+                    Line({ EventColorButton(shownColor, colors[e.listHref], writable) { recolored = Recolor(it) } }) {
+                        TitleField(e.summary, editable = writable) { renamed = it }
                     }
                     Line({ Icon(Icons.Outlined.Schedule, null) }) { Text(eventWhen(e, now)) }
                     e.location?.takeIf { it.isNotBlank() }?.let { Line({ Icon(Icons.Outlined.Place, null) }) { Text(it) } }
@@ -1740,6 +1748,17 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
             renamed = null
             model.act {
                 core.updateEvent(e.listHref, e.uid, e.recurrenceId, scope, EventPatch(summary = name))
+                model.synced()
+            }
+        }
+    }
+    recolored?.let { r ->
+        val e = (item as? Item.Event)?.event ?: return@let
+        ScopeDialog(tr("Change Repeating Event?"), e.recurring, delete = false, onDismiss = { recolored = null }) { scope ->
+            recolored = null
+            shownColor = r.color
+            model.act {
+                core.updateEvent(e.listHref, e.uid, e.recurrenceId, scope, EventPatch(color = TextValue(r.color)))
                 model.synced()
             }
         }

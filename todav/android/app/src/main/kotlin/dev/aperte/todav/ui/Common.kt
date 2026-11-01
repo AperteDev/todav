@@ -253,6 +253,8 @@ fun FieldItem(
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
+    /** In place of `icon`: something of its own there, such as a button. */
+    leading: (@Composable () -> Unit)? = null,
 ) = TextField(
     value = value,
     onValueChange = onValueChange,
@@ -261,7 +263,8 @@ fun FieldItem(
     label = label?.let { { Text(it) } },
     placeholder = placeholder?.let { { Text(it) } },
     // In line with an [Item]'s icon, a little further in.
-    leadingIcon = icon?.let { { Icon(it, null, Modifier.offset(x = 4.dp)) } },
+    leadingIcon = leading?.let { { Box(Modifier.offset(x = 4.dp)) { it() } } }
+        ?: icon?.let { { Icon(it, null, Modifier.offset(x = 4.dp)) } },
     trailingIcon = trailing,
     visualTransformation = visualTransformation,
     keyboardOptions = keyboardOptions,
