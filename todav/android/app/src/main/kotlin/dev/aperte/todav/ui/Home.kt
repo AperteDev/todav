@@ -105,6 +105,7 @@ import dev.aperte.todav.accountName
 import dev.aperte.todav.core.SyncState
 import dev.aperte.todav.ntr
 import dev.aperte.todav.tr
+import kotlinx.coroutines.flow.collectLatest
 
 /** The snackbar of the home screen. */
 val LocalSnackbar = compositionLocalOf { SnackbarHostState() }
@@ -314,7 +315,9 @@ private fun Rail(view: View, pane: Boolean, onMenu: () -> Unit, onShow: (View) -
 @Composable
 private fun Messages(model: Main, screen: Screen, snackbar: SnackbarHostState) {
     LaunchedEffect(Unit) {
-        model.messages.collect { (text, change) ->
+        // A new one takes the place of the one shown (its Undo goes with it), rather than
+        // waiting its turn: a few actions in a row queued up minutes of them.
+        model.messages.collectLatest { (text, change) ->
             val action = if (change != null) tr("Undo") else null
             // With an action it would stay until dismissed, and hold back the messages after it.
             val shown = snackbar.showSnackbar(text, action, duration = SnackbarDuration.Long)

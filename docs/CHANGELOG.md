@@ -89,6 +89,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   title as fit, the last one ending in "…", instead of a line cut in half.
 - Android: on wide screens a message (with Undo, say) shows at the bottom of the view, beside
   the add button, instead of in the middle of the window over the rail and the sidebar.
+- Android: a new message (with Undo, say) takes the place of the one shown instead of waiting
+  for it: a few actions in a row kept messages on screen for minutes.
 - Linux: a list's Completed group stays open when a task in it is reopened or the list is
   redrawn, until it is closed.
 - Linux: every task list is as wide at a given window size; one with a long row was a little
