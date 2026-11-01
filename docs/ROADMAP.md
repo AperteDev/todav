@@ -38,6 +38,11 @@ Planned work, not yet done. [FEATURES.md](FEATURES.md) lists it publicly; the or
 - **More of an event**: a time zone for its start and end, declined and cancelled events
   hidden by a setting; the weather of the coming days in the calendar's views (open: its
   source).
+- **A task's own colour** (`COLOR` on a VTODO), as events have one: set with Own Color in the
+  task dialog and page (`lists::swatches`, `ColorSwatches`, the event presets), shown on its
+  chips and blocks in the calendar views and the widgets (`Item::color`). Few task apps set or
+  show one (Nextcloud Tasks, Tasks.org, Thunderbird do not), so it is mostly Todav's own. Open:
+  how a task row in a list shows it (a coloured mark, the check's tint), if at all.
 - **Attachments** to tasks and events (`ATTACH`): links, and files uploaded to the account's
   Nextcloud Files; shown and opened from the task dialog and the event's details.
 - **Invitations**: attendees on an event, invitations sent and answered through the server's

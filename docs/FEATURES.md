@@ -109,6 +109,7 @@ What Todav can do, in short. The details of each release are in the
 - Duplicating tasks and events; templates.
 - A Year view, week numbers and folded night hours in the calendar.
 - An event's own time zone; declined events hidden; the weather in the calendar.
+- A task's own colour, as events have.
 - Attachments to tasks and events.
 - Invitations: attendees, sending and answering.
 - More choices for the GNOME extension's task list, and a place beside GNOME's calendar.
