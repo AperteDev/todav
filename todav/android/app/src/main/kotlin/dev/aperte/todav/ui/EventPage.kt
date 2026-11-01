@@ -219,7 +219,9 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
     BackHandler(enabled = changed) { discard = true }
     sheet?.let { LaunchedEffect(changed) { it.locked = changed } }
     Scaffold(
-        floatingActionButton = { EditorButtons(calendar != null, { if (changed) discard = true else cancel() }, ::save) },
+        // A lambda, not `::save`: references to a local function are all equal, so Compose kept
+        // the first one, with what the page had then (`patch`), and saved nothing changed since.
+        floatingActionButton = { EditorButtons(calendar != null, { if (changed) discard = true else cancel() }) { save() } },
         containerColor = if (sheet != null) Color.Transparent else MaterialTheme.colorScheme.background,
         contentWindowInsets = if (sheet != null) WindowInsets.navigationBars else ScaffoldDefaults.contentWindowInsets,
     ) { padding ->

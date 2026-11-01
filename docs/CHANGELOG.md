@@ -38,6 +38,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An older Todav no longer opens data a newer one left (after a downgrade, say); it says to
   update instead of reading and writing a database it does not know.
 
+### Fixed
+
+- Android: saving an event saved it as it was at the first change made on its page and
+  dropped the changes after it, such as a repeat picked after the title was edited.
+
 ## [2.3.0] - 2026-10-30
 
 ### Added
