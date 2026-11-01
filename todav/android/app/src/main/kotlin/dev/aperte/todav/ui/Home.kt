@@ -3,6 +3,10 @@ package dev.aperte.todav.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -11,7 +15,9 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
@@ -42,6 +48,7 @@ import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.TaskAlt
+import androidx.compose.material.icons.outlined.Today
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
@@ -56,6 +63,7 @@ import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -138,8 +146,31 @@ fun Home(model: Main) {
             snackbarHost = { SnackbarHost(snackbar) },
             bottomBar = { if (!wide) Switcher(view, page, menu, show, add.takeIf { canAdd }) },
             floatingActionButton = {
-                // Not over the calendar's "To Plan" sheet, which is under this layer.
-                if (wide && canAdd && !(toPlan && view == View.CALENDAR)) Box(Modifier.navigationBarsPadding()) { AddButton(addLabel(view), raised = true, onClick = add) }
+                // Neither over the calendar's "To Plan" sheet, which is under this layer.
+                val planning = toPlan && view == View.CALENDAR
+                val away by model.awayFromToday.collectAsStateWithLifecycle()
+                Column(
+                    if (wide) Modifier.navigationBarsPadding() else Modifier,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    // Today, above the add button (on phones, the one in the bar), only while the
+                    // calendar is away from today.
+                    AnimatedVisibility(
+                        view == View.CALENDAR && away && !planning && !(page && !wide),
+                        enter = scaleIn() + fadeIn(),
+                        exit = scaleOut() + fadeOut(),
+                    ) {
+                        Tip(tr("Today")) {
+                            SmallFloatingActionButton(
+                                onClick = model::today,
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            ) { Icon(Icons.Outlined.Today, tr("Today")) }
+                        }
+                    }
+                    if (wide && canAdd && !planning) AddButton(addLabel(view), raised = true, onClick = add)
+                }
             },
             contentWindowInsets = WindowInsets(0),
         ) { padding ->

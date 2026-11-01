@@ -269,6 +269,18 @@ class Main(app: Application) : AndroidViewModel(app) {
         day.value = d
     }
 
+    /** Whether the calendar is away from today: another day shown, or today scrolled out of sight. */
+    val awayFromToday = MutableStateFlow(false)
+
+    /** Counts Today's taps, so a view still on today scrolls back to it. */
+    val toToday = MutableStateFlow(0)
+
+    /** The calendar back on today (the Today button, its shortcut). */
+    fun today() {
+        pick(midnight(core.localNow()))
+        toToday.value++
+    }
+
     /** The calendar on the day of `t`, from wherever the user is. */
     fun showDay(t: Long) {
         pick(midnight(t))

@@ -41,7 +41,6 @@ import androidx.compose.material.icons.outlined.CalendarViewDay
 import androidx.compose.material.icons.outlined.CalendarViewMonth
 import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.CalendarViewWeek
-import androidx.compose.material.icons.outlined.Today
 import androidx.compose.material.icons.outlined.ViewAgenda
 import androidx.compose.material.icons.outlined.ViewColumn
 import androidx.compose.material.icons.outlined.ViewWeek
@@ -194,6 +193,7 @@ import dev.aperte.todav.tr
 import java.time.temporal.WeekFields
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -262,6 +262,11 @@ fun CalendarPane(model: Main) {
     LaunchedEffect(changes) { model.workDays.value = withContext(Dispatchers.IO) { model.core.workDays() } }
     // Each list's colour, once for all pages: a page coming into view has them at once.
     val colors = load(changes, initial = emptyMap<String, String>()) { model.core.colors() }
+    // Away from today, for the Today button: the month and the agenda, which scroll away from
+    // it, tell themselves.
+    LaunchedEffect(mode, day) {
+        if (mode.hours()) model.awayFromToday.value = day != midnight(model.core.localNow())
+    }
     val title = when (mode) {
         CalMode.AGENDA -> tr("Agenda")
         else -> format(day, "LLLL yyyy").replaceFirstChar { it.titlecase() }
@@ -271,11 +276,6 @@ fun CalendarPane(model: Main) {
             TopAppBar(
                 title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 actions = {
-                    Tip(tr("Today")) {
-                        IconButton(onClick = { model.pick(midnight(model.core.localNow())) }) {
-                            Icon(Icons.Outlined.Today, tr("Today"))
-                        }
-                    }
                     if (mode != CalMode.AGENDA) {
                         Tip(tr("To Plan")) {
                             IconButton(onClick = { model.toPlan.value = true }) { Icon(Icons.Outlined.Inbox, tr("To Plan")) }
@@ -463,6 +463,17 @@ private fun MonthView(model: Main, day: Long, colors: Map<String, String>, onIte
     val shown by remember { derivedStateOf { monthFirst(base + (list.firstVisibleItemIndex - MIDDLE) * 7 * DAY + 21 * DAY) } }
     LaunchedEffect(day) {
         if (monthFirst(day) != shown) list.animateScrollToItem(rowOf(monthFirst(day)))
+    }
+    // Today's week out of sight, or another day picked; Today brings it back into sight.
+    val todayRow = { rowOf(midnight(model.core.localNow())) }
+    val away by remember(day) {
+        derivedStateOf { day != midnight(model.core.localNow()) || todayRow() - list.firstVisibleItemIndex !in 0 until 6 }
+    }
+    LaunchedEffect(away) { model.awayFromToday.value = away }
+    LaunchedEffect(list) {
+        model.toToday.drop(1).collect {
+            if (todayRow() - list.firstVisibleItemIndex !in 0 until 6) list.animateScrollToItem(rowOf(monthFirst(midnight(model.core.localNow()))))
+        }
     }
     val scope = rememberCoroutineScope()
     LaunchedEffect(list) {
@@ -920,6 +931,17 @@ private fun AgendaView(model: Main, day: Long, onItem: (Item) -> Unit) {
     val now = model.core.localNow()
     val state = rememberLazyListState()
     LaunchedEffect(day) { state.scrollToItem(0) }
+    // Another day first, or today's (the top, if it has nothing) scrolled out of sight; Today
+    // goes back up.
+    val away by remember(day) {
+        derivedStateOf {
+            val today = midnight(model.core.localNow())
+            day != today || state.firstVisibleItemIndex > 0 &&
+                state.layoutInfo.visibleItemsInfo.none { it.key == "d$today" || (it.key as? String)?.startsWith("$today:") == true }
+        }
+    }
+    LaunchedEffect(away) { model.awayFromToday.value = away }
+    LaunchedEffect(state) { model.toToday.drop(1).collect { state.animateScrollToItem(0) } }
     if (entries.isEmpty()) {
         Box(Modifier.fillMaxSize(), Alignment.Center) {
             Text(tr("Nothing scheduled"), color = MaterialTheme.colorScheme.onSurfaceVariant)

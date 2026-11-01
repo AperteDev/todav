@@ -34,6 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Android: the calendar's Today button left the top bar for a small floating button above the
+  add button, shown only while the calendar is away from today: another day picked, or today
+  scrolled out of sight.
 - A task added for an event goes to the event's calendar, and only calendars that hold tasks
   offer to add one, unless a list is picked for the others (before, any event took tasks,
   added to the last opened list).

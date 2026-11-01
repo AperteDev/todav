@@ -239,7 +239,7 @@ class MainActivity : ComponentActivity() {
                     true
                 }
                 KeyEvent.KEYCODE_T -> {
-                    model.pick(dev.aperte.todav.core.midnight(model.core.localNow()))
+                    model.today()
                     true
                 }
                 in KeyEvent.KEYCODE_1..KeyEvent.KEYCODE_6 -> {
