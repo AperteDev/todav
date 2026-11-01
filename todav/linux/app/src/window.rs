@@ -135,6 +135,11 @@ struct Ui {
     /// A title is being edited in place: rebuilds wait until it is done (`stale`: one waits).
     renaming: Cell<bool>,
     stale: Cell<bool>,
+    /// Tasks just completed that leave the page: their rows, struck through, then faded out
+    /// (`linger`), the page rebuilt only then; meanwhile rebuilds wait (`stale`). The wait, and
+    /// the page (list, search) it is for: another one shown ends it.
+    lingering: RefCell<Vec<(gtk::Widget, String)>>,
+    linger: RefCell<Option<(glib::SourceId, Shown)>>,
     /// The task being dragged and where it came from.
     dragging: RefCell<Option<(Task, Slot)>>,
     /// This drag was told that reordering needs manual sort (once a drag).
@@ -158,6 +163,9 @@ struct Ui {
 thread_local! {
     static UI: RefCell<Option<Rc<Ui>>> = const { RefCell::new(None) };
 }
+
+/// What the task page shows: the list or page (its href), and the search typed.
+type Shown = (Option<String>, String);
 
 fn ui() -> Option<Rc<Ui>> {
     UI.with(|u| u.borrow().clone())
@@ -792,6 +800,8 @@ fn build(app: &adw::Application) -> Rc<Ui> {
         inline: Cell::new(false),
         renaming: Cell::new(false),
         stale: Cell::new(false),
+        lingering: RefCell::default(),
+        linger: RefCell::default(),
         dragging: RefCell::new(None),
         told_sort: Cell::new(false),
         drop_mark: RefCell::new(None),
@@ -1429,6 +1439,22 @@ fn refresh_tasks(ui: &Rc<Ui>) {
     if ui.renaming.get() {
         ui.stale.set(true);
         return;
+    }
+    // Completed tasks fading out of this page wait; another page is shown at once.
+    let here = (ui.current.borrow().clone(), ui.query.borrow().clone());
+    let waiting = ui.linger.borrow().as_ref().map(|(_, on)| *on == here);
+    match waiting {
+        Some(true) => {
+            ui.stale.set(true);
+            return;
+        }
+        Some(false) => {
+            if let Some((id, _)) = ui.linger.take() {
+                id.remove();
+            }
+            ui.lingering.borrow_mut().clear();
+        }
+        None => {}
     }
     if GtkWindowExt::focus(&ui.window).is_some_and(|f| f.is_ancestor(&ui.groups)) {
         GtkWindowExt::set_focus(&ui.window, None::<&gtk::Widget>);
@@ -2589,8 +2615,79 @@ fn done_check(t: &Task) -> gtk::CheckButton {
         .valign(gtk::Align::Center)
         .build();
     let uid = t.uid.clone();
-    check.connect_toggled(move |c| tick(c, &uid, || {}));
+    check.connect_toggled(move |c| {
+        let (check, u) = (c.downgrade(), uid.clone());
+        tick(c, &uid, move || {
+            if let Some(c) = check.upgrade() {
+                linger(&c, &u);
+            }
+        });
+    });
     check
+}
+
+/// Task `uid`, just ticked with `check`: completed and no longer among what the page shows (in
+/// the Completed group, or out of Upcoming), its row stays struck through, then fades out
+/// (`tasks::DONE_LINGER_MS`, `DONE_FADE_MS`), before the page shows it gone. Ticking another
+/// restarts the wait for all of them.
+fn linger(check: &gtk::CheckButton, uid: &str) {
+    let Some(ui) = ui() else { return };
+    let (href, query) = (ui.current.borrow().clone(), ui.query.borrow().clone());
+    let Some(list) = href.clone() else { return };
+    let page = match list.as_str() {
+        UPCOMING => Some(tasks::Page::Upcoming),
+        IMPORTANT => Some(tasks::Page::Important),
+        _ => None,
+    };
+    // Search results show completed tasks too.
+    let done = core().task(uid.into()).is_some_and(|t| t.done);
+    if !done || !query.is_empty() || tasks::shown(core(), page, &list, uid) {
+        return;
+    }
+    let Some(row) = check.ancestor(adw::PreferencesRow::static_type()) else {
+        return;
+    };
+    row.add_css_class("task-done");
+    ui.lingering.borrow_mut().push((row, uid.to_string()));
+    if let Some((id, _)) = ui.linger.take() {
+        id.remove();
+    }
+    let wait = std::time::Duration::from_millis(tasks::DONE_LINGER_MS);
+    let id = glib::timeout_add_local_once(wait, fade_lingering);
+    *ui.linger.borrow_mut() = Some((id, (href, query)));
+}
+
+/// Fade out the rows `linger` kept whose tasks are still completed, then show the page anew.
+fn fade_lingering() {
+    let Some(ui) = ui() else { return };
+    let Some((_, on)) = ui.linger.take() else {
+        return;
+    };
+    let rows: Vec<gtk::Widget> = ui
+        .lingering
+        .take()
+        .into_iter()
+        .filter(|(_, uid)| core().task(uid.clone()).is_some_and(|t| t.done))
+        .map(|(row, _)| row)
+        .collect();
+    for row in &rows {
+        let target = adw::PropertyAnimationTarget::new(row, "opacity");
+        adw::TimedAnimation::new(row, 1.0, 0.0, tasks::DONE_FADE_MS as u32, target).play();
+    }
+    let done = || {
+        if let Some(ui) = self::ui() {
+            ui.linger.take();
+            ui.stale.set(false);
+            refresh_tasks(&ui);
+        }
+    };
+    if rows.is_empty() {
+        return done();
+    }
+    // Still waiting meanwhile, for the same page.
+    let wait = std::time::Duration::from_millis(tasks::DONE_FADE_MS);
+    let id = glib::timeout_add_local_once(wait, done);
+    *ui.linger.borrow_mut() = Some((id, on));
 }
 
 /// Complete or reopen task `uid` as its check `check` now says, then `after`. Completed, its open

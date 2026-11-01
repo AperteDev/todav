@@ -15,6 +15,8 @@ What Todav can do, in short. The details of each release are in the
 - Priority on a star, coloured by its level, as Nextcloud Tasks stars tasks; an Important page
   with the high-priority tasks of every list.
 - Pinned tasks stay at the top of their list.
+- A task completed where it doesn't stay (into the Completed group, out of Upcoming) shows
+  struck through a moment, then fades out: in the app, the GNOME extension and the widget.
 - Move a task with its subtasks to another list, by drag and drop or from the task dialog.
 - Due dates and start dates, with or without a time.
 - Repeating tasks: daily, weekly, monthly or yearly, every n, until a day, from their dates or

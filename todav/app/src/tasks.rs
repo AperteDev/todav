@@ -41,6 +41,28 @@ pub fn pages(c: &Client) -> Vec<(Page, usize)> {
     .collect()
 }
 
+/// How long a task just completed that leaves the list stays where it was, struck through, then
+/// how long it takes to fade out (ms): ticking several in a row, they all stay until the last
+/// one's time is up.
+pub const DONE_LINGER_MS: u64 = 1500;
+pub const DONE_FADE_MS: u64 = 300;
+
+/// Whether task `uid` shows among what `page`, else list `list`, shows now: the open tasks with
+/// their trees (not the Completed group). A task just completed that no longer does fades out
+/// of where it was before the front-ends show the list again.
+pub fn shown(c: &Client, page: Option<Page>, list: &str, uid: &str) -> bool {
+    let tasks = match page {
+        Some(Page::Upcoming) => c.upcoming(),
+        Some(Page::Important) => c.important(),
+        None => {
+            let order = prefs::order(c);
+            let view = prefs::done_view(c);
+            c.ungrouped_by(list.to_string(), order.tasks, order.subtasks, view)
+        }
+    };
+    tasks.iter().any(|t| t.uid == uid)
+}
+
 /// Split a group's depth-first task list into root tasks, each with its (depth, subtask) list.
 pub fn trees(tasks: &[Task]) -> Vec<(&Task, Vec<(usize, &Task)>)> {
     let mut depth = HashMap::new();
@@ -497,6 +519,56 @@ pub(crate) mod tests {
         );
         c.set_setting("task_sort".into(), "manual".into()).unwrap();
         assert!(!needs_manual(&c, &a, &slot(None), &b, &slot(None)));
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_completed_task_is_shown_while_it_stays_among_the_open_ones() {
+        use todav_core::AccountKind;
+        let dir = std::env::temp_dir().join(format!("todav-app-shown-{}", std::process::id()));
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let account = c
+            .add_account(
+                AccountKind::Local,
+                String::new(),
+                String::new(),
+                String::new(),
+            )
+            .unwrap();
+        let list = c
+            .create_list(account, "Tasks".into(), "#0082C9".into(), false)
+            .unwrap();
+        let add = |name: &str, parent: Option<&str>| {
+            let t = c.add_task(
+                list.clone(),
+                name.into(),
+                None,
+                parent.map(Into::into),
+                false,
+            );
+            t.unwrap().uid
+        };
+        let (a, b) = (add("a", None), add("b", None));
+        let a1 = add("a1", Some(&a));
+        let patch = TaskPatch {
+            priority: Some(Some(1)),
+            ..Default::default()
+        };
+        c.update_task(b.clone(), patch).unwrap();
+        let shown = |page, uid: &str| shown(&c, page, &list, uid);
+        assert!(shown(None, &b) && shown(Some(Page::Important), &b));
+
+        // Into the Completed group, out of Important; a subtask stays under its open task.
+        c.set_done(b.clone(), true).unwrap();
+        c.set_done(a1.clone(), true).unwrap();
+        assert!(!shown(None, &b) && !shown(Some(Page::Important), &b));
+        assert!(shown(None, &a1));
+        // Completed tasks in place stay; completed subtasks hidden go.
+        c.set_setting("done_tasks".into(), "in_place".into())
+            .unwrap();
+        c.set_setting("done_subtasks".into(), "hide".into())
+            .unwrap();
+        assert!(shown(None, &b) && !shown(None, &a1));
         let _ = std::fs::remove_dir_all(dir);
     }
 

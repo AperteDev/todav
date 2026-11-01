@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Edit… for the whole dialog with what was typed. A double click still opens the dialog.
 - Android: holding a day of the month opens a new all-day event on it, and holding then moving
   across days, on it over all of them (holding an event still moves it).
+- A task ticked done that leaves the list (into its Completed group, out of Upcoming or
+  Important, a completed subtask hidden) stays where it was, struck through, for a moment, then
+  fades out, on Linux and Android, in the GNOME extension's task list and the task widget (in
+  steps there); ticking several in a row, they all stay until the last one's moment is over.
 - Android: haptic feedback where it helps: a bump when something is held to move, a tick for
   each day, time step or place it is moved across and when it is dropped there; when a swipe,
   a pull to sync or a sheet goes far enough to act; ticking a task and every switch on or off,

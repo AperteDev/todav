@@ -33,6 +33,8 @@ import dev.aperte.todav.core.trees
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import dev.aperte.todav.core.doneFadeMs
+import dev.aperte.todav.core.doneLingerMs
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -206,9 +208,52 @@ class Main(app: Application) : AndroidViewModel(app) {
     val newEvent = MutableStateFlow<Dest.EventEdit?>(null)
 
     // A read failing keeps what was shown: an exception would end the flow for good.
-    val screen: StateFlow<Screen?> = combine(todav.ready, todav.changes, selected, expanded, filter) { ready, _, key, open, f ->
+    private val loaded: StateFlow<Screen?> = combine(todav.ready, todav.changes, selected, expanded, filter) { ready, _, key, open, f ->
         if (ready) runCatching { load(key, open, f) }.onFailure { Log.w("Todav", "load", it) }.getOrNull() else null
     }.filterNotNull().flowOn(Dispatchers.IO).stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    /**
+     * Tasks just completed that leave the list (into its Completed group, out of Upcoming): by
+     * UID, whether they fade out yet. Meanwhile the list shows as it was (`held`), them struck
+     * through, until they have faded (`linger`).
+     */
+    val leaving = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+    private val held = MutableStateFlow<Screen?>(null)
+    private var lingering: kotlinx.coroutines.Job? = null
+
+    /** What the main screen shows: the list as loaded, or as it was while tasks leave it. */
+    val screen: StateFlow<Screen?> = combine(loaded, held, leaving) { now, then, gone ->
+        val shown = then?.takeIf { it.current == now?.current } ?: return@combine now
+        val done = { r: Row -> if (r.task.uid in gone) r.copy(task = r.task.copy(done = true)) else r }
+        shown.copy(groups = shown.groups.map { g -> g.copy(rows = g.rows.map(done)) })
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    /**
+     * Task `uid`, just completed on `before` (the list as it showed): if it no longer shows, it
+     * stays struck through with its subtasks completed with it, then fades out, the list held as
+     * it was until then. Another one completed meanwhile restarts the wait for all of them.
+     */
+    private fun linger(before: Screen?, uid: String) {
+        val key = before?.current ?: return
+        val page = when (key) {
+            UPCOMING -> SidebarPage.UPCOMING
+            IMPORTANT -> SidebarPage.IMPORTANT
+            else -> null
+        }
+        if (core.task(uid)?.done != true || core.taskShown(page, key, uid)) return
+        val gone = listOf(uid) + core.subtasks(uid, true).map { it.uid }
+        if (held.value?.current != key) held.value = before
+        leaving.value = leaving.value + gone.associateWith { false }
+        lingering?.cancel()
+        lingering = viewModelScope.launch {
+            delay(doneLingerMs().toLong())
+            // Those reopened meanwhile stay.
+            leaving.value = leaving.value.filterKeys { core.task(it)?.done == true }.mapValues { true }
+            delay(doneFadeMs().toLong())
+            held.value = null
+            leaving.value = emptyMap()
+        }
+    }
 
     /** Calendars and task lists for the calendar's drawer, by account. */
     val calendarLists: StateFlow<List<CalRow>> = combine(todav.ready, todav.changes) { ready, _ ->
@@ -524,8 +569,15 @@ class Main(app: Application) : AndroidViewModel(app) {
     private fun tick(task: TodavTask, done: Boolean, subtasks: Boolean) {
         // Completing them all, reopening one reopens its completed parents.
         val parents = !done && core.subtaskCompletion() == SubtaskCompletion.COMPLETE
+        // The list as it showed, before the change takes the task out of it.
+        val before = loaded.value
         core.setDoneTree(task.uid, done, subtasks, parents)
         synced()
+        if (done) {
+            linger(before, task.uid)
+        } else {
+            leaving.value = leaving.value - task.uid
+        }
         if (done) {
             // A repeating task stays open, at its next date.
             val moved = core.task(task.uid)?.done == false

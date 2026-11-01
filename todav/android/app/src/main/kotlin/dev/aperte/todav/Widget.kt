@@ -2,6 +2,10 @@ package dev.aperte.todav
 
 import android.appwidget.AppWidgetManager
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import dev.aperte.todav.core.SidebarPage
+import dev.aperte.todav.core.doneFadeMs
+import dev.aperte.todav.core.doneLingerMs
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -377,13 +381,29 @@ private val TICK_DONE = ActionParameters.Key<Boolean>("done")
 class Tick : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         val uid = parameters[TICK_UID] ?: return
+        val done = parameters[TICK_DONE] ?: true
         val app = context.applicationContext as TodavApp
         app.awaitReady()
-        app.core.setDoneUnasked(uid, parameters[TICK_DONE] ?: true)
-        app.core.requestSync()
-        app.changed()
         val id = GlanceAppWidgetManager(context).getAppWidgetId(glanceId)
-        WidgetKind.of(context, id)?.widget()?.update(context, glanceId)
+        val kind = WidgetKind.of(context, id)
+        // The task widget's rows as they show, before the change takes the task out of them.
+        val before = if (kind == WidgetKind.TASKS && done) TasksWidget.shown(context, app, id) else null
+        app.core.setDoneUnasked(uid, done)
+        app.core.requestSync()
+        if (!done) TasksWidget.stays(id, uid)
+        val leaves = before?.let { TasksWidget.hold(app, id, it, uid) }
+        app.changed()
+        val widget = kind?.widget()
+        widget?.update(context, glanceId)
+        // Completed and out of the list: struck through a moment, then fainter, then gone; another
+        // ticked meanwhile restarts the wait for all of them.
+        if (leaves == null || widget == null) return
+        delay(doneLingerMs().toLong())
+        if (!TasksWidget.fade(app, id, leaves)) return
+        widget.update(context, glanceId)
+        delay(doneFadeMs().toLong())
+        if (!TasksWidget.release(id, leaves)) return
+        widget.update(context, glanceId)
     }
 }
 
@@ -439,7 +459,7 @@ fun Chunked(vertical: Boolean, modifier: GlanceModifier, parts: List<@Composable
 // --- tasks ------------------------------------------------------------------------------------
 
 /** A row of the task widget: a heading, or a task at its depth. */
-private sealed interface TaskLine {
+internal sealed interface TaskLine {
     data class Heading(val text: String) : TaskLine
     data class Task(val task: TodavTask, val depth: Int) : TaskLine
 }
@@ -453,7 +473,10 @@ private sealed interface TaskLine {
 class TasksWidget : TodavWidget() {
     @Composable
     override fun Content(context: Context, app: TodavApp, widget: Int, changes: Long) {
-        val (title, color, href, lines) = remember(changes) { content(context, app, widget) }
+        val loaded = remember(changes) { content(context, app, widget) }
+        val holding = held[widget]
+        val (title, color, href, lines) = holding?.shown ?: loaded
+        val leaving = holding?.leaving.orEmpty()
         val check = WidgetPrefs.check(context, widget)
         val add = Intent(context, MainActivity::class.java).setAction(MainActivity.NEW_TASK)
             .apply { if (href != UPCOMING && href != IMPORTANT) putExtra("list", href) }
@@ -483,35 +506,96 @@ class TasksWidget : TodavWidget() {
                 items(lines) { line ->
                     when (line) {
                         is TaskLine.Heading -> WidgetHeading(line.text)
-                        is TaskLine.Task -> TaskRow(context, line, check)
+                        is TaskLine.Task -> TaskRow(context, line, check, leaving[line.task.uid])
                     }
                 }
             }
         }
     }
 
+    /** A task; `leaving` (completed, leaving the list): struck through, then (true) fainter. */
     @Composable
-    private fun TaskRow(context: Context, line: TaskLine.Task, check: Boolean) {
+    private fun TaskRow(context: Context, line: TaskLine.Task, check: Boolean, leaving: Boolean? = null) {
         val t = line.task
+        val done = t.done || leaving != null
+        val faint = { c: androidx.glance.unit.ColorProvider ->
+            if (leaving == true) androidx.glance.unit.ColorProvider(c.getColor(context).copy(alpha = 0.35f)) else c
+        }
         Row(
             GlanceModifier.fillMaxWidth().clickable(actionStartActivity(openTask(context, t.uid)))
                 .padding(start = (4 + line.depth * 20).dp, top = if (check) 0.dp else 5.dp, bottom = if (check) 0.dp else 5.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TaskMark(t.uid, t.done, check, GlanceTheme.colors.onSurfaceVariant)
+            TaskMark(t.uid, done, check, faint(GlanceTheme.colors.onSurfaceVariant))
             Spacer(GlanceModifier.width(if (check) 4.dp else 10.dp))
             Text(
                 t.summary,
                 maxLines = 1,
                 style = TextStyle(
-                    color = if (t.done) GlanceTheme.colors.onSurfaceVariant else GlanceTheme.colors.onSurface,
-                    textDecoration = if (t.done) TextDecoration.LineThrough else null,
+                    color = faint(if (done) GlanceTheme.colors.onSurfaceVariant else GlanceTheme.colors.onSurface),
+                    textDecoration = if (done) TextDecoration.LineThrough else null,
                 ),
             )
         }
     }
 
-    private data class Shown(val title: String, val color: String?, val href: String?, val lines: List<TaskLine>)
+    internal data class Shown(val title: String, val color: String?, val href: String?, val lines: List<TaskLine>)
+
+    /** A widget's rows as they were while tasks completed on it leave them (UID: fading yet). */
+    private class Held(val shown: Shown, val leaving: Map<String, Boolean>, val tick: Int)
+
+    companion object {
+        /** By widget; read by its content, which shows again as it changes. */
+        private val held = androidx.compose.runtime.mutableStateMapOf<Int, Held>()
+        private var ticks = 0
+
+        /** What widget `id` shows now. */
+        internal fun shown(context: Context, app: TodavApp, id: Int): Shown =
+            held[id]?.shown ?: TasksWidget().content(context, app, id)
+
+        /**
+         * Task `uid`, just completed on widget `id`, which showed `before` (`shown`): if it left
+         * the list, the widget shows `before` with it (and its subtasks completed with it) struck
+         * through; gives the wait's number for `fade` and `release`.
+         */
+        @Synchronized
+        internal fun hold(app: TodavApp, id: Int, shown: Shown, uid: String): Int? {
+            val href = shown.href ?: return null
+            val page = when (href) {
+                UPCOMING -> SidebarPage.UPCOMING
+                IMPORTANT -> SidebarPage.IMPORTANT
+                else -> null
+            }
+            if (app.core.task(uid)?.done != true || app.core.taskShown(page, href, uid)) return null
+            val gone = listOf(uid) + app.core.subtasks(uid, true).map { it.uid }
+            val old = held[id]
+            held[id] = Held(old?.shown ?: shown, old?.leaving.orEmpty() + gone.associateWith { false }, ++ticks)
+            return ticks
+        }
+
+        /** The tasks of wait `tick` still completed show fainter; false if another wait took over. */
+        @Synchronized
+        internal fun fade(app: TodavApp, id: Int, tick: Int): Boolean {
+            val h = held[id]?.takeIf { it.tick == tick } ?: return false
+            held[id] = Held(h.shown, h.leaving.filterKeys { app.core.task(it)?.done == true }.mapValues { true }, tick)
+            return true
+        }
+
+        /** Widget `id` shows its list as it is again; false if another wait took over. */
+        @Synchronized
+        internal fun release(id: Int, tick: Int): Boolean {
+            if (held[id]?.tick != tick) return false
+            held.remove(id)
+            return true
+        }
+
+        /** Task `uid`, reopened on widget `id`, stays. */
+        @Synchronized
+        internal fun stays(id: Int, uid: String) {
+            val h = held[id] ?: return
+            held[id] = Held(h.shown, h.leaving - uid, h.tick)
+        }
+    }
 
     /** The widget's list in its account (else Upcoming), its colour, and its rows. */
     private fun content(context: Context, app: TodavApp, widget: Int): Shown {

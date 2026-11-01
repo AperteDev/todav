@@ -48,7 +48,7 @@ Planned work, not yet done. [FEATURES.md](FEATURES.md) lists it publicly; the or
 - **Invitations**: attendees on an event, invitations sent and answered through the server's
   scheduling (iTIP), replies shown per attendee. A large piece; after the rest.
 - **GNOME extension**: the task list showing only some groups (overdue, today, the next 7 days,
-  started), done tasks hidden after a while, several lists merged; a place beside GNOME's
+  started), several lists merged; a place beside GNOME's
   calendar and events as well as in place of them. GNOME's designers propose moving
   notifications out of the clock menu into Quick Settings: follow it if it lands.
 - **Scripting**: adding, listing and ticking tasks from a shell or other apps through the

@@ -26,6 +26,10 @@ const {HORIZONTAL, VERTICAL} = Clutter.Orientation;
 const CENTER = Clutter.ActorAlign.CENTER;
 /// What St draws dimmed (it has no CSS opacity): done tasks, other months' days, weekdays.
 const DIM = 140;
+/// How long a task just completed that leaves the list stays struck through, then fades out
+/// (ms), as in the app (`todav_app::tasks::DONE_LINGER_MS`, `DONE_FADE_MS`).
+const DONE_LINGER_MS = 1500;
+const DONE_FADE_MS = 300;
 
 function label(text, style_class, props = {}) {
     const l = new St.Label({text, style_class, y_align: CENTER, ...props});
@@ -487,7 +491,7 @@ class TodavIndicator extends PanelMenu.Button {
                 category = t[2];
                 content.add_child(label(category || pgettext('category', 'Other'), 'todav-category'));
             }
-            content.add_child(this._taskRow(t));
+            content.add_child(this._taskRow(t, href));
         }
         if (tasks.length > MAX_TASKS) {
             const n = tasks.length - MAX_TASKS;
@@ -499,8 +503,9 @@ class TodavIndicator extends PanelMenu.Button {
 
     /// A task's circle (in `color`, its calendar's, in the agenda), with a check in it when done,
     /// and its `title` struck through then. With `_check` (and a `uid`) the circle is a button
-    /// completing or reopening it; read-only otherwise.
-    _taskMark(uid, done, title, color = null) {
+    /// completing or reopening it; read-only otherwise. Completed so, `onDone` hears it, with a
+    /// way to ask whether it still is.
+    _taskMark(uid, done, title, color = null, onDone = null) {
         const props = {style_class: 'todav-mark', style: color ? `border-color: ${color};` : null, y_align: CENTER};
         const check = this._check && uid;
         const mark = check ? new St.Button({...props, style_class: 'todav-mark todav-check', can_focus: true}) : new St.Bin(props);
@@ -518,7 +523,10 @@ class TodavIndicator extends PanelMenu.Button {
         mark.connect('clicked', () => {
             done = !done;
             show(done);
-            this._proxy.SetDoneAsync(uid, done).catch(e => {
+            this._proxy.SetDoneAsync(uid, done).then(() => {
+                if (done)
+                    onDone?.(() => done);
+            }).catch(e => {
                 logError(e, 'Todav: SetDone failed');
                 done = !done;
                 show(done);
@@ -529,15 +537,55 @@ class TodavIndicator extends PanelMenu.Button {
 
     /// A task's circle (`_taskMark`) and title; clicking opens the task in Todav, in its list or
     /// its editor (`_edit`).
-    _taskRow([uid, summary, , done, depth]) {
+    _taskRow([uid, summary, , done, depth], href) {
         const title = label(summary, 'todav-task', {x_expand: true});
-        const mark = this._taskMark(uid, done, title);
-        const item = row([mark, title]);
+        let item = null;
+        const mark = this._taskMark(uid, done, title, null, still => this._linger(item, uid, href, still));
+        item = row([mark, title]);
+        item._depth = depth;
+        item.connect('destroy', () => (item._gone = true));
         item.child.style = `padding-left: ${depth * 16}px;`;
         item.connect('clicked', () => this._open(p => (this._edit?.tasks
             ? p.EditItemAsync(uid, true, 0).catch(() => p.ShowTaskAsync(uid))
             : p.ShowTaskAsync(uid))));
         return item;
+    }
+
+    /// Task row `item`, just completed: a moment later, if it `still` is and the list (`href`) no
+    /// longer has it (it went to its Completed group), it fades out with its subtasks under it.
+    _linger(item, uid, href, still) {
+        this._lingers ??= new Set();
+        const id = GLib.timeout_add(GLib.PRIORITY_DEFAULT, DONE_LINGER_MS, () => {
+            this._lingers.delete(id);
+            this._fadeOut(item, uid, href, still).catch(e => logError(e, 'Todav: cannot fade a task out'));
+            return GLib.SOURCE_REMOVE;
+        });
+        this._lingers.add(id);
+    }
+
+    async _fadeOut(item, uid, href, still) {
+        if (item._gone || !still())
+            return;
+        const [all] = await this._proxy.GetTasksAsync(href);
+        if (item._gone || !still() || all.some(t => t[0] === uid))
+            return;
+        const rows = [item];
+        for (let next = item.get_next_sibling(); next?._depth > item._depth; next = next.get_next_sibling())
+            rows.push(next);
+        for (const r of rows) {
+            r.ease({
+                opacity: 0,
+                duration: DONE_FADE_MS,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                // Then the rows below close up.
+                onComplete: () => r.ease({
+                    height: 0,
+                    duration: DONE_FADE_MS / 2,
+                    mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                    onComplete: () => r.destroy(),
+                }),
+            });
+        }
     }
 
     async _calendarColumn(on) {
@@ -735,6 +783,7 @@ class TodavIndicator extends PanelMenu.Button {
     destroy() {
         this._destroyed = true;
         GLib.source_remove(this._midnightId);
+        this._lingers?.forEach(id => GLib.source_remove(id));
         this._context.destroy();
         if (this._dateMenu) {
             this._clockPlace(() => false);

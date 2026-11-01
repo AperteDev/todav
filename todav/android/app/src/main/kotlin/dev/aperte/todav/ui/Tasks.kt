@@ -671,6 +671,13 @@ private fun TaskItem(
     // Held: indented as deep as it would land (beside a row: that row's depth; into it: one deeper).
     val depth = target?.takeIf { dragged }?.let { t -> t.row?.let { it.depth + (if (t.mode == 0) 1 else 0) - row.depth } } ?: 0
     val dx by animateFloatAsState(depth * 24f, label = "depth")
+    // Completed and leaving the list: faded out before it goes (`Main.leaving`).
+    val leaving by model.leaving.collectAsStateWithLifecycle()
+    val fade by animateFloatAsState(
+        if (leaving[task.uid] == true) 0f else 1f,
+        androidx.compose.animation.core.tween(dev.aperte.todav.core.doneFadeMs().toInt()),
+        label = "leaving",
+    )
     // Kept only while the row is shown: a saved one came back swiped with the row (its task
     // reopened by Undo, say) and did it again.
     val threshold = SwipeToDismissBoxDefaults.positionalThreshold
@@ -689,6 +696,7 @@ private fun TaskItem(
         modifier = Modifier
             .zIndex(if (dragged) 1f else 0f)
             .graphicsLayer {
+                alpha = fade
                 if (dragged && drag != null) {
                     val now = state.layoutInfo.visibleItemsInfo.firstOrNull { it.key == key }?.offset ?: 0
                     translationY = drag.y - drag.grab - now
@@ -777,7 +785,7 @@ private fun TaskItem(
             }
         }
     }
-    HorizontalDivider(Modifier.padding(start = (56 + 24 * row.depth).dp))
+    HorizontalDivider(Modifier.padding(start = (56 + 24 * row.depth).dp).graphicsLayer { alpha = fade })
     if (moving) MoveDialog(model, task) { moving = false }
 }
 

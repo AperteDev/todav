@@ -479,6 +479,12 @@ impl Todav {
         self.c().moves_on(uid)
     }
 
+    /// Whether task `uid` shows among the open tasks (with their trees) of `page`, else of list
+    /// `list`: one just completed that no longer does fades out first.
+    pub fn task_shown(&self, page: Option<SidebarPage>, list: String, uid: String) -> bool {
+        todav_app::tasks::shown(self.c(), page, &list, &uid)
+    }
+
     /// The task's subtasks, at any depth, that are `done` or open.
     pub fn subtasks(&self, uid: String, done: bool) -> Vec<Task> {
         todav_app::tasks::subtasks(self.c(), &uid, done)
@@ -1236,6 +1242,18 @@ pub fn trees(tasks: Vec<Task>) -> Vec<Tree> {
                 .collect(),
         })
         .collect()
+}
+
+/// How long a task just completed that leaves its list stays there struck through, then fades
+/// out (ms): `todav_app::tasks::DONE_LINGER_MS`, `DONE_FADE_MS`.
+#[uniffi::export]
+pub fn done_linger_ms() -> u64 {
+    todav_app::tasks::DONE_LINGER_MS
+}
+
+#[uniffi::export]
+pub fn done_fade_ms() -> u64 {
+    todav_app::tasks::DONE_FADE_MS
 }
 
 /// Open and done direct subtasks of each task, by UID.
