@@ -90,6 +90,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the add button, instead of in the middle of the window over the rail and the sidebar.
 - Linux: a list's Completed group stays open when a task in it is reopened or the list is
   redrawn, until it is closed.
+- Linux: every task list is as wide at a given window size; one with a long row was a little
+  wider than the others.
 - Linux: the week views' title names the month in the form a date takes ("16 – 22 listopada
   2026" in Polish, not "listopad").
 - Linux: in an event's or a task's details, the text of every line starts at the same place,

@@ -197,6 +197,7 @@ Adw.ApplicationWindow window {
 
                   Adw.Clamp {
                     maximum-size: 720;
+                    tightening-threshold: 560;
                     hexpand: true;
 
                     Gtk.SearchEntry task_query {
@@ -209,8 +210,12 @@ Adw.ApplicationWindow window {
                 content: Gtk.ScrolledWindow {
                   vexpand: true;
 
+                  // Tightening from above the rows' least width (a task with its date, count
+                  // and buttons): below it the clamp starts from the child's own, which made
+                  // each list's column as wide as its widest row needs.
                   Adw.Clamp {
                     maximum-size: 720;
+                    tightening-threshold: 560;
 
                     Gtk.Box {
                       orientation: vertical;
