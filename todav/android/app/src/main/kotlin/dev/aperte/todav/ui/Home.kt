@@ -10,7 +10,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -190,7 +192,11 @@ private fun Panes(model: Main, screen: Screen, view: View, modifier: Modifier) {
     val pager = rememberPagerState(initialPage = view.ordinal) { 2 }
     LaunchedEffect(view) { if (pager.currentPage != view.ordinal) pager.animateScrollToPage(view.ordinal) }
     HorizontalPager(pager, modifier, userScrollEnabled = false, beyondViewportPageCount = 1) { page ->
-        if (page == View.TASKS.ordinal) TasksPane(model, screen) else CalendarPane(model)
+        // The page out of sight takes no focus: focus left behind by a closing sheet (a new
+        // event's title) went there, and the pager scrolled to it, Tasks under Calendar's button.
+        Box(Modifier.focusProperties { onEnter = { if (page != view.ordinal) cancelFocusChange() } }.focusGroup()) {
+            if (page == View.TASKS.ordinal) TasksPane(model, screen) else CalendarPane(model)
+        }
     }
 }
 

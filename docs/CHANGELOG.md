@@ -49,6 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Android: on a phone, saving a new event after typing its title showed the task list under the
+  Calendar button, until Tasks and Calendar were tapped again.
 - Android: saving an event saved it as it was at the first change made on its page and
   dropped the changes after it, such as a repeat picked after the title was edited.
 - Android: a message with Undo ("... saved", "... completed") stayed until swiped away, and the
