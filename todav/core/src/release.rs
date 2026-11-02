@@ -9,6 +9,7 @@ const LATEST: &str = "https://api.github.com/repos/AperteDev/todav/releases/late
 /// when it cannot be checked.
 pub fn newer(current: &str) -> Option<(String, String)> {
     let agent = ureq::Agent::config_builder()
+        .tls_config(crate::net::tls())
         .user_agent("Todav")
         .timeout_global(Some(std::time::Duration::from_secs(30)))
         .build()

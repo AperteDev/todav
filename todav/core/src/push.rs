@@ -325,6 +325,7 @@ impl Client {
 /// message event. Only a failed connection is an error.
 fn ntfy_stream(url: &str, stop: &dyn Fn() -> bool, f: &mut dyn FnMut(&str, Vec<u8>)) -> Result<()> {
     let agent = ureq::Agent::config_builder()
+        .tls_config(crate::net::tls())
         .timeout_global(None)
         .timeout_recv_body(Some(std::time::Duration::from_secs(120))) // ntfy sends keepalives every 45 s
         .build()
@@ -364,6 +365,7 @@ fn ntfy_stream(url: &str, stop: &dyn Fn() -> bool, f: &mut dyn FnMut(&str, Vec<u
 pub fn ntfy_check(ntfy_url: String) -> Result<()> {
     let url = format!("{}/v1/health", ntfy_url.trim_end_matches('/'));
     let mut r = ureq::Agent::config_builder()
+        .tls_config(crate::net::tls())
         .http_status_as_error(false)
         .user_agent("Todav")
         .timeout_global(Some(std::time::Duration::from_secs(10)))

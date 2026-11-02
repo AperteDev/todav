@@ -12,5 +12,9 @@ ring = "0.17"
 rusqlite = ">=0.38, <0.41"
 ureq = "3.4.2"
 
+# The system's certificate authorities (net.rs); Android's come from the app.
+[target.'cfg(not(target_os = "android"))'.dependencies]
+ureq = { version = "3.4.2", features = ["platform-verifier"] }
+
 [features]
 integration = []

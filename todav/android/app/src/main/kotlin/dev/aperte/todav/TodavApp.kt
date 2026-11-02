@@ -8,6 +8,8 @@ import dev.aperte.todav.core.ServiceShell
 import dev.aperte.todav.core.SyncState
 import dev.aperte.todav.core.Todav
 import dev.aperte.todav.core.TodavException
+import dev.aperte.todav.core.setTrustedCertificates
+import java.security.KeyStore
 import java.time.ZoneId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -57,6 +59,7 @@ class TodavApp : Application() {
     @OptIn(FlowPreview::class)
     override fun onCreate() {
         super.onCreate()
+        trustCertificates()
         I18n.load(this)
         passwords = Passwords(this)
         push = Push(this)
@@ -125,6 +128,16 @@ class TodavApp : Application() {
             if (a.kind != AccountKind.NEXTCLOUD || a.source.isNotEmpty()) continue
             val password = passwords.load(a.url, a.user) ?: continue
             runCatching { core.connect(a.id, password) }
+        }
+    }
+
+    /** HTTPS trusts what Android does, certificate authorities the user installed too (a
+     * self-hosted server's own CA), not only the core's built-in ones. Read once per process:
+     * one added later counts from the next start. */
+    private fun trustCertificates() {
+        runCatching {
+            val store = KeyStore.getInstance("AndroidCAStore").apply { load(null) }
+            setTrustedCertificates(store.aliases().toList().mapNotNull { store.getCertificate(it)?.encoded })
         }
     }
 }

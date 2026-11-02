@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A server whose certificate comes from a certificate authority added to the system (a
+  self-hosted Nextcloud's own CA) connects, instead of failing with "invalid peer certificate:
+  UnknownIssuer": Todav trusts the system's certificate authorities, not only its built-in
+  list; on Android the ones installed by the user too.
+
 ## [2.4.0] - 2026-11-01
 
 ### Added

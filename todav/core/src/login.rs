@@ -20,6 +20,7 @@ pub struct Credentials {
 
 fn agent() -> ureq::Agent {
     ureq::Agent::config_builder()
+        .tls_config(crate::net::tls())
         .http_status_as_error(false)
         .user_agent("Todav")
         .timeout_global(Some(std::time::Duration::from_secs(30)))

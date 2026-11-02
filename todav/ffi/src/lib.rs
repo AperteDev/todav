@@ -1050,6 +1050,13 @@ pub fn ntfy_check(ntfy_url: String) -> Result<()> {
     Ok(todav_core::ntfy_check(ntfy_url)?)
 }
 
+/// Trust these certificate authorities (DER) for HTTPS: on Android its store's, the system's
+/// and the user's, as the core cannot read them itself. Call it before the first request.
+#[uniffi::export]
+pub fn set_trusted_certificates(certs: Vec<Vec<u8>>) {
+    todav_core::set_roots(certs);
+}
+
 /// The host of a Nextcloud account's server, for its default name ("user@host").
 #[uniffi::export]
 pub fn account_host(account: Account) -> String {
