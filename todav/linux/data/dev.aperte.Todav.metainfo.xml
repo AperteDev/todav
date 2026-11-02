@@ -36,19 +36,19 @@
   <!-- From the release tag (scripts/release.py moves them to each new one). -->
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.4.0/docs/screenshots/tasks.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.4.1/docs/screenshots/tasks.png</image>
       <caption>Tasks grouped by category, with subtasks and due dates</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.4.0/docs/screenshots/calendar-month.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.4.1/docs/screenshots/calendar-month.png</image>
       <caption>The month, with an event's details</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.4.0/docs/screenshots/calendar-week.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.4.1/docs/screenshots/calendar-week.png</image>
       <caption>Tasks planned into the week next to events</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.4.0/docs/screenshots/event-dialog.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.4.1/docs/screenshots/event-dialog.png</image>
       <caption>Editing an event</caption>
     </screenshot>
   </screenshots>
@@ -63,6 +63,21 @@
     <control>touch</control>
   </supports>
   <releases>
+    <release version="2.4.1" date="2026-11-02">
+      <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.4.1</url>
+      <description translate="no">
+        <p>Added</p>
+        <ul>
+          <li>The GNOME Shell extension runs on GNOME 48 too (Debian 13, for instance), with the app installed as a Flatpak.</li>
+        </ul>
+        <p>Fixed</p>
+        <ul>
+          <li>A server whose certificate comes from a certificate authority added to the system (a self-hosted Nextcloud's own CA) connects, instead of failing with "invalid peer certificate: UnknownIssuer": Todav trusts the system's certificate authorities, not only its built-in list; on Android the ones installed by the user too.</li>
+          <li>An error page from the server or a proxy shows as its text in error messages, not as its HTML.</li>
+          <li>The GNOME extension no longer fills the system log with "Attempting to call back into JSAPI during the sweeping phase of GC", one per task row, after a task is added or the list is changed.</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.4.0" date="2026-11-01">
       <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.4.0</url>
       <description translate="no">
