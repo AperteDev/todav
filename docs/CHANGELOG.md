@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   list; on Android the ones installed by the user too.
 - An error page from the server or a proxy shows as its text in error messages, not as its
   HTML.
+- The GNOME extension no longer fills the system log with "Attempting to call back into JSAPI
+  during the sweeping phase of GC", one per task row, after a task is added or the list is
+  changed.
 
 ## [2.4.0] - 2026-11-01
 

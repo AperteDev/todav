@@ -434,6 +434,9 @@ class TodavIndicator extends PanelMenu.Button {
                 lists.forEach(l => content.add_child(this._listRow(l, l[0] === href)));
             else
                 await this._fillTasks(content, href, on('subtasks'));
+            // Destroyed, not only taken out: left to the garbage collector, the rows' destroy
+            // handlers would run during its sweep, which GJS refuses.
+            body.child?.destroy();
             body.child = content;
         };
         if (has('tasks')) {
@@ -634,6 +637,7 @@ class TodavIndicator extends PanelMenu.Button {
             }
             if (items.length === 0)
                 content.add_child(label(picked === null ? _('Nothing planned this week') : _('Nothing planned'), 'todav-empty'));
+            scroll.child?.destroy();
             scroll.child = content;
         };
         this._showAgenda = show;
