@@ -36,19 +36,19 @@
   <!-- From the release tag (scripts/release.py moves them to each new one). -->
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.4.1/docs/screenshots/tasks.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.4.2/docs/screenshots/tasks.png</image>
       <caption>Tasks grouped by category, with subtasks and due dates</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.4.1/docs/screenshots/calendar-month.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.4.2/docs/screenshots/calendar-month.png</image>
       <caption>The month, with an event's details</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.4.1/docs/screenshots/calendar-week.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.4.2/docs/screenshots/calendar-week.png</image>
       <caption>Tasks planned into the week next to events</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.4.1/docs/screenshots/event-dialog.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.4.2/docs/screenshots/event-dialog.png</image>
       <caption>Editing an event</caption>
     </screenshot>
   </screenshots>
@@ -63,6 +63,15 @@
     <control>touch</control>
   </supports>
   <releases>
+    <release version="2.4.2" date="2026-11-02">
+      <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.4.2</url>
+      <description translate="no">
+        <p>Fixed</p>
+        <ul>
+          <li>Linux: the calendar's Month view no longer scrolls back month after month without end when it is redrawn (an event saved after editing, an undo) while one of its items has the focus.</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.4.1" date="2026-11-02">
       <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.4.1</url>
       <description translate="no">

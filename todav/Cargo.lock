@@ -1276,14 +1276,14 @@ dependencies = [
 
 [[package]]
 name = "todav-app"
-version = "2.4.1"
+version = "2.4.2"
 dependencies = [
  "todav-core",
 ]
 
 [[package]]
 name = "todav-core"
-version = "2.4.1"
+version = "2.4.2"
 dependencies = [
  "p256",
  "quick-xml",
@@ -1294,7 +1294,7 @@ dependencies = [
 
 [[package]]
 name = "todav-ffi"
-version = "2.4.1"
+version = "2.4.2"
 dependencies = [
  "rusqlite",
  "todav-app",
