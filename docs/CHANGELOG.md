@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Linux: the calendar's Month view no longer scrolls back month after month without end
+  when it is redrawn (an event saved after editing, an undo) while one of its items has the
+  focus.
+
 ## [2.4.1] - 2026-11-02
 
 ### Added

@@ -710,6 +710,13 @@ pub fn refresh() {
         c.pending.set(true);
         return;
     }
+    // An item drawn anew with the focus would hand it to the grid's first one, above the weeks
+    // in sight: the month view would scroll there, into the month before, drawn anew in turn.
+    if let Some(root) = c.views.root()
+        && root.focus().is_some_and(|f| f.is_ancestor(&c.views))
+    {
+        root.set_focus(None::<&gtk::Widget>);
+    }
     refresh_calendars(&c);
     mini::refresh(&c);
     let until = match mode(&c) {
