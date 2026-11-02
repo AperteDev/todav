@@ -1033,12 +1033,13 @@ impl std::fmt::Display for Error {
             Error::Conflict => write!(f, "precondition failed (changed on server)"),
             Error::NoAccount => write!(f, "no account configured"),
             Error::NotFound(s) => write!(f, "not found: {s}"),
-            // A WebDAV error body is XML: its <s:message> is the part worth reading.
+            // A WebDAV error body is XML: its <s:message> is the part worth reading. A web
+            // server's or proxy's error page is HTML: its text only.
             Error::Http(code, body) => {
                 let message = body
                     .split_once("<s:message>")
                     .and_then(|(_, m)| m.split_once("</s:message>"))
-                    .map_or(body.as_str(), |(m, _)| m);
+                    .map_or_else(|| html_text(body), |(m, _)| m.into());
                 let short: String = message.chars().take(300).collect();
                 write!(f, "HTTP {code}: {}", short.trim())
             }
@@ -1051,6 +1052,50 @@ impl std::fmt::Display for Error {
 }
 
 impl std::error::Error for Error {}
+
+/// The text of an HTML page (its body's, without scripts and styles), on one line; anything else
+/// as it is.
+fn html_text(body: &str) -> String {
+    let lower = body.to_ascii_lowercase();
+    if !lower.trim_start().starts_with("<!doctype html") && !lower.contains("<html") {
+        return body.into();
+    }
+    let mut text = String::new();
+    let mut rest = body;
+    let mut lower = lower.as_str();
+    while let Some(open) = lower.find('<') {
+        text.push_str(&rest[..open]);
+        // Skipped with their content.
+        let end = ["head", "script", "style"]
+            .iter()
+            .find(|t| {
+                lower[open + 1..].starts_with(*t)
+                    && !lower[open + 1 + t.len()..].starts_with(|c: char| c.is_ascii_alphanumeric())
+            })
+            .and_then(|t| lower[open..].find(&format!("</{t}")).map(|i| open + i))
+            .unwrap_or(open);
+        let Some(close) = lower[end..].find('>') else {
+            rest = "";
+            break;
+        };
+        text.push(' ');
+        rest = &rest[end + close + 1..];
+        lower = &lower[end + close + 1..];
+    }
+    text.push_str(rest);
+    let text = [
+        ("&lt;", "<"),
+        ("&gt;", ">"),
+        ("&quot;", "\""),
+        ("&#39;", "'"),
+        ("&#x27;", "'"),
+        ("&nbsp;", " "),
+        ("&amp;", "&"),
+    ]
+    .iter()
+    .fold(text, |t, (entity, c)| t.replace(entity, c));
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
 
 impl From<rusqlite::Error> for Error {
     fn from(e: rusqlite::Error) -> Self {
@@ -1371,6 +1416,36 @@ mod tests {
         assert_eq!(
             Error::Http(500, "oops".into()).to_string(),
             "HTTP 500: oops"
+        );
+    }
+
+    #[test]
+    fn http_errors_show_an_html_pages_text() {
+        let nginx = "<html>\r\n<head><title>502 Bad Gateway</title></head>\r\n<body>\r\n<center><h1>502 Bad Gateway</h1></center>\r\n<hr><center>nginx</center>\r\n</body>\r\n</html>\r\n";
+        assert_eq!(
+            Error::Http(502, nginx.into()).to_string(),
+            "HTTP 502: 502 Bad Gateway nginx"
+        );
+        let python = r#"<!DOCTYPE HTML>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <style type="text/css">
+            :root { color-scheme: light dark; }
+        </style>
+        <title>Error response</title>
+    </head>
+    <body>
+        <h1>Error response</h1>
+        <p>Error code: 501</p>
+        <p>Message: Unsupported method (&#x27;PROPFIND&#x27;).</p>
+        <script>let a = 1 < 2;</script>
+    </body>
+</html>
+"#;
+        assert_eq!(
+            Error::Http(501, python.into()).to_string(),
+            "HTTP 501: Error response Error code: 501 Message: Unsupported method ('PROPFIND')."
         );
     }
 

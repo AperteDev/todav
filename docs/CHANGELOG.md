@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   self-hosted Nextcloud's own CA) connects, instead of failing with "invalid peer certificate:
   UnknownIssuer": Todav trusts the system's certificate authorities, not only its built-in
   list; on Android the ones installed by the user too.
+- An error page from the server or a proxy shows as its text in error messages, not as its
+  HTML.
 
 ## [2.4.0] - 2026-11-01
 
