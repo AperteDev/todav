@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The GNOME Shell extension runs on GNOME 48 too (Debian 13, for instance), with the app
+  installed as a Flatpak.
+
 ### Fixed
 
 - A server whose certificate comes from a certificate authority added to the system (a

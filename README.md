@@ -78,7 +78,8 @@ All of what Todav does, and what it will, is listed in [FEATURES.md](docs/FEATUR
 
 ## Getting started
 
-Todav needs GNOME 49 or newer, or Android 10 or newer. The GNOME Shell extension is optional.
+Todav needs GNOME 49 or newer, or Android 10 or newer. The GNOME Shell extension is optional;
+it runs on GNOME 48 too (Debian 13, for instance), with the app installed as a Flatpak.
 
 **Android:** download `todav-<version>.apk` from the
 [latest release](https://github.com/AperteDev/todav/releases/latest) and open it on your phone
@@ -166,7 +167,8 @@ Todav is developed and tested mainly on this setup:
 
 - **Nextcloud** with its built-in CalDAV server (the Tasks and Calendar apps are optional, but
   handy as web fallbacks).
-- **GNOME** 49 to 51, with the app (GTK 4 + libadwaita) and the optional GNOME Shell extension.
+- **GNOME** 49 to 51, with the app (GTK 4 + libadwaita) and the optional GNOME Shell extension
+  (which runs on 48 too).
 - **Android** 15 to 17 on phones and foldables (the emulator), with the ntfy app as the
   UnifiedPush distributor.
 - Optionally, for instant updates: the [DAV Push](https://github.com/bitfireAT/nc_ext_dav_push)

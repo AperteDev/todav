@@ -62,7 +62,9 @@
   and the extension zip. Run the checks before committing.
 - The lowest supported GNOME is 49 (libadwaita 1.8, for `Adw.ShortcutsDialog`). A newer
   widget raises it: update the README, `scripts/deb.sh`'s libadwaita version and the
-  tarball's build distribution together.
+  tarball's build distribution together. The extension alone goes down to GNOME 48 (Debian
+  13, with the app as a Flatpak; `St.BoxLayout`'s `orientation` is new in 48): keep it
+  working there.
 
 ## Translations
 
