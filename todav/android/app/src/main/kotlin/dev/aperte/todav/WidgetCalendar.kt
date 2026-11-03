@@ -340,14 +340,20 @@ class AgendaWidget : TodavWidget() {
         }
     }
 
+    /**
+     * A dense row, as Outlook's: the mark, the title with an event's place under it, and on the
+     * right its time with its length under it.
+     */
     @Composable
     private fun AgendaRow(context: Context, e: dev.aperte.todav.core.AgendaEntry, check: Boolean) {
         val item = e.item
+        val event = (item as? Item.Event)?.event
         val open = openItem(context, item)
+        val dim = GlanceTheme.colors.onSurfaceVariant
         Row(
             // A circle that ticks has room around it: the row's own goes.
             GlanceModifier.fillMaxWidth().clickable(actionStartActivity(open))
-                .padding(horizontal = 4.dp, vertical = if (check && item is Item.Task) 0.dp else 5.dp),
+                .padding(horizontal = 4.dp, vertical = if (check && item is Item.Task) 0.dp else 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (item is Item.Task) {
@@ -356,26 +362,55 @@ class AgendaWidget : TodavWidget() {
                 WidgetMark(false, false, widgetColor(e.color), 18.dp)
             }
             Spacer(GlanceModifier.width(if (check && item is Item.Task) 2.dp else 8.dp))
-            Text(
-                when (val t = e.time) {
-                    Time.AllDay -> tr("All day")
-                    Time.Date -> ""
-                    is Time.At -> time(t.time)
-                    is Time.Until -> tr("Until {time}").replace("{time}", time(t.end))
-                },
-                maxLines = 1,
-                style = TextStyle(fontSize = 12.sp, color = GlanceTheme.colors.onSurfaceVariant),
-                modifier = GlanceModifier.width(if (hours24) 48.dp else 64.dp),
-            )
-            Text(
-                item.title(),
-                maxLines = 1,
-                style = TextStyle(
-                    color = if (item.done()) GlanceTheme.colors.onSurfaceVariant else GlanceTheme.colors.onSurface,
-                    textDecoration = if (item.struck()) TextDecoration.LineThrough else null,
-                ),
-            )
+            Column(GlanceModifier.defaultWeight()) {
+                Text(
+                    item.title(),
+                    maxLines = 1,
+                    style = TextStyle(
+                        color = if (item.done()) dim else GlanceTheme.colors.onSurface,
+                        textDecoration = if (item.struck()) TextDecoration.LineThrough else null,
+                    ),
+                )
+                event?.location?.takeIf { it.isNotBlank() }?.let { place ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            ImageProvider(R.drawable.ic_widget_place),
+                            null,
+                            GlanceModifier.size(12.dp),
+                            colorFilter = androidx.glance.ColorFilter.tint(dim),
+                        )
+                        Spacer(GlanceModifier.width(2.dp))
+                        Text(place, maxLines = 1, style = TextStyle(fontSize = 12.sp, color = dim))
+                    }
+                }
+            }
+            val at = when (val t = e.time) {
+                Time.AllDay -> tr("All day")
+                Time.Date -> null
+                is Time.At -> time(t.time)
+                is Time.Until -> tr("Until {time}").replace("{time}", time(t.end))
+            }
+            if (at != null) {
+                Spacer(GlanceModifier.width(8.dp))
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(at, maxLines = 1, style = TextStyle(fontSize = 13.sp, color = GlanceTheme.colors.onSurface))
+                    val length = event?.takeIf { e.time is Time.At && !it.allDay }?.let { length(it.end - it.start) }
+                    if (length != null) Text(length, maxLines = 1, style = TextStyle(fontSize = 12.sp, color = dim))
+                }
+            }
         }
+    }
+}
+
+/** An event's length, short: "30m", "1h", "1h 30m"; none for an instant or a day or more. */
+private fun length(seconds: Long): String? {
+    val minutes = seconds / 60
+    if (minutes <= 0 || minutes >= 24 * 60) return null
+    val (h, m) = minutes / 60 to minutes % 60
+    return when {
+        h == 0L -> tr("{m}m").replace("{m}", "$m")
+        m == 0L -> tr("{h}h").replace("{h}", "$h")
+        else -> tr("{h}h {m}m").replace("{h}", "$h").replace("{m}", "$m")
     }
 }
 

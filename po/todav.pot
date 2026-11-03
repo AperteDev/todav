@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Todav\n"
 "Report-Msgid-Bugs-To: https://github.com/AperteDev/todav/issues\n"
-"POT-Creation-Date: 2026-11-03 14:29+0100\n"
+"POT-Creation-Date: 2026-11-03 14:38+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -109,7 +109,7 @@ msgid "Sync"
 msgstr ""
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:267
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:427
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:462
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:80
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:96
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:169
@@ -362,21 +362,33 @@ msgstr ""
 msgid "Nothing planned this week"
 msgstr ""
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:361
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:388
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:1064
 #: todav/linux/app/src/calendar.rs:630 todav/linux/app/src/calendar.rs:2208
 #: todav/linux/app/src/window.rs:1778
 msgid "All day"
 msgstr ""
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:364
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:391
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:1067
 #: todav/linux/app/src/calendar.rs:631
 #, rust-format
 msgid "Until {time}"
 msgstr ""
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:428
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:411
+msgid "{m}m"
+msgstr ""
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:412
+msgid "{h}h"
+msgstr ""
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:413
+msgid "{h}h {m}m"
+msgstr ""
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:463
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:81
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:97
 #: todav/gnome-extension/extension.js:629 todav/linux/app/src/calendar.rs:2123
@@ -384,7 +396,7 @@ msgstr ""
 msgid "Tomorrow"
 msgstr ""
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:429
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:464
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:82
 #: todav/linux/app/src/dates.rs:58
 msgid "Yesterday"
