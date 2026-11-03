@@ -1071,6 +1071,12 @@ pub fn list_color(list: TodavList) -> String {
     todav_app::lists::color(&list)
 }
 
+/// Whether text on `color` should be dark rather than white.
+#[uniffi::export]
+pub fn dark_text(color: String) -> bool {
+    todav_app::lists::dark_text(&color)
+}
+
 /// Which occurrence of `task` a reminder shown now is for, to keep with its notification.
 #[uniffi::export]
 pub fn reminder_occurrence(task: TodavTask) -> Option<i64> {

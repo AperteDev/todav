@@ -860,7 +860,7 @@ private fun Chip(item: Item, colors: Map<String, String>, large: Boolean = false
         lineHeight = if (large) 20.sp else 13.sp,
         maxLines = if (large) 2 else 1,
         overflow = if (large) TextOverflow.Ellipsis else TextOverflow.Clip,
-        color = if (item is Item.Event) Color.White else MaterialTheme.colorScheme.onSurface,
+        color = if (item is Item.Event) onColor(item.color(colors)) else MaterialTheme.colorScheme.onSurface,
         textDecoration = if (item.done()) TextDecoration.LineThrough else null,
         modifier = Modifier.fillMaxWidth().clip(shape ?: RoundedCornerShape(if (large) 12.dp else 3.dp))
             .background(if (item is Item.Event) color else color.copy(alpha = 0.25f))
@@ -1411,7 +1411,7 @@ private fun Week(
                                     item.title(),
                                     fontSize = 10.sp,
                                     lineHeight = 12.sp,
-                                    color = if (item is Item.Event) Color.White else MaterialTheme.colorScheme.onSurface,
+                                    color = if (item is Item.Event) onColor(item.color(colors)) else MaterialTheme.colorScheme.onSurface,
                                     textDecoration = if (item.done()) TextDecoration.LineThrough else null,
                                     maxLines = lines.coerceAtLeast(1),
                                     overflow = TextOverflow.Ellipsis,

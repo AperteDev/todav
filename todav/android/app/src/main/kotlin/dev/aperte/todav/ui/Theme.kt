@@ -11,6 +11,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import dev.aperte.todav.core.darkText
 
 /**
  * Light or dark as `scheme` says ("light", "dark", else the system's); the wallpaper's colours
@@ -40,3 +41,6 @@ fun parseColor(hex: String?): Color = try {
 } catch (_: Exception) {
     Color.Gray
 }
+
+/** The colour of text and icons on `hex` (as `parseColor` reads it): dark on light colours. */
+fun onColor(hex: String?): Color = if (hex != null && darkText(hex)) Color.Black.copy(alpha = 0.8f) else Color.White

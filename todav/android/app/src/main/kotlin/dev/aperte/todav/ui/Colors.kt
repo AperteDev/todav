@@ -75,7 +75,7 @@ fun ColorSwatches(presets: List<String>, chosen: String?, onPick: (String) -> Un
                     .clickable { onPick(c) },
                 Alignment.Center,
             ) {
-                if (selected) Icon(Icons.Default.Check, null, tint = Color.White)
+                if (selected) Icon(Icons.Default.Check, null, tint = onColor(c))
             }
         }
         val name = tr("Custom Color…")
@@ -93,7 +93,7 @@ fun ColorSwatches(presets: List<String>, chosen: String?, onPick: (String) -> Un
                 if (isPreset) {
                     Icon(Icons.Default.MoreHoriz, null, tint = MaterialTheme.colorScheme.onSurface)
                 } else {
-                    Icon(Icons.Default.Check, null, tint = Color.White)
+                    Icon(Icons.Default.Check, null, tint = onColor(chosen))
                 }
             }
         }

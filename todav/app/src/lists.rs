@@ -44,6 +44,30 @@ pub fn color(l: &List) -> String {
         .to_string()
 }
 
+/// Whether text on `color` ("#rrggbb" or "#rgb", maybe with alpha, which is ignored) should be
+/// dark rather than white: when its relative luminance (WCAG) is above 0.4. That leans to white
+/// more than equal contrast (0.18) would, as GNOME and Nextcloud keep white on their blues.
+pub fn dark_text(color: &str) -> bool {
+    let short = matches!(color.len(), 4 | 5);
+    let channel = |i: usize| {
+        let hex = if short {
+            color.get(i..=i)?.repeat(2)
+        } else {
+            color.get(i * 2 - 1..i * 2 + 1)?.to_string()
+        };
+        let c = f64::from(u8::from_str_radix(&hex, 16).ok()?) / 255.0;
+        Some(if c <= 0.04045 {
+            c / 12.92
+        } else {
+            ((c + 0.055) / 1.055).powf(2.4)
+        })
+    };
+    match (channel(1), channel(2), channel(3)) {
+        (Some(r), Some(g), Some(b)) => 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.4,
+        _ => false,
+    }
+}
+
 /// Where account `id` comes among the accounts (the user's order), for sorting.
 pub fn rank(c: &Client) -> impl Fn(i64) -> usize + use<> {
     let ids: Vec<i64> = c.accounts().iter().map(|a| a.id).collect();
@@ -138,6 +162,25 @@ pub fn start_local(c: &Client, account: i64, s: Starter) -> Result<()> {
 mod tests {
     use super::*;
     use todav_core::SystemCalendar;
+
+    #[test]
+    fn light_colours_take_dark_text() {
+        for light in [
+            "#ffffff",
+            "#fff",
+            "#fff8",
+            "#DDCB55",
+            "#f6d32d",
+            "#ffffff80",
+        ] {
+            assert!(dark_text(light), "{light}");
+        }
+        for dark in [
+            "#000000", "#000", "#3584e4", "#0082C9", "#B6469D", "nonsense",
+        ] {
+            assert!(!dark_text(dark), "{dark}");
+        }
+    }
 
     #[test]
     fn event_tasks_go_to_their_calendar_or_the_picked_list() {

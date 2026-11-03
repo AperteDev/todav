@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Events in light colours (white, yellow…) show their titles in dark text instead of white,
+  in the app and the calendar widgets; so do the colour swatches' checks.
+
 ## [2.4.2] - 2026-11-02
 
 ### Fixed

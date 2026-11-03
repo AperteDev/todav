@@ -61,6 +61,7 @@ import dev.aperte.todav.ui.DAY
 import dev.aperte.todav.ui.color
 import dev.aperte.todav.ui.done
 import dev.aperte.todav.ui.firstWeekday
+import dev.aperte.todav.ui.onColor
 import dev.aperte.todav.ui.parseColor
 import dev.aperte.todav.ui.title
 import dev.aperte.todav.ui.weekend
@@ -430,7 +431,7 @@ class DayWidget : TodavWidget() {
                 maxLines = 1,
                 style = TextStyle(
                     fontSize = 12.sp,
-                    color = ColorProvider(androidx.compose.ui.graphics.Color.White),
+                    color = ColorProvider(onColor(color)),
                     textDecoration = if (item.done()) TextDecoration.LineThrough else null,
                 ),
                 modifier = GlanceModifier.fillMaxWidth().cornerRadius(6.dp).background(widgetColor(color))
@@ -472,7 +473,7 @@ class DayWidget : TodavWidget() {
                                     maxLines = maxOf(1, ((shown - from) / 1800).toInt()),
                                     style = TextStyle(
                                         fontSize = 12.sp,
-                                        color = ColorProvider(androidx.compose.ui.graphics.Color.White),
+                                        color = ColorProvider(onColor(b.color)),
                                         textDecoration = if (b.item.done()) TextDecoration.LineThrough else null,
                                     ),
                                     modifier = GlanceModifier.fillMaxSize().cornerRadius(6.dp).background(widgetColor(b.color))
@@ -573,7 +574,7 @@ class PlannerWidget : TodavWidget() {
                                     Text(
                                         b.item.title(),
                                         maxLines = 1,
-                                        style = TextStyle(fontSize = if (slim) 9.sp else 10.sp, color = ColorProvider(androidx.compose.ui.graphics.Color.White)),
+                                        style = TextStyle(fontSize = if (slim) 9.sp else 10.sp, color = ColorProvider(onColor(b.color))),
                                         modifier = GlanceModifier.width(cell * (b.last - b.first + 1) - 2.dp).height(bar - 1.dp)
                                             .cornerRadius(3.dp).background(ColorProvider(color)).padding(horizontal = 3.dp),
                                     )

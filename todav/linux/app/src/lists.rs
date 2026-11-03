@@ -8,21 +8,20 @@ use adw::prelude::*;
 use gtk::{gdk, gio, glib};
 use std::cell::RefCell;
 use std::rc::Rc;
-use todav_app::lists::{PRESETS, color};
+use todav_app::lists::{PRESETS, color, dark_text};
 use todav_core::{AccountKind, List};
 
 /// Swatches per row in the dialog.
 const COLUMNS: i32 = 7;
 
 const CSS: &str = "
-.swatch { min-width: 32px; min-height: 32px; padding: 0; color: white; }
+.swatch { min-width: 32px; min-height: 32px; padding: 0; }
 .swatch:hover { filter: brightness(1.1); }
 .swatch image { opacity: 0; }
 .swatch.chosen image { opacity: 1; }
 /* The custom colour: a smaller swatch in a rainbow ring, the size of the others in all. */
 .custom-ring { padding: 4px; border-radius: 9999px; background-image: conic-gradient(#e01b24, #f6d32d, #33d17a, #3584e4, #9141ac, #e01b24); }
 .custom-ring > button { min-width: 24px; min-height: 24px; padding: 0; box-shadow: 0 0 0 2px @dialog_bg_color; background-color: @dialog_bg_color; }
-.custom-ring > button.custom { color: white; }
 .custom-ring > button:hover { filter: brightness(1.1); }
 ";
 
@@ -43,12 +42,22 @@ pub fn class(href: &str) -> String {
     format!("cal-{:x}", h.finish())
 }
 
+/// The colour of text and icons on `col`.
+fn text_on(col: &str) -> &'static str {
+    if dark_text(col) {
+        "rgba(0, 0, 0, 0.8)"
+    } else {
+        "white"
+    }
+}
+
 /// The CSS showing what has class `cls` in colour `col`.
 fn rules(cls: &str, col: &str) -> String {
+    let text = text_on(col);
     format!(
         ".dot.{cls}, .chip.all-day.{cls} {{ background-color: {col}; }}
          .ring.{cls} {{ color: {col}; }}
-         .chip.all-day.{cls} {{ color: white; }}
+         .chip.all-day.{cls} {{ color: {text}; }}
          .chip.{cls}:not(.all-day) {{ background-color: alpha({col}, 0.18); }}\n"
     )
 }
@@ -507,7 +516,12 @@ pub fn swatches(
     let preset_css: String = presets
         .iter()
         .enumerate()
-        .map(|(i, p)| format!(".swatch.preset-{i} {{ background-color: {p}; }}\n"))
+        .map(|(i, p)| {
+            format!(
+                ".swatch.preset-{i} {{ background-color: {p}; color: {}; }}\n",
+                text_on(p)
+            )
+        })
         .collect();
 
     let swatch = |tip: &str| {
@@ -558,7 +572,8 @@ pub fn swatches(
             }
             let icon = if at.is_none() && !c.is_empty() {
                 css.load_from_string(&format!(
-                    "{preset_css}.custom-ring > button.custom {{ background-color: {c}; }}"
+                    "{preset_css}.custom-ring > button.custom {{ background-color: {c}; color: {}; }}",
+                    text_on(&c)
                 ));
                 custom.set_css_classes(&["circular", "custom"]);
                 "object-select-symbolic"
