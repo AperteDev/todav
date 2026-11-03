@@ -36,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Android: the agenda widget's rows show an event's place under its title, and its time on
   the right with its length under it (as "1h 30m").
+- Android: a widget's row, item or day shows it is pressed, in a grey that stands out on light
+  and dark backgrounds.
 
 ### Fixed
 

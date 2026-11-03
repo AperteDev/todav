@@ -322,6 +322,9 @@ fun WidgetFrame(context: Context, onClick: Action? = null, content: @Composable 
     )
 }
 
+/** Tapped, `action` runs, and the spot shows it (`widget_ripple`: Glance's own hardly shows). */
+fun GlanceModifier.tap(action: Action) = clickable(action, rippleOverride = R.drawable.widget_ripple)
+
 /** A round button of a widget's header showing `icon`. */
 @Composable
 fun WidgetButton(icon: Int, label: String, action: Action, filled: Boolean = false) {
@@ -526,7 +529,7 @@ class TasksWidget : TodavWidget() {
             if (leaving == true) androidx.glance.unit.ColorProvider(c.getColor(context).copy(alpha = 0.35f)) else c
         }
         Row(
-            GlanceModifier.fillMaxWidth().clickable(actionStartActivity(openTask(context, t.uid)))
+            GlanceModifier.fillMaxWidth().tap(actionStartActivity(openTask(context, t.uid)))
                 .padding(start = (4 + line.depth * 20).dp, top = if (check) 0.dp else 5.dp, bottom = if (check) 0.dp else 5.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

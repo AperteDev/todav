@@ -236,7 +236,7 @@ class MonthWidget : TodavWidget() {
                     for (d in 0 until 7) {
                         val day = start + (w * 7 + d) * DAY
                         Column(
-                            GlanceModifier.defaultWeight().fillMaxHeight().clickable(actionStartActivity(openDay(context, day))),
+                            GlanceModifier.defaultWeight().fillMaxHeight().tap(actionStartActivity(openDay(context, day))),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
@@ -352,7 +352,7 @@ class AgendaWidget : TodavWidget() {
         val dim = GlanceTheme.colors.onSurfaceVariant
         Row(
             // A circle that ticks has room around it: the row's own goes.
-            GlanceModifier.fillMaxWidth().clickable(actionStartActivity(open))
+            GlanceModifier.fillMaxWidth().tap(actionStartActivity(open))
                 .padding(horizontal = 4.dp, vertical = if (check && item is Item.Task) 0.dp else 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -496,7 +496,7 @@ class DayWidget : TodavWidget() {
                     textDecoration = if (item.struck()) TextDecoration.LineThrough else null,
                 ),
                 modifier = GlanceModifier.fillMaxWidth().cornerRadius(6.dp).background(widgetColor(color))
-                    .clickable(actionStartActivity(openItem(context, item))).padding(horizontal = 8.dp, vertical = 3.dp),
+                    .tap(actionStartActivity(openItem(context, item))).padding(horizontal = 8.dp, vertical = 3.dp),
             )
         }
     }
@@ -538,7 +538,7 @@ class DayWidget : TodavWidget() {
                                         textDecoration = if (b.item.struck()) TextDecoration.LineThrough else null,
                                     ),
                                     modifier = GlanceModifier.fillMaxSize().cornerRadius(6.dp).background(widgetColor(b.color))
-                                        .clickable(actionStartActivity(openItem(context, b.item))).padding(horizontal = 6.dp, vertical = 2.dp),
+                                        .tap(actionStartActivity(openItem(context, b.item))).padding(horizontal = 6.dp, vertical = 2.dp),
                                 )
                             }
                         }
@@ -611,7 +611,7 @@ class PlannerWidget : TodavWidget() {
                 Box(GlanceModifier.fillMaxWidth().defaultWeight()) {
                     Row(GlanceModifier.fillMaxSize()) {
                         for (d in 0 until 7) {
-                            Box(GlanceModifier.width(cell).fillMaxHeight().clickable(actionStartActivity(openDay(context, monday + d * DAY)))) {}
+                            Box(GlanceModifier.width(cell).fillMaxHeight().tap(actionStartActivity(openDay(context, monday + d * DAY)))) {}
                         }
                     }
                     Column(GlanceModifier.fillMaxSize()) {
