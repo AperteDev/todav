@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.3] - 2026-11-03
+
 ### Fixed
 
 - Events in light colours (white, yellow…) show their titles in dark text instead of white,
@@ -584,7 +586,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Its options are in the app's Preferences. Without the app installed, its
   menu says so and links to the download.
 
-[Unreleased]: https://github.com/AperteDev/todav/compare/v2.4.2...HEAD
+[Unreleased]: https://github.com/AperteDev/todav/compare/v2.4.3...HEAD
+[2.4.3]: https://github.com/AperteDev/todav/compare/v2.4.2...v2.4.3
 [2.4.2]: https://github.com/AperteDev/todav/compare/v2.4.1...v2.4.2
 [2.4.1]: https://github.com/AperteDev/todav/compare/v2.4.0...v2.4.1
 [2.4.0]: https://github.com/AperteDev/todav/compare/v2.3.0...v2.4.0
