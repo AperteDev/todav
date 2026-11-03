@@ -50,6 +50,7 @@
 .todav-month-title { font-weight: bold; }
 .todav-nav { padding: 4px; border-radius: 99px; }
 .todav-weekday { font-size: 0.8em; padding: 2px 0; }
+.todav-week-number { font-size: 0.75em; font-feature-settings: "tnum"; }
 .todav-day { width: 30px; height: 28px; border-radius: 99px; font-size: 0.9em; font-feature-settings: "tnum"; }
 /* The day whose agenda shows; today keeps its own fill. */
 .todav-day.selected { background-color: rgba(128, 128, 128, 0.35); font-weight: bold; }

@@ -56,10 +56,12 @@ import dev.aperte.todav.core.midnight
 import dev.aperte.todav.core.midnightOn
 import dev.aperte.todav.core.monthFirst
 import dev.aperte.todav.core.sameList
+import dev.aperte.todav.core.weekNumber
 import dev.aperte.todav.core.weekStart
 import dev.aperte.todav.ui.DAY
 import dev.aperte.todav.ui.color
 import dev.aperte.todav.ui.done
+import dev.aperte.todav.ui.struck
 import dev.aperte.todav.ui.firstWeekday
 import dev.aperte.todav.ui.onColor
 import dev.aperte.todav.ui.parseColor
@@ -140,8 +142,10 @@ private fun monthTitle(first: Long) = format(first, "LLLL yyyy").replaceFirstCha
 
 /** The weekdays' short names over a month from `start`. */
 @Composable
-private fun WeekdayNames(start: Long) {
+private fun WeekdayNames(start: Long, numbered: Boolean = false) {
     Row(GlanceModifier.fillMaxWidth()) {
+        // Over the month widget's column of week numbers.
+        if (numbered) Spacer(GlanceModifier.width(WEEK_COLUMN))
         for (i in 0 until 7) {
             Text(
                 format(start + i * DAY, "EEE"),
@@ -194,6 +198,9 @@ private fun DayNumber(day: Long, today: Long, inMonth: Boolean, size: Dp, modifi
 
 // --- month --------------------------------------------------------------------------------------
 
+/** The month widget's column of week numbers. */
+private val WEEK_COLUMN = 20.dp
+
 /**
  * The month widget, as the GNOME extension's month: its days with a dot for each calendar with
  * something on it (three at most), arrows turning the month; a day opens the app there.
@@ -210,13 +217,22 @@ class MonthWidget : TodavWidget() {
         val weeks = ceil(((next - start) / DAY) / 7.0).toInt()
         val (account, shown) = remember(changes) { widgetCalendars(context, app, widget) }
         val dots = remember(changes, offset, shown) { core.dayColors(start, weeks * 7L, shown.map { it.href }) }
+        // A column of week numbers first, as the GNOME extension's month (`ext_week_numbers`).
+        val numbered = remember(changes) { core.widgetWeekNumbers() }
         val density = context.resources.displayMetrics.density
         val images = remember { HashMap<List<String>, android.graphics.Bitmap>() }
         WidgetFrame(context) {
             TurnHeader(context, widget, monthTitle(first), openDay(context, first, month = true), newEvent(context, widget, account, shown, today, allDay = true))
-            WeekdayNames(start)
+            WeekdayNames(start, numbered)
             for (w in 0 until weeks) {
-                Row(GlanceModifier.fillMaxWidth().defaultWeight()) {
+                Row(GlanceModifier.fillMaxWidth().defaultWeight(), verticalAlignment = Alignment.CenterVertically) {
+                    if (numbered) {
+                        Text(
+                            "${weekNumber(start + w * 7 * DAY)}",
+                            style = TextStyle(fontSize = 10.sp, textAlign = TextAlign.Center, color = GlanceTheme.colors.onSurfaceVariant),
+                            modifier = GlanceModifier.width(WEEK_COLUMN),
+                        )
+                    }
                     for (d in 0 until 7) {
                         val day = start + (w * 7 + d) * DAY
                         Column(
@@ -346,7 +362,7 @@ class AgendaWidget : TodavWidget() {
                 maxLines = 1,
                 style = TextStyle(
                     color = if (item.done()) GlanceTheme.colors.onSurfaceVariant else GlanceTheme.colors.onSurface,
-                    textDecoration = if (item.done()) TextDecoration.LineThrough else null,
+                    textDecoration = if (item.struck()) TextDecoration.LineThrough else null,
                 ),
             )
         }
@@ -432,7 +448,7 @@ class DayWidget : TodavWidget() {
                 style = TextStyle(
                     fontSize = 12.sp,
                     color = ColorProvider(onColor(color)),
-                    textDecoration = if (item.done()) TextDecoration.LineThrough else null,
+                    textDecoration = if (item.struck()) TextDecoration.LineThrough else null,
                 ),
                 modifier = GlanceModifier.fillMaxWidth().cornerRadius(6.dp).background(widgetColor(color))
                     .clickable(actionStartActivity(openItem(context, item))).padding(horizontal = 8.dp, vertical = 3.dp),
@@ -474,7 +490,7 @@ class DayWidget : TodavWidget() {
                                     style = TextStyle(
                                         fontSize = 12.sp,
                                         color = ColorProvider(onColor(b.color)),
-                                        textDecoration = if (b.item.done()) TextDecoration.LineThrough else null,
+                                        textDecoration = if (b.item.struck()) TextDecoration.LineThrough else null,
                                     ),
                                     modifier = GlanceModifier.fillMaxSize().cornerRadius(6.dp).background(widgetColor(b.color))
                                         .clickable(actionStartActivity(openItem(context, b.item))).padding(horizontal = 6.dp, vertical = 2.dp),

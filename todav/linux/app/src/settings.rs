@@ -31,7 +31,7 @@ pub fn apply_color_scheme() {
 /// `ext_edit_*`: a task or event clicked opens its editor, else its place in Todav.
 /// `ext_add_*_kind`: adding a task or an event with a `field`, a `button` (opening Todav) or
 /// `none`; `ext_add_*`, where (`sync_adds`). `ext_check_tasks`: a task's circle ticks it.
-pub const EXTENSION: [(&str, &str); 18] = [
+pub const EXTENSION: [(&str, &str); 19] = [
     ("ext_columns", "double"),
     ("ext_order", "tasks"),
     ("ext_icon", "center"),
@@ -41,6 +41,7 @@ pub const EXTENSION: [(&str, &str); 18] = [
     ("ext_add_task", "true"),
     ("ext_month", "true"),
     ("ext_month_dots", "true"),
+    ("ext_week_numbers", "false"),
     ("ext_agenda", "true"),
     ("ext_add_event", "true"),
     ("ext_open", "true"),
@@ -444,6 +445,21 @@ pub fn present(parent: &adw::ApplicationWindow, page: Option<&str>) -> adw::Pref
         let _ = core().set_setting("mini_dots".into(), d.is_active().to_string());
         crate::calendar::refresh();
     });
+    let weeks: adw::SwitchRow = get(&b, "week_numbers");
+    weeks.set_active(prefs::week_numbers(core()));
+    weeks.connect_active_notify(|w| {
+        let _ = core().set_setting("week_numbers".into(), w.is_active().to_string());
+        crate::calendar::refresh();
+    });
+    let cancelled: adw::ComboRow = get(&b, "cancelled_events");
+    let now = prefs::cancelled_events(core());
+    let at = prefs::CANCELLED.iter().position(|(_, k)| *k == now);
+    cancelled.set_selected(at.unwrap_or(1) as u32);
+    cancelled.connect_selected_notify(|r| {
+        let value = prefs::CANCELLED[r.selected() as usize].0;
+        let _ = core().set_setting("cancelled_events".into(), value.into());
+        crate::calendar::refresh();
+    });
     // The extension: its rows carry the setting's name as their id. It hears of a change at
     // once, to put its parts and icon where they now go.
     let ext_changed = || crate::dbus::on_event(&crate::Event::Changed(String::new()));
@@ -483,6 +499,7 @@ pub fn present(parent: &adw::ApplicationWindow, page: Option<&str>) -> adw::Pref
     for key in [
         "ext_subtasks",
         "ext_month_dots",
+        "ext_week_numbers",
         "ext_open",
         "ext_edit_tasks",
         "ext_edit_events",
@@ -501,6 +518,7 @@ pub fn present(parent: &adw::ApplicationWindow, page: Option<&str>) -> adw::Pref
     for (part, option) in [
         ("ext_tasks", "ext_subtasks"),
         ("ext_month", "ext_month_dots"),
+        ("ext_month", "ext_week_numbers"),
     ] {
         let (part, option): (adw::ComboRow, adw::SwitchRow) = (get(&b, part), get(&b, option));
         let sync = move |p: &adw::ComboRow| option.set_sensitive(p.selected() != 2);

@@ -108,12 +108,25 @@ impl Client {
     /// The account's calendars, and for a Google account its task lists too.
     fn remote_lists(&self, id: i64, dav: &Dav) -> Result<Vec<RemoteList>> {
         let mut remote = dav.discover()?;
-        if self
-            .account(id)
+        let account = self.account(id);
+        if account
+            .as_ref()
             .is_some_and(|a| a.kind == AccountKind::Google)
         {
             remote.extend(gtasks::lists(dav)?);
         }
+        // The user's addresses, to tell the invitations they declined (`Event::declined`); a
+        // login that is an address (Google's) is one too.
+        let mut mine: Vec<String> = dav
+            .addresses()
+            .iter()
+            .filter_map(|a| crate::event::mail(a))
+            .collect();
+        if let Some(user) = account.map(|a| a.user).filter(|u| u.contains('@')) {
+            mine.push(user.to_lowercase());
+        }
+        let db = self.db.lock().unwrap();
+        store::kv_set(&db, &crate::account::key(id, "addresses"), &mine.join("\n"))?;
         Ok(remote)
     }
 

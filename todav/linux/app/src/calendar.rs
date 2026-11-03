@@ -63,6 +63,7 @@ menubutton.more { padding: 0; }
 menubutton.more > button { padding: 0 6px; border-radius: 6px; }
 .mini { padding: 6px; }
 .mini .weekday { font-size: smaller; opacity: 0.6; padding: 4px 0; }
+.week-number { font-size: smaller; opacity: 0.55; font-feature-settings: 'tnum'; }
 .mini button.day { min-width: 32px; min-height: 32px; padding: 0; font-weight: normal; font-feature-settings: 'tnum'; }
 .mini button.day.other { opacity: 0.45; }
 .mini button.day.today { box-shadow: inset 0 0 0 1px @accent_color; }
@@ -81,6 +82,7 @@ menubutton.more > button { padding: 0 6px; border-radius: 6px; }
 button.block.task { padding-left: 4px; }
 .chip.done label { text-decoration-line: line-through; opacity: 0.55; }
 .chip.cancelled label { text-decoration-line: line-through; }
+.chip.cancelled { opacity: 0.6; }
 .more { padding: 0 6px; min-height: 20px; font-size: smaller; }
 .dot { min-width: 10px; min-height: 10px; border-radius: 9999px; }
 /* An event's colour by its title, a button where it can be changed (dialog::color_button). */
@@ -1145,6 +1147,29 @@ fn week_start(day: i64) -> i64 {
 }
 
 /// `w`, a day's name or number, tinted red a little when `day` is a Saturday or a Sunday.
+/// "Week 45", for the week shown from `start`.
+fn week_text(start: i64) -> String {
+    gettext("Week {n}").replace("{n}", &todav_app::dates::week_number(start).to_string())
+}
+
+/// A week's short number ("W45") by the first day's number in its cell `cell`, as the Month
+/// view's rows show them with the `week_numbers` setting on.
+fn number_week(cell: &gtk::Box, start: i64) {
+    let Some(num) = cell.first_child() else {
+        return;
+    };
+    let n = todav_app::dates::week_number(start).to_string();
+    // Translators: a week's number, short, by a day in the calendar's month ("W45").
+    let short = gtk::Label::new(Some(&pgettext("week number", "W{n}").replace("{n}", &n)));
+    short.add_css_class("week-number");
+    short.set_tooltip_text(Some(&week_text(start)));
+    let line = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    cell.remove(&num);
+    line.append(&num);
+    line.append(&short);
+    cell.prepend(&line);
+}
+
 fn weekend(w: &impl IsA<gtk::Widget>, day: i64) {
     if todav_app::dates::weekend(day) {
         w.add_css_class("weekend");
@@ -1287,7 +1312,7 @@ fn chip(c: &Rc<Cal>, i: &Item) -> gtk::Widget {
             if e.all_day {
                 b.add_css_class("all-day");
             }
-            if e.cancelled {
+            if calendar::crossed(core(), e) {
                 b.add_css_class("cancelled");
             }
             drag_event(c, &b, e);
@@ -1422,6 +1447,8 @@ fn tooltip(c: &Cal, i: &Item) -> String {
             lines.extend(e.location.clone());
             if e.cancelled {
                 lines.push(gettext("Cancelled"));
+            } else if e.declined {
+                lines.push(gettext("Declined"));
             }
         }
         Item::Task(t) => {

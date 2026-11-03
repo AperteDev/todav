@@ -73,11 +73,22 @@ fn render(c: &Rc<Cal>) {
         m.grid.remove(&w);
     }
     let start = week_start(first);
+    // With the setting on, a column of week numbers first.
+    let col = i32::from(prefs::week_numbers(core()));
+    if col == 1 {
+        for w in 0..6 {
+            let from = start + w * 7 * DAY;
+            let n = gtk::Label::new(Some(&todav_app::dates::week_number(from).to_string()));
+            n.add_css_class("week-number");
+            n.set_tooltip_text(Some(&week_text(from)));
+            m.grid.attach(&n, 0, w as i32 + 1, 1, 1);
+        }
+    }
     for d in 0..7 {
         let name = gtk::Label::new(Some(&fmt(start + d * DAY, "%a")));
         name.add_css_class("weekday");
         weekend(&name, start + d * DAY);
-        m.grid.attach(&name, d as i32, 0, 1, 1);
+        m.grid.attach(&name, col + d as i32, 0, 1, 1);
     }
     let (today, anchor, month) = (today(), c.anchor.get(), dates::fields(first).month());
     // The Week or Work Week view's week: a band under its row (if shown in this month).
@@ -86,7 +97,7 @@ fn render(c: &Rc<Cal>) {
         if (0..6).contains(&row) {
             let band = gtk::Box::new(gtk::Orientation::Horizontal, 0);
             band.add_css_class("week-band");
-            m.grid.attach(&band, 0, row as i32 + 1, 7, 1);
+            m.grid.attach(&band, col, row as i32 + 1, 7, 1);
         }
     }
     let all = if prefs::mini_dots(core()) {
@@ -142,6 +153,7 @@ fn render(c: &Rc<Cal>) {
             }
             go(|_| day);
         });
-        m.grid.attach(&b, (n % 7) as i32, (n / 7) as i32 + 1, 1, 1);
+        m.grid
+            .attach(&b, col + (n % 7) as i32, (n / 7) as i32 + 1, 1, 1);
     }
 }

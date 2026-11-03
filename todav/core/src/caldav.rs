@@ -250,6 +250,8 @@ pub struct Dav {
     origin: String,
     root: String,
     auth: String,
+    /// The user's own addresses (calendar-user-address-set), as `home` last read them.
+    addresses: std::sync::Mutex<Vec<String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -325,6 +327,7 @@ impl Dav {
             origin,
             root,
             auth,
+            addresses: Default::default(),
         }
     }
 
@@ -455,14 +458,32 @@ impl Dav {
             .map_or_else(|| self.root.clone(), |h| percent_decode(&h)))
     }
 
-    /// The collection the user's calendars are in.
+    /// The collection the user's calendars are in; the user's addresses are read with it
+    /// (`addresses`).
     pub fn home(&self) -> Result<String> {
         let principal = self.principal()?;
-        let p = self.propfind(&principal, "0", "<c:calendar-home-set/>")?;
+        let props = "<c:calendar-home-set/><c:calendar-user-address-set/>";
+        let p = self.propfind(&principal, "0", props)?;
+        if let Some(set) = p
+            .first()
+            .and_then(|r| r.props.child(CALDAV, "calendar-user-address-set"))
+        {
+            *self.addresses.lock().unwrap() = set
+                .children
+                .iter()
+                .filter(|c| c.ns == DAV && c.name == "href")
+                .map(|c| c.text.trim().to_string())
+                .collect();
+        }
         p.first()
             .and_then(|r| r.props.find_text(DAV, "href"))
             .map(|h| percent_decode(&h)) // Google's: "/caldav/v2/me%40gmail.com/"
             .ok_or_else(|| Error::Parse("no calendar-home-set".into()))
+    }
+
+    /// The user's own addresses ("mailto:…"), as the last `home` (or `discover`) read them.
+    pub fn addresses(&self) -> Vec<String> {
+        self.addresses.lock().unwrap().clone()
     }
 
     pub fn discover(&self) -> Result<Vec<RemoteList>> {

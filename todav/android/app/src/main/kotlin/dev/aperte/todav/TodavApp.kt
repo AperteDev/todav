@@ -28,6 +28,12 @@ import kotlinx.coroutines.launch
  * calls block, so they run on [Dispatchers.IO]; its callbacks come from its own threads.
  */
 class TodavApp : Application() {
+    companion object {
+        /** The process's app, for what renders without one at hand (`Item.struck`). */
+        lateinit var app: TodavApp
+            private set
+    }
+
     lateinit var core: Todav
         private set
     lateinit var passwords: Passwords
@@ -59,6 +65,7 @@ class TodavApp : Application() {
     @OptIn(FlowPreview::class)
     override fun onCreate() {
         super.onCreate()
+        app = this
         trustCertificates()
         I18n.load(this)
         passwords = Passwords(this)

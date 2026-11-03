@@ -185,6 +185,7 @@ import dev.aperte.todav.core.midnight
 import dev.aperte.todav.core.monthFirst
 import dev.aperte.todav.core.onDay
 import dev.aperte.todav.core.taskWhen
+import dev.aperte.todav.core.weekNumber
 import dev.aperte.todav.core.weekStart
 import dev.aperte.todav.date
 import dev.aperte.todav.dayLabel
@@ -232,6 +233,9 @@ fun Item.uid(): String = when (this) {
 fun Item.color(colors: Map<String, String>): String? = (this as? Item.Event)?.event?.color ?: colors[list()]
 
 fun Item.done(): Boolean = this is Item.Task && task.done
+
+/** Shown struck through: a done task, or a cancelled or declined event with the setting so. */
+fun Item.struck(): Boolean = done() || this is Item.Event && dev.aperte.todav.TodavApp.app.core.crossed(event)
 
 /** When an event happens, in words: its days, or its day and times. */
 fun eventWhen(e: Event, now: Long): String {
@@ -291,9 +295,13 @@ fun CalendarPane(model: Main) {
     LaunchedEffect(mode, day) {
         if (mode.hours()) model.awayFromToday.value = day != midnight(model.core.localNow())
     }
+    val weeks = load(changes, initial = false) { model.core.weekNumbers() }
     val title = when (mode) {
         CalMode.AGENDA -> tr("Agenda")
-        else -> format(day, "LLLL yyyy").replaceFirstChar { it.titlecase() }
+        // The week views' with their week's number, with the setting on.
+        CalMode.MONTH -> format(day, "LLLL yyyy").replaceFirstChar { it.titlecase() }
+        else -> format(day, "LLLL yyyy").replaceFirstChar { it.titlecase() } +
+            if (weeks) " · " + weekText(weekStart(day, firstWeekday())) else ""
     }
     Scaffold(
         topBar = {
@@ -568,6 +576,7 @@ private fun MonthGrid(
     }
     val today = midnight(model.core.localNow())
     val thisMonth = fields(month).monthValue
+    val numbered = load(changes, initial = false) { model.core.weekNumbers() }
     // A chip held and moved: the day under it, and the drop to apply.
     var target by remember { mutableStateOf<Long?>(null) }
     var moved by remember { mutableStateOf<Pair<Item, Change>?>(null) }
@@ -632,6 +641,7 @@ private fun MonthGrid(
                         DayCell(
                             at, at == today, at == picked || at == target || at == planDay || spanned(at), fields(at).monthValue == thisMonth,
                             Modifier.weight(1f).fillMaxHeight().gridLines(left = d > 0),
+                            week = start.takeIf { numbered && d == 0 },
                             Modifier.pointerInput(at, heldAt) {
                                 // Held on a chip and moved: to the day it is let go over. Held
                                 // elsewhere: a new event on that day, or on the days moved across.
@@ -687,6 +697,9 @@ private fun MonthGrid(
         }
     }
 }
+
+/** "Week 45", for the week shown from `start`. */
+fun weekText(start: Long) = tr("Week {n}").replace("{n}", "${weekNumber(start)}")
 
 /** Whether `t` falls on a Saturday or a Sunday. */
 fun weekend(t: Long) = fields(t).dayOfWeek.value >= 6
@@ -832,6 +845,8 @@ private fun DayCell(
     picked: Boolean,
     inMonth: Boolean,
     modifier: Modifier,
+    // A row's first cell: the start of the week whose short number goes by the day's.
+    week: Long? = null,
     // Inside the tap, so a hold let go without moving ends there, not taken as a tap.
     held: Modifier = Modifier,
     onClick: () -> Unit,
@@ -843,19 +858,31 @@ private fun DayCell(
             .padding(2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(
-            Modifier.size(22.dp).background(if (today) MaterialTheme.colorScheme.primary else Color.Transparent, CircleShape),
-            Alignment.Center,
-        ) {
-            Text(
-                "${fields(day).dayOfMonth}",
-                style = MaterialTheme.typography.labelMedium,
-                color = when {
-                    today -> MaterialTheme.colorScheme.onPrimary
-                    inMonth -> dayColor(day, MaterialTheme.colorScheme.onSurface)
-                    else -> dayColor(day, MaterialTheme.colorScheme.onSurfaceVariant).copy(alpha = 0.6f)
-                },
-            )
+        // The number in the middle; a row's first cell has its week's short number at the left.
+        Box(Modifier.fillMaxWidth()) {
+            if (week != null) {
+                Text(
+                    ptr("week number", "W{n}").replace("{n}", "${weekNumber(week)}"),
+                    fontSize = 9.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    modifier = Modifier.align(Alignment.CenterStart),
+                )
+            }
+            Box(
+                Modifier.size(22.dp).align(Alignment.Center)
+                    .background(if (today) MaterialTheme.colorScheme.primary else Color.Transparent, CircleShape),
+                Alignment.Center,
+            ) {
+                Text(
+                    "${fields(day).dayOfMonth}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = when {
+                        today -> MaterialTheme.colorScheme.onPrimary
+                        inMonth -> dayColor(day, MaterialTheme.colorScheme.onSurface)
+                        else -> dayColor(day, MaterialTheme.colorScheme.onSurfaceVariant).copy(alpha = 0.6f)
+                    },
+                )
+            }
         }
     }
 }
@@ -871,7 +898,7 @@ private fun Chip(item: Item, colors: Map<String, String>, large: Boolean = false
         maxLines = if (large) 2 else 1,
         overflow = if (large) TextOverflow.Ellipsis else TextOverflow.Clip,
         color = if (item is Item.Event) onColor(item.color(colors)) else MaterialTheme.colorScheme.onSurface,
-        textDecoration = if (item.done()) TextDecoration.LineThrough else null,
+        textDecoration = if (item.struck()) TextDecoration.LineThrough else null,
         modifier = Modifier.fillMaxWidth().clip(shape ?: RoundedCornerShape(if (large) 12.dp else 3.dp))
             .background(if (item is Item.Event) color else color.copy(alpha = 0.25f))
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
@@ -1056,7 +1083,7 @@ private fun AgendaRow(e: AgendaEntry, onItem: (Item) -> Unit) {
         Column(Modifier.weight(1f)) {
             Text(
                 item.title(),
-                textDecoration = if (item.done()) TextDecoration.LineThrough else null,
+                textDecoration = if (item.struck()) TextDecoration.LineThrough else null,
                 color = if (item.done()) MaterialTheme.colorScheme.onSurfaceVariant else Color.Unspecified,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -1422,7 +1449,7 @@ private fun Week(
                                     fontSize = 10.sp,
                                     lineHeight = 12.sp,
                                     color = if (item is Item.Event) onColor(item.color(colors)) else MaterialTheme.colorScheme.onSurface,
-                                    textDecoration = if (item.done()) TextDecoration.LineThrough else null,
+                                    textDecoration = if (item.struck()) TextDecoration.LineThrough else null,
                                     maxLines = lines.coerceAtLeast(1),
                                     overflow = TextOverflow.Ellipsis,
                                 )

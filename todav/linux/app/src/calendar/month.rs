@@ -154,6 +154,7 @@ pub(super) fn render(c: &Rc<Cal>) -> i64 {
     let end = start + ROWS * 7 * DAY;
     let all = items(start, end);
     let month = dates::fields(first).month();
+    let weeks = prefs::week_numbers(core());
     for w in 0..ROWS {
         let from = start + w * 7 * DAY;
         let week: Vec<i64> = (0..7).map(|d| from + d * DAY).collect();
@@ -162,7 +163,11 @@ pub(super) fn render(c: &Rc<Cal>) -> i64 {
             .filter(|i| week.iter().any(|&d| on_day(i, d)))
             .collect();
         let row = days::row(c, &week, &here, CHIPS, false, |day| {
-            day_cell(c, day, dates::fields(day).month() != month, select)
+            let cell = day_cell(c, day, dates::fields(day).month() != month, select);
+            if weeks && day == from {
+                number_week(&cell, from);
+            }
+            cell
         });
         c.month.attach(&row, 0, w as i32, 1, 1);
     }

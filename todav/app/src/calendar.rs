@@ -59,11 +59,26 @@ pub fn when(t: &Task) -> (i64, bool) {
 pub fn items(c: &Client, from: i64, to: i64, lists: Option<&[String]>) -> Vec<Item> {
     let hidden = prefs::hidden(c);
     let keep = |l: &str| lists.map_or(!hidden.contains(l), |ls| ls.iter().any(|x| x == l));
-    let events = c.events(from, to).into_iter().map(Item::Event);
+    let hide = prefs::cancelled_events(c) == prefs::Cancelled::Hide;
+    let events = c
+        .events(from, to)
+        .into_iter()
+        .filter(|e| !(hide && called_off(e)))
+        .map(Item::Event);
     let tasks = c.scheduled(from, to).into_iter().map(Item::Task);
     let mut out: Vec<Item> = events.chain(tasks).filter(|i| keep(i.list())).collect();
     out.sort_by_key(Item::key);
     out
+}
+
+/// Whether event `e` is off for the user: cancelled, or an invitation they declined.
+pub fn called_off(e: &Event) -> bool {
+    e.cancelled || e.declined
+}
+
+/// Whether event `e` shows struck through, as `cancelled_events` says of those `called_off`.
+pub fn crossed(c: &Client, e: &Event) -> bool {
+    called_off(e) && prefs::cancelled_events(c) == prefs::Cancelled::Crossed
 }
 
 /// Whether `i` is on the day starting at `day`.
@@ -189,7 +204,7 @@ pub fn today_events(c: &Client) -> Vec<Event> {
     let hidden = prefs::hidden(c);
     let today = dates::midnight(c.local_now());
     let mut all = c.events(today, today + DAY);
-    all.retain(|e| !hidden.contains(&e.list_href) && !e.cancelled);
+    all.retain(|e| !hidden.contains(&e.list_href) && !called_off(e));
     all.sort_by_key(|e| (!e.all_day, e.start));
     all
 }

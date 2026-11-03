@@ -52,6 +52,16 @@ pub fn weekend(t: i64) -> bool {
     matches!(weekday(t), 0 | 6)
 }
 
+/// The ISO 8601 week number of the week shown from `start` (its first day, whichever weekday
+/// weeks start on): the number of the Monday-to-Sunday week it mostly overlaps, 1 to 53.
+pub fn week_number(start: i64) -> u32 {
+    // The Thursday of the ISO week holding the row's middle day decides its year and number.
+    let mid = midnight(start) + 3 * DAY;
+    let thursday = mid + (3 - (weekday(mid) + 6) % 7) * DAY;
+    let (year, _, _) = date(thursday);
+    ((thursday - on(year, 1, 1)) / DAY / 7 + 1) as u32
+}
+
 /// The days of the week holding `t` (weeks starting on `first`) that are among `weekdays`
 /// (0 = Sunday), in order: the Work Week view's days.
 pub fn days_of_week(t: i64, first: i64, weekdays: &[i64]) -> Vec<i64> {
@@ -179,6 +189,19 @@ mod tests {
         // Sunday ends a week starting on Monday, and starts one starting on Sunday.
         assert_eq!(days(1, &[0, 5]), vec![fri, at("20261018")]);
         assert_eq!(days(0, &[0, 5]), vec![sun, fri]);
+    }
+
+    #[test]
+    fn weeks_are_numbered_as_iso_8601_does() {
+        // Rows starting on Monday and on Sunday get the same number.
+        assert_eq!(week_number(at("20261102")), 45);
+        assert_eq!(week_number(at("20261101")), 45);
+        // 2026-12-28 is in week 53 of 2026; 2027-01-04 starts week 1 of 2027.
+        assert_eq!(week_number(at("20261228")), 53);
+        assert_eq!(week_number(at("20270104")), 1);
+        // 2024-12-30 (a Monday) is in week 1 of 2025.
+        assert_eq!(week_number(at("20241230")), 1);
+        assert_eq!(week_number(at("20240101")), 1);
     }
 
     #[test]

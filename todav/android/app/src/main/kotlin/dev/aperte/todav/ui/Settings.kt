@@ -652,9 +652,18 @@ private fun CalendarSettings(model: Main) {
             modifier = Modifier.clickable { pick = true },
         )
         if (pick) WorkDaysDialog(model) { pick = false }
+        SwitchRow(model, tr("Week numbers"), "week_numbers", tr("In the months and the week views"), default = false)
     }
     Section(tr("Events")) {
         DurationRow(model, tr("Default duration"), tr("When an event is added at a time, or an all-day one gets a time"), "event_duration")
+        // As todav_app::prefs::CANCELLED lists them; crossed out by default.
+        val cancelled = listOf("show", "crossed", "hide")
+        ChoiceRow(
+            model, tr("Cancelled and declined events"), "cancelled_events", cancelled,
+            listOf(tr("Show"), tr("Cross Out"), tr("Hide")),
+            subtitle = tr("Events called off, and invitations you declined"),
+            shown = cancelled.indexOf(setting(model, "cancelled_events")).takeIf { it >= 0 } ?: 1,
+        )
         // None (stored empty), then the task lists, named with their account when from more
         // than one.
         val changes by model.todav.changes.collectAsStateWithLifecycle()

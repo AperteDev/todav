@@ -783,6 +783,21 @@ impl Todav {
         todav_app::prefs::mini_dots(self.c())
     }
 
+    /// Whether the app's calendar numbers its weeks.
+    pub fn week_numbers(&self) -> bool {
+        todav_app::prefs::week_numbers(self.c())
+    }
+
+    /// Whether the calendar widgets number their weeks (as the GNOME extension's month).
+    pub fn widget_week_numbers(&self) -> bool {
+        todav_app::prefs::ext_week_numbers(self.c())
+    }
+
+    /// Whether event `event` shows struck through (`todav_app::calendar::crossed`).
+    pub fn crossed(&self, event: Event) -> bool {
+        todav_app::calendar::crossed(self.c(), &event)
+    }
+
     pub fn subtask_completion(&self) -> SubtaskCompletion {
         todav_app::prefs::subtask_completion(self.c())
     }
@@ -1141,6 +1156,12 @@ pub fn note_read(text: String) -> types::NoteRead {
 #[uniffi::export]
 pub fn note_toggle_task(text: String, n: u32) -> Option<String> {
     todav_app::note::toggle_nth_task(&text, n as usize)
+}
+
+/// The ISO 8601 number of the week shown from `start` (`todav_app::dates::week_number`).
+#[uniffi::export]
+pub fn week_number(start: i64) -> u32 {
+    todav_app::dates::week_number(start)
 }
 
 /// The link to join event `event`'s video call at (`todav_app::meeting`).

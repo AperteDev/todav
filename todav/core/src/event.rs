@@ -34,6 +34,8 @@ pub struct Event {
     pub priority: Option<i64>,
     /// Its own colour ("#RRGGBB", from COLOR), shown instead of its calendar's; None when not set.
     pub color: Option<String>,
+    /// An invitation the user declined: their ATTENDEE says PARTSTAT=DECLINED.
+    pub declined: bool,
     /// Its web page (URL).
     pub url: Option<String>,
     /// Its video call or other conference (CONFERENCE, or Google's X-GOOGLE-CONFERENCE).
@@ -101,7 +103,29 @@ fn occurrence(
     Ok((s, e.max(s), reminders))
 }
 
-fn event(c: &Comp, list_href: &str, (start, end, reminders): (i64, i64, Vec<i64>)) -> Event {
+/// The address in `uri` ("mailto:Ann@x.org"), lowercase; None for another kind of URI.
+pub(crate) fn mail(uri: &str) -> Option<String> {
+    let (scheme, address) = uri.trim().split_once(':')?;
+    scheme
+        .eq_ignore_ascii_case("mailto")
+        .then(|| address.to_lowercase())
+}
+
+/// Whether component `c` has the user (one of addresses `mine`) declining it.
+fn declined(c: &Comp, mine: &[String]) -> bool {
+    c.props("ATTENDEE").iter().any(|a| {
+        a.param("PARTSTAT")
+            .is_some_and(|p| p.eq_ignore_ascii_case("DECLINED"))
+            && mail(&a.value).is_some_and(|m| mine.contains(&m))
+    })
+}
+
+fn event(
+    c: &Comp,
+    list_href: &str,
+    (start, end, reminders): (i64, i64, Vec<i64>),
+    mine: &[String],
+) -> Event {
     Event {
         uid: c.text("UID").unwrap_or_default(),
         list_href: list_href.to_string(),
@@ -124,6 +148,7 @@ fn event(c: &Comp, list_href: &str, (start, end, reminders): (i64, i64, Vec<i64>
             .and_then(|p| p.parse::<i64>().ok())
             .filter(|&p| p != 0),
         color: c.text("COLOR").as_deref().and_then(crate::color::parse),
+        declined: declined(c, mine),
         url: c.text("URL"),
         conference: c
             .text("CONFERENCE")
@@ -156,6 +181,8 @@ pub(crate) fn occurrences(
     let Some(start) = master.prop("DTSTART").and_then(tz::stamp) else {
         return Ok(Vec::new());
     };
+    let mine = store::addresses(db, list_href)?;
+    let event = |c: &Comp, occ| event(c, list_href, occ, &mine);
     let overrides: Vec<(i64, Comp)> = cal
         .comps()
         .into_iter()
@@ -177,7 +204,7 @@ pub(crate) fn occurrences(
         let occ = occurrence(db, cal, &master, &start)?;
         let overlaps = occ.0 < to && (occ.1 > from || occ.0 >= from);
         return Ok(if overlaps {
-            vec![event(&master, list_href, occ)]
+            vec![event(&master, occ)]
         } else {
             vec![]
         });
@@ -219,7 +246,7 @@ pub(crate) fn occurrences(
                 recurrence_id: Some(local),
                 recurring: true,
                 rule: rule_text.clone(),
-                ..event(&master, list_href, occ)
+                ..event(&master, occ)
             });
         }
     }
@@ -234,7 +261,7 @@ pub(crate) fn occurrences(
                 recurrence_id: Some(*rid),
                 recurring: true,
                 rule: rule_text.clone(),
-                ..event(c, list_href, occ)
+                ..event(c, occ)
             });
         }
     }

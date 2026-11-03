@@ -54,6 +54,8 @@ What Todav can do, in short. The details of each release are in the
   default).
 - Opens iCalendar files (`.ics`), importing their events and tasks.
 - Copy Link: a `todav://` link that opens a task or an event, to paste elsewhere.
+- Week numbers, by a setting for the app and another for the GNOME extension and the widgets.
+- Cancelled events and invitations you declined shown, crossed out (the default) or hidden.
 - Join Call: a button for an event's video call (Meet, Zoom, Teams, Jitsi, Webex, Nextcloud
   Talk…), found in its link, place or notes, in its details, its reminder and the extension's
   agenda.
@@ -115,8 +117,8 @@ What Todav can do, in short. The details of each release are in the
 - Advanced search, filtering and sorting: saved filters, tasks hidden until they start.
 - Selecting several tasks to change them at once.
 - Duplicating by Ctrl+drag; templates.
-- A Year view, week numbers and folded night hours in the calendar.
-- An event's own time zone; declined events hidden; the weather in the calendar.
+- A Year view and folded night hours in the calendar.
+- An event's own time zone; the weather in the calendar.
 - A task's own colour, as events have.
 - Attachments to tasks and events.
 - Invitations: attendees, sending and answering.

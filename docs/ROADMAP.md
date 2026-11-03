@@ -28,11 +28,11 @@ Planned work, not yet done. [FEATURES.md](FEATURES.md) lists it publicly; the or
   (`Client::together`).
 - **Duplicating** by Ctrl+drag (Duplicate in the dialogs and details exists); **templates**: a
   task with subtasks, or a list, kept to copy from.
-- **More of the calendar**: a Year view, week numbers, night hours folded away in the week
-  views.
-- **More of an event**: a time zone for its start and end, declined and cancelled events
-  hidden by a setting; the weather of the coming days in the calendar's views (open: its
-  source).
+- **More of the calendar**: a Year view, night hours folded away in the week views; week
+  numbers in the planner widget too.
+- **More of an event**: a time zone for its start and end; declined events of System Calendars
+  on Android (the provider's own attendee status, not read yet); the weather of the coming days
+  in the calendar's views (open: its source).
 - **A task's own colour** (`COLOR` on a VTODO), as events have one: set with Own Color in the
   task dialog and page (`lists::swatches`, `ColorSwatches`, the event presets), shown on its
   chips and blocks in the calendar views and the widgets (`Item::color`). Few task apps set or

@@ -314,6 +314,8 @@ class TodavIndicator extends PanelMenu.Button {
         this._edit = {tasks: on('edit_tasks'), events: on('edit_events')};
         // A task's circle completes or reopens it (`ext_check_tasks`).
         this._check = settings.ext_check_tasks === 'true';
+        // The month's weeks numbered (`ext_week_numbers`).
+        this._weeks = settings.ext_week_numbers === 'true';
         // Adding a task or an event with a button opening Todav, else a field (`ext_add_*_kind`).
         this._buttons = {task: at('add_task_kind') === 'button', event: at('add_event_kind') === 'button'};
         this._clockPlace(clock);
@@ -758,12 +760,20 @@ class TodavIndicator extends PanelMenu.Button {
             const offset = (first.get_day_of_week() % 7 - Shell.util_get_week_start() + 7) % 7;
             const days = first.add_months(1).add_days(-1).get_day_of_month();
             const start = first.add_days(-offset);
+            // With week numbers, a column of them first: ISO 8601's, of each row's middle day
+            // (todav_app::dates::week_number).
+            const col = this._weeks ? 1 : 0;
             for (let i = 0; i < 7; i++) {
                 const weekday = label(start.add_days(i).format('%a'), 'todav-weekday', {x_align: CENTER});
                 weekday.opacity = DIM;
-                layout.attach(weekday, i, 0, 1, 1);
+                layout.attach(weekday, col + i, 0, 1, 1);
             }
             const weeks = Math.ceil((offset + days) / 7);
+            for (let w = 0; w < weeks && col; w++) {
+                const n = label(`${start.add_days(w * 7 + 3).get_week_of_year()}`, 'todav-week-number', {x_align: CENTER, y_align: CENTER});
+                n.opacity = DIM;
+                layout.attach(n, 0, 1 + w, 1, 1);
+            }
             const marks = [];
             const buttons = new Map();
             for (let i = 0; i < weeks * 7; i++) {
@@ -785,7 +795,7 @@ class TodavIndicator extends PanelMenu.Button {
                     day.opacity = DIM;
                 buttons.set(key, day);
                 day.connect('clicked', () => this._dayClicked(key, buttons));
-                layout.attach(day, i % 7, 1 + Math.floor(i / 7), 1, 1);
+                layout.attach(day, col + i % 7, 1 + Math.floor(i / 7), 1, 1);
             }
             if (!dots)
                 return;

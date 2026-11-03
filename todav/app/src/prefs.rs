@@ -159,6 +159,41 @@ pub fn mini_dots(c: &Client) -> bool {
     c.setting("mini_dots".into()).as_deref() == Some("true")
 }
 
+/// Whether the app's calendar numbers its weeks (`week_numbers`; off by default).
+pub fn week_numbers(c: &Client) -> bool {
+    c.setting("week_numbers".into()).as_deref() == Some("true")
+}
+
+/// Whether the GNOME extension's month and the calendar widgets number their weeks
+/// (`ext_week_numbers`; off by default).
+pub fn ext_week_numbers(c: &Client) -> bool {
+    c.setting("ext_week_numbers".into()).as_deref() == Some("true")
+}
+
+/// How cancelled events and those the user declined show (`cancelled_events`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Cancelled {
+    Show,
+    /// Struck through and dimmed; the default.
+    Crossed,
+    Hide,
+}
+
+/// Stored values of the `cancelled_events` choices, in the order the front-ends offer them.
+pub const CANCELLED: [(&str, Cancelled); 3] = [
+    ("show", Cancelled::Show),
+    ("crossed", Cancelled::Crossed),
+    ("hide", Cancelled::Hide),
+];
+
+pub fn cancelled_events(c: &Client) -> Cancelled {
+    let v = c.setting("cancelled_events".into()).unwrap_or_default();
+    CANCELLED
+        .iter()
+        .find(|(s, _)| *s == v)
+        .map_or(Cancelled::Crossed, |(_, k)| *k)
+}
+
 /// The weekdays the Work Week view shows (`work_days`, comma-separated, 0 = Sunday): one to six
 /// of them, in order; Monday to Friday by default.
 pub fn work_days(c: &Client) -> Vec<i64> {

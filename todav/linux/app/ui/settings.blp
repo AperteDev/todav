@@ -306,6 +306,11 @@ Adw.PreferencesDialog dialog {
         title: _("Dots in the sidebar month");
         subtitle: _("Mark the days that have events or tasks");
       }
+
+      Adw.SwitchRow week_numbers {
+        title: _("Week numbers");
+        subtitle: _("In the months and the week views");
+      }
     }
 
     Adw.PreferencesGroup {
@@ -316,6 +321,13 @@ Adw.PreferencesDialog dialog {
         title: _("Default duration");
         subtitle: _("When an event is added at a time, or an all-day one gets a time");
         model: Gtk.StringList { strings [_("15 minutes"), _("30 minutes"), _("45 minutes"), _("1 hour"), _("1.5 hours"), _("2 hours"), _("3 hours")] };
+      }
+
+      // Entries as todav_app::prefs::CANCELLED lists them.
+      Adw.ComboRow cancelled_events {
+        title: _("Cancelled and declined events");
+        subtitle: _("Events called off, and invitations you declined");
+        model: Gtk.StringList { strings [_("Show"), _("Cross Out"), _("Hide")] };
       }
 
       // None, then the task lists (src/settings.rs `connect_event_tasks_list`).
@@ -527,6 +539,11 @@ Adw.PreferencesDialog dialog {
       Adw.SwitchRow ext_month_dots {
         title: _("Dots in the month");
         subtitle: _("Mark the days that have events or tasks");
+      }
+
+      Adw.SwitchRow ext_week_numbers {
+        title: _("Week numbers");
+        subtitle: _("By the month’s weeks");
       }
 
       Adw.SwitchRow ext_edit_events {

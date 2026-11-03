@@ -176,6 +176,22 @@ fun WidgetsSettings(model: Main) {
             trailingContent = { Switch(gear, setGear) },
             modifier = Modifier.clickable { setGear(!gear) },
         )
+        // A synced setting, as the GNOME extension's month numbers its weeks by it.
+        val weeks = remember(changes) { app.core.widgetWeekNumbers() }
+        val setWeeks = { on: Boolean ->
+            app.scope.launch {
+                app.core.setSetting("ext_week_numbers", on.toString())
+                app.changed()
+                WidgetKind.refreshAll(context)
+            }
+            Unit
+        }
+        Item(
+            headlineContent = { Text(tr("Week numbers")) },
+            supportingContent = { Text(tr("By the month’s weeks")) },
+            trailingContent = { Switch(weeks, setWeeks) },
+            modifier = Modifier.clickable { setWeeks(!weeks) },
+        )
     }
     // The system's colours, or the widgets' own: background and text for light and dark.
     var dynamic by remember { mutableStateOf(WidgetPrefs.dynamic(context)) }

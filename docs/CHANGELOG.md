@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and others), found in its link, place or notes: in its details, its reminder and the GNOME
   extension's agenda.
 - Linux: Snooze on task and event reminders, back in ten minutes, as on Android.
+- Week numbers in the calendar (the months and the week views) and, by a setting of their own,
+  in the GNOME extension's month and the month widget; both off by default.
+- Cancelled events and invitations you declined (found by your addresses on the server) show
+  as usual, crossed out (the default) or not at all, by a setting; declined ones remind no
+  more.
 - Duplicate a task with its subtasks, or an event (the whole series, without its attendees),
   from its dialog or its details; Undo takes the copy back.
 

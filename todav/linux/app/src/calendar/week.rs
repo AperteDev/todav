@@ -362,7 +362,9 @@ pub(super) fn render(c: &Rc<Cal>) -> i64 {
         format!("{} – {}", fmt(start, "%-d %b"), fmt(last, "%-d %b %Y"))
     };
     c.title.set_title(&title);
-    c.title.set_subtitle("");
+    // Its week's number (that of the week the days start in), with the setting on.
+    let week = prefs::week_numbers(core()).then(|| week_text(week_start(start)));
+    c.title.set_subtitle(week.as_deref().unwrap_or_default());
     strip(c, mode(c) == Mode::Day);
 
     // Day names (but for one day: its week above has them), then the all-day row, both after a
@@ -517,7 +519,7 @@ fn block(c: &Rc<Cal>, i: &Item, geo: Geo) -> gtk::Widget {
             b.add_css_class("chip");
             b.add_css_class(&event_class(e));
             b.set_tooltip_markup(Some(&tooltip(c, i)));
-            if e.cancelled {
+            if calendar::crossed(core(), e) {
                 b.add_css_class("cancelled");
             }
             drag_event(c, &b, e);

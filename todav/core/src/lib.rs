@@ -533,7 +533,9 @@ impl Client {
     /// are missed; widen if someone uses them.
     pub fn event_reminders(&self, from: i64, to: i64) -> Vec<Event> {
         let mut all = self.events(from, to + 8 * 86400);
-        all.retain(|e| !e.cancelled && e.reminders.iter().any(|r| *r > from && *r <= to));
+        all.retain(|e| {
+            !e.cancelled && !e.declined && e.reminders.iter().any(|r| *r > from && *r <= to)
+        });
         all
     }
 
@@ -1897,6 +1899,38 @@ mod tests {
         assert_eq!(raw(&parent).href.as_deref(), Some("/a/p.ics"));
         assert_eq!(raw(&sub).list_href, "/a/");
         assert!(moved().is_empty());
+    }
+
+    #[test]
+    fn invitations_the_user_declined_are_marked() {
+        let dir = std::env::temp_dir().join(format!("todav-test-declined-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let db = c.db.lock().unwrap();
+        db.execute_batch(
+            "INSERT INTO lists (href, display_name, has_events) VALUES ('/c/', 'C', 1)",
+        )
+        .unwrap();
+        store::kv_set(&db, &account::key(0, "addresses"), "me@x.org").unwrap();
+        let ics = |uid: &str, me: &str| {
+            format!(
+                "BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:{uid}\nDTSTART:20261020T090000Z\n\
+                 DTEND:20261020T100000Z\nATTENDEE;PARTSTAT=ACCEPTED:mailto:boss@x.org\n\
+                 ATTENDEE;CN=Me;PARTSTAT={me}:MAILTO:Me@X.org\nEND:VEVENT\nEND:VCALENDAR\n"
+            )
+        };
+        for (uid, me) in [("a", "DECLINED"), ("b", "ACCEPTED")] {
+            let cal = Calendar::parse(&ics(uid, me)).unwrap();
+            store::save(&db, "/c/", None, None, &cal, store::MODIFIED).unwrap();
+        }
+        drop(db);
+        let day = ical::parse_time("20261020").unwrap();
+        let declined: Vec<(String, bool)> = c
+            .events(day - 86400, day + 2 * 86400)
+            .into_iter()
+            .map(|e| (e.uid, e.declined))
+            .collect();
+        assert_eq!(declined, [("a".into(), true), ("b".into(), false)]);
     }
 
     #[test]

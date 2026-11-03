@@ -427,6 +427,13 @@ pub fn lists(db: &Connection) -> Result<Vec<List>> {
     Ok(rows.collect::<rusqlite::Result<_>>()?)
 }
 
+/// The addresses of the user of the account calendar `list_href` is in (`Event::declined`).
+pub fn addresses(db: &Connection, list_href: &str) -> Result<Vec<String>> {
+    let id = list_account(db, list_href)?;
+    let mine = kv_get(db, &crate::account::key(id, "addresses"))?;
+    Ok(mine.map_or_else(Vec::new, |m| m.lines().map(String::from).collect()))
+}
+
 /// The account list `href` belongs to (0: none, as in tests).
 pub fn list_account(db: &Connection, href: &str) -> Result<i64> {
     Ok(db

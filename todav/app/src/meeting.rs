@@ -83,6 +83,7 @@ mod tests {
             rule: None,
             priority: None,
             color: None,
+            declined: false,
             url: None,
             conference: None,
         }
