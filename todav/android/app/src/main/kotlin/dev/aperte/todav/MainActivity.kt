@@ -122,8 +122,9 @@ class MainActivity : ComponentActivity() {
         if (intent.hasExtra("day")) model.showDay(intent.getLongExtra("day", 0))
         // A widget's month: shown in the month view, for now (the view picked stays saved).
         if (intent.getStringExtra("view") == "month") model.calMode.value = CalMode.MONTH
-        // A widget's event: this occurrence in its editor.
+        // A widget's event: this occurrence in its editor, over the calendar on its day.
         intent.getStringExtra("event")?.let { uid ->
+            model.showDay(intent.getLongExtra("event_start", 0))
             model.open(
                 Dest.EventEdit(
                     intent.getStringExtra("event_list"), uid,

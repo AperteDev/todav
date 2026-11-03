@@ -39,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Android: an event opened from a widget opens over the calendar on its day, so Back leads
+  there rather than to the tasks.
 - Linux: Edit… in an item's details in the calendar opens it as it is now, with a title or
   note changed there meanwhile.
 - Android: the calendar's day list no longer crashes on two items of the same title at the
