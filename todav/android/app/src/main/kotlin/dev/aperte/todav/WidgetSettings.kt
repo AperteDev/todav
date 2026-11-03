@@ -284,6 +284,18 @@ fun WidgetPage(app: TodavApp, id: Int, onBack: () -> Unit) {
                         })
                     },
                 )
+                if (kind == WidgetKind.AGENDA) {
+                    Item(
+                        headlineContent = { Text(tr("Title")) },
+                        supportingContent = { Text(tr("Without it, the buttons float over the agenda")) },
+                        trailingContent = {
+                            Switch(WidgetPrefs.title(context, id), {
+                                WidgetPrefs.setTitle(context, id, it)
+                                changed()
+                            })
+                        },
+                    )
+                }
                 // Where tasks show with their circles.
                 if (tasks || kind == WidgetKind.AGENDA) {
                     Item(

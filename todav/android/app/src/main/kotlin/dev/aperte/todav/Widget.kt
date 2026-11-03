@@ -158,13 +158,17 @@ object WidgetPrefs {
     fun add(c: Context, id: Int) = prefs(c).getBoolean("$id.add", true)
     fun setAdd(c: Context, id: Int, v: Boolean) = prefs(c).edit().putBoolean("$id.add", v).apply()
 
+    /** Whether the agenda widget shows its title (else: its buttons float over its list). */
+    fun title(c: Context, id: Int) = prefs(c).getBoolean("$id.title", true)
+    fun setTitle(c: Context, id: Int, v: Boolean) = prefs(c).edit().putBoolean("$id.title", v).apply()
+
     /** Whether a task's circle on a widget (the task list, the agenda) completes or reopens it. */
     fun check(c: Context, id: Int) = prefs(c).getBoolean("$id.check", false)
     fun setCheck(c: Context, id: Int, v: Boolean) = prefs(c).edit().putBoolean("$id.check", v).apply()
 
     /** A removed widget's settings go. */
     fun forget(c: Context, id: Int) = prefs(c).edit().apply {
-        for (k in listOf("$id", "$id.account", "$id.calendars", "$id.add", "$id.own", "$id.check")) remove(k)
+        for (k in listOf("$id", "$id.account", "$id.calendars", "$id.add", "$id.own", "$id.check", "$id.title")) remove(k)
     }.apply()
 }
 

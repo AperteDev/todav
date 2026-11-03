@@ -310,22 +310,32 @@ class AgendaWidget : TodavWidget() {
         val (account, shown) = remember(changes) { widgetCalendars(context, app, widget) }
         val entries = remember(changes, shown) { core.agenda(today, AGENDA_DAYS, shown.map { it.href }) }
         val check = WidgetPrefs.check(context, widget)
+        val add = newEvent(context, widget, account, shown, today)
+        val titled = WidgetPrefs.title(context, widget)
         WidgetFrame(context) {
-            Row(GlanceModifier.fillMaxWidth().padding(start = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    tr("Agenda"),
-                    maxLines = 1,
-                    style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 16.sp, color = GlanceTheme.colors.onSurface),
-                    modifier = GlanceModifier.defaultWeight(),
-                )
-                WidgetButtons(context, widget, newEvent(context, widget, account, shown, today))
-            }
-            if (entries.isEmpty()) WidgetEmpty(tr("Nothing planned this week"))
-            val rows: List<Any> = entries.groupBy { it.day }.flatMap { (day, es) -> listOf(agendaHeading(day, today)) + es }
-            LazyColumn {
-                items(rows) { r ->
-                    if (r is String) WidgetHeading(r) else AgendaRow(context, r as dev.aperte.todav.core.AgendaEntry, check)
+            if (titled) {
+                Row(GlanceModifier.fillMaxWidth().padding(start = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        tr("Agenda"),
+                        maxLines = 1,
+                        style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 16.sp, color = GlanceTheme.colors.onSurface),
+                        modifier = GlanceModifier.defaultWeight(),
+                    )
+                    WidgetButtons(context, widget, add)
                 }
+            }
+            // Untitled, the buttons float over the list's top end, drawn last to take their taps.
+            Box(GlanceModifier.fillMaxSize(), contentAlignment = Alignment.TopEnd) {
+                Column(GlanceModifier.fillMaxSize()) {
+                    if (entries.isEmpty()) WidgetEmpty(tr("Nothing planned this week"))
+                    val rows: List<Any> = entries.groupBy { it.day }.flatMap { (day, es) -> listOf(agendaHeading(day, today)) + es }
+                    LazyColumn {
+                        items(rows) { r ->
+                            if (r is String) WidgetHeading(r) else AgendaRow(context, r as dev.aperte.todav.core.AgendaEntry, check)
+                        }
+                    }
+                }
+                if (!titled) Row { WidgetButtons(context, widget, add) }
             }
         }
     }

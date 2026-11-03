@@ -97,7 +97,8 @@ What Todav can do, in short. The details of each release are in the
 - Swipe actions of your choice; drag and drop to reorder tasks, make subtasks, change a category
   and plan tasks into the calendar's hours.
 - Month, Week, Work Week, 3 Days, Day and Agenda views.
-- Home-screen widgets: a task list, the month, the agenda, a day's hours and a month planner.
+- Home-screen widgets: a task list, the month, the agenda (its title optional), a day's hours
+  and a month planner.
 - Push through UnifiedPush (the ntfy app, for instance), without Google services.
 - Reminders with "Mark as Done" and Snooze; "New Task" from the launcher; text shared as a task.
 - Syncs with Nextcloud by itself, no DAVx⁵ needed; the Nextcloud app's accounts fill in the

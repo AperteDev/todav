@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Linux: Ctrl while dropping a task or an event on another list or calendar in the sidebar
   copies it there instead of moving it; the pointer shows a copy. Events of read-only
   calendars drag too, to be copied that way.
+- Android: the agenda widget's title can be hidden, by a setting of the widget; its buttons
+  then float over the agenda's top corner.
 
 ### Fixed
 
