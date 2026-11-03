@@ -522,7 +522,7 @@ fn block(c: &Rc<Cal>, i: &Item, geo: Geo) -> gtk::Widget {
             if calendar::crossed(core(), e) {
                 b.add_css_class("cancelled");
             }
-            drag_event(c, &b, e);
+            drag_event(&b, e);
             event_clicks(&b, e);
             b.upcast()
         }

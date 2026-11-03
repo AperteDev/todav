@@ -1374,35 +1374,31 @@ fn refresh_lists(ui: &Rc<Ui>) {
 }
 
 /// Dropping a task on the sidebar list `href` moves it there with its subtasks; a subtask
-/// leaves its parent first.
+/// leaves its parent first. With Ctrl held, a copy goes there instead.
 fn list_drop(ui: &Rc<Ui>, row: &gtk::ListBoxRow, href: &str) {
-    let drop = gtk::DropTarget::new(glib::Type::STRING, gtk::gdk::DragAction::MOVE);
     let (weak, h) = (Rc::downgrade(ui), href.to_string());
-    drop.connect_accept(move |_, _| {
+    let accept = move || {
         weak.upgrade().is_some_and(|ui| {
             let dragging = ui.dragging.borrow();
             dragging.as_ref().is_some_and(|(d, _)| d.list_href != h)
         })
-    });
+    };
     let (weak, h) = (Rc::downgrade(ui), href.to_string());
-    drop.connect_drop(move |_, _, _, _| {
-        let Some((d, ds)) = weak.upgrade().and_then(|ui| ui.dragging.take()) else {
-            return false;
+    crate::lists::item_drop(row, accept, move |copy| {
+        let Some((d, _)) = weak.upgrade().and_then(|ui| ui.dragging.take()) else {
+            return;
         };
-        let moved = core().together(|| {
-            if !ds.root {
-                core().promote(d.uid.clone())?;
-            }
-            core().move_task(d.uid.clone(), h.clone())
-        });
-        match moved {
+        let i = todav_app::calendar::Item::Task(d);
+        let done = if copy {
+            todav_app::calendar::copy_to_list(core(), &i, h.clone())
+        } else {
+            todav_app::calendar::move_to_list(core(), &i, h.clone())
+        };
+        match done {
             Ok(()) => request_sync(),
             Err(e) => toast(&e.to_string()),
         }
-        true
     });
-    row.add_css_class("cat-drop");
-    row.add_controller(drop);
 }
 
 fn refresh_sidebar_counts(ui: &Rc<Ui>) {
@@ -2372,7 +2368,8 @@ fn connect_dnd(
 ) {
     row.add_css_class("task-dnd");
     let drag = gtk::DragSource::new();
-    drag.set_actions(gtk::gdk::DragAction::MOVE);
+    // Copy with Ctrl held, onto a list.
+    drag.set_actions(gtk::gdk::DragAction::MOVE | gtk::gdk::DragAction::COPY);
     let (weak, task) = (Rc::downgrade(ui), t.clone());
     drag.connect_prepare(move |src, x, y| {
         // Without a handle the whole row drags, except from the "Add subtask" entry inside it

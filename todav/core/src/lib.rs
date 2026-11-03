@@ -445,14 +445,24 @@ impl Client {
     /// reminders, done or not), in its list and under its parent; it goes last in the list. One
     /// undo step. Returns the copy.
     pub fn duplicate_task(&self, uid: String) -> Result<Task> {
+        self.copy_task(uid, None)
+    }
+
+    /// `duplicate_task` into list `to` (None: its own); in another list the copy is top-level.
+    pub fn copy_task(&self, uid: String, to: Option<String>) -> Result<Task> {
+        if let Some(to) = &to {
+            self.writable(to)?;
+        }
         let (list, copies) = {
             let db = self.db.lock().unwrap();
             let raw = store::raw(&db, Kind::Task, "", &uid)?
                 .ok_or_else(|| Error::NotFound(uid.clone()))?;
             let all = store::tasks(&db, &raw.list_href, true)?;
+            let list = to.unwrap_or_else(|| raw.list_href.clone());
+            let elsewhere = list != raw.list_href;
             let last: i64 = db.query_row(
                 "SELECT COALESCE(MAX(sort_order), 0) + 1 FROM tasks WHERE list_href = ?",
-                [&raw.list_href],
+                [&list],
                 |r| r.get(0),
             )?;
             // (original, its copy's UID, the copy's parent), parents first.
@@ -474,14 +484,19 @@ impl Client {
                     fresh_copy(&mut cal, copy);
                     match parent {
                         Some(p) => cal.set_parent(p),
-                        None => set_order(&mut cal, last),
+                        None => {
+                            set_order(&mut cal, last);
+                            if elsewhere {
+                                cal.clear_parent();
+                            }
+                        }
                     }
-                    self.remember(&db, Kind::Task, &r.list_href, copy)?;
-                    store::save(&db, &r.list_href, None, None, &cal, store::MODIFIED)?;
+                    self.remember(&db, Kind::Task, &list, copy)?;
+                    store::save(&db, &list, None, None, &cal, store::MODIFIED)?;
                 }
                 Ok(())
             })?;
-            (raw.list_href, tree)
+            (list, tree)
         };
         let uids: Vec<String> = copies.iter().map(|(_, c, _)| c.clone()).collect();
         self.emit(&list, uids);
@@ -493,18 +508,23 @@ impl Client {
     /// occurrences, as it is (time, repeat, reminders, notes) but for its attendees and
     /// organizer: the server would send them invitations. Returns the copy's UID.
     pub fn duplicate_event(&self, list_href: String, uid: String) -> Result<String> {
-        self.writable(&list_href)?;
+        self.copy_event(list_href.clone(), uid, list_href)
+    }
+
+    /// `duplicate_event` of event `uid` in calendar `from` into calendar `to`.
+    pub fn copy_event(&self, from: String, uid: String, to: String) -> Result<String> {
+        self.writable(&to)?;
         let copy = new_uid();
         {
             let db = self.db.lock().unwrap();
-            let raw = store::raw(&db, Kind::Event, &list_href, &uid)?
+            let raw = store::raw(&db, Kind::Event, &from, &uid)?
                 .ok_or_else(|| Error::NotFound(uid.clone()))?;
             let mut cal = Calendar::parse(&raw.raw_ics).ok_or_else(|| Error::Parse(uid.clone()))?;
             fresh_copy(&mut cal, &copy);
-            self.remember(&db, Kind::Event, &list_href, &copy)?;
-            store::save(&db, &list_href, None, None, &cal, store::MODIFIED)?;
+            self.remember(&db, Kind::Event, &to, &copy)?;
+            store::save(&db, &to, None, None, &cal, store::MODIFIED)?;
         }
-        self.emit(&list_href, vec![copy.clone()]);
+        self.emit(&to, vec![copy.clone()]);
         Ok(copy)
     }
 
@@ -1986,6 +2006,21 @@ mod tests {
         c.undo(None).unwrap();
         c.undo(None).unwrap();
         assert_eq!(c.tasks("/a/".into(), true).len(), 3);
+        // Into another list: a subtask copied there is top-level, its subtasks under it.
+        c.db.lock()
+            .unwrap()
+            .execute_batch(
+                "INSERT INTO lists (href, display_name, has_events) VALUES ('/b/', 'B', 1)",
+            )
+            .unwrap();
+        let s3 = c.copy_task(s.clone(), Some("/b/".into())).unwrap();
+        assert_eq!((s3.list_href.as_str(), s3.parent_uid), ("/b/", None));
+        let b = c.tasks("/b/".into(), true);
+        assert_eq!(b.len(), 2);
+        assert!(b.iter().any(|t| t.parent_uid.as_ref() == Some(&s3.uid)));
+        assert_eq!(c.tasks("/a/".into(), true).len(), 3);
+        c.undo(None).unwrap();
+        assert!(c.tasks("/b/".into(), true).is_empty());
 
         let time = EventTime {
             start: 1_800_000_000,
@@ -2011,5 +2046,9 @@ mod tests {
             .unwrap()
             .unwrap();
         assert!(!raw.raw_ics.contains("ATTENDEE"));
+        let e3 = c.copy_event("/a/".into(), e.clone(), "/b/".into()).unwrap();
+        let all = c.events(time.start - 1, time.end);
+        assert_eq!(all.len(), 3);
+        assert!(all.iter().any(|x| x.uid == e3 && x.list_href == "/b/"));
     }
 }

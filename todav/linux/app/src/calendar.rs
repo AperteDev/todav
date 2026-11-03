@@ -849,11 +849,19 @@ fn dragging() -> Option<Item> {
     DRAGGING.with(|d| d.borrow().clone())
 }
 
-/// Make `w` drag `i`: onto a day or an hour of the week; a task also back to "To Plan".
+/// Make `w` drag `i`: onto a day or an hour of the week; a task also back to "To Plan"; onto a
+/// list or calendar in the sidebar, where Ctrl copies it (`list_drop`). One in a read-only list
+/// or calendar only goes to be copied there.
 fn drag_item(w: &impl IsA<gtk::Widget>, i: Item) {
     let src = gtk::DragSource::new();
-    src.set_actions(gdk::DragAction::MOVE);
-    src.connect_prepare(|src, _, y| {
+    let it = i.clone();
+    src.connect_prepare(move |src, _, y| {
+        // Here, not when made: the sidebar's lists may come later than the item.
+        src.set_actions(if movable(&it) {
+            gdk::DragAction::MOVE | gdk::DragAction::COPY
+        } else {
+            gdk::DragAction::COPY
+        });
         let block = src.widget().is_some_and(|w| w.has_css_class("block"));
         GRAB.set(if block { y } else { 0.0 });
         Some(gdk::ContentProvider::for_value(&"todav-item".to_value()))
@@ -886,11 +894,17 @@ fn drag_task(w: &impl IsA<gtk::Widget>, t: &Task) {
     drag_item(w, Item::Task(t.clone()));
 }
 
-/// An event in a calendar we may change can be dragged.
-fn drag_event(c: &Cal, w: &impl IsA<gtk::Widget>, e: &Event) {
-    if writable(c, &e.list_href) {
-        drag_item(w, Item::Event(e.clone()));
-    }
+fn drag_event(w: &impl IsA<gtk::Widget>, e: &Event) {
+    drag_item(w, Item::Event(e.clone()));
+}
+
+/// Whether `i` may change: its list or calendar is not read-only.
+fn movable(i: &Item) -> bool {
+    let list = match i {
+        Item::Task(t) => &t.list_href,
+        Item::Event(e) => &e.list_href,
+    };
+    cal().is_some_and(|c| writable(&c, list))
 }
 
 fn writable(c: &Cal, list: &str) -> bool {
@@ -900,15 +914,15 @@ fn writable(c: &Cal, list: &str) -> bool {
         .any(|l| l.href == list && l.writable)
 }
 
-/// A drop target taking the dragged items `accepts` agrees to (no highlight for the others);
-/// `dropped` gets the item.
+/// A drop target taking the dragged items `accepts` agrees to that may change (no highlight for
+/// the others); `dropped` gets the item.
 fn item_drop(
     w: &impl IsA<gtk::Widget>,
     accepts: fn(&Item) -> bool,
     dropped: impl Fn(&Item) + 'static,
 ) -> gtk::DropTarget {
     let drop = gtk::DropTarget::new(glib::Type::STRING, gdk::DragAction::MOVE);
-    drop.connect_accept(move |_, _| dragging().is_some_and(|i| accepts(&i)));
+    drop.connect_accept(move |_, _| dragging().is_some_and(|i| movable(&i) && accepts(&i)));
     drop.connect_drop(move |_, _, _, _| {
         let Some(i) = dragging() else { return false };
         dropped(&i);
@@ -1081,27 +1095,29 @@ fn refresh_calendars(c: &Rc<Cal>) {
 }
 
 /// Dropping an event on sidebar row `l` moves it to that calendar (all of a repeating one), a
-/// task moves to that list with its subtasks (a subtask leaves its parent first).
+/// task moves to that list with its subtasks (a subtask leaves its parent first). With Ctrl
+/// held, a copy goes there instead.
 fn list_drop(row: &gtk::ListBoxRow, l: &List) {
-    let drop = gtk::DropTarget::new(glib::Type::STRING, gdk::DragAction::MOVE);
     let (tasks, events, href) = (l.holds_tasks, l.holds_events, l.href.clone());
-    drop.connect_accept(move |_, _| {
+    let accept = move || {
         dragging().is_some_and(|i| match &i {
             Item::Task(t) => tasks && t.list_href != href,
             Item::Event(e) => events && e.list_href != href,
         })
-    });
+    };
     let href = l.href.clone();
-    drop.connect_drop(move |_, _, _, _| {
-        let Some(i) = dragging() else { return false };
-        match calendar::move_to_list(core(), &i, href.clone()) {
+    crate::lists::item_drop(row, accept, move |copy| {
+        let Some(i) = dragging() else { return };
+        let done = if copy || !movable(&i) {
+            calendar::copy_to_list(core(), &i, href.clone())
+        } else {
+            calendar::move_to_list(core(), &i, href.clone())
+        };
+        match done {
             Ok(()) => request_sync(),
             Err(e) => crate::window::toast(&e.to_string()),
         }
-        true
     });
-    row.add_css_class("cat-drop");
-    row.add_controller(drop);
 }
 
 /// The hrefs of the calendars (`events`) or task lists, in sidebar order.
@@ -1315,7 +1331,7 @@ fn chip(c: &Rc<Cal>, i: &Item) -> gtk::Widget {
             if calendar::crossed(core(), e) {
                 b.add_css_class("cancelled");
             }
-            drag_event(c, &b, e);
+            drag_event(&b, e);
             event_clicks(&b, e);
             b.upcast()
         }

@@ -429,6 +429,17 @@ pub fn move_to_list(c: &Client, i: &Item, href: String) -> Result<()> {
     }
 }
 
+/// Copy `i` into the list or calendar `href`: a task with its subtasks, the whole series of an
+/// event (`Client::copy_task`, `Client::copy_event`).
+pub fn copy_to_list(c: &Client, i: &Item, href: String) -> Result<()> {
+    match i {
+        Item::Task(t) => c.copy_task(t.uid.clone(), Some(href)).map(drop),
+        Item::Event(e) => c
+            .copy_event(e.list_href.clone(), e.uid.clone(), href)
+            .map(drop),
+    }
+}
+
 // --- layout --------------------------------------------------------------------
 
 /// Length in minutes of what a dropped item becomes: its own, else the default.

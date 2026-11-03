@@ -19,7 +19,8 @@ What Todav can do, in short. The details of each release are in the
 - Pinned tasks stay at the top of their list.
 - A task completed where it doesn't stay (into the Completed group, out of Upcoming) shows
   struck through a moment, then fades out: in the app, the GNOME extension and the widget.
-- Move a task with its subtasks to another list, by drag and drop or from the task dialog.
+- Move a task with its subtasks to another list, by drag and drop or from the task dialog;
+  with Ctrl held while dropping, a copy goes there.
 - Duplicate a task with its subtasks, or an event, from its dialog or details.
 - Due dates and start dates, with or without a time.
 - Repeating tasks: daily, weekly, monthly or yearly, every n, until a day, from their dates or
@@ -47,7 +48,8 @@ What Todav can do, in short. The details of each release are in the
 - Plan a task by dropping it from "To Plan" on an hour (a time slot) or a day (due that day),
   with a preview in 15-minute steps; drop it back to unplan it.
 - Move events and planned tasks by drag and drop; resize them in the week view by their edges.
-- Drop an event on another calendar in the sidebar to move it there.
+- Drop an event on another calendar in the sidebar to move it there, or with Ctrl held, a copy
+  (always a copy from a read-only calendar).
 - An event's or a task's details on a click (subtasks, an event's tasks), with Edit there.
 - Tasks linked to events: an event lists its tasks, a task shows its event; a task added for
   an event goes to its calendar, or, for calendars without tasks, to a list you pick (none by
@@ -117,7 +119,7 @@ What Todav can do, in short. The details of each release are in the
 - Advanced notifications, configurable: repeating until done, per list.
 - Advanced search, filtering and sorting: saved filters, tasks hidden until they start.
 - Selecting several tasks to change them at once.
-- Duplicating by Ctrl+drag; templates.
+- Duplicating by Ctrl+drag in the calendar and among the tasks; templates.
 - A Year view and folded night hours in the calendar.
 - An event's own time zone; the weather in the calendar.
 - A task's own colour, as events have.

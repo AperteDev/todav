@@ -327,6 +327,33 @@ pub fn reorderable(row: &gtk::ListBoxRow, l: &List, siblings: Vec<String>) {
     row.add_css_class("reorderable");
 }
 
+/// A drop target on sidebar row `row` for a dragged task or event (its source offers Move and
+/// Copy): it moves there; with Ctrl held the compositor picks Copy, and the pointer shows a copy.
+/// `dropped` gets whether it copies.
+pub fn item_drop(
+    row: &gtk::ListBoxRow,
+    accept: impl Fn() -> bool + 'static,
+    dropped: impl Fn(bool) + 'static,
+) {
+    let drop = gtk::DropTarget::new(
+        glib::Type::STRING,
+        gdk::DragAction::MOVE | gdk::DragAction::COPY,
+    );
+    drop.connect_accept(move |_, _| accept());
+    // Move unless asked otherwise: left alone, GTK would prefer Copy of the two.
+    drop.connect_enter(|_, _, _| gdk::DragAction::MOVE);
+    drop.connect_motion(|_, _, _| gdk::DragAction::MOVE);
+    drop.connect_drop(move |dt, _, _, _| {
+        dropped(
+            dt.current_drop()
+                .is_some_and(|d| d.actions() == gdk::DragAction::COPY),
+        );
+        true
+    });
+    row.add_css_class("cat-drop");
+    row.add_controller(drop);
+}
+
 thread_local! {
     /// The list being dragged by its sidebar row.
     static DRAGGED: RefCell<Option<String>> = const { RefCell::new(None) };
