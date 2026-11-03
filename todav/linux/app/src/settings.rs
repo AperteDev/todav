@@ -923,21 +923,26 @@ fn connect_settings_sync(b: &gtk::Builder) -> impl Fn() + 'static {
 /// Where tasks for events of calendars without tasks go: none (stored empty, so those events
 /// take none) or a list picked; the returned closure fills the lists anew.
 fn connect_event_tasks_list(b: &gtk::Builder) -> impl Fn() + 'static {
-    let row: adw::ComboRow = get(b, "event_tasks_list");
+    let first: adw::ComboRow = get(b, "event_tasks_list");
     let hrefs: Rc<RefCell<Vec<String>>> = Rc::default();
     let filling = Rc::new(Cell::new(false));
     let (h, f) = (hrefs.clone(), filling.clone());
-    row.connect_selected_notify(move |r| {
-        if f.get() {
-            return;
-        }
-        let href = h.borrow().get(r.selected() as usize).cloned();
-        let _ = core().set_setting("event_tasks_list".into(), href.unwrap_or_default());
-    });
-    move || {
+    let watch = move |row: &adw::ComboRow| {
+        let (h, f) = (h.clone(), f.clone());
+        row.connect_selected_notify(move |r| {
+            if f.get() {
+                return;
+            }
+            let href = h.borrow().get(r.selected() as usize).cloned();
+            let _ = core().set_setting("event_tasks_list".into(), href.unwrap_or_default());
+        });
+    };
+    watch(&first);
+    let current_row = RefCell::new(first);
+    let fill = move |row: &adw::ComboRow| {
         filling.set(true);
         let lists = todav_app::lists::event_task_lists(core());
-        crate::lists::picker(&row, &lists, Some(&gettext("None")));
+        crate::lists::picker(row, &lists, Some(&gettext("None")));
         let mut v = vec![String::new()];
         v.extend(lists.into_iter().map(|l| l.href));
         let current = core()
@@ -946,6 +951,29 @@ fn connect_event_tasks_list(b: &gtk::Builder) -> impl Fn() + 'static {
         row.set_selected(v.iter().position(|h| *h == current).unwrap_or(0) as u32);
         *hrefs.borrow_mut() = v;
         filling.set(false);
+    };
+    move || {
+        // Filled again (as accounts change): a new row, filled before it takes the old one's
+        // place. GTK 4.24 breaks the list of a shown row that gets headings, and crashes later.
+        let old = current_row.borrow().clone();
+        if old.model().is_none() {
+            fill(&old);
+            return;
+        }
+        let row = adw::ComboRow::builder()
+            .title(old.title())
+            .subtitle(old.subtitle().unwrap_or_default())
+            .build();
+        fill(&row);
+        watch(&row);
+        if let Some(group) = old
+            .ancestor(adw::PreferencesGroup::static_type())
+            .and_downcast::<adw::PreferencesGroup>()
+        {
+            group.remove(&old);
+            group.add(&row);
+        }
+        *current_row.borrow_mut() = row;
     }
 }
 
