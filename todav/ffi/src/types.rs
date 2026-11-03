@@ -241,6 +241,8 @@ pub struct Event {
     pub rule: Option<String>,
     pub priority: Option<i64>,
     pub color: Option<String>,
+    pub url: Option<String>,
+    pub conference: Option<String>,
 }
 
 #[uniffi::remote(Record)]

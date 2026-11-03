@@ -1133,6 +1133,12 @@ pub fn note_toggle_task(text: String, n: u32) -> Option<String> {
     todav_app::note::toggle_nth_task(&text, n as usize)
 }
 
+/// The link to join event `event`'s video call at (`todav_app::meeting`).
+#[uniffi::export]
+pub fn meeting_link(event: Event) -> Option<String> {
+    todav_app::meeting::link(&event)
+}
+
 /// Nextcloud's colour presets, in its order.
 #[uniffi::export]
 pub fn color_presets() -> Vec<String> {

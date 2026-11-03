@@ -18,6 +18,7 @@ const XML = `<node>
   <method name="GetDays"><arg direction="in" name="from" type="x"/><arg direction="in" name="days" type="u"/><arg direction="out" type="aas"/></method>
   <method name="GetAgenda"><arg direction="in" name="days" type="u"/><arg direction="out" type="a(xsssbb)"/></method>
   <method name="GetAgendaFrom"><arg direction="in" name="from" type="x"/><arg direction="in" name="days" type="u"/><arg direction="out" type="a(xsssbbsx)"/></method>
+  <method name="GetAgendaLinks"><arg direction="in" name="from" type="x"/><arg direction="in" name="days" type="u"/><arg direction="out" type="a(xsssbbsxs)"/></method>
   <method name="EditItem"><arg direction="in" name="uid" type="s"/><arg direction="in" name="task" type="b"/><arg direction="in" name="start" type="x"/></method>
   <method name="GetCounts"><arg direction="out" type="a{su}"/></method>
   <method name="ShowDay"><arg direction="in" name="at" type="x"/></method>

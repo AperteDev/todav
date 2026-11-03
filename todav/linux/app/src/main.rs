@@ -549,6 +549,13 @@ fn notify_reminders() {
             None => when,
         }));
         n.set_default_action_and_target_value("app.show-day", Some(&e.start.to_variant()));
+        if let Some(url) = todav_app::meeting::link(&e) {
+            n.add_button_with_target_value(
+                &i18n::gettext("Join Call"),
+                "app.join",
+                Some(&url.to_variant()),
+            );
+        }
         app.send_notification(Some(&format!("event-{}-{}", e.uid, e.start)), &n);
     }
 }

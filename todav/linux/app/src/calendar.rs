@@ -630,9 +630,15 @@ pub fn agenda(from: i64, days: i64) -> Vec<AgendaRow> {
                 Time::At(t) => fmt(t, "%H:%M"),
                 Time::Date => String::new(),
             };
-            let (task, done, uid, start) = match &e.item {
-                Item::Task(t) => (true, t.done, t.uid.clone(), 0),
-                Item::Event(ev) => (false, false, ev.uid.clone(), ev.start),
+            let (task, done, uid, start, join) = match &e.item {
+                Item::Task(t) => (true, t.done, t.uid.clone(), 0, None),
+                Item::Event(ev) => (
+                    false,
+                    false,
+                    ev.uid.clone(),
+                    ev.start,
+                    todav_app::meeting::link(ev),
+                ),
             };
             (
                 e.day,
@@ -643,14 +649,16 @@ pub fn agenda(from: i64, days: i64) -> Vec<AgendaRow> {
                 done,
                 uid,
                 start,
+                join.unwrap_or_default(),
             )
         })
         .collect()
 }
 
 /// A row of the extension's agenda: (day, time, title, colour, is a task, done, its UID, an
-/// event's start, which tells its occurrences apart; 0 for a task).
-pub type AgendaRow = (i64, String, String, String, bool, bool, String, i64);
+/// event's start, which tells its occurrences apart (0 for a task), an event's meeting link
+/// ("" for none)).
+pub type AgendaRow = (i64, String, String, String, bool, bool, String, i64, String);
 
 /// Edit what a row of the extension's agenda holds: a task, or the occurrence of an event
 /// starting at `start`, over its day in the calendar. In a calendar that may not be written to,
@@ -1592,6 +1600,28 @@ fn line_of(icon: &str, l: &impl IsA<gtk::Widget>) -> gtk::Box {
     r
 }
 
+/// Join the event's video call at `url` (`todav_app::meeting`).
+fn join_button(url: String) -> gtk::Button {
+    let b = gtk::Button::builder()
+        .child(
+            &adw::ButtonContent::builder()
+                .icon_name("camera-video-symbolic")
+                .label(gettext("Join Call"))
+                .build(),
+        )
+        .tooltip_text(&url)
+        .halign(gtk::Align::Start)
+        .css_classes(["suggested-action", "pill"])
+        .build();
+    b.connect_clicked(move |b| {
+        crate::note::open(&url, b);
+        if let Some(p) = b.ancestor(gtk::Popover::static_type()) {
+            p.downcast::<gtk::Popover>().unwrap().popdown();
+        }
+    });
+    b
+}
+
 /// A note, as read; its boxes tick when `save` saves it ticked.
 fn note_line(text: &str, save: Option<Box<dyn Fn(String)>>) -> gtk::Box {
     line_of("text-x-generic-symbolic", &crate::note::label(text, save))
@@ -1842,6 +1872,9 @@ fn details(c: &Cal, e: &Event) -> gtk::Popover {
     }
     if let Some(l) = &e.location {
         b.append(&line("todav-location-symbolic", l));
+    }
+    if let Some(url) = todav_app::meeting::link(e) {
+        b.append(&join_button(url));
     }
     b.append(&which(&e.list_href, &list_name(c, &e.list_href)));
     if let Some(p) = crate::window::priority_text(e.priority) {

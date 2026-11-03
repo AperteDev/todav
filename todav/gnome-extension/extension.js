@@ -608,8 +608,11 @@ class TodavIndicator extends PanelMenu.Button {
         const show = async () => {
             const picked = this._selected;
             const today = dayKey(GLib.DateTime.new_now_local());
-            const [items] = await this._proxy.GetAgendaFromAsync(picked ?? today, picked === null ? AGENDA_DAYS : 1)
-                // An app without it: the week, its rows without what EditItem needs.
+            const from = picked ?? today, days = picked === null ? AGENDA_DAYS : 1;
+            const [items] = await this._proxy.GetAgendaLinksAsync(from, days)
+                // An app without it: the rows without meeting links.
+                .catch(() => this._proxy.GetAgendaFromAsync(from, days))
+                // Without that either: the week, its rows without what EditItem needs.
                 .catch(e => (picked === null ? this._proxy.GetAgendaAsync(AGENDA_DAYS) : Promise.reject(e)))
                 .catch(e => {
                     logError(e, 'Todav: cannot read the agenda');
@@ -658,13 +661,30 @@ class TodavIndicator extends PanelMenu.Button {
     }
 
     /// An event's dot or a task's circle (checked when done) in its calendar's colour, its time
-    /// and title (a row of GetAgendaFrom: its UID and an event's start, for EditItem).
-    _agendaRow(day, time, title, color, task, done, uid, start) {
+    /// and title (a row of GetAgendaLinks: its UID and an event's start, for EditItem), and a
+    /// button joining an event's call when it has a meeting link.
+    _agendaRow(day, time, title, color, task, done, uid, start, join) {
         const name = label(title, 'todav-task', {x_expand: true});
         const mark = task
             ? this._taskMark(uid, done, name, color)
             : new St.Bin({style_class: 'todav-mark-slot', child: dot(color), y_align: CENTER});
-        const item = row([mark, label(time, 'todav-time'), name]);
+        const parts = [mark, label(time, 'todav-time'), name];
+        if (join) {
+            const b = new St.Button({
+                style_class: 'todav-nav',
+                can_focus: true,
+                accessible_name: _('Join Call'),
+                child: new St.Icon({icon_name: 'camera-video-symbolic', icon_size: 16}),
+                y_align: CENTER,
+            });
+            b.connect('clicked', () => {
+                this.menu.close();
+                this._dateMenu?.menu.close();
+                Gio.AppInfo.launch_default_for_uri(join, global.create_app_launch_context(0, -1));
+            });
+            parts.push(b);
+        }
+        const item = row(parts);
         // Its editor if `_edit` says so for tasks or events, else (and from an app without
         // EditItem: no UID in the row) its day.
         const edit = uid && this._edit?.[task ? 'tasks' : 'events'];

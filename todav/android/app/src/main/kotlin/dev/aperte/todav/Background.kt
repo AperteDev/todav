@@ -27,6 +27,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import dev.aperte.todav.core.Event
 import dev.aperte.todav.core.TodavTask
+import dev.aperte.todav.core.meetingLink
 import dev.aperte.todav.core.reminderOccurrence
 import dev.aperte.todav.core.remindsOfStart
 import java.util.UUID
@@ -375,6 +376,19 @@ object Reminders {
         .setAutoCancel(true)
         .setContentIntent(open(app, (e.uid + e.start).hashCode()) { putExtra("day", e.start) })
         .addAction(snoozeAction(app, (e.uid + e.start).hashCode()) { putExtra("event", e.uid).putExtra("start", e.start) })
+        .apply {
+            // Its video call (`todav_app::meeting`), in the browser or the call's app.
+            meetingLink(e)?.let { url ->
+                addAction(
+                    0,
+                    tr("Join Call"),
+                    PendingIntent.getActivity(
+                        app, (e.uid + e.start).hashCode(), Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)),
+                        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                    ),
+                )
+            }
+        }
         .build()
 }
 

@@ -237,6 +237,15 @@ pub fn setup_actions(app: &adw::Application) {
         move |_, _| crate::update::restart(&app, false)
     ));
     app.add_action(&restart);
+    // From event reminders: the call's link (`todav_app::meeting`) in the browser or its app.
+    let join = gio::SimpleAction::new("join", Some(glib::VariantTy::STRING));
+    join.connect_activate(|_, url| {
+        if let Some(url) = url.and_then(|u| u.str()) {
+            let window = ui().map(|ui| ui.window.clone().upcast::<gtk::Window>());
+            gtk::UriLauncher::new(url).launch(window.as_ref(), gio::Cancellable::NONE, |_| {});
+        }
+    });
+    app.add_action(&join);
     let shortcuts = gio::SimpleAction::new("shortcuts", None);
     shortcuts.connect_activate(|_, _| {
         if let Some(ui) = ui() {

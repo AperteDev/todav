@@ -17,6 +17,7 @@ import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.EventRepeat
 import androidx.compose.material.icons.outlined.Pin
 import androidx.compose.material.icons.outlined.Place
+import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material.icons.outlined.Update
 import androidx.compose.material.icons.outlined.Schedule
@@ -48,6 +49,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.aperte.todav.Dest
 import dev.aperte.todav.Main
@@ -61,6 +64,7 @@ import dev.aperte.todav.core.RepeatValue
 import dev.aperte.todav.core.Scope
 import dev.aperte.todav.core.TextValue
 import dev.aperte.todav.core.listColor
+import dev.aperte.todav.core.meetingLink
 import dev.aperte.todav.core.plainRepeat
 import dev.aperte.todav.ntr
 import dev.aperte.todav.ptr
@@ -267,6 +271,17 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
                         icon = Icons.Outlined.Place,
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                     )
+                    // Its video call, found in its link, place or notes as they are now.
+                    val join = ev?.let { meetingLink(it.copy(location = location, description = notes)) }
+                    if (join != null) {
+                        val uri = LocalUriHandler.current
+                        Item(
+                            headlineContent = { Text(tr("Join Call")) },
+                            supportingContent = { Text(join, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            leadingContent = { Icon(Icons.Outlined.Videocam, null) },
+                            modifier = Modifier.clickable { uri.openUri(join) },
+                        )
+                    }
                     ChoiceItem(
                         tr("Calendar"),
                         calendars.map { it.displayName },

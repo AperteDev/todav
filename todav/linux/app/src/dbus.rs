@@ -20,6 +20,7 @@ const XML: &str = r#"<node>
   <method name="GetDays"><arg direction="in" name="from" type="x"/><arg direction="in" name="days" type="u"/><arg direction="out" type="aas"/></method>
   <method name="GetAgenda"><arg direction="in" name="days" type="u"/><arg direction="out" type="a(xsssbb)"/></method>
   <method name="GetAgendaFrom"><arg direction="in" name="from" type="x"/><arg direction="in" name="days" type="u"/><arg direction="out" type="a(xsssbbsx)"/></method>
+  <method name="GetAgendaLinks"><arg direction="in" name="from" type="x"/><arg direction="in" name="days" type="u"/><arg direction="out" type="a(xsssbbsxs)"/></method>
   <method name="EditItem"><arg direction="in" name="uid" type="s"/><arg direction="in" name="task" type="b"/><arg direction="in" name="start" type="x"/></method>
   <method name="GetCounts"><arg direction="out" type="a{su}"/></method>
   <method name="ShowDay"><arg direction="in" name="at" type="x"/></method>
@@ -191,15 +192,26 @@ fn call(method: &str, params: &glib::Variant) -> Result<Option<glib::Variant>, S
             let items: Vec<_> =
                 crate::calendar::agenda(crate::calendar::today(), i64::from(days.min(31)))
                     .into_iter()
-                    .map(|(day, time, title, color, task, done, _, _)| {
+                    .map(|(day, time, title, color, task, done, ..)| {
                         (day, time, title, color, task, done)
                     })
                     .collect();
             Some((items,).to_variant())
         }
         // The same from the day `from` (local midnight), each with its UID and an event's start
-        // for EditItem (calendar::AgendaRow).
+        // for EditItem (for older extensions).
         "GetAgendaFrom" => {
+            let (from, days) = params.get::<(i64, u32)>().ok_or_else(bad)?;
+            let items: Vec<_> = crate::calendar::agenda(from, i64::from(days.min(31)))
+                .into_iter()
+                .map(|(day, time, title, color, task, done, uid, start, _)| {
+                    (day, time, title, color, task, done, uid, start)
+                })
+                .collect();
+            Some((items,).to_variant())
+        }
+        // The same with an event's meeting link, "" for none (calendar::AgendaRow).
+        "GetAgendaLinks" => {
             let (from, days) = params.get::<(i64, u32)>().ok_or_else(bad)?;
             let items = crate::calendar::agenda(from, i64::from(days.min(31)));
             Some((items,).to_variant())

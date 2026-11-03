@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   formatted; links, bare web addresses, e-mail addresses and `todav://` links open with a click
   (Ctrl+click while editing on Linux); checkboxes (`- [ ]`) tick with a click, also in an
   item's details. Notes stay plain text, so other apps show them as written.
+- Join Call for an event's video call (Google Meet, Zoom, Teams, Jitsi, Webex, Nextcloud Talk
+  and others), found in its link, place or notes: in its details, its reminder and the GNOME
+  extension's agenda.
 
 ### Fixed
 

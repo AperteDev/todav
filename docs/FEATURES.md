@@ -53,6 +53,9 @@ What Todav can do, in short. The details of each release are in the
   default).
 - Opens iCalendar files (`.ics`), importing their events and tasks.
 - Copy Link: a `todav://` link that opens a task or an event, to paste elsewhere.
+- Join Call: a button for an event's video call (Meet, Zoom, Teams, Jitsi, Webex, Nextcloud
+  Talk…), found in its link, place or notes, in its details, its reminder and the extension's
+  agenda.
 
 **Accounts and sync**
 
@@ -109,7 +112,6 @@ What Todav can do, in short. The details of each release are in the
 - Task status (in progress, cancelled) and percent complete.
 - Advanced notifications, configurable: Snooze on Linux too, repeating until done, per list.
 - Advanced search, filtering and sorting: saved filters, tasks hidden until they start.
-- Join buttons for meeting links in events.
 - Selecting several tasks to change them at once.
 - Duplicating tasks and events; templates.
 - A Year view, week numbers and folded night hours in the calendar.

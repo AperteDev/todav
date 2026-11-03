@@ -34,6 +34,10 @@ pub struct Event {
     pub priority: Option<i64>,
     /// Its own colour ("#RRGGBB", from COLOR), shown instead of its calendar's; None when not set.
     pub color: Option<String>,
+    /// Its web page (URL).
+    pub url: Option<String>,
+    /// Its video call or other conference (CONFERENCE, or Google's X-GOOGLE-CONFERENCE).
+    pub conference: Option<String>,
 }
 
 /// Wall-clock length of a component: DTEND − DTSTART, DURATION, or else a day for a date and
@@ -120,6 +124,10 @@ fn event(c: &Comp, list_href: &str, (start, end, reminders): (i64, i64, Vec<i64>
             .and_then(|p| p.parse::<i64>().ok())
             .filter(|&p| p != 0),
         color: c.text("COLOR").as_deref().and_then(crate::color::parse),
+        url: c.text("URL"),
+        conference: c
+            .text("CONFERENCE")
+            .or_else(|| c.text("X-GOOGLE-CONFERENCE")),
     }
 }
 

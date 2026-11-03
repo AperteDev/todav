@@ -52,7 +52,9 @@ import androidx.compose.material.icons.outlined.EventRepeat
 import androidx.compose.material.icons.automirrored.outlined.Notes
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Place
+import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -149,6 +151,8 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalUriHandler
+import dev.aperte.todav.core.meetingLink
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.aperte.todav.CalMode
@@ -1778,6 +1782,12 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
                     }
                     Line({ Icon(Icons.Outlined.Schedule, null) }) { Text(eventWhen(e, now)) }
                     e.location?.takeIf { it.isNotBlank() }?.let { Line({ Icon(Icons.Outlined.Place, null) }) { Text(it) } }
+                    meetingLink(e)?.let { url ->
+                        val uri = LocalUriHandler.current
+                        Line({ Icon(Icons.Outlined.Videocam, null) }) {
+                            Button(onClick = { uri.openUri(url) }) { Text(tr("Join Call")) }
+                        }
+                    }
                     Line({ ColorMark(colors[e.listHref]) }) { Text(lists[e.listHref]?.displayName ?: "") }
                     if (e.reminders.isNotEmpty()) {
                         Line({ Icon(Icons.Outlined.Notifications, null) }) {

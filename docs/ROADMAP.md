@@ -23,9 +23,6 @@ Planned work, not yet done. [FEATURES.md](FEATURES.md) lists it publicly; the or
 - **Task status and progress**: in progress and cancelled next to open and done (`STATUS`
   `IN-PROCESS`, `CANCELLED`), and percent complete (`PERCENT-COMPLETE`), shown on the task row and
   set in the task dialog; cancelled tasks show with done ones. The Plan view's board uses it.
-- **Meeting links**: video call links (Meet, Zoom, Teams, Jitsi and the like) found in an
-  event's location, description, URL or `CONFERENCE`, with a Join button in its details, its
-  reminder and the extension's agenda.
 - **Selecting several tasks** (Ctrl+click, Shift+click, a selection mode on touch and Android) to
   set their date, list, category or priority, tick or delete them at once, as one undo step
   (`Client::together`).
@@ -67,10 +64,10 @@ Planned work, not yet done. [FEATURES.md](FEATURES.md) lists it publicly; the or
   (`gtasks::is_list`). Open: whether to ask for the calendar scope too, or keep calendars to
   System Calendars.
 - **Advanced notifications**, configurable, beyond the reminder notifications shown now
-  (urgent ones for important tasks and events, or for all, exist): Snooze on Linux too (Android
-  has it), a reminder repeating until the task is done (every n minutes, n times), notifications
-  on or off per list and per calendar (with the settings per list), the event's Join button
-  (meeting links); the rest to be specified.
+  (urgent ones for important tasks and events, or for all, and an event's Join Call exist):
+  Snooze on Linux too (Android has it), a reminder repeating until the task is done (every n
+  minutes, n times), notifications on or off per list and per calendar (with the settings per
+  list); the rest to be specified.
   Open: on Android an urgent reminder that stays on screen needs a full-screen intent
   (`USE_FULL_SCREEN_INTENT`), which Android 14+ and Google Play keep for alarm and calling apps.
 - **Advanced search, filtering and sorting**: saved filters (smart lists) combining lists,
