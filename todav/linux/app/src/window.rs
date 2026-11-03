@@ -246,6 +246,15 @@ pub fn setup_actions(app: &adw::Application) {
         }
     });
     app.add_action(&join);
+    // From reminders: (a task's, its UID, its occurrence or `i64::MIN`; an event's, its UID,
+    // the occurrence's start).
+    let snooze = gio::SimpleAction::new("snooze", Some(glib::VariantTy::new("(bsx)").unwrap()));
+    snooze.connect_activate(|_, v| {
+        if let Some((task, uid, at)) = v.and_then(|v| v.get::<(bool, String, i64)>()) {
+            crate::snooze(task, uid, at);
+        }
+    });
+    app.add_action(&snooze);
     let shortcuts = gio::SimpleAction::new("shortcuts", None);
     shortcuts.connect_activate(|_, _| {
         if let Some(ui) = ui() {

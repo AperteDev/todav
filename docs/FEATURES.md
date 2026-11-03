@@ -24,7 +24,7 @@ What Todav can do, in short. The details of each release are in the
 - Repeating tasks: daily, weekly, monthly or yearly, every n, until a day, from their dates or
   from when they are done; ticked, one moves on to its next date.
 - Several reminders per task, before or after its due date or its start, as notifications with
-  "Mark as Done"; one already past when set goes off at once.
+  "Mark as Done" and Snooze (back in ten minutes); one already past when set goes off at once.
 - Urgent reminders for important tasks and events (high priority), for all with a setting:
   they stay on screen until dismissed (on Android: a channel of their own).
 - An Upcoming page across all lists: Overdue, Today, Tomorrow, the coming days and later.
@@ -110,7 +110,7 @@ What Todav can do, in short. The details of each release are in the
 - Quick add in plain words ("tomorrow 17:00 #work"), and from anywhere with a system-wide
   shortcut.
 - Task status (in progress, cancelled) and percent complete.
-- Advanced notifications, configurable: Snooze on Linux too, repeating until done, per list.
+- Advanced notifications, configurable: repeating until done, per list.
 - Advanced search, filtering and sorting: saved filters, tasks hidden until they start.
 - Selecting several tasks to change them at once.
 - Duplicating tasks and events; templates.

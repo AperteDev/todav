@@ -65,9 +65,9 @@ Planned work, not yet done. [FEATURES.md](FEATURES.md) lists it publicly; the or
   System Calendars.
 - **Advanced notifications**, configurable, beyond the reminder notifications shown now
   (urgent ones for important tasks and events, or for all, and an event's Join Call exist):
-  Snooze on Linux too (Android has it), a reminder repeating until the task is done (every n
-  minutes, n times), notifications on or off per list and per calendar (with the settings per
-  list); the rest to be specified.
+  a reminder repeating until the task is done (every n minutes, n times), notifications on or
+  off per list and per calendar (with the settings per list), a choice of snooze delays; the
+  rest to be specified.
   Open: on Android an urgent reminder that stays on screen needs a full-screen intent
   (`USE_FULL_SCREEN_INTENT`), which Android 14+ and Google Play keep for alarm and calling apps.
 - **Advanced search, filtering and sorting**: saved filters (smart lists) combining lists,

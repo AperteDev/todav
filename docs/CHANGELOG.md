@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Join Call for an event's video call (Google Meet, Zoom, Teams, Jitsi, Webex, Nextcloud Talk
   and others), found in its link, place or notes: in its details, its reminder and the GNOME
   extension's agenda.
+- Linux: Snooze on task and event reminders, back in ten minutes, as on Android.
 
 ### Fixed
 

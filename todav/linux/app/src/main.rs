@@ -503,61 +503,123 @@ fn reschedule_reminder() {
 
 /// Notify about reminders that went off since the last check.
 fn notify_reminders() {
+    let (tasks, events) = service().due_reminders();
+    for t in tasks {
+        notify_task(&t);
+    }
+    for e in events {
+        notify_event(&e);
+    }
+}
+
+/// A reminder notification titled `summary`. Urgent: GNOME Shell keeps it on screen until
+/// dismissed (and shows it through fullscreen and with banners off).
+fn reminder(summary: &str, priority: Option<i64>) -> gio::Notification {
+    let n = gio::Notification::new(summary);
+    if todav_app::prefs::urgent_reminder(core(), priority) {
+        n.set_priority(gio::NotificationPriority::Urgent);
+    }
+    n
+}
+
+/// The reminder of task `t`, with Mark as Done and Snooze.
+fn notify_task(t: &todav_core::Task) {
     let Some(app) = gio::Application::default() else {
         return;
     };
     let now = core().local_now();
-    let (tasks, events) = service().due_reminders();
-    // Urgent: GNOME Shell keeps it on screen until dismissed (and shows it through fullscreen
-    // and with banners off).
-    let notification = |summary: &str, priority| {
-        let n = gio::Notification::new(summary);
-        if todav_app::prefs::urgent_reminder(core(), priority) {
-            n.set_priority(gio::NotificationPriority::Urgent);
+    let n = reminder(&t.summary, t.priority);
+    let body = match (t.start, t.due) {
+        (Some(s), _) if todav_app::service::reminds_of_start(t, now) => {
+            Some((i18n::gettext("Starts {date}"), s, t.start_all_day))
         }
-        n
+        (_, Some(d)) => Some((i18n::gettext("Due {date}"), d, t.due_all_day)),
+        _ => None,
     };
-    for t in tasks {
-        let n = notification(&t.summary, t.priority);
-        let body = match (t.start, t.due) {
-            (Some(s), _) if todav_app::service::reminds_of_start(&t, now) => {
-                Some((i18n::gettext("Starts {date}"), s, t.start_all_day))
-            }
-            (_, Some(d)) => Some((i18n::gettext("Due {date}"), d, t.due_all_day)),
-            _ => None,
-        };
-        if let Some((text, at, all_day)) = body {
-            n.set_body(Some(
-                &text.replace("{date}", &dates::label(at, all_day, now)),
-            ));
-        }
-        n.set_default_action_and_target_value("app.show-list", Some(&t.list_href.to_variant()));
+    if let Some((text, at, all_day)) = body {
+        n.set_body(Some(
+            &text.replace("{date}", &dates::label(at, all_day, now)),
+        ));
+    }
+    n.set_default_action_and_target_value("app.show-list", Some(&t.list_href.to_variant()));
+    n.add_button_with_target_value(
+        &i18n::gettext("Mark as Done"),
+        "app.complete",
+        Some(&t.uid.to_variant()),
+    );
+    let at = todav_app::service::reminder_occurrence(t);
+    n.add_button_with_target_value(
+        &i18n::gettext("Snooze"),
+        "app.snooze",
+        Some(&(true, t.uid.as_str(), at.unwrap_or(i64::MIN)).to_variant()),
+    );
+    app.send_notification(Some(&format!("reminder-{}", t.uid)), &n);
+    SHOWN.with(|s| s.borrow_mut().insert(t.uid.clone(), at));
+}
+
+/// The reminder of the occurrence `e` of an event, with Join Call (if it has a call) and Snooze.
+fn notify_event(e: &todav_core::Event) {
+    let Some(app) = gio::Application::default() else {
+        return;
+    };
+    let now = core().local_now();
+    let n = reminder(&e.summary, e.priority);
+    let when = dates::label(e.start, e.all_day, now);
+    n.set_body(Some(&match &e.location {
+        Some(l) => format!("{when} · {l}"),
+        None => when,
+    }));
+    n.set_default_action_and_target_value("app.show-day", Some(&e.start.to_variant()));
+    if let Some(url) = todav_app::meeting::link(e) {
         n.add_button_with_target_value(
-            &i18n::gettext("Mark as Done"),
-            "app.complete",
-            Some(&t.uid.to_variant()),
+            &i18n::gettext("Join Call"),
+            "app.join",
+            Some(&url.to_variant()),
         );
-        app.send_notification(Some(&format!("reminder-{}", t.uid)), &n);
-        let at = todav_app::service::reminder_occurrence(&t);
-        SHOWN.with(|s| s.borrow_mut().insert(t.uid.clone(), at));
     }
-    for e in events {
-        let n = notification(&e.summary, e.priority);
-        let when = dates::label(e.start, e.all_day, now);
-        n.set_body(Some(&match &e.location {
-            Some(l) => format!("{when} · {l}"),
-            None => when,
-        }));
-        n.set_default_action_and_target_value("app.show-day", Some(&e.start.to_variant()));
-        if let Some(url) = todav_app::meeting::link(&e) {
-            n.add_button_with_target_value(
-                &i18n::gettext("Join Call"),
-                "app.join",
-                Some(&url.to_variant()),
-            );
+    n.add_button_with_target_value(
+        &i18n::gettext("Snooze"),
+        "app.snooze",
+        Some(&(false, e.uid.as_str(), e.start).to_variant()),
+    );
+    app.send_notification(Some(&format!("event-{}-{}", e.uid, e.start)), &n);
+}
+
+/// Minutes a snoozed reminder waits, as on Android.
+// ponytail: a fixed delay that the app quitting forgets; a choice of delays, kept snoozes, if
+// they turn out to be wanted.
+const SNOOZE_MINUTES: u64 = 10;
+
+/// Snooze: the reminder of task `uid` (`task`, for its occurrence `at`, `i64::MIN` for none) or
+/// of event `uid`'s occurrence starting at `at` gone, and back in ten minutes as the item is then,
+/// unless the task is done or moved on or the event gone meanwhile.
+pub fn snooze(task: bool, uid: String, at: i64) {
+    let Some(app) = gio::Application::default() else {
+        return;
+    };
+    if task {
+        app.withdraw_notification(&format!("reminder-{uid}"));
+        SHOWN.with(|s| s.borrow_mut().remove(&uid));
+    } else {
+        app.withdraw_notification(&format!("event-{uid}-{at}"));
+    }
+    let wait = std::time::Duration::from_secs(SNOOZE_MINUTES * 60);
+    glib::timeout_add_local_once(wait, move || {
+        if task {
+            let occurrence = (at != i64::MIN).then_some(at);
+            if !todav_app::service::reminder_stale(core(), &uid, occurrence)
+                && let Some(t) = core().task(uid)
+            {
+                notify_task(&t);
+            }
+        } else if let Some(e) = core()
+            .events(at - 86_400, at + 86_400)
+            .into_iter()
+            .find(|e| e.uid == uid && e.start == at)
+        {
+            notify_event(&e);
         }
-        app.send_notification(Some(&format!("event-{}-{}", e.uid, e.start)), &n);
-    }
+    });
 }
 
 /// The Flatpak cannot reach the host's autostart folder: ask the Background portal to start the
