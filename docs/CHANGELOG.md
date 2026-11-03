@@ -43,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Android: an event opened from a widget opens over the calendar on its day, so Back leads
   there rather than to the tasks.
+- Android: the widgets move on to the new day at midnight (and when the clock or the time
+  zone changes), the day widget's line at the current time every quarter hour; a widget's
+  settings show on it even when left right after the change.
 - Linux: Edit… in an item's details in the calendar opens it as it is now, with a title or
   note changed there meanwhile.
 - Android: the calendar's day list no longer crashes on two items of the same title at the

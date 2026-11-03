@@ -177,9 +177,15 @@ private val resized = kotlinx.coroutines.flow.MutableStateFlow(0)
 
 /** Removing a widget removes its settings; resizing one lays it out again. */
 abstract class TodavWidgetReceiver : GlanceAppWidgetReceiver() {
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        WidgetClock.schedule(context) // one placed, or all after a boot
+    }
+
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
         super.onDeleted(context, appWidgetIds)
         appWidgetIds.forEach { WidgetPrefs.forget(context, it) }
+        WidgetClock.schedule(context)
     }
 
     // Glance does nothing on a resize in `SizeMode.Single`.

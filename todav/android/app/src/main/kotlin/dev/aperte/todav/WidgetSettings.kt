@@ -45,7 +45,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -113,11 +112,11 @@ private fun icon(kind: WidgetKind) = when (kind) {
  */
 @Composable
 private fun redraw(app: TodavApp): () -> Unit {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val context = LocalContext.current.applicationContext
     return {
         app.changed()
-        scope.launch { WidgetKind.refreshAll(context) }
+        // In the app's scope: leaving the page right after must not cancel it.
+        app.scope.launch { WidgetKind.refreshAll(context) }
     }
 }
 

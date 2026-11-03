@@ -112,6 +112,7 @@ class TodavApp : Application() {
             changes.debounce(1_000).collect {
                 runCatching { Reminders.schedule(this@TodavApp) }
                 WidgetKind.refreshAll(this@TodavApp)
+                WidgetClock.schedule(this@TodavApp)
             }
         }
     }

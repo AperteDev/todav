@@ -417,12 +417,53 @@ class ReminderReceiver : BroadcastReceiver() {
     }
 }
 
-/** At boot and when the clock or the time zone changes: the alarm again, in the new zone. */
+/** At boot and when the clock or the time zone changes: the alarm again, in the new zone, and the widgets. */
 class ClockReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         background(context) {
             it.core.setLocalZone(java.time.ZoneId.systemDefault().id)
             Reminders.schedule(it)
+            WidgetClock.tick(it)
         }
     }
+}
+
+/**
+ * The widgets drawn again as time goes on: when the day turns (today, the coming days), and every
+ * quarter hour while a Day widget shows its line at the current time.
+ */
+object WidgetClock {
+    private const val QUARTER = 15 * 60 * 1000L
+
+    fun schedule(context: Context) {
+        val alarms = context.getSystemService(AlarmManager::class.java)
+        val intent = PendingIntent.getBroadcast(
+            context, 0, Intent(context, WidgetClockReceiver::class.java),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val placed = WidgetKind.placed(context)
+        if (placed.isEmpty()) return alarms.cancel(intent)
+        val zone = java.time.ZoneId.systemDefault()
+        val now = System.currentTimeMillis()
+        var at = java.time.LocalDate.now(zone).plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        if (placed.any { it.first == WidgetKind.DAY }) at = minOf(at, now - now % QUARTER + QUARTER)
+        // Not waking the device: a screen off shows no widget. Gone off meanwhile, it rings once
+        // the device wakes, before the home screen is seen. On time where it may (as reminders).
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarms.canScheduleExactAlarms()) {
+            alarms.setExact(AlarmManager.RTC, at + 1_000, intent)
+        } else {
+            alarms.setWindow(AlarmManager.RTC, at + 1_000, 60_000, intent)
+        }
+    }
+
+    /** Everything read again (today has moved on), the widgets drawn, the next time set. */
+    suspend fun tick(app: TodavApp) {
+        app.changed()
+        WidgetKind.refreshAll(app)
+        schedule(app)
+    }
+}
+
+class WidgetClockReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) = background(context) { WidgetClock.tick(it) }
 }

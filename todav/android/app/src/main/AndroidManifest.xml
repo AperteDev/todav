@@ -207,5 +207,9 @@
                 <action android:name="android.intent.action.TIME_SET" />
             </intent-filter>
         </receiver>
+        <!-- Its alarm: the widgets drawn again when the day turns. -->
+        <receiver
+            android:name=".WidgetClockReceiver"
+            android:exported="false" />
     </application>
 </manifest>
