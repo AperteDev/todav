@@ -7,6 +7,7 @@ mod dbus;
 mod goa;
 mod i18n;
 mod lists;
+mod note;
 mod open;
 mod reminders;
 mod search;

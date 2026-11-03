@@ -11,6 +11,7 @@ pub mod dates;
 pub mod i18n;
 pub mod links;
 pub mod lists;
+pub mod note;
 pub mod prefs;
 pub mod service;
 pub mod tasks;

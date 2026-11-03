@@ -15,7 +15,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Label
-import androidx.compose.material.icons.automirrored.outlined.Notes
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.CalendarToday
@@ -266,14 +265,7 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null, draft: 
                     }
                 }
                 Section(null) {
-                    FieldItem(
-                        note,
-                        { note = it },
-                        tr("Note"),
-                        icon = Icons.AutoMirrored.Outlined.Notes,
-                        minLines = 3,
-                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                    )
+                    NoteItem(note, { note = it }, tr("Note"))
                 }
                 Section(null) {
                     DateTimeField(tr("Start"), start, startAllDay, Icons.Outlined.PlayArrow, { t, allDay ->

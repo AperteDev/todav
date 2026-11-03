@@ -6,3 +6,4 @@ license.workspace = true
 
 [dependencies]
 todav-core = { path = "../core" }
+pulldown-cmark = { version = "0.13.5", default-features = false }

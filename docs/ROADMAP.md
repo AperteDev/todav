@@ -26,8 +26,6 @@ Planned work, not yet done. [FEATURES.md](FEATURES.md) lists it publicly; the or
 - **Meeting links**: video call links (Meet, Zoom, Teams, Jitsi and the like) found in an
   event's location, description, URL or `CONFERENCE`, with a Join button in its details, its
   reminder and the extension's agenda.
-- **Markdown in notes** of tasks and events: links clickable, checkboxes tickable, light
-  formatting; `DESCRIPTION` stays plain text, so other clients show it as written.
 - **Selecting several tasks** (Ctrl+click, Shift+click, a selection mode on touch and Android) to
   set their date, list, category or priority, tick or delete them at once, as one undo step
   (`Client::together`).

@@ -368,6 +368,7 @@ fn open_with(
             .buffer()
             .set_text(e.description.as_deref().unwrap_or_default());
     }
+    crate::note::attach(&description);
     all_day.set_active(time.all_day);
     start_cal.select_day(&dates::fields(time.start));
     // An all-day event's last day is the one before its end.

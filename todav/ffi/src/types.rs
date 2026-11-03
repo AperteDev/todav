@@ -17,6 +17,75 @@ pub struct IcsCount {
     pub tasks: u32,
 }
 
+/// What a range of a note is (`todav_app::note::Style`).
+#[derive(uniffi::Enum)]
+pub enum NoteStyle {
+    Heading { level: u8 },
+    Strong,
+    Emphasis,
+    Strikethrough,
+    Code,
+    CodeBlock,
+    Quote,
+    Link { url: Option<String> },
+    ListMark,
+    Task { done: bool },
+    Mark,
+}
+
+impl From<todav_app::note::Style> for NoteStyle {
+    fn from(s: todav_app::note::Style) -> Self {
+        use todav_app::note::Style;
+        match s {
+            Style::Heading(level) => NoteStyle::Heading { level },
+            Style::Strong => NoteStyle::Strong,
+            Style::Emphasis => NoteStyle::Emphasis,
+            Style::Strikethrough => NoteStyle::Strikethrough,
+            Style::Code => NoteStyle::Code,
+            Style::CodeBlock => NoteStyle::CodeBlock,
+            Style::Quote => NoteStyle::Quote,
+            Style::Link(url) => NoteStyle::Link { url },
+            Style::ListMark => NoteStyle::ListMark,
+            Style::Task(done) => NoteStyle::Task { done },
+            Style::Mark => NoteStyle::Mark,
+        }
+    }
+}
+
+/// `style` over a note's UTF-16 code units `start` to `end` (as Kotlin and C# strings count).
+#[derive(uniffi::Record)]
+pub struct NoteSpan {
+    pub start: u32,
+    pub end: u32,
+    pub style: NoteStyle,
+}
+
+/// `spans` (character offsets in `text`) in UTF-16 code units.
+pub(crate) fn utf16_spans(text: &str, spans: Vec<todav_app::note::Span>) -> Vec<NoteSpan> {
+    let mut at = Vec::with_capacity(text.len() + 1);
+    let mut n = 0u32;
+    for c in text.chars() {
+        at.push(n);
+        n += c.len_utf16() as u32;
+    }
+    at.push(n);
+    spans
+        .into_iter()
+        .map(|s| NoteSpan {
+            start: at[s.start],
+            end: at[s.end],
+            style: s.style.into(),
+        })
+        .collect()
+}
+
+/// A note as read (`todav_app::note::read`).
+#[derive(uniffi::Record)]
+pub struct NoteRead {
+    pub text: String,
+    pub spans: Vec<NoteSpan>,
+}
+
 /// What a `todav://` link is to (`todav_app::links::Link`).
 #[derive(uniffi::Enum)]
 pub enum LinkTarget {

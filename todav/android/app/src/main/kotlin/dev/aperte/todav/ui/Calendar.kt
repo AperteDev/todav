@@ -1747,6 +1747,8 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
     // Its new colour, likewise; shown at once.
     var recolored by remember { mutableStateOf<Recolor?>(null) }
     var shownColor by remember { mutableStateOf((item as? Item.Event)?.event?.color) }
+    // Its note, as its boxes are ticked here.
+    var shownNote by remember { mutableStateOf((item as? Item.Event)?.event?.description) }
     val lists = load(initial = emptyMap<String, TodavList>()) { (core.calendars() + core.lists()).associateBy { it.href } }
     val colors = load(changes, initial = emptyMap<String, String>()) { core.colors() }
     DetailsSheet(
@@ -1782,7 +1784,17 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
                             Text(ntr("{n} reminder", "{n} reminders", e.reminders.size.toLong()).replace("{n}", "${e.reminders.size}"))
                         }
                     }
-                    e.description?.takeIf { it.isNotBlank() }?.let { Line({ Icon(Icons.AutoMirrored.Outlined.Notes, null) }) { Text(it) } }
+                    shownNote?.takeIf { it.isNotBlank() }?.let { note ->
+                        // Its boxes tick here unless it repeats (which occurrences would ask).
+                        val tick = { ticked: String ->
+                            shownNote = ticked
+                            model.act {
+                                core.updateEvent(e.listHref, e.uid, e.recurrenceId, Scope.ALL, EventPatch(description = ticked))
+                                model.synced()
+                            }
+                        }
+                        Line({ Icon(Icons.AutoMirrored.Outlined.Notes, null) }) { NoteText(note, tick.takeIf { writable && !e.recurring }) }
+                    }
                     Row(buttons, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         // A read-only calendar's (shared so, or the system's) are only looked at.
                         if (lists[e.listHref]?.writable == true) {
@@ -1814,7 +1826,11 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
                         Text(listOfNotNull(lists[t.listHref]?.displayName, t.category).joinToString(" · "))
                     }
                     if (priorityColor(t.priority) != null) Line({ StarIcon(t.priority) }) { Text(priorityName(t.priority)) }
-                    t.description?.takeIf { it.isNotBlank() }?.let { Line({ Icon(Icons.AutoMirrored.Outlined.Notes, null) }) { Text(it) } }
+                    t.description?.takeIf { it.isNotBlank() }?.let { note ->
+                        Line({ Icon(Icons.AutoMirrored.Outlined.Notes, null) }) {
+                            NoteText(note) { model.update(t.uid, TaskPatch(description = it)) }
+                        }
+                    }
                     Row(buttons, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         EditButton(edit)
                         CopyLink(model, dev.aperte.todav.core.linkTask(t.uid))

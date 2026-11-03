@@ -1572,10 +1572,6 @@ fn details_box() -> gtk::Box {
 }
 
 fn line(icon: &str, text: &str) -> gtk::Box {
-    let r = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-    let i = gtk::Image::from_icon_name(icon);
-    i.set_valign(gtk::Align::Start);
-    r.append(&i);
     // Wrapped at about 40 characters: else a long description makes the popover as wide.
     let l = gtk::Label::builder()
         .label(text)
@@ -1584,8 +1580,21 @@ fn line(icon: &str, text: &str) -> gtk::Box {
         .wrap_mode(gtk::pango::WrapMode::WordChar)
         .max_width_chars(40)
         .build();
-    r.append(&l);
+    line_of(icon, &l)
+}
+
+fn line_of(icon: &str, l: &impl IsA<gtk::Widget>) -> gtk::Box {
+    let r = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let i = gtk::Image::from_icon_name(icon);
+    i.set_valign(gtk::Align::Start);
+    r.append(&i);
+    r.append(l);
     r
+}
+
+/// A note, as read; its boxes tick when `save` saves it ticked.
+fn note_line(text: &str, save: Option<Box<dyn Fn(String)>>) -> gtk::Box {
+    line_of("text-x-generic-symbolic", &crate::note::label(text, save))
 }
 
 /// The collection's dot and `name`.
@@ -1842,7 +1851,22 @@ fn details(c: &Cal, e: &Event) -> gtk::Popover {
         b.append(&r);
     }
     if let Some(d) = &e.description {
-        b.append(&line("text-x-generic-symbolic", d));
+        // Its boxes tick here unless it repeats (which occurrences would ask).
+        let ev = e.clone();
+        let save = move |ticked: String| {
+            let patch = EventPatch {
+                description: Some(ticked),
+                ..Default::default()
+            };
+            let (list, uid) = (ev.list_href.clone(), ev.uid.clone());
+            match core().update_event(list, uid, ev.recurrence_id, Scope::All, patch) {
+                Ok(()) => request_sync(),
+                Err(err) => crate::window::toast(&err.to_string()),
+            }
+        };
+        let save = (writable(c, &e.list_href) && !e.recurring)
+            .then(|| Box::new(save) as Box<dyn Fn(String)>);
+        b.append(&note_line(d, save));
     }
     if let Some(tasks) = event_tasks(e) {
         b.append(&tasks);
@@ -1941,7 +1965,15 @@ fn task_details(c: &Cal, t: &Task) -> gtk::Popover {
         b.append(&r);
     }
     if let Some(d) = t.description.as_deref().filter(|d| !d.is_empty()) {
-        b.append(&line("text-x-generic-symbolic", d));
+        let uid = t.uid.clone();
+        let save = move |ticked: String| {
+            let patch = TaskPatch {
+                description: Some(ticked),
+                ..Default::default()
+            };
+            save(&uid, patch);
+        };
+        b.append(&note_line(d, Some(Box::new(save))));
     }
     if let Some(parent) = t.parent_uid.clone().and_then(|p| core().task(p)) {
         b.append(&line(

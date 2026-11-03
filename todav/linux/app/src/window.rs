@@ -2974,6 +2974,7 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
     description
         .buffer()
         .set_text(t.description.as_deref().unwrap_or_default());
+    crate::note::attach(&description);
 
     // Same choices as the new-task picker, plus the task's own category if that lacks it.
     let items: Vec<glib::GString> = (0..ui.cats.n_items())

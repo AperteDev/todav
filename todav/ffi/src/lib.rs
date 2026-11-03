@@ -1111,6 +1111,28 @@ pub fn parse_link(url: String) -> Option<types::LinkTarget> {
     })
 }
 
+/// The styled ranges of a note as it is edited (`todav_app::note::spans`), in UTF-16 units.
+#[uniffi::export]
+pub fn note_spans(text: String) -> Vec<types::NoteSpan> {
+    types::utf16_spans(&text, todav_app::note::spans(&text))
+}
+
+/// A note as it is read: without its marks, boxes as ☐ and ☑ (`todav_app::note::read`).
+#[uniffi::export]
+pub fn note_read(text: String) -> types::NoteRead {
+    let read = todav_app::note::read(&text);
+    types::NoteRead {
+        spans: types::utf16_spans(&read.text, read.spans),
+        text: read.text,
+    }
+}
+
+/// Note `text` with its box number `n` (from 0) ticked or unticked; None when it has none.
+#[uniffi::export]
+pub fn note_toggle_task(text: String, n: u32) -> Option<String> {
+    todav_app::note::toggle_nth_task(&text, n as usize)
+}
+
 /// Nextcloud's colour presets, in its order.
 #[uniffi::export]
 pub fn color_presets() -> Vec<String> {

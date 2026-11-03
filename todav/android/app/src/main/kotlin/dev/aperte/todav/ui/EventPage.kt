@@ -12,7 +12,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Notes
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.EventRepeat
@@ -309,14 +308,7 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
                 }
                 RepeatItems(repeat, custom, every, until, { repeat = it }, { every = it }, { until = it })
                 Section(null) {
-                    FieldItem(
-                        notes,
-                        { notes = it },
-                        tr("Notes"),
-                        icon = Icons.AutoMirrored.Outlined.Notes,
-                        minLines = 3,
-                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                    )
+                    NoteItem(notes, { notes = it }, tr("Notes"))
                 }
                 Reminders(model, reminders, allDay, fromStart = true)
                 if (ev != null) DeleteButton(tr("Delete Event")) { askDelete = true }

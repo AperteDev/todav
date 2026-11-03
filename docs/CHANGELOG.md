@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Notes of tasks and events in light Markdown: bold, italic, headings, lists and code show
+  formatted; links, bare web addresses, e-mail addresses and `todav://` links open with a click
+  (Ctrl+click while editing on Linux); checkboxes (`- [ ]`) tick with a click, also in an
+  item's details. Notes stay plain text, so other apps show them as written.
+
 ### Fixed
 
 - Linux: Edit… in an item's details in the calendar opens it as it is now, with a title or

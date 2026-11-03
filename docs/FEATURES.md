@@ -10,6 +10,8 @@ What Todav can do, in short. The details of each release are in the
 - Task lists from your Nextcloud calendars; create, rename, recolour and delete them.
 - Categories (CalDAV `CATEGORIES`), shown as groups or tags, with a filter in the sidebar.
 - Subtasks nested to any depth, and notes.
+- Notes in light Markdown, kept as plain text for other apps: bold, italic, headings, lists;
+  links and e-mail addresses open with a click, checkboxes (`- [ ]`) tick in place.
 - Manual order by drag and drop (the order Nextcloud Tasks uses), or sorted by creation date,
   due date or priority.
 - Priority on a star, coloured by its level, as Nextcloud Tasks stars tasks; an Important page
@@ -108,7 +110,6 @@ What Todav can do, in short. The details of each release are in the
 - Advanced notifications, configurable: Snooze on Linux too, repeating until done, per list.
 - Advanced search, filtering and sorting: saved filters, tasks hidden until they start.
 - Join buttons for meeting links in events.
-- Markdown in notes.
 - Selecting several tasks to change them at once.
 - Duplicating tasks and events; templates.
 - A Year view, week numbers and folded night hours in the calendar.
