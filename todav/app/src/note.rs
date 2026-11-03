@@ -185,71 +185,133 @@ pub fn spans(text: &str) -> Vec<Span> {
 }
 
 /// A note as it is read: its text without Markdown's marks, its boxes as ☐ and ☑, its bullets
-/// as •, and the styled ranges of that text (no `Mark` or `ListMark`; a `Task` is its box).
+/// as •, long bare web addresses shortened (the link keeps the whole), blank lines at its ends
+/// and runs of them inside dropped; and the styled ranges of that text (no `Mark` or
+/// `ListMark`; a `Task` is its box).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Read {
     pub text: String,
     pub spans: Vec<Span>,
 }
 
+/// Characters a bare web address shows at most where a note is read, its scheme left out.
+const SHORT_URL: usize = 40;
+
 pub fn read(text: &str) -> Read {
     let spans = spans(text);
     let chars: Vec<char> = text.chars().collect();
     let covering = |i: usize| spans.iter().filter(move |s| s.start <= i && i < s.end);
-    let mut out = String::new();
-    let mut len = 0;
-    // Where each character of `text` starts in `out`, in characters.
+    let mut out: Vec<char> = Vec::new();
+    // Where each character of `text` starts in `out`.
     let mut at = vec![0; chars.len() + 1];
     let mut i = 0;
     while i < chars.len() {
-        at[i] = len;
-        let (shown, next) = if let Some(s) = covering(i).find(|s| matches!(s.style, Style::Task(_)))
-        {
-            let mark = if s.style == Style::Task(true) {
-                '☑'
+        at[i] = out.len();
+        let (shown, next): (Vec<char>, usize) =
+            if let Some(s) = covering(i).find(|s| matches!(s.style, Style::Task(_))) {
+                let mark = if s.style == Style::Task(true) {
+                    '☑'
+                } else {
+                    '☐'
+                };
+                (vec![mark], s.end)
+            } else if let Some((s, short)) = covering(i).find_map(|s| match &s.style {
+                Style::Link(Some(url)) if s.start == i => {
+                    let shown: String = chars[s.start..s.end].iter().collect();
+                    short_url(&shown, url).map(|short| (s, short))
+                }
+                _ => None,
+            }) {
+                (short.chars().collect(), s.end)
+            } else if let Some(mark) = covering(i).find(|s| s.style == Style::Mark) {
+                let tag: String = chars[i..mark.end.min(i + 3)].iter().collect();
+                // Line breaks stay (a heading's is its mark).
+                let br = chars[i] == '\n' || mark.start == i && tag.eq_ignore_ascii_case("<br");
+                (br.then_some('\n').into_iter().collect(), i + 1)
+            } else if let Some(l) = covering(i).find(|s| s.style == Style::ListMark) {
+                // A task's box stands for its bullet.
+                let boxed = spans
+                    .iter()
+                    .any(|s| matches!(s.style, Style::Task(_)) && s.start == l.end);
+                match chars[i] {
+                    _ if boxed => (vec![], i + 1),
+                    '-' | '*' | '+' => (vec!['•'], i + 1),
+                    c => (vec![c], i + 1),
+                }
             } else {
-                '☐'
+                (vec![chars[i]], i + 1)
             };
-            (Some(mark), s.end)
-        } else if let Some(mark) = covering(i).find(|s| s.style == Style::Mark) {
-            let tag: String = chars[i..mark.end.min(i + 3)].iter().collect();
-            // Line breaks stay (a heading's is its mark).
-            let br = chars[i] == '\n' || mark.start == i && tag.eq_ignore_ascii_case("<br");
-            (br.then_some('\n'), i + 1)
-        } else if let Some(l) = covering(i).find(|s| s.style == Style::ListMark) {
-            // A task's box stands for its bullet.
-            let boxed = spans
-                .iter()
-                .any(|s| matches!(s.style, Style::Task(_)) && s.start == l.end);
-            match chars[i] {
-                _ if boxed => (None, i + 1),
-                '-' | '*' | '+' => (Some('•'), i + 1),
-                c => (Some(c), i + 1),
-            }
-        } else {
-            (Some(chars[i]), i + 1)
-        };
-        if let Some(c) = shown {
-            out.push(c);
-            len += 1;
-        }
+        out.extend(shown);
         for a in &mut at[i + 1..next] {
-            *a = len;
+            *a = out.len();
         }
         i = next;
     }
-    at[chars.len()] = len;
+    at[chars.len()] = out.len();
+    let (out, kept) = tidy(&out);
     let spans = spans
         .iter()
         .filter(|s| !matches!(s.style, Style::Mark | Style::ListMark))
         .map(|s| Span {
-            start: at[s.start],
-            end: at[s.end],
+            start: kept[at[s.start]],
+            end: kept[at[s.end]],
             style: s.style.clone(),
         })
         .filter(|s| s.start < s.end)
         .collect();
-    Read { text: out, spans }
+    Read {
+        text: out.into_iter().collect(),
+        spans,
+    }
+}
+
+/// A bare web address `shown` (its text is its address `url`) as it is read when long: without
+/// its scheme, cut at `SHORT_URL` characters with "…".
+fn short_url(shown: &str, url: &str) -> Option<String> {
+    let bare = shown == url || format!("https://{shown}") == url;
+    let rest = url.split_once("://").map_or(url, |(_, r)| r);
+    if !bare || !url.starts_with("http") || rest.chars().count() <= SHORT_URL {
+        return None;
+    }
+    let cut: String = rest.chars().take(SHORT_URL - 1).collect();
+    Some(format!("{cut}…"))
+}
+
+/// `chars` without blank lines (only spaces) at the start and the end, with one empty line for
+/// each run of them inside, and without spaces ending a line; and where each character (and the
+/// end) of `chars` went in what is kept.
+fn tidy(chars: &[char]) -> (Vec<char>, Vec<usize>) {
+    let lines: Vec<&[char]> = chars.split(|c| *c == '\n').collect();
+    let blank = |l: &[char]| l.iter().all(|c| c.is_whitespace());
+    let first = lines.iter().position(|l| !blank(l));
+    let last = lines.iter().rposition(|l| !blank(l));
+    let mut out = Vec::new();
+    let mut kept = Vec::with_capacity(chars.len() + 1);
+    let mut was_blank = false;
+    for (n, line) in lines.iter().enumerate() {
+        let inside = first.is_some_and(|f| n >= f) && last.is_some_and(|l| n <= l);
+        let shown = inside && !(blank(line) && was_blank);
+        was_blank = blank(line);
+        let end = line
+            .iter()
+            .rposition(|c| !c.is_whitespace())
+            .map_or(0, |e| e + 1);
+        for (k, c) in line.iter().enumerate() {
+            kept.push(out.len());
+            if shown && k < end {
+                out.push(*c);
+            }
+        }
+        // Its line break, unless it ends the last line shown.
+        if n + 1 < lines.len() {
+            kept.push(out.len());
+            if shown && last.is_some_and(|l| n < l) {
+                out.push('\n');
+            }
+        }
+    }
+    kept.push(out.len());
+    (out, kept)
 }
 
 /// `text` with its task box number `n` (from 0, in the order they come) ticked or unticked; as
@@ -557,7 +619,7 @@ mod tests {
         let r = read(t);
         assert_eq!(
             r.text,
-            "Plan\nBuy milk at\nnoon\n\n☐ one\n☑ two\n• three\n\n<p>kept</p>\n"
+            "Plan\nBuy milk at\nnoon\n\n☐ one\n☑ two\n• three\n\n<p>kept</p>"
         );
         let of = |style: Style| -> Vec<String> {
             let chars: Vec<char> = r.text.chars().collect();
@@ -572,5 +634,34 @@ mod tests {
         assert_eq!(of(Style::Link(Some("https://a.b".into()))), ["milk"]);
         assert_eq!(of(Style::Task(false)), ["☐"]);
         assert_eq!(of(Style::Task(true)), ["☑"]);
+    }
+
+    #[test]
+    fn read_without_gaps_and_long_addresses() {
+        let long = "https://teams.microsoft.com/l/meetup-join/19%3ameeting_abc%40thread.v2/0";
+        let t = format!("\n  \nCaution  \n\n \n\n\nJoin **now** {long}\n\nhttps://a.b/c\n \n\n");
+        let r = read(&t);
+        assert_eq!(
+            r.text,
+            "Caution\n\nJoin now teams.microsoft.com/l/meetup-join/19%3a…\n\nhttps://a.b/c"
+        );
+        let chars: Vec<char> = r.text.chars().collect();
+        let piece = |style: Style| -> Vec<String> {
+            r.spans
+                .iter()
+                .filter(|s| s.style == style)
+                .map(|s| chars[s.start..s.end].iter().collect())
+                .collect()
+        };
+        assert_eq!(piece(Style::Strong), ["now"]);
+        assert_eq!(
+            piece(Style::Link(Some(long.into()))),
+            ["teams.microsoft.com/l/meetup-join/19%3a…"]
+        );
+        assert_eq!(
+            piece(Style::Link(Some("https://a.b/c".into()))),
+            ["https://a.b/c"]
+        );
+        assert_eq!(read(" \n\n").text, "");
     }
 }

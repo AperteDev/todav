@@ -85,7 +85,11 @@ fn markup(text: &str, tick: bool) -> String {
         let mut tags: Vec<(String, &str)> = Vec::new();
         for s in &here {
             let url = match &s.style {
-                Style::Link(Some(url)) => glib::markup_escape_text(url).to_string(),
+                // Its whole address on hover: a long bare one shows shortened.
+                Style::Link(Some(url)) => {
+                    let url = glib::markup_escape_text(url);
+                    format!("{url}\" title=\"{url}")
+                }
                 Style::Task(_) if tick => {
                     let n = boxes.iter().position(|&b| b == s.start).unwrap_or_default();
                     format!("{BOX}{n}")

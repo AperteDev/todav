@@ -1601,17 +1601,12 @@ fn line_of(icon: &str, l: &impl IsA<gtk::Widget>) -> gtk::Box {
 }
 
 /// Join the event's video call at `url` (`todav_app::meeting`).
-fn join_button(url: String) -> gtk::Button {
+fn join_button(url: String) -> gtk::Box {
     let b = gtk::Button::builder()
-        .child(
-            &adw::ButtonContent::builder()
-                .icon_name("camera-video-symbolic")
-                .label(gettext("Join Call"))
-                .build(),
-        )
+        .label(gettext("Join Call"))
         .tooltip_text(&url)
         .halign(gtk::Align::Start)
-        .css_classes(["suggested-action", "pill"])
+        .css_classes(["suggested-action"])
         .build();
     b.connect_clicked(move |b| {
         crate::note::open(&url, b);
@@ -1619,12 +1614,23 @@ fn join_button(url: String) -> gtk::Button {
             p.downcast::<gtk::Popover>().unwrap().popdown();
         }
     });
-    b
+    let line = line_of("todav-video-symbolic", &b);
+    line.set_valign(gtk::Align::Center);
+    line
 }
 
-/// A note, as read; its boxes tick when `save` saves it ticked.
+/// A note, as read; its boxes tick when `save` saves it ticked. A long one scrolls, so the
+/// details stay on screen.
 fn note_line(text: &str, save: Option<Box<dyn Fn(String)>>) -> gtk::Box {
-    line_of("text-x-generic-symbolic", &crate::note::label(text, save))
+    let scroll = gtk::ScrolledWindow::builder()
+        .child(&crate::note::label(text, save))
+        .hscrollbar_policy(gtk::PolicyType::Never)
+        .propagate_natural_height(true)
+        .propagate_natural_width(true)
+        .max_content_height(280)
+        .hexpand(true)
+        .build();
+    line_of("text-x-generic-symbolic", &scroll)
 }
 
 /// The collection's dot and `name`.
