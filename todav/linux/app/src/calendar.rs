@@ -1615,7 +1615,10 @@ fn join_button(url: String) -> gtk::Box {
         }
     });
     let line = line_of("todav-video-symbolic", &b);
-    line.set_valign(gtk::Align::Center);
+    // The icon by the button's middle, not its top as by a text's first line.
+    if let Some(icon) = line.first_child() {
+        icon.set_valign(gtk::Align::Center);
+    }
     line
 }
 
