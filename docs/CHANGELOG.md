@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Linux: Edit… in an item's details in the calendar opens it as it is now, with a title or
+  note changed there meanwhile.
+
 ## [2.4.3] - 2026-11-03
 
 ### Fixed

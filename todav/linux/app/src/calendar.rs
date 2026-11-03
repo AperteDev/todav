@@ -1849,7 +1849,14 @@ fn details(c: &Cal, e: &Event) -> gtk::Popover {
     }
     let buttons = writable(c, &e.list_href).then(|| {
         let ev = e.clone();
-        let on_edit = move || edit_event(&ev);
+        // As it is now: its title or note may have changed here meanwhile.
+        let on_edit = move || {
+            let now = core()
+                .events(ev.start, ev.start + 1)
+                .into_iter()
+                .find(|n| n.uid == ev.uid && n.start == ev.start);
+            edit_event(now.as_ref().unwrap_or(&ev))
+        };
         let ev = e.clone();
         let on_delete = move || {
             let ev = ev.clone();
@@ -1946,7 +1953,9 @@ fn task_details(c: &Cal, t: &Task) -> gtk::Popover {
     let task = t.clone();
     let on_delete = move || crate::window::delete_task(&task);
     let task = t.clone();
-    let on_edit = move || crate::window::edit_task(&task);
+    // As it is now: its title or note may have changed here meanwhile.
+    let on_edit =
+        move || crate::window::edit_task(&core().task(task.uid.clone()).unwrap_or(task.clone()));
     let link = todav_app::links::task(&t.uid);
     details_popover(&b, link, Some((Box::new(on_delete), Box::new(on_edit))))
 }
