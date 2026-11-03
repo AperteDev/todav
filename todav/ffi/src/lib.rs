@@ -311,6 +311,11 @@ impl Todav {
         Ok(self.c().reset_list(href)?)
     }
 
+    /// List or calendar `list_href` as an iCalendar file, to save.
+    pub fn export_ics(&self, list_href: String) -> Result<String> {
+        Ok(self.c().export_ics(list_href)?)
+    }
+
     /// What iCalendar text `ics` holds.
     pub fn ics_count(&self, ics: String) -> IcsCount {
         self.c().ics_count(ics)

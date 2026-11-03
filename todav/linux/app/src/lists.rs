@@ -760,8 +760,19 @@ pub fn open(parent: &gtk::Widget, list: Option<List>, events: bool) {
                 .account(l.account)
                 .is_some_and(|a| a.kind == AccountKind::Google)
     };
+    let export: adw::ButtonRow = get(&b, "export");
+    if let Some(l) = list.clone() {
+        let d = dialog.clone();
+        export.connect_activated(move |_| {
+            glib::spawn_future_local(self::export(d.clone(), l.clone()));
+        });
+    }
     match list {
-        Some(l) if l.writable && !google(&l) => {
+        // Not to be deleted here: only exported.
+        Some(_) if !list.as_ref().is_some_and(|l| l.writable && !google(l)) => {
+            delete.set_visible(false);
+        }
+        Some(l) => {
             let d = dialog.clone();
             delete.connect_activated(move |_| {
                 let (d, l, busy, fail) = (d.clone(), l.clone(), busy.clone(), fail.clone());
@@ -802,6 +813,31 @@ pub fn open(parent: &gtk::Widget, list: Option<List>, events: bool) {
         _ => delete_box.set_visible(false),
     }
     dialog.present(Some(parent));
+}
+
+/// Export list `l` (from `dialog`) to an iCalendar file the user picks; a toast says how it went.
+async fn export(dialog: adw::Dialog, l: List) {
+    let file = gtk::FileDialog::builder()
+        .title(gettext("Export"))
+        .initial_name(format!("{}.ics", l.display_name.replace('/', "-")))
+        .build();
+    let window = dialog.root().and_downcast::<gtk::Window>();
+    let Ok(file) = file.save_future(window.as_ref()).await else {
+        return; // cancelled
+    };
+    let href = l.href.clone();
+    let ics = match gio::spawn_blocking(move || core().export_ics(href)).await {
+        Ok(Ok(ics)) => ics,
+        Ok(Err(e)) => return crate::window::toast(&e.to_string()),
+        Err(_) => return,
+    };
+    let saved = file
+        .replace_contents_future(ics.into_bytes(), None, false, gio::FileCreateFlags::NONE)
+        .await;
+    crate::window::toast(&match saved {
+        Ok(_) => gettext("“{name}” exported").replace("{name}", &l.display_name),
+        Err((_, e)) => gettext("Not exported: {error}").replace("{error}", e.message()),
+    });
 }
 
 /// What deleting list `l` deletes with it (its events, its tasks), as whole sentences for

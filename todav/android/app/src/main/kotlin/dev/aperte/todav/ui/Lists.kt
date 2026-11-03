@@ -1,5 +1,7 @@
 package dev.aperte.todav.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
@@ -25,6 +28,21 @@ import dev.aperte.todav.core.colorPresets
 import dev.aperte.todav.core.listColor
 import dev.aperte.todav.ntr
 import dev.aperte.todav.tr
+
+/** Export list `list` to an iCalendar file the user picks (`exportIcs`), with a message after. */
+@Composable
+private fun ExportButton(model: Main, list: TodavList) {
+    val context = LocalContext.current
+    val save = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/calendar")) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        model.act {
+            val ics = model.core.exportIcs(list.href)
+            context.contentResolver.openOutputStream(uri, "wt")!!.use { it.write(ics.toByteArray()) }
+            model.messages.tryEmit(tr("“{name}” exported").replace("{name}", list.displayName) to null)
+        }
+    }
+    TextButton(onClick = { save.launch("${list.displayName.replace('/', '-')}.ics") }) { Text(tr("Export…")) }
+}
 
 /**
  * A new list or calendar (`href` null; `events` picks calendar first), or the one at `href` to
@@ -94,6 +112,7 @@ fun ListDialog(model: Main, href: String?, events: Boolean, onDismiss: () -> Uni
                         model.act { core.resetList(list.href) }
                     }) { Text(tr("Use the System's Name and Color")) }
                 }
+                if (list != null) ExportButton(model, list)
                 if (list != null && list.writable) {
                     TextButton(onClick = { confirm = true }) {
                         Text(

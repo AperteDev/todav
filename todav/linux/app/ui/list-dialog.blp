@@ -66,6 +66,12 @@ Adw.Dialog dialog {
         selection-mode: none;
         styles ["boxed-list"]
 
+        // Its events and tasks to an iCalendar file (src/lists.rs `export`).
+        Adw.ButtonRow export {
+          title: _("Export…");
+          start-icon-name: "document-save-symbolic";
+        }
+
         Adw.ButtonRow delete {
           styles ["destructive-action"]
         }

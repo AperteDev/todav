@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cancelled events and invitations you declined (found by your addresses on the server) show
   as usual, crossed out (the default) or not at all, by a setting; declined ones remind no
   more.
+- Export a task list or a calendar to an iCalendar file (`.ics`), from its dialog: everything
+  in it, done tasks too.
 - Duplicate a task with its subtasks, or an event (the whole series, without its attendees),
   from its dialog or its details; Undo takes the copy back.
 

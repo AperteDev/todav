@@ -83,10 +83,9 @@ Planned work, not yet done. [FEATURES.md](FEATURES.md) lists it publicly; the or
   (with the list, for every device on the account; lists on this device only in `kv`) or in the
   synced settings keyed by list; which options are worth it per list; how the GNOME extension
   and the widgets, which show one list, follow them.
-- **Export**, the counterpart of the iCalendar import (`core/src/import.rs`): lists and
-  calendars (one, some or all) to an `.ics` file, on Linux and Android; details to be
-  specified (one file or one per list, done tasks, a date range for events). Then automatic
-  backups: all of it exported daily to a folder, the last n kept, restored by importing.
+- **More of export** (one list or calendar to an `.ics` file exists, `Client::export_ics`):
+  several or all at once (open: one file or one per list), then automatic backups: all of it
+  exported daily to a folder, the last n kept, restored by importing.
 - **Pebble app**, fed by the Android app (see [Pebble](#pebble-watchapp--companion)).
 - **Windows app**: a native WinUI 3 front-end (see [Windows](#windows-app)).
 - iOS and macOS, later: SwiftUI over UniFFI's Swift bindings from `todav-ffi`.

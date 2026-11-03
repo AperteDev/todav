@@ -522,6 +522,48 @@ fn fold_into(out: &mut String, line: &str) {
     out.push_str("\r\n");
 }
 
+/// Calendar objects `cals` as one iCalendar file, `split`'s counterpart: their events and tasks,
+/// and each time zone they use once (by TZID), named `name` (X-WR-CALNAME) when given.
+pub fn join(cals: &[Calendar], name: Option<&str>) -> String {
+    let mut zones: Vec<(String, &[Line])> = Vec::new();
+    let mut items: Vec<&[Line]> = Vec::new();
+    for cal in cals {
+        for (b, e) in cal.ranges() {
+            let comp = &cal.lines[b..=e];
+            if !cal.lines[b].value.eq_ignore_ascii_case("VTIMEZONE") {
+                items.push(comp);
+                continue;
+            }
+            let tzid = Comp {
+                kind: "",
+                lines: &comp[1..comp.len() - 1],
+            }
+            .text("TZID")
+            .unwrap_or_default();
+            if !zones.iter().any(|(z, _)| *z == tzid) {
+                zones.push((tzid, comp));
+            }
+        }
+    }
+    let mut lines = vec![
+        Line::parse("BEGIN:VCALENDAR"),
+        Line::parse("VERSION:2.0"),
+        Line::parse("PRODID:-//Todav//EN"),
+    ];
+    if let Some(name) = name {
+        lines.push(Line::parse(&format!("X-WR-CALNAME:{}", escape(name))));
+    }
+    for comp in zones.into_iter().map(|(_, c)| c).chain(items) {
+        lines.extend(comp.iter().cloned());
+    }
+    lines.push(Line::parse("END:VCALENDAR"));
+    let mut out = String::new();
+    for l in &lines {
+        fold_into(&mut out, &l.render());
+    }
+    out
+}
+
 /// The objects of an iCalendar file (an invitation, an export of many): one per UID, its VEVENTs or
 /// its VTODO, each with the file's VTIMEZONEs. One without a UID gets one from `new_uid`.
 pub fn split(text: &str, new_uid: impl Fn() -> String) -> Vec<Calendar> {

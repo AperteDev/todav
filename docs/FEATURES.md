@@ -52,7 +52,8 @@ What Todav can do, in short. The details of each release are in the
 - Tasks linked to events: an event lists its tasks, a task shows its event; a task added for
   an event goes to its calendar, or, for calendars without tasks, to a list you pick (none by
   default).
-- Opens iCalendar files (`.ics`), importing their events and tasks.
+- Opens iCalendar files (`.ics`), importing their events and tasks; exports a list or a
+  calendar to one, from its dialog.
 - Copy Link: a `todav://` link that opens a task or an event, to paste elsewhere.
 - Week numbers, by a setting for the app and another for the GNOME extension and the widgets.
 - Cancelled events and invitations you declined shown, crossed out (the default) or hidden.
@@ -126,7 +127,7 @@ What Todav can do, in short. The details of each release are in the
 - Scripting through the running app.
 - Nextcloud Deck boards as task lists.
 - Settings per list and per calendar, such as how its completed tasks show.
-- Export of lists and calendars to iCalendar files, and automatic backups.
+- Export of several lists at once, and automatic backups.
 - More services besides Nextcloud: other CalDAV servers first.
 - Google Tasks on Android, with a Google sign-in of its own.
 - Google Play and F-Droid for the Android app; Flathub for the Linux one.

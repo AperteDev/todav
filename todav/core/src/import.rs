@@ -13,6 +13,27 @@ pub struct IcsCount {
 }
 
 impl Client {
+    /// List or calendar `list_href` as one iCalendar file (`ical::join`), named after it: its
+    /// events and tasks, done ones too, as they are kept.
+    pub fn export_ics(&self, list_href: String) -> Result<String> {
+        let db = self.db.lock().unwrap();
+        let mut st = db.prepare(
+            "SELECT raw_ics FROM events WHERE list_href = ?1 AND dirty != ?2
+             UNION ALL SELECT raw_ics FROM tasks WHERE list_href = ?1 AND dirty != ?2",
+        )?;
+        let cals: Vec<Calendar> = st
+            .query_map(rusqlite::params![list_href, store::DELETED], |r| {
+                r.get::<_, String>(0)
+            })?
+            .filter_map(|raw| Calendar::parse(&raw.ok()?))
+            .collect();
+        let name = store::lists(&db)?
+            .into_iter()
+            .find(|l| l.href == list_href)
+            .map(|l| l.display_name);
+        Ok(crate::ical::join(&cals, name.as_deref()))
+    }
+
     /// What iCalendar text `ics` holds.
     pub fn ics_count(&self, ics: String) -> IcsCount {
         count(&split(&ics, crate::new_uid))
@@ -153,5 +174,36 @@ mod tests {
             c.import_ics("BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n".into(), None, None),
             Err(Error::Parse(_))
         ));
+    }
+
+    #[test]
+    fn an_export_imports_back_as_it_was() {
+        let dir = std::env::temp_dir().join(format!("todav-test-export-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let here = c
+            .add_account(AccountKind::Local, "".into(), "".into(), "".into())
+            .unwrap();
+        let cal = c
+            .create_list(here, "Trips".into(), "#000".into(), true)
+            .unwrap();
+        c.import_ics(FILE.into(), Some(cal.clone()), Some(cal.clone()))
+            .unwrap();
+        let out = c.export_ics(cal.clone()).unwrap();
+        // Everything once: the zone both events could use, the series with its override.
+        assert_eq!(out.matches("BEGIN:VTIMEZONE").count(), 1);
+        assert_eq!(out.matches("BEGIN:VEVENT").count(), 3);
+        assert_eq!(out.matches("BEGIN:VTODO").count(), 1);
+        assert!(out.contains("X-WR-CALNAME:Trips"));
+        assert_eq!(
+            c.ics_count(out.clone()),
+            IcsCount {
+                events: 2,
+                tasks: 1
+            }
+        );
+        // Deleted items stay out.
+        c.delete_task("pack".into()).unwrap();
+        assert_eq!(c.ics_count(c.export_ics(cal).unwrap()).tasks, 0);
     }
 }
