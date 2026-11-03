@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -220,6 +221,11 @@ fun Item.title(): String = when (this) {
 fun Item.list(): String = when (this) {
     is Item.Event -> event.listHref
     is Item.Task -> task.listHref
+}
+
+fun Item.uid(): String = when (this) {
+    is Item.Event -> event.uid
+    is Item.Task -> task.uid
 }
 
 /** Its colour: an event's own, else its list's in `colors` (`core.colors()`). */
@@ -970,7 +976,7 @@ private fun DayList(model: Main, day: Long, onItem: (Item) -> Unit, modifier: Mo
                 )
             }
         }
-        items(entries, key = { "${it.item.list()}:${it.item.title()}:${(it.item as? Item.Event)?.event?.start ?: 0}:${it.time}" }) {
+        items(entries, key = { "${it.item.list()}:${it.item.uid()}:${(it.item as? Item.Event)?.event?.start ?: 0}:${it.time}" }) {
             AgendaRow(it, onItem)
         }
     }
@@ -1007,7 +1013,7 @@ private fun AgendaView(model: Main, day: Long, onItem: (Item) -> Unit) {
     LazyColumn(Modifier.fillMaxSize(), state, contentPadding = PaddingValues(bottom = 88.dp)) {
         entries.groupBy { it.day }.forEach { (d, es) ->
             stickyHeader(key = "d$d") { Heading(dayLabel(d, true, now).replaceFirstChar { it.titlecase() }) }
-            items(es, key = { "$d:${it.item.list()}:${it.item.title()}:${it.time}:${(it.item as? Item.Event)?.event?.start}" }) {
+            items(es, key = { "$d:${it.item.list()}:${it.item.uid()}:${it.time}:${(it.item as? Item.Event)?.event?.start}" }) {
                 AgendaRow(it, onItem)
             }
         }
@@ -1805,13 +1811,19 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
                         }
                         Line({ Icon(Icons.AutoMirrored.Outlined.Notes, null) }) { NoteText(note, tick.takeIf { writable && !e.recurring }) }
                     }
-                    Row(buttons, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FlowRow(buttons, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         // A read-only calendar's (shared so, or the system's) are only looked at.
                         if (lists[e.listHref]?.writable == true) {
                             EditButton(edit)
                             TextButton(onClick = { askDelete = true }) { Text(tr("Delete"), color = MaterialTheme.colorScheme.error) }
                         }
                         CopyLink(model, dev.aperte.todav.core.linkEvent(e.uid))
+                        if (lists[e.listHref]?.writable == true) {
+                            TextButton(onClick = {
+                                dismiss()
+                                model.duplicate(e)
+                            }) { Text(tr("Duplicate")) }
+                        }
                     }
                     val tasks = remember(changes, e.uid) { core.eventTasks(e.uid) }
                     // None for a calendar that holds no tasks, unless Preferences pick a list for them.
@@ -1841,9 +1853,13 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
                             NoteText(note) { model.update(t.uid, TaskPatch(description = it)) }
                         }
                     }
-                    Row(buttons, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FlowRow(buttons, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         EditButton(edit)
                         CopyLink(model, dev.aperte.todav.core.linkTask(t.uid))
+                        TextButton(onClick = {
+                            dismiss()
+                            model.duplicate(t.uid)
+                        }) { Text(tr("Duplicate")) }
                         dev.aperte.todav.core.unplan(t)?.let { patch ->
                             TextButton(onClick = {
                                 dismiss()

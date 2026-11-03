@@ -333,6 +333,11 @@ Adw.Dialog dialog {
               start-icon-name: "edit-copy-symbolic";
             }
 
+            // Saves the dialog, then copies the task with its subtasks.
+            Adw.ButtonRow duplicate {
+              title: _("Duplicate");
+            }
+
             Adw.ButtonRow delete {
               title: _("Delete Task");
               styles ["destructive-action"]

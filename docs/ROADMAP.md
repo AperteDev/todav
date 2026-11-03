@@ -26,8 +26,8 @@ Planned work, not yet done. [FEATURES.md](FEATURES.md) lists it publicly; the or
 - **Selecting several tasks** (Ctrl+click, Shift+click, a selection mode on touch and Android) to
   set their date, list, category or priority, tick or delete them at once, as one undo step
   (`Client::together`).
-- **Duplicating** a task (with its subtasks) or an event, from its menu or Ctrl+drag; later
-  **templates**: a task with subtasks, or a list, kept to copy from.
+- **Duplicating** by Ctrl+drag (Duplicate in the dialogs and details exists); **templates**: a
+  task with subtasks, or a list, kept to copy from.
 - **More of the calendar**: a Year view, week numbers, night hours folded away in the week
   views.
 - **More of an event**: a time zone for its start and end, declined and cancelled events

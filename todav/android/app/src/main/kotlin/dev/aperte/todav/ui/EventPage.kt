@@ -326,7 +326,14 @@ fun EventPage(model: Main, dest: Dest.EventEdit, sheet: DetailsSheetState? = nul
                     NoteItem(notes, { notes = it }, tr("Notes"))
                 }
                 Reminders(model, reminders, allDay, fromStart = true)
-                if (ev != null) DeleteButton(tr("Delete Event")) { askDelete = true }
+                if (ev != null) {
+                    // The event as saved: with changes made here, Save first.
+                    TextButton(enabled = !changed, onClick = {
+                        cancel()
+                        model.duplicate(ev)
+                    }, modifier = Modifier.padding(horizontal = 16.dp)) { Text(tr("Duplicate")) }
+                    DeleteButton(tr("Delete Event")) { askDelete = true }
+                }
                 Spacer(Modifier.height(EDITOR_END))
             }
         }

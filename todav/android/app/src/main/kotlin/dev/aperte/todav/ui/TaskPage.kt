@@ -305,6 +305,11 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null, draft: 
                 if (draft == null) {
                     Subtasks(model, task, sheet)
                     CopyLink(model, dev.aperte.todav.core.linkTask(task.uid))
+                    // The task as saved: with changes made here, Save first.
+                    TextButton(enabled = !changed, onClick = {
+                        cancel()
+                        model.duplicate(task.uid)
+                    }) { Text(tr("Duplicate")) }
                     DeleteButton(tr("Delete Task")) { confirmDelete = true }
                 }
                 Spacer(Modifier.height(EDITOR_END))

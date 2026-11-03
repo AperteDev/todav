@@ -526,6 +526,24 @@ fn open_with(
         let link = todav_app::links::event(&ev.uid);
         get::<adw::ButtonRow>(&b, "copy_link")
             .connect_activated(move |row| crate::open::copy_link(row, link.clone()));
+        // What the dialog changed saved first, so the copy has it.
+        // ponytail: a repeating event's change waits for which occurrences it is for, and the
+        // copy is made before; ask the scope first if that turns out to matter.
+        let (save, e2) = (get::<gtk::Button>(&b, "save"), ev.clone());
+        get::<adw::ButtonRow>(&b, "duplicate").connect_activated(move |_| {
+            save.emit_clicked();
+            match core().duplicate_event(e2.list_href.clone(), e2.uid.clone()) {
+                Ok(copy) => {
+                    request_sync();
+                    // Its title as just saved.
+                    let title = core().event(copy).map_or(e2.summary.clone(), |e| e.summary);
+                    crate::window::undo_toast(
+                        &gettext("“{title}” duplicated").replace("{title}", &title),
+                    );
+                }
+                Err(err) => crate::window::toast(&err.to_string()),
+            }
+        });
         let d = dialog.downgrade();
         get::<adw::ButtonRow>(&b, "delete").connect_activated(move |_| {
             let Some(d) = d.upgrade() else { return };

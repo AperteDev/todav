@@ -521,6 +521,11 @@ impl Todav {
         Ok(self.c().move_task(uid, to)?)
     }
 
+    /// A copy of a task with its subtasks, as one undo step; gives the copy.
+    pub fn duplicate_task(&self, uid: String) -> Result<Task> {
+        Ok(self.c().duplicate_task(uid)?)
+    }
+
     pub fn can_adopt(&self, dragged: Task, parent: Task) -> bool {
         todav_app::tasks::can_adopt(self.c(), &dragged, &parent)
     }
@@ -652,6 +657,11 @@ impl Todav {
     /// Move an event (the whole series) to another calendar.
     pub fn move_event(&self, from: String, uid: String, to: String) -> Result<()> {
         Ok(self.c().move_event(from, uid, to)?)
+    }
+
+    /// A copy of an event (the whole series), without its attendees; gives its UID.
+    pub fn duplicate_event(&self, list_href: String, uid: String) -> Result<String> {
+        Ok(self.c().duplicate_event(list_href, uid)?)
     }
 
     /// Events and dated tasks in `[from, to)` in `lists` (None: the collections shown).

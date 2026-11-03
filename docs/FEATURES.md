@@ -20,6 +20,7 @@ What Todav can do, in short. The details of each release are in the
 - A task completed where it doesn't stay (into the Completed group, out of Upcoming) shows
   struck through a moment, then fades out: in the app, the GNOME extension and the widget.
 - Move a task with its subtasks to another list, by drag and drop or from the task dialog.
+- Duplicate a task with its subtasks, or an event, from its dialog or details.
 - Due dates and start dates, with or without a time.
 - Repeating tasks: daily, weekly, monthly or yearly, every n, until a day, from their dates or
   from when they are done; ticked, one moves on to its next date.
@@ -113,7 +114,7 @@ What Todav can do, in short. The details of each release are in the
 - Advanced notifications, configurable: repeating until done, per list.
 - Advanced search, filtering and sorting: saved filters, tasks hidden until they start.
 - Selecting several tasks to change them at once.
-- Duplicating tasks and events; templates.
+- Duplicating by Ctrl+drag; templates.
 - A Year view, week numbers and folded night hours in the calendar.
 - An event's own time zone; declined events hidden; the weather in the calendar.
 - A task's own colour, as events have.

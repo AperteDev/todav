@@ -441,6 +441,73 @@ impl Client {
         Ok(())
     }
 
+    /// A copy of task `uid`, with copies of its subtasks under it, all as they are (notes, dates,
+    /// reminders, done or not), in its list and under its parent; it goes last in the list. One
+    /// undo step. Returns the copy.
+    pub fn duplicate_task(&self, uid: String) -> Result<Task> {
+        let (list, copies) = {
+            let db = self.db.lock().unwrap();
+            let raw = store::raw(&db, Kind::Task, "", &uid)?
+                .ok_or_else(|| Error::NotFound(uid.clone()))?;
+            let all = store::tasks(&db, &raw.list_href, true)?;
+            let last: i64 = db.query_row(
+                "SELECT COALESCE(MAX(sort_order), 0) + 1 FROM tasks WHERE list_href = ?",
+                [&raw.list_href],
+                |r| r.get(0),
+            )?;
+            // (original, its copy's UID, the copy's parent), parents first.
+            let mut tree = vec![(uid.clone(), new_uid(), None::<String>)];
+            let mut i = 0;
+            while i < tree.len() {
+                let (p, copy) = (tree[i].0.clone(), tree[i].1.clone());
+                let kids = all.iter().filter(|t| t.parent_uid.as_ref() == Some(&p));
+                tree.extend(kids.map(|t| (t.uid.clone(), new_uid(), Some(copy.clone()))));
+                i += 1;
+            }
+            self.together(|| -> Result<()> {
+                for (u, copy, parent) in &tree {
+                    let Some(r) = store::raw(&db, Kind::Task, "", u)? else {
+                        continue;
+                    };
+                    let mut cal =
+                        Calendar::parse(&r.raw_ics).ok_or_else(|| Error::Parse(u.clone()))?;
+                    fresh_copy(&mut cal, copy);
+                    match parent {
+                        Some(p) => cal.set_parent(p),
+                        None => set_order(&mut cal, last),
+                    }
+                    self.remember(&db, Kind::Task, &r.list_href, copy)?;
+                    store::save(&db, &r.list_href, None, None, &cal, store::MODIFIED)?;
+                }
+                Ok(())
+            })?;
+            (raw.list_href, tree)
+        };
+        let uids: Vec<String> = copies.iter().map(|(_, c, _)| c.clone()).collect();
+        self.emit(&list, uids);
+        let copy = copies[0].1.clone();
+        self.task(copy.clone()).ok_or(Error::NotFound(copy))
+    }
+
+    /// A copy of event `uid` in calendar `list_href`, the whole series with its changed
+    /// occurrences, as it is (time, repeat, reminders, notes) but for its attendees and
+    /// organizer: the server would send them invitations. Returns the copy's UID.
+    pub fn duplicate_event(&self, list_href: String, uid: String) -> Result<String> {
+        self.writable(&list_href)?;
+        let copy = new_uid();
+        {
+            let db = self.db.lock().unwrap();
+            let raw = store::raw(&db, Kind::Event, &list_href, &uid)?
+                .ok_or_else(|| Error::NotFound(uid.clone()))?;
+            let mut cal = Calendar::parse(&raw.raw_ics).ok_or_else(|| Error::Parse(uid.clone()))?;
+            fresh_copy(&mut cal, &copy);
+            self.remember(&db, Kind::Event, &list_href, &copy)?;
+            store::save(&db, &list_href, None, None, &cal, store::MODIFIED)?;
+        }
+        self.emit(&list_href, vec![copy.clone()]);
+        Ok(copy)
+    }
+
     /// Task lists.
     pub fn lists(&self) -> Vec<List> {
         let db = self.db.lock().unwrap();
@@ -977,6 +1044,27 @@ fn forget(db: &Connection, o: &RawObject) -> Result<()> {
 }
 
 /// Nextcloud Tasks' manual order, so both apps share one order; drops our old X-TODAV-ORDER.
+/// `cal` made a new item's: UID `uid` on each of its tasks or events (a series' changed
+/// occurrences too), made now, at SEQUENCE 0, without attendees or organizer.
+fn fresh_copy(cal: &mut Calendar, uid: &str) {
+    let t = ical::fmt_utc(now());
+    let items: Vec<usize> = (0..cal.comps().len())
+        .filter(|&i| {
+            let kind = cal.comps()[i].kind.to_ascii_uppercase();
+            kind == "VTODO" || kind == "VEVENT"
+        })
+        .collect();
+    for i in items {
+        cal.set_in(i, "UID", "", Some(&ical::escape(uid)));
+        for stamp in ["CREATED", "DTSTAMP", "LAST-MODIFIED"] {
+            cal.set_in(i, stamp, "", Some(&t));
+        }
+        cal.set_in(i, "SEQUENCE", "", Some("0"));
+        cal.set_in(i, "ATTENDEE", "", None);
+        cal.set_in(i, "ORGANIZER", "", None);
+    }
+}
+
 fn set_order(cal: &mut Calendar, order: i64) {
     cal.set("X-APPLE-SORT-ORDER", "", Some(&order.to_string()));
     cal.set("X-TODAV-ORDER", "", None);
@@ -1809,5 +1897,85 @@ mod tests {
         assert_eq!(raw(&parent).href.as_deref(), Some("/a/p.ics"));
         assert_eq!(raw(&sub).list_href, "/a/");
         assert!(moved().is_empty());
+    }
+
+    #[test]
+    fn duplicates_are_new_items_and_undo_as_one() {
+        let dir = std::env::temp_dir().join(format!("todav-test-dup-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        c.db.lock()
+            .unwrap()
+            .execute_batch(
+                "INSERT INTO lists (href, display_name, has_events) VALUES ('/a/', 'A', 1)",
+            )
+            .unwrap();
+        let add = |s: &str, parent: Option<String>| {
+            c.add_task("/a/".into(), s.into(), None, parent, false)
+                .unwrap()
+                .uid
+        };
+        let p = add("p", None);
+        let s = add("s", Some(p.clone()));
+        let ss = add("ss", Some(s.clone()));
+        let patch = TaskPatch {
+            description: Some("note".into()),
+            ..Default::default()
+        };
+        c.update_task(s.clone(), patch).unwrap();
+        c.set_done(ss.clone(), true).unwrap();
+
+        let copy = c.duplicate_task(p.clone()).unwrap();
+        assert_ne!(copy.uid, p);
+        assert_eq!((copy.summary.as_str(), copy.parent_uid), ("p", None));
+        let tasks = c.tasks("/a/".into(), true);
+        assert_eq!(tasks.len(), 6);
+        let kid = |parent: &str| -> Task {
+            tasks
+                .iter()
+                .find(|t| t.parent_uid.as_deref() == Some(parent))
+                .unwrap()
+                .clone()
+        };
+        let s2 = kid(&copy.uid);
+        assert_eq!(
+            (s2.summary.as_str(), s2.description.as_deref()),
+            ("s", Some("note"))
+        );
+        let ss2 = kid(&s2.uid);
+        assert!(ss2.done && ss2.uid != ss);
+        // A subtask copied stays under its parent.
+        assert_eq!(
+            c.duplicate_task(s.clone()).unwrap().parent_uid,
+            Some(p.clone())
+        );
+        c.undo(None).unwrap();
+        c.undo(None).unwrap();
+        assert_eq!(c.tasks("/a/".into(), true).len(), 3);
+
+        let time = EventTime {
+            start: 1_800_000_000,
+            end: 1_800_003_600,
+            all_day: false,
+        };
+        let e = c
+            .add_event("/a/".into(), "e".into(), time, vec![-600])
+            .unwrap();
+        {
+            let db = c.db.lock().unwrap();
+            let r = store::raw(&db, Kind::Event, "/a/", &e).unwrap().unwrap();
+            let mut cal = Calendar::parse(&r.raw_ics).unwrap();
+            cal.set("ATTENDEE", "", Some("mailto:x@y.z"));
+            store::save(&db, "/a/", None, None, &cal, store::MODIFIED).unwrap();
+        }
+        let e2 = c.duplicate_event("/a/".into(), e.clone()).unwrap();
+        let both = c.events(time.start - 1, time.end);
+        assert_eq!(both.len(), 2);
+        let copy = both.iter().find(|x| x.uid == e2).unwrap();
+        assert_eq!((copy.summary.as_str(), copy.reminders.len()), ("e", 1));
+        let raw = store::raw(&c.db.lock().unwrap(), Kind::Event, "/a/", &e2)
+            .unwrap()
+            .unwrap();
+        assert!(!raw.raw_ics.contains("ATTENDEE"));
     }
 }

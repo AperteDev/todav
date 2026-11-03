@@ -17,11 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and others), found in its link, place or notes: in its details, its reminder and the GNOME
   extension's agenda.
 - Linux: Snooze on task and event reminders, back in ten minutes, as on Android.
+- Duplicate a task with its subtasks, or an event (the whole series, without its attendees),
+  from its dialog or its details; Undo takes the copy back.
 
 ### Fixed
 
 - Linux: Edit… in an item's details in the calendar opens it as it is now, with a title or
   note changed there meanwhile.
+- Android: the calendar's day list no longer crashes on two items of the same title at the
+  same time in one list.
 - Linux: Todav no longer crashes when Preferences close after an account was added, moved or
   switched on or off in them.
 

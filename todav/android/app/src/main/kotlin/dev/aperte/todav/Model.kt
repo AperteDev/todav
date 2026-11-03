@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import dev.aperte.todav.core.Account
 import dev.aperte.todav.core.AccountKind
 import dev.aperte.todav.core.Changes
+import dev.aperte.todav.core.Event
 import dev.aperte.todav.core.LoginFlow
 import dev.aperte.todav.core.SidebarPage
 import dev.aperte.todav.core.SwipeAction
@@ -596,6 +597,20 @@ class Main(app: Application) : AndroidViewModel(app) {
             ntr("“{title}” deleted with {n} subtask", "“{title}” deleted with {n} subtasks", n).replace("{n}", "$n")
         }
         messages.tryEmit(text.replace("{title}", task.summary) to core.lastChange())
+    }
+
+    /** A copy of task `uid` with its subtasks, with Undo. */
+    fun duplicate(uid: String) = act {
+        val copy = core.duplicateTask(uid)
+        synced()
+        messages.tryEmit(tr("“{title}” duplicated").replace("{title}", copy.summary) to core.lastChange())
+    }
+
+    /** A copy of event `e` (its whole series), with Undo. */
+    fun duplicate(e: Event) = act {
+        core.duplicateEvent(e.listHref, e.uid)
+        synced()
+        messages.tryEmit(tr("“{title}” duplicated").replace("{title}", e.summary) to core.lastChange())
     }
 
     fun move(task: TodavTask, list: String) = act {

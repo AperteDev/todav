@@ -3186,6 +3186,18 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
     let link = todav_app::links::task(&t.uid);
     get::<adw::ButtonRow>(&b, "copy_link")
         .connect_activated(move |row| crate::open::copy_link(row, link.clone()));
+    // What the dialog changed saved first (it closes), so the copy has it.
+    let (s, uid) = (save.clone(), t.uid.clone());
+    get::<adw::ButtonRow>(&b, "duplicate").connect_activated(move |_| {
+        s.emit_clicked();
+        match core().duplicate_task(uid.clone()) {
+            Ok(copy) => {
+                request_sync();
+                undo_toast(&gettext("“{title}” duplicated").replace("{title}", &copy.summary));
+            }
+            Err(e) => toast(&e.to_string()),
+        }
+    });
     let (task, d) = (t.clone(), dialog.downgrade());
     get::<adw::ButtonRow>(&b, "delete").connect_activated(move |_| {
         if let Some(d) = d.upgrade() {
