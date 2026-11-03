@@ -52,6 +52,7 @@ import dev.aperte.todav.core.Item
 import dev.aperte.todav.core.Time
 import dev.aperte.todav.core.TodavList
 import dev.aperte.todav.core.dateOf
+import dev.aperte.todav.core.meetingLink
 import dev.aperte.todav.core.midnight
 import dev.aperte.todav.core.midnightOn
 import dev.aperte.todav.core.monthFirst
@@ -374,7 +375,8 @@ class AgendaWidget : TodavWidget() {
                 event?.location?.takeIf { it.isNotBlank() }?.let { place ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Image(
-                            ImageProvider(R.drawable.ic_widget_place),
+                            // An online meeting's place: a call's camera, not a pin.
+                            ImageProvider(if (meetingLink(event) != null) R.drawable.ic_widget_video else R.drawable.ic_widget_place),
                             null,
                             GlanceModifier.size(12.dp),
                             colorFilter = androidx.glance.ColorFilter.tint(dim),

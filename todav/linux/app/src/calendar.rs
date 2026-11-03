@@ -1922,10 +1922,17 @@ fn details(c: &Cal, e: &Event) -> gtk::Popover {
     if e.recurring {
         b.append(&line("media-playlist-repeat-symbolic", &gettext("Repeats")));
     }
+    let meeting = todav_app::meeting::link(e);
     if let Some(l) = &e.location {
-        b.append(&line("todav-location-symbolic", l));
+        // An online meeting's place: a call's camera, not a pin.
+        let icon = if meeting.is_some() {
+            "todav-video-symbolic"
+        } else {
+            "todav-location-symbolic"
+        };
+        b.append(&line(icon, l));
     }
-    if let Some(url) = todav_app::meeting::link(e) {
+    if let Some(url) = meeting {
         b.append(&join_button(url));
     }
     b.append(&which(&e.list_href, &list_name(c, &e.list_href)));

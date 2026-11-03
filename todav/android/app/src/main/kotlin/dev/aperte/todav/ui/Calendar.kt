@@ -1814,10 +1814,16 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
                         TitleField(e.summary, editable = writable) { renamed = it }
                     }
                     Line({ Icon(Icons.Outlined.Schedule, null) }) { Text(eventWhen(e, now)) }
-                    e.location?.takeIf { it.isNotBlank() }?.let { Line({ Icon(Icons.Outlined.Place, null) }) { Text(it) } }
-                    meetingLink(e)?.let { url ->
+                    val meeting = meetingLink(e)
+                    val place = e.location?.takeIf { it.isNotBlank() }
+                    place?.let {
+                        // An online meeting's place: a call's camera, not a pin.
+                        Line({ Icon(if (meeting != null) Icons.Outlined.Videocam else Icons.Outlined.Place, null) }) { Text(it) }
+                    }
+                    meeting?.let { url ->
                         val uri = LocalUriHandler.current
-                        Line({ Icon(Icons.Outlined.Videocam, null) }) {
+                        // The camera once: on the place above when there is one.
+                        Line({ if (place == null) Icon(Icons.Outlined.Videocam, null) }) {
                             Button(onClick = { uri.openUri(url) }) { Text(tr("Join Call")) }
                         }
                     }
