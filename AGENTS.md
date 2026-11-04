@@ -71,6 +71,14 @@
   tarball's build distribution together. The extension alone goes down to GNOME 48 (Debian
   13, with the app as a Flatpak; `St.BoxLayout`'s `orientation` is new in 48): keep it
   working there.
+- extensions.gnome.org runs Shexli (static analysis) on each upload, and reviewers reject the
+  extension until its findings are resolved, warnings included. Check a change to the extension
+  with it: `make -C todav/gnome-extension stage`, then `uvx --python 3.12 --with
+  'tree-sitter==0.25.2' shexli --format text $PWD/target/extension` (an absolute path; the
+  newest tree-sitter crashes it). Clean up in `destroy()` what it can see: release fields with
+  `null`, keep timeout ids and remove them, connect signals with `connectObject(…, this)`, and
+  no `Gio.Settings` (it asks for a schema of our own). The PyPI release may lag the site's (0.2.1
+  calls `shell-version` 51 a future release, which the site accepts).
 
 ## Translations
 
