@@ -43,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Android: the calendar's month shows as much of a title as fits rather than its first word
+  only, so birthdays ("🎂 Name") show the name, not only the cake.
 - Android: an event opened from a widget opens over the calendar on its day, so Back leads
   there rather than to the tasks.
 - Android: the widgets move on to the new day at midnight (and when the clock or the time

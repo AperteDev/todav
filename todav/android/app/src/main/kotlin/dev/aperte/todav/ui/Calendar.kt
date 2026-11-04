@@ -896,6 +896,8 @@ private fun Chip(item: Item, colors: Map<String, String>, large: Boolean = false
         fontSize = if (large) 14.sp else 10.sp,
         lineHeight = if (large) 20.sp else 13.sp,
         maxLines = if (large) 2 else 1,
+        // A one-line chip is cut off, not wrapped at a word: "🎂 Name" would show the cake only.
+        softWrap = large,
         overflow = if (large) TextOverflow.Ellipsis else TextOverflow.Clip,
         color = if (item is Item.Event) onColor(item.color(colors)) else MaterialTheme.colorScheme.onSurface,
         textDecoration = if (item.struck()) TextDecoration.LineThrough else null,
