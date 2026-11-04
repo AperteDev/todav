@@ -130,14 +130,14 @@ class TodavIndicator extends PanelMenu.Button {
         }, null, Gio.DBusProxyFlags.DO_NOT_AUTO_START_AT_CONSTRUCTION);
 
         // Built on open: each time the lists, this month and the options as they are now.
-        this.menu.connect('open-state-changed', (_menu, open) => {
+        this.menu.connectObject('open-state-changed', (_menu, open) => {
             if (open) {
                 this._choosing = false;
                 this._month = null;
                 this._selected = null;
                 this._rebuild();
             }
-        });
+        }, this);
         this._placeholder(_('Starting…'));
         this._contextSetup();
         // A right click opens the context menu.
@@ -158,16 +158,17 @@ class TodavIndicator extends PanelMenu.Button {
         Main.uiGroup.add_child(this._context.actor);
         this._context.actor.hide();
         // A manager of its own: the panel's opens a button's menu as the pointer comes over it
-        // from another open one, and with this one there too it would open this one.
-        this._contextManager = new PopupMenu.PopupMenuManager(this);
-        this._contextManager.addMenu(this._context);
+        // from another open one, and with this one there too it would open this one. Kept by the
+        // menu, which it leaves when the menu goes.
+        const manager = new PopupMenu.PopupMenuManager(this);
+        manager.addMenu(this._context);
         // Highlighted while open, as for its main menu.
-        this._context.connect('open-state-changed', (_menu, open) => {
+        this._context.connectObject('open-state-changed', (_menu, open) => {
             if (open)
                 this.add_style_pseudo_class('active');
             else
                 this.remove_style_pseudo_class('active');
-        });
+        }, this);
         this._context.addAction(_('Open Todav'), () => this._open(p => p.ShowListAsync(this._pinned ?? '')));
         const args = new GLib.Variant('(sava{sv})', ['show-preferences', [new GLib.Variant('s', 'extension')], {}]);
         this._context.addAction(_('Preferences'), () => this._open(() => Gio.DBus.session.call(BUS_NAME,
@@ -361,12 +362,17 @@ class TodavIndicator extends PanelMenu.Button {
     _open(call) {
         this.menu.close();
         this._dateMenu?.menu.close();
-        const id = global.display.connect('window-demands-attention', (_display, window) => {
+        // For 3 s, counted from the last such call.
+        if (this._raiseId)
+            GLib.source_remove(this._raiseId);
+        global.display.disconnectObject(this);
+        global.display.connectObject('window-demands-attention', (_display, window) => {
             if (window.get_wm_class()?.startsWith(BUS_NAME))
                 Main.activateWindow(window);
-        });
-        GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 3, () => {
-            global.display.disconnect(id);
+        }, this);
+        this._raiseId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 3, () => {
+            global.display.disconnectObject(this);
+            this._raiseId = 0;
             return GLib.SOURCE_REMOVE;
         });
         call(this._proxy).catch(e => logError(e, 'Todav'));
@@ -476,12 +482,12 @@ class TodavIndicator extends PanelMenu.Button {
     _listRow([href, name, open, color], current) {
         const count = label(`${open}`, 'todav-list-count');
         const item = row([dot(color), label(name, current ? 'todav-list current' : 'todav-list', {x_expand: true}), count]);
-        item.connect('clicked', () => {
+        item.connectObject('clicked', () => {
             this._choosing = false;
             this._proxy.SetSettingAsync('ext_list', href)
                 .then(() => (this._dateMenu?.menu.isOpen ? this._clockRebuild() : this._rebuild()))
                 .catch(e => logError(e, 'Todav: cannot pick the list'));
-        });
+        }, this);
         return item;
     }
 
@@ -525,7 +531,7 @@ class TodavIndicator extends PanelMenu.Button {
         if (!check)
             return mark;
         // At once, put back if the app refuses; the rest of the row still opens the task.
-        mark.connect('clicked', () => {
+        mark.connectObject('clicked', () => {
             done = !done;
             show(done);
             this._proxy.SetDoneAsync(uid, done).then(() => {
@@ -536,7 +542,7 @@ class TodavIndicator extends PanelMenu.Button {
                 done = !done;
                 show(done);
             });
-        });
+        }, this);
         return mark;
     }
 
@@ -548,11 +554,13 @@ class TodavIndicator extends PanelMenu.Button {
         const mark = this._taskMark(uid, done, title, null, still => this._linger(item, uid, href, still));
         item = row([mark, title]);
         item._depth = depth;
-        item.connect('destroy', () => (item._gone = true));
         item.child.style = `padding-left: ${depth * 16}px;`;
-        item.connect('clicked', () => this._open(p => (this._edit?.tasks
-            ? p.EditItemAsync(uid, true, 0).catch(() => p.ShowTaskAsync(uid))
-            : p.ShowTaskAsync(uid))));
+        item.connectObject(
+            'destroy', () => (item._gone = true),
+            'clicked', () => this._open(p => (this._edit?.tasks
+                ? p.EditItemAsync(uid, true, 0).catch(() => p.ShowTaskAsync(uid))
+                : p.ShowTaskAsync(uid))),
+            this);
         return item;
     }
 
@@ -646,7 +654,7 @@ class TodavIndicator extends PanelMenu.Button {
             scroll.child = content;
         };
         this._showAgenda = show;
-        const scroll = this._agendaView = new St.ScrollView({
+        const scroll = new St.ScrollView({
             style_class: 'todav-agenda',
             hscrollbar_policy: St.PolicyType.NEVER,
             vscrollbar_policy: St.PolicyType.AUTOMATIC,
@@ -654,9 +662,11 @@ class TodavIndicator extends PanelMenu.Button {
             x_expand: true,
             y_expand: true,
         });
+        // In sight: a day clicked in the month shows there.
+        this._agendaShown = () => scroll.is_mapped();
         scroll.connect('destroy', () => {
             if (this._showAgenda === show)
-                this._showAgenda = null;
+                this._showAgenda = this._agendaShown = null;
         });
         await show();
         return scroll;
@@ -690,7 +700,7 @@ class TodavIndicator extends PanelMenu.Button {
         // Its editor if `_edit` says so for tasks or events, else (and from an app without
         // EditItem: no UID in the row) its day.
         const edit = uid && this._edit?.[task ? 'tasks' : 'events'];
-        item.connect('clicked', () => this._open(p => (edit ? p.EditItemAsync(uid, task, start) : p.ShowDayAsync(day))));
+        item.connectObject('clicked', () => this._open(p => (edit ? p.EditItemAsync(uid, task, start) : p.ShowDayAsync(day))), this);
         return item;
     }
 
@@ -716,9 +726,8 @@ class TodavIndicator extends PanelMenu.Button {
         const now = GLib.get_monotonic_time() / 1000;
         const last = this._lastClick;
         this._lastClick = {key, at: now};
-        this._mouse ??= new Gio.Settings({schema_id: 'org.gnome.desktop.peripherals.mouse'});
-        const again = last?.key === key && now - last.at < this._mouse.get_int('double-click');
-        if (again || !this._showAgenda || !this._agendaView?.is_mapped()) {
+        const again = last?.key === key && now - last.at < global.stage.get_context().get_settings().double_click_time;
+        if (again || !this._agendaShown?.()) {
             this._open(p => p.ShowDayAsync(key));
             return;
         }
@@ -817,13 +826,19 @@ class TodavIndicator extends PanelMenu.Button {
     destroy() {
         this._destroyed = true;
         GLib.source_remove(this._midnightId);
+        if (this._raiseId)
+            GLib.source_remove(this._raiseId);
         this._lingers?.forEach(id => GLib.source_remove(id));
         this._context.destroy();
+        this._context = null;
         if (this._dateMenu) {
             this._clockPlace(() => false);
             this._dateMenu.menu.disconnect(this._clockOpenId);
             this._clockMonth.destroy();
             this._clockBox.destroy();
+            this._clockMonth = null;
+            this._clockBox = null;
+            this._dateMenu = null;
         }
         if (this._proxy) {
             this._proxy.disconnectSignal(this._signalId);
