@@ -4,7 +4,7 @@
 %bcond check 1
 
 Name:           todav
-Version:        2.4.3
+Version:        2.5.0
 Release:        1%{?dist}
 Summary:        Tasks and calendar kept in your Nextcloud
 
@@ -98,6 +98,9 @@ appstreamcli validate --no-net %{buildroot}%{_metainfodir}/dev.aperte.Todav.meta
 %{_datadir}/gnome-shell/extensions/todav@aperte.dev/
 
 %changelog
+* Wed Nov 04 2026 SelfRef <git@selfref.dev> - 2.5.0-1
+- See CHANGELOG.md
+
 * Tue Nov 03 2026 SelfRef <git@selfref.dev> - 2.4.3-1
 - See CHANGELOG.md
 

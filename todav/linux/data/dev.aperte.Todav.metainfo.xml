@@ -36,19 +36,19 @@
   <!-- From the release tag (scripts/release.py moves them to each new one). -->
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.4.3/docs/screenshots/tasks.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.5.0/docs/screenshots/tasks.png</image>
       <caption>Tasks grouped by category, with subtasks and due dates</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.4.3/docs/screenshots/calendar-month.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.5.0/docs/screenshots/calendar-month.png</image>
       <caption>The month, with an event's details</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.4.3/docs/screenshots/calendar-week.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.5.0/docs/screenshots/calendar-week.png</image>
       <caption>Tasks planned into the week next to events</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.4.3/docs/screenshots/event-dialog.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.5.0/docs/screenshots/event-dialog.png</image>
       <caption>Editing an event</caption>
     </screenshot>
   </screenshots>
@@ -63,6 +63,38 @@
     <control>touch</control>
   </supports>
   <releases>
+    <release version="2.5.0" date="2026-11-04">
+      <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.5.0</url>
+      <description translate="no">
+        <p>Added</p>
+        <ul>
+          <li>Notes of tasks and events in light Markdown: bold, italic, headings, lists and code show formatted; links, bare web addresses, e-mail addresses and <code>todav://</code> links open with a click (Ctrl+click while editing on Linux); checkboxes (<code>- [ ]</code>) tick with a click, also in an item's details. Notes stay plain text, so other apps show them as written.</li>
+          <li>Join Call for an event's video call (Google Meet, Zoom, Teams, Jitsi, Webex, Nextcloud Talk and others), found in its link, place or notes: in its details, its reminder and the GNOME extension's agenda.</li>
+          <li>Linux: Snooze on task and event reminders, back in ten minutes, as on Android.</li>
+          <li>Week numbers in the calendar (the months and the week views) and, by a setting of their own, in the GNOME extension's month and the month widget; both off by default.</li>
+          <li>Cancelled events and invitations you declined (found by your addresses on the server) show as usual, crossed out (the default) or not at all, by a setting; declined ones remind no more.</li>
+          <li>Export a task list or a calendar to an iCalendar file (<code>.ics</code>), from its dialog: everything in it, done tasks too.</li>
+          <li>Duplicate a task with its subtasks, or an event (the whole series, without its attendees), from its dialog or its details; Undo takes the copy back.</li>
+          <li>Linux: Ctrl while dropping a task or an event on another list or calendar in the sidebar copies it there instead of moving it; the pointer shows a copy. Events of read-only calendars drag too, to be copied that way.</li>
+          <li>Android: the agenda widget's title can be hidden, by a setting of the widget; its buttons then float over the agenda's top corner.</li>
+        </ul>
+        <p>Changed</p>
+        <ul>
+          <li>Android: the agenda widget's rows show an event's place under its title, and its time on the right with its length under it (as "1h 30m").</li>
+          <li>An online meeting's place (an event with a video call link) shows with a camera instead of a map pin: in its details on Linux and Android and in the agenda widget.</li>
+          <li>Android: a widget's row, item or day shows it is pressed, in a grey that stands out on light and dark backgrounds.</li>
+        </ul>
+        <p>Fixed</p>
+        <ul>
+          <li>Android: the calendar's month shows as much of a title as fits rather than its first word only, so birthdays ("🎂 Name") show the name, not only the cake.</li>
+          <li>Android: an event opened from a widget opens over the calendar on its day, so Back leads there rather than to the tasks.</li>
+          <li>Android: the widgets move on to the new day at midnight (and when the clock or the time zone changes), the day widget's line at the current time every quarter hour; a widget's settings show on it even when left right after the change.</li>
+          <li>Linux: Edit… in an item's details in the calendar opens it as it is now, with a title or note changed there meanwhile.</li>
+          <li>Android: the calendar's day list no longer crashes on two items of the same title at the same time in one list.</li>
+          <li>Linux: Todav no longer crashes when Preferences close after an account was added, moved or switched on or off in them.</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.4.3" date="2026-11-03">
       <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.4.3</url>
       <description translate="no">
