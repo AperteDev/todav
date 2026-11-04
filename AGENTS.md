@@ -6,6 +6,12 @@
   what is built is described by the code. Read it before working on a planned feature, and
   update it in the same change: remove what is done, add a plan or an open question, move a
   dropped plan under "Ruled out" with why.
+- A feature goes to every platform it applies to (the Linux app and its GNOME extension,
+  Android, later Windows), working the same way and with the same words where the platform
+  allows, in the same change or the next one. What cannot be made on a platform yet gets its
+  plan under that platform in `docs/ROADMAP.md`; what does not apply there (a platform's own
+  convention, a piece only one has) goes under "Ruled out" with why. A fix to shared behaviour
+  is checked on each platform.
 - `docs/FEATURES.md` lists what Todav does, one short line each, and what is planned; the
   README keeps only the highlights and links it. Keep it in step in the same commit: a new
   feature goes under "Now" and leaves "Planned"; a new plan in `docs/ROADMAP.md` gets its line
