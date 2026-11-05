@@ -32,4 +32,5 @@ const XML = `<node>
 </interface>
 </node>`;
 
-export const TodavProxy = Gio.DBusProxy.makeProxyWrapper(XML);
+/// The proxy class; made when the extension is enabled, not when this module loads.
+export const makeTodavProxy = () => Gio.DBusProxy.makeProxyWrapper(XML);

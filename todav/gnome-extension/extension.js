@@ -16,7 +16,7 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import {Extension, gettext as _, ngettext, pgettext} from 'resource:///org/gnome/shell/extensions/extension.js';
 
-import {BUS_NAME, OBJECT_PATH, RELEASES, TodavProxy} from './dbus.js';
+import {BUS_NAME, OBJECT_PATH, RELEASES, makeTodavProxy} from './dbus.js';
 
 const MAX_TASKS = 100;
 /// Days the agenda covers, from today.
@@ -112,9 +112,11 @@ class TodavIndicator extends PanelMenu.Button {
         this.add_child(box);
 
         // Don't launch the app at Shell start; the first method call (menu open) activates it.
+        this._cancellable = new Gio.Cancellable();
+        const TodavProxy = makeTodavProxy();
         new TodavProxy(Gio.DBus.session, BUS_NAME, OBJECT_PATH, (proxy, error) => {
-            if (error || this._destroyed) {
-                if (error)
+            if (error) {
+                if (!error.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
                     logError(error, 'Todav: cannot create D-Bus proxy');
                 return;
             }
@@ -127,7 +129,7 @@ class TodavIndicator extends PanelMenu.Button {
             });
             this._refreshCount();
             this._updateState();
-        }, null, Gio.DBusProxyFlags.DO_NOT_AUTO_START_AT_CONSTRUCTION);
+        }, this._cancellable, Gio.DBusProxyFlags.DO_NOT_AUTO_START_AT_CONSTRUCTION);
 
         // Built on open: each time the lists, this month and the options as they are now.
         this.menu.connectObject('open-state-changed', (_menu, open) => {
@@ -824,7 +826,8 @@ class TodavIndicator extends PanelMenu.Button {
     }
 
     destroy() {
-        this._destroyed = true;
+        this._cancellable.cancel();
+        this._cancellable = null;
         GLib.source_remove(this._midnightId);
         if (this._raiseId)
             GLib.source_remove(this._raiseId);
