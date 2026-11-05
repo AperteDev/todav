@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- GNOME extension: its D-Bus proxy is created when the extension is enabled and its pending
+  request is cancelled when it is disabled (extensions.gnome.org review).
+
 ## [2.5.1] - 2026-11-05
 
 ### Added
