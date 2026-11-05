@@ -8,8 +8,8 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue" alt="License: GPL-3.0-or-later"></a>
-  <a href="https://github.com/AperteDev/todav/actions/workflows/ci.yml"><img src="https://github.com/AperteDev/todav/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/AperteDev/todav/releases/latest"><img src="https://img.shields.io/github/v/release/AperteDev/todav" alt="Latest release"></a>
+  <a href="https://github.com/AperteDev/todav/releases"><img src="https://img.shields.io/github/downloads/AperteDev/todav/total" alt="GitHub downloads"></a>
   <a href="https://aur.archlinux.org/packages/todav-bin"><img src="https://img.shields.io/aur/version/todav-bin" alt="AUR version"></a>
   <a href="https://copr.fedorainfracloud.org/coprs/selfref/todav/"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcopr.fedorainfracloud.org%2Fapi_3%2Fpackage%3Fownername%3Dselfref%26projectname%3Dtodav%26packagename%3Dtodav%26with_latest_succeeded_build%3Dtrue&amp;query=%24.builds.latest_succeeded.source_package.version&amp;label=copr&amp;prefix=v&amp;color=51A2DA" alt="COPR version"></a>
 </p>
