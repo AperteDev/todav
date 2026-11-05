@@ -190,6 +190,10 @@ on a phone, whether Week shows as a list of days.
 - **Fedora's own repositories** (COPR works now) would want Fedora's crates instead of vendored
   ones: all are packaged at our versions except `libsecret` (not packaged) and `rusqlite`
   (Fedora has 0.38, which the core accepts).
+- **README badges** (shields.io), added as each source exists: the GitHub download count
+  (`github/downloads/AperteDev/todav/total`, works now), the Flathub and F-Droid versions
+  (`flathub/v/dev.aperte.Todav`, `f-droid/v/dev.aperte.todav`; both say "not found" until we are
+  listed) and Repology (`repology/v/todav`, once a repository other than ours packages it).
 - **Microsoft Store** and winget for the Windows app; check the Store's rules on AI-assisted code
   first, as for Flathub.
 
