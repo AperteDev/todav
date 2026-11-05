@@ -72,8 +72,8 @@
   13, with the app as a Flatpak; `St.BoxLayout`'s `orientation` is new in 48): keep it
   working there.
 - extensions.gnome.org runs Shexli (static analysis) on each upload, and reviewers reject the
-  extension until its findings are resolved, warnings included. Check a change to the extension
-  with it: `make -C todav/gnome-extension stage`, then `uvx --python 3.12 --with
+  extension until its findings are resolved, warnings included. Every change to the extension
+  must pass it (only the `shell-version` 51 finding below is accepted); check with it: `make -C todav/gnome-extension stage`, then `uvx --python 3.12 --with
   'tree-sitter==0.25.2' shexli --format text $PWD/target/extension` (an absolute path; the
   newest tree-sitter crashes it). Clean up in `destroy()` what it can see: release fields with
   `null`, keep timeout ids and remove them, connect signals with `connectObject(…, this)`, and
