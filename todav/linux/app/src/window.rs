@@ -105,10 +105,8 @@ struct Ui {
     cat_rows: RefCell<Vec<Option<String>>>,
     /// Category the task page is narrowed to, with the list it belongs to.
     filter: RefCell<Option<(String, Option<String>)>>,
-    /// Categories created in the picker per list, shown until a task or the config has them.
+    /// Categories made in the sidebar per list, shown until a task or the config has them.
     new_cats: RefCell<Vec<(String, String)>>,
-    /// Set while refresh_tasks rewrites the picker, so "New Category…" handling ignores it.
-    cat_busy: Rc<Cell<bool>>,
     hrefs: RefCell<Vec<String>>,
     /// Name and colour of each list's row, to notice when they change.
     looks: RefCell<Vec<(String, Option<String>)>>,
@@ -810,7 +808,6 @@ fn build(app: &adw::Application) -> Rc<Ui> {
         cat_rows: RefCell::new(Vec::new()),
         filter: RefCell::new(None),
         new_cats: RefCell::new(Vec::new()),
-        cat_busy: Rc::new(Cell::new(false)),
         hrefs: RefCell::new(Vec::new()),
         looks: RefCell::new(Vec::new()),
         current: RefCell::new(None),
@@ -1007,9 +1004,7 @@ fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
         glib::idle_add_local_once(move || refresh_tasks(&ui));
     });
 
-    connect_new_category(ui, &ui.cat, &ui.cats, ui.cat_busy.clone(), add_category);
-
-    // The sidebar's "+" makes one too; a right-click or long press on a category edits it.
+    // The sidebar's "+" makes a category; a right-click or long press on a category edits it.
     let weak = Rc::downgrade(ui);
     get::<gtk::Button>(b, "cat_add").connect_clicked(move |_| {
         if let Some(ui) = weak.upgrade() {
@@ -1593,18 +1588,15 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
             names.push(n.clone());
         }
     }
-    let (none, new) = (gettext("No category"), gettext("New Category…"));
+    let none = gettext("No category");
     let refs: Vec<&str> = std::iter::once(none.as_str())
         .chain(names.iter().map(String::as_str))
-        .chain(std::iter::once(new.as_str()))
         .collect();
     let sel = selected
-        .and_then(|s| refs[..refs.len() - 1].iter().position(|r| *r == s))
+        .and_then(|s| refs.iter().position(|r| *r == s))
         .unwrap_or(0);
-    ui.cat_busy.set(true);
     ui.cats.splice(0, ui.cats.n_items(), &refs);
     ui.cat.set_selected(sel as u32);
-    ui.cat_busy.set(false);
 
     // Sidebar categories plus "Other"; rebuilt only when they change, so the selection holds.
     let rows: Vec<Option<String>> = names
@@ -2961,8 +2953,8 @@ fn undo(change: Option<u64>) {
     }
 }
 
-/// A category made in the picker or the sidebar joins the shown list's categories (until a task
-/// has it) and becomes the picker's choice.
+/// A category made in the sidebar joins the shown list's categories (until a task has it) and
+/// becomes the picker's choice.
 fn add_category(ui: &Rc<Ui>, name: String) {
     let href = ui.current.borrow().clone();
     if let Some(href) = href {
@@ -3071,14 +3063,17 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
         .set_text(t.description.as_deref().unwrap_or_default());
     crate::note::attach(&description);
 
-    // Same choices as the new-task picker, plus the task's own category if that lacks it.
+    // Same choices as the new-task picker, plus the task's own category if that lacks it, and
+    // "New Category…" last.
     let items: Vec<glib::GString> = (0..ui.cats.n_items())
         .filter_map(|i| ui.cats.string(i))
         .collect();
     let mut items: Vec<&str> = items.iter().map(|s| s.as_str()).collect();
     if let Some(c) = t.category.as_deref().filter(|c| !items[1..].contains(c)) {
-        items.insert(items.len() - 1, c);
+        items.push(c);
     }
+    let new = gettext("New Category…");
+    items.push(&new);
     cats.splice(0, cats.n_items(), &items);
     category.set_visible(!sub);
     category.set_selected(0);
