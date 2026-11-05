@@ -36,19 +36,19 @@
   <!-- From the release tag (scripts/release.py moves them to each new one). -->
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.5.0/docs/screenshots/tasks.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.5.1/docs/screenshots/tasks.png</image>
       <caption>Tasks grouped by category, with subtasks and due dates</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.5.0/docs/screenshots/calendar-month.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.5.1/docs/screenshots/calendar-month.png</image>
       <caption>The month, with an event's details</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.5.0/docs/screenshots/calendar-week.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.5.1/docs/screenshots/calendar-week.png</image>
       <caption>Tasks planned into the week next to events</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.5.0/docs/screenshots/event-dialog.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.5.1/docs/screenshots/event-dialog.png</image>
       <caption>Editing an event</caption>
     </screenshot>
   </screenshots>
@@ -63,6 +63,19 @@
     <control>touch</control>
   </supports>
   <releases>
+    <release version="2.5.1" date="2026-11-05">
+      <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.5.1</url>
+      <description translate="no">
+        <p>Added</p>
+        <ul>
+          <li>Linux: a "+" beside Categories in the Tasks sidebar adds a category (it shows even for a list without any), and a right-click or long press on a category offers Edit… to rename it on all the list's tasks, as one undo step.</li>
+        </ul>
+        <p>Fixed</p>
+        <ul>
+          <li>Linux: dropping a task in a long list with manual sorting no longer freezes the window for seconds; the page is rebuilt once after a burst of changes instead of once per renumbered task.</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.5.0" date="2026-11-04">
       <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.5.0</url>
       <description translate="no">
