@@ -74,25 +74,36 @@ Adw.ApplicationWindow window {
                       visible: false;
                       margin-top: 6;
 
-                      Gtk.ToggleButton cat_toggle {
-                        active: true;
+                      Gtk.Box {
+                        spacing: 2;
                         margin-start: 6;
                         margin-end: 6;
-                        styles ["flat", "cat-toggle"]
 
-                        Gtk.Box {
-                          spacing: 6;
+                        Gtk.ToggleButton cat_toggle {
+                          active: true;
+                          hexpand: true;
+                          styles ["flat", "cat-toggle"]
 
-                          Gtk.Label {
-                            label: _("Categories");
-                            xalign: 0;
-                            hexpand: true;
-                            styles ["heading"]
+                          Gtk.Box {
+                            spacing: 6;
+
+                            Gtk.Label {
+                              label: _("Categories");
+                              xalign: 0;
+                              hexpand: true;
+                              styles ["heading"]
+                            }
+
+                            Gtk.Image {
+                              icon-name: "pan-down-symbolic";
+                            }
                           }
+                        }
 
-                          Gtk.Image {
-                            icon-name: "pan-down-symbolic";
-                          }
+                        Gtk.Button cat_add {
+                          icon-name: "list-add-symbolic";
+                          tooltip-text: _("New Category");
+                          styles ["flat"]
                         }
                       }
 

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Linux: a "+" beside Categories in the Tasks sidebar adds a category (it shows even for a list
+  without any), and a right-click or long press on a category offers Edit… to rename it on all
+  the list's tasks, as one undo step.
+
 ### Fixed
 
 - Linux: dropping a task in a long list with manual sorting no longer freezes the window for

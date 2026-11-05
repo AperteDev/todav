@@ -274,6 +274,22 @@ pub fn set_category(c: &Client, uid: &str, category: Option<String>) -> Result<(
     c.update_task(uid.into(), patch)
 }
 
+/// Rename category `from` of list `list_href` to `to`, on every task of the list that has it,
+/// done ones too, as one change for undo. A name the list already has joins its tasks.
+pub fn rename_category(c: &Client, list_href: &str, from: &str, to: &str) -> Result<()> {
+    if from == to || to.is_empty() {
+        return Ok(());
+    }
+    c.together(|| {
+        for t in c.tasks(list_href.into(), true) {
+            if t.category.as_deref() == Some(from) {
+                set_category(c, &t.uid, Some(to.into()))?;
+            }
+        }
+        Ok(())
+    })
+}
+
 /// A task dropped on a category: into it (a subtask becomes top-level), first or last in it as
 /// new tasks would be.
 pub fn drop_on_category(c: &Client, d: &Task, ds: &Slot, category: Option<String>) -> Result<()> {
@@ -746,5 +762,37 @@ pub(crate) mod tests {
                 .all(|u| c.task(u.to_string()).is_some())
         );
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn renaming_a_category_retags_its_tasks_in_that_list_only() {
+        use todav_core::AccountKind;
+        let dir = std::env::temp_dir().join(format!("todav-app-rename-cat-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let acc = c
+            .add_account(AccountKind::Local, "".into(), "".into(), "".into())
+            .unwrap();
+        let new = |name: &str| {
+            c.create_list(acc, name.into(), "#0082C9".into(), false)
+                .unwrap()
+        };
+        let (a, b) = (new("A"), new("B"));
+        let add = |list: &str, s: &str, cat: &str| {
+            c.add_task(list.into(), s.into(), Some(cat.into()), None, false)
+                .unwrap()
+        };
+        let (x, y, other) = (
+            add(&a, "x", "Old"),
+            add(&a, "y", "Keep"),
+            add(&b, "o", "Old"),
+        );
+        rename_category(&c, &a, "Old", "New").unwrap();
+        let cat = |uid: &str| c.task(uid.into()).unwrap().category;
+        assert_eq!(cat(&x.uid).as_deref(), Some("New"));
+        assert_eq!(cat(&y.uid).as_deref(), Some("Keep"));
+        assert_eq!(cat(&other.uid).as_deref(), Some("Old"));
+        assert!(c.undo(None).unwrap());
+        assert_eq!(cat(&x.uid).as_deref(), Some("Old"));
     }
 }

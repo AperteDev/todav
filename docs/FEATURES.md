@@ -8,7 +8,8 @@ What Todav can do, in short. The details of each release are in the
 **Tasks**
 
 - Task lists from your Nextcloud calendars; create, rename, recolour and delete them.
-- Categories (CalDAV `CATEGORIES`), shown as groups or tags, with a filter in the sidebar.
+- Categories (CalDAV `CATEGORIES`), shown as groups or tags, with a filter in the sidebar,
+  where you also add a category and rename one (Linux for now).
 - Subtasks nested to any depth, and notes.
 - Notes in light Markdown, kept as plain text for other apps: bold, italic, headings, lists;
   links and e-mail addresses open with a click, checkboxes (`- [ ]`) tick in place.

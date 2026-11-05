@@ -1007,14 +1007,34 @@ fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
         glib::idle_add_local_once(move || refresh_tasks(&ui));
     });
 
-    connect_new_category(ui, &ui.cat, &ui.cats, ui.cat_busy.clone(), |ui, name| {
-        let href = ui.current.borrow().clone();
-        if let Some(href) = href {
-            ui.new_cats.borrow_mut().push((href, name.clone()));
+    connect_new_category(ui, &ui.cat, &ui.cats, ui.cat_busy.clone(), add_category);
+
+    // The sidebar's "+" makes one too; a right-click or long press on a category edits it.
+    let weak = Rc::downgrade(ui);
+    get::<gtk::Button>(b, "cat_add").connect_clicked(move |_| {
+        if let Some(ui) = weak.upgrade() {
+            new_category_dialog(&ui, None, add_category);
         }
-        refresh_tasks(ui);
-        select_name(&ui.cat, &ui.cats, &name);
     });
+    let weak = Rc::downgrade(ui);
+    crate::lists::context_menu(&ui.cat_list, "win.edit-category", None, move |row| {
+        let ui = weak.upgrade()?;
+        let name = ui.cat_rows.borrow().get(row.index() as usize).cloned();
+        name.flatten() // "Other" is no category
+    });
+    let edit = gio::SimpleAction::new("edit-category", Some(glib::VariantTy::STRING));
+    let weak = Rc::downgrade(ui);
+    edit.connect_activate(move |_, name| {
+        let (Some(ui), Some(name)) = (weak.upgrade(), name.and_then(|n| n.str().map(String::from)))
+        else {
+            return;
+        };
+        let from = name.clone();
+        new_category_dialog(&ui, Some(&name), move |ui, to| {
+            rename_category(ui, &from, to)
+        });
+    });
+    ui.window.add_action(&edit);
 
     // "+": accented and usable once something is typed.
     let add: gtk::Button = get(b, "add_task");
@@ -1624,7 +1644,9 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
         }
         *ui.cat_rows.borrow_mut() = rows;
     }
-    ui.cat_section.set_visible(!names.is_empty());
+    // Google Tasks keeps no categories.
+    ui.cat_section
+        .set_visible(!todav_core::gtasks::is_list(&href));
 
     // The filter only survives while its list is shown and its category is listed.
     let filter = ui
@@ -2939,13 +2961,59 @@ fn undo(change: Option<u64>) {
     }
 }
 
-/// Ask for a category name; it joins this list's categories and becomes the picker's choice.
-fn new_category_dialog(ui: &Rc<Ui>, created: impl Fn(&Rc<Ui>, String) + 'static) {
+/// A category made in the picker or the sidebar joins the shown list's categories (until a task
+/// has it) and becomes the picker's choice.
+fn add_category(ui: &Rc<Ui>, name: String) {
+    let href = ui.current.borrow().clone();
+    if let Some(href) = href {
+        ui.new_cats.borrow_mut().push((href, name.clone()));
+    }
+    refresh_tasks(ui);
+    select_name(&ui.cat, &ui.cats, &name);
+}
+
+/// Rename category `from` of the shown list: its tasks, the picker's new ones and the filter.
+fn rename_category(ui: &Rc<Ui>, from: &str, to: String) {
+    let Some(href) = ui.current.borrow().clone() else {
+        return;
+    };
+    if let Err(e) = tasks::rename_category(core(), &href, from, &to) {
+        return toast(&e.to_string());
+    }
+    request_sync();
+    for (h, n) in ui.new_cats.borrow_mut().iter_mut() {
+        if *h == href && n == from {
+            *n = to.clone();
+        }
+    }
+    if let Some((h, Some(c))) = ui.filter.borrow_mut().as_mut()
+        && *h == href
+        && c == from
+    {
+        *c = to.clone();
+    }
+    refresh_tasks(ui);
+    select_name(&ui.cat, &ui.cats, &to);
+}
+
+/// Ask for a category name, given to `created`. With `current`, the name of the category being
+/// edited: the dialog says so, starts from it and saves instead of creating.
+fn new_category_dialog(
+    ui: &Rc<Ui>,
+    current: Option<&str>,
+    created: impl Fn(&Rc<Ui>, String) + 'static,
+) {
     let b = view!("new-category");
     let dialog: adw::AlertDialog = get(&b, "dialog");
     let name: adw::EntryRow = get(&b, "name");
     let d = dialog.clone();
     name.connect_changed(move |e| d.set_response_enabled("create", !e.text().trim().is_empty()));
+    if let Some(current) = current {
+        dialog.set_heading(Some(&gettext("Edit Category")));
+        dialog.set_response_label("create", &gettext("Save"));
+        name.set_text(current);
+        name.select_region(0, -1);
+    }
     let weak = Rc::downgrade(ui);
     dialog.connect_response(Some("create"), move |_, _| {
         if let Some(ui) = weak.upgrade() {
@@ -2979,7 +3047,7 @@ fn connect_new_category(
         p.set_property("selected", prev.get());
         busy.set(false);
         let created = created.clone();
-        new_category_dialog(&ui, move |ui, name| created(ui, name));
+        new_category_dialog(&ui, None, move |ui, name| created(ui, name));
     });
 }
 

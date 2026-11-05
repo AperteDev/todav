@@ -569,6 +569,16 @@ impl Todav {
         )?)
     }
 
+    /// Category `from` of a list renamed to `to` on all its tasks, as one undo step.
+    pub fn rename_category(&self, list_href: String, from: String, to: String) -> Result<()> {
+        Ok(todav_app::tasks::rename_category(
+            self.c(),
+            &list_href,
+            &from,
+            &to,
+        )?)
+    }
+
     /// A task dropped on a category (None: "Other").
     pub fn drop_on_category(
         &self,
