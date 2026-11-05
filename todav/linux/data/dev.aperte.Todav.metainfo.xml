@@ -36,19 +36,19 @@
   <!-- From the release tag (scripts/release.py moves them to each new one). -->
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.5.1/docs/screenshots/tasks.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.5.2/docs/screenshots/tasks.png</image>
       <caption>Tasks grouped by category, with subtasks and due dates</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.5.1/docs/screenshots/calendar-month.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.5.2/docs/screenshots/calendar-month.png</image>
       <caption>The month, with an event's details</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.5.1/docs/screenshots/calendar-week.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.5.2/docs/screenshots/calendar-week.png</image>
       <caption>Tasks planned into the week next to events</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.5.1/docs/screenshots/event-dialog.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.5.2/docs/screenshots/event-dialog.png</image>
       <caption>Editing an event</caption>
     </screenshot>
   </screenshots>
@@ -63,6 +63,15 @@
     <control>touch</control>
   </supports>
   <releases>
+    <release version="2.5.2" date="2026-11-05">
+      <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.5.2</url>
+      <description translate="no">
+        <p>Fixed</p>
+        <ul>
+          <li>GNOME extension: its D-Bus proxy is created when the extension is enabled and its pending request is cancelled when it is disabled (extensions.gnome.org review).</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.5.1" date="2026-11-05">
       <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.5.1</url>
       <description translate="no">

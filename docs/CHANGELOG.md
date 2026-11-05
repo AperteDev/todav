@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.2] - 2026-11-05
+
 ### Fixed
 
 - GNOME extension: its D-Bus proxy is created when the extension is enabled and its pending
@@ -656,7 +658,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Its options are in the app's Preferences. Without the app installed, its
   menu says so and links to the download.
 
-[Unreleased]: https://github.com/AperteDev/todav/compare/v2.5.1...HEAD
+[Unreleased]: https://github.com/AperteDev/todav/compare/v2.5.2...HEAD
+[2.5.2]: https://github.com/AperteDev/todav/compare/v2.5.1...v2.5.2
 [2.5.1]: https://github.com/AperteDev/todav/compare/v2.5.0...v2.5.1
 [2.5.0]: https://github.com/AperteDev/todav/compare/v2.4.3...v2.5.0
 [2.4.3]: https://github.com/AperteDev/todav/compare/v2.4.2...v2.4.3
