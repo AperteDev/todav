@@ -127,6 +127,14 @@ sudo apt install ./todav_<version>_amd64.deb
 sudo tar -xzf todav-<version>-x86_64.tar.gz -C /
 ```
 
+<p align="center">
+  <a href="https://extensions.gnome.org/extension/11473/todav-tasks-calendar/"><img src="https://raw.githubusercontent.com/andyholmes/gnome-shell-extensions-badge/master/get-it-on-ego.svg?sanitize=true" alt="Get it on GNOME Extensions" height="60"></a>
+</p>
+
+The extension is also on [extensions.gnome.org](https://extensions.gnome.org/extension/11473/todav-tasks-calendar/),
+a second way to get it. It suits the Flatpak app, which doesn't include it; the packages above
+install it with the app. It still needs the Todav app.
+
 Log out and back in, then turn the extension on in Extensions (or
 `gnome-extensions enable todav@aperte.dev`). Or [build and install](#building-and-installing)
 Todav from source. Then:
