@@ -142,6 +142,9 @@ struct Ui {
     linger: RefCell<Option<(glib::SourceId, Shown)>>,
     /// The list whose Completed group is open: it stays so as the page is rebuilt.
     done_open: RefCell<Option<String>>,
+    /// Lists changed since the page was last rebuilt (`on_event`): a burst of changes, such as
+    /// renumbering a list after a drop, rebuilds it once.
+    changed: RefCell<HashSet<String>>,
     /// The task being dragged and where it came from.
     dragging: RefCell<Option<(Task, Slot)>>,
     /// This drag was told that reordering needs manual sort (once a drag).
@@ -651,17 +654,25 @@ pub fn on_event(ev: &Event) {
     let Some(ui) = ui() else { return };
     match ev {
         Event::Changed(list) => {
-            let list = list.clone();
-            // Rebuild outside the signal handler that caused the change.
-            glib::idle_add_local_once(move || {
-                refresh_sidebar_counts(&ui);
-                let current = ui.current.borrow().clone();
-                let page = current.as_deref().is_some_and(|c| PAGES.contains(&c));
-                if current.as_deref() == Some(&list) || page || !ui.query.borrow().is_empty() {
-                    refresh_tasks(&ui);
-                }
-                crate::calendar::refresh();
-            });
+            // Rebuild outside the signal handler that caused the change, once for a burst of
+            // them (one event per task a drop renumbers).
+            let first = ui.changed.borrow().is_empty();
+            ui.changed.borrow_mut().insert(list.clone());
+            if first {
+                glib::idle_add_local_once(move || {
+                    let lists = std::mem::take(&mut *ui.changed.borrow_mut());
+                    refresh_sidebar_counts(&ui);
+                    let current = ui.current.borrow().clone();
+                    let page = current.as_deref().is_some_and(|c| PAGES.contains(&c));
+                    if current.as_deref().is_some_and(|c| lists.contains(c))
+                        || page
+                        || !ui.query.borrow().is_empty()
+                    {
+                        refresh_tasks(&ui);
+                    }
+                    crate::calendar::refresh();
+                });
+            }
         }
         Event::SyncState(s) => {
             set_syncing(&ui.sync_state, s == "syncing");
@@ -823,6 +834,7 @@ fn build(app: &adw::Application) -> Rc<Ui> {
         lingering: RefCell::default(),
         linger: RefCell::default(),
         done_open: RefCell::default(),
+        changed: RefCell::default(),
         dragging: RefCell::new(None),
         told_sort: Cell::new(false),
         drop_mark: RefCell::new(None),

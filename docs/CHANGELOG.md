@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Linux: dropping a task in a long list with manual sorting no longer freezes the window for
+  seconds; the page is rebuilt once after a burst of changes instead of once per renumbered task.
+
 ## [2.5.0] - 2026-11-04
 
 ### Added
