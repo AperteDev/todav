@@ -194,6 +194,38 @@ pub fn cancelled_events(c: &Client) -> Cancelled {
         .map_or(Cancelled::Crossed, |(_, k)| *k)
 }
 
+/// What the number on the app's icon in a dock counts (`launcher_count`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LauncherCount {
+    /// Nothing is set: the dock shows what it does itself (the app's notifications); the default.
+    Default,
+    /// Open tasks past their due date.
+    Overdue,
+    /// Open tasks due today or earlier (Upcoming's count).
+    Due,
+    /// Open tasks of high priority.
+    Important,
+    /// Today's events.
+    Events,
+}
+
+/// Stored values of the `launcher_count` choices, in the order the front-ends offer them.
+pub const LAUNCHER_COUNTS: [(&str, LauncherCount); 5] = [
+    ("default", LauncherCount::Default),
+    ("overdue", LauncherCount::Overdue),
+    ("due", LauncherCount::Due),
+    ("important", LauncherCount::Important),
+    ("events", LauncherCount::Events),
+];
+
+pub fn launcher_count(c: &Client) -> LauncherCount {
+    let v = c.setting("launcher_count".into()).unwrap_or_default();
+    LAUNCHER_COUNTS
+        .iter()
+        .find(|(s, _)| *s == v)
+        .map_or(LauncherCount::Default, |(_, k)| *k)
+}
+
 /// The weekdays the Work Week view shows (`work_days`, comma-separated, 0 = Sunday): one to six
 /// of them, in order; Monday to Friday by default.
 pub fn work_days(c: &Client) -> Vec<i64> {

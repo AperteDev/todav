@@ -6,6 +6,7 @@ mod dates;
 mod dbus;
 mod goa;
 mod i18n;
+mod launcher;
 mod lists;
 mod note;
 mod open;
@@ -473,6 +474,7 @@ fn withdraw_stale_reminders() {
 fn remind() {
     withdraw_stale_reminders();
     notify_reminders();
+    launcher::update();
     let now = core().local_now();
     let next = todav_app::service::next_reminder(core(), now);
     NEXT_REMINDER.with(|n| {

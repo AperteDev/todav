@@ -88,6 +88,9 @@ What Todav can do, in short. The details of each release are in the
 - A GNOME Shell extension: a count by the clock and a menu with a task list, the month and the
   agenda, which adds tasks and events; or the same in GNOME's clock menu.
 - Can be the system's calendar app, opened by the date in GNOME's clock menu.
+- A number on the app's icon in docks that show one (Dash to Dock and others), by a setting:
+  overdue tasks, tasks due today or earlier, important tasks or today's events; by default the
+  dock's own count of notifications.
 - Follows the system style; adaptive layout for narrow windows and touchscreens; keyboard
   shortcuts.
 - Restart into a new version from a banner, when Todav is updated while it runs.

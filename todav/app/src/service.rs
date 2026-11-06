@@ -323,6 +323,21 @@ pub fn next_reminder(c: &Client, now: i64) -> Option<i64> {
     tasks.chain(events).filter(|&r| r > now && r <= to).min()
 }
 
+/// The number for the app's icon in a dock (`prefs::launcher_count`) at `now` (local time), or
+/// `None` when the setting leaves it to the dock.
+pub fn launcher_count(c: &Client, now: i64) -> Option<u32> {
+    use crate::prefs::LauncherCount::*;
+    let tasks =
+        |keep: fn(&Task, i64) -> bool| c.upcoming().iter().filter(|t| keep(t, now)).count() as u32;
+    match crate::prefs::launcher_count(c) {
+        Default => None,
+        Overdue => Some(tasks(crate::dates::overdue)),
+        Due => Some(tasks(crate::dates::pressing)),
+        Important => Some(c.important().len() as u32),
+        Events => Some(crate::calendar::today_events(c).len() as u32),
+    }
+}
+
 /// Tells the service about settings other devices changed.
 struct Settings(Weak<Service>);
 
@@ -446,6 +461,59 @@ mod tests {
         // Past it, the task's comes next; past both, none within the week.
         assert_eq!(next_reminder(&c, now + 1500), Some(now + 3600));
         assert_eq!(next_reminder(&c, now + 3600), None);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn the_icons_number_counts_what_the_setting_says() {
+        let dir = std::env::temp_dir().join(format!("todav-app-badge-{}", std::process::id()));
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let account = c
+            .add_account(
+                AccountKind::Local,
+                String::new(),
+                String::new(),
+                String::new(),
+            )
+            .unwrap();
+        let list = c
+            .create_list(account, "Tasks".into(), "#0082C9".into(), false)
+            .unwrap();
+        let now = c.local_now();
+        let due = |at| TaskPatch {
+            due: Some(Some(Due { at, all_day: false })),
+            ..Default::default()
+        };
+        // One past due, one due later today (not overdue yet), one important and undated.
+        for (name, patch) in [
+            ("Late", Some(due(now - 60))),
+            ("Soon", Some(due(now + 60))),
+            ("Big", None),
+        ] {
+            let t = c
+                .add_task(list.clone(), name.into(), None, None, false)
+                .unwrap();
+            if let Some(p) = patch {
+                c.update_task(t.uid, p).unwrap();
+            } else {
+                let p = TaskPatch {
+                    priority: Some(Some(1)),
+                    ..Default::default()
+                };
+                c.update_task(t.uid, p).unwrap();
+            }
+        }
+        let set = |v: &str| c.set_setting("launcher_count".into(), v.into()).unwrap();
+        assert_eq!(launcher_count(&c, now), None);
+        set("overdue");
+        assert_eq!(launcher_count(&c, now), Some(1));
+        set("important");
+        assert_eq!(launcher_count(&c, now), Some(1));
+        set("events");
+        assert_eq!(launcher_count(&c, now), Some(0));
+        // A day on, both dated tasks are overdue.
+        set("overdue");
+        assert_eq!(launcher_count(&c, now + 86400 * 2), Some(2));
         let _ = std::fs::remove_dir_all(dir);
     }
 

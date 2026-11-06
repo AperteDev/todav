@@ -460,6 +460,13 @@ pub fn present(parent: &adw::ApplicationWindow, page: Option<&str>) -> adw::Pref
         let _ = core().set_setting("cancelled_events".into(), value.into());
         crate::calendar::refresh();
     });
+    connect_choice(
+        &b,
+        "launcher_count",
+        &["default", "overdue", "due", "important", "events"],
+    );
+    get::<adw::ComboRow>(&b, "launcher_count")
+        .connect_selected_notify(|_| crate::launcher::update());
     // The extension: its rows carry the setting's name as their id. It hears of a change at
     // once, to put its parts and icon where they now go.
     let ext_changed = || crate::dbus::on_event(&crate::Event::Changed(String::new()));

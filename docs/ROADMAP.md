@@ -208,6 +208,9 @@ C# bindings (`uniffi-bindgen-cs`):
 - A tray flyout with a list and the agenda, the GNOME extension's counterpart. WinUI 3 has no
   tray icon of its own: a small library (H.NotifyIcon) or the Win32 calls through CsWin32, to be
   chosen.
+- The number on the app's icon (`launcher_count`, as on Linux) as the taskbar button's overlay
+  badge (`ITaskbarList3::SetOverlayIcon`, with the number drawn into an icon), from
+  `todav_app::service::launcher_count`.
 - Translations through `Translations` from `todav-ffi`, as on Android; `scripts/i18n.sh` gets
   the C# sources.
 - Builds only on Windows: `cargo build --target x86_64-pc-windows-msvc` (and `aarch64`) in
@@ -293,5 +296,10 @@ repository. The two keep separate configuration and credentials. What Todav prov
   `cardstyle` and `card_background` `blur`, but only for the packages in its built-in
   `widgetcard_whitelist` (Honor's own apps and the system UI). Another app's widget stays a
   plain one, and a widget can't blur what is behind it itself.
+- **The number on the app's icon on Android** (looked into 2026-11-06): there is no API to set a
+  launcher's badge count. Since Android 8 the launcher draws a notification dot for an app with
+  a notification, and `Notification.Builder.setNumber` only shows a number in the long-press
+  popup; a number on the icon itself comes from vendor broadcasts (Samsung, older Sony and HTC),
+  which break between versions. Worth another look only if Android adds a public API.
 - **A cross-platform UI toolkit** (Compose Multiplatform, Flutter, Slint): a native UI per
   platform over the shared Rust instead.

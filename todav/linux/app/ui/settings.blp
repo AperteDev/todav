@@ -77,6 +77,13 @@ Adw.PreferencesDialog dialog {
         title: _("Urgent reminders for all");
         subtitle: _("Kept on screen until dismissed, as those of important tasks and events are");
       }
+
+      // Dock icons that show a number (Unity Launcher API); Default leaves it to the dock.
+      Adw.ComboRow launcher_count {
+        title: _("Number on the app icon");
+        subtitle: _("In docks that show one, such as Dash to Dock");
+        model: Gtk.StringList { strings [_("Default"), _("Overdue tasks"), _("Due today or earlier"), _("Important tasks"), _("Today’s events")] };
+      }
     }
   }
 

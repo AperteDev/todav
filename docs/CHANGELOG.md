@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Linux: a number on the app's icon in docks that show one (Dash to Dock, Plank, KDE's task
+  manager…), chosen in Preferences → General → "Number on the app icon": overdue tasks, tasks due
+  today or earlier, important tasks or today's events. By default it stays the dock's own count of
+  notifications. The Flatpak gets the permission to talk to `com.canonical.Unity` for it.
 - Categories can be put in order, and deleted. Dragging a category in the Linux sidebar, or by
   its handle in Android's "Edit Categories…" (in the category filter's menu, where a category is
   also added, renamed or deleted), saves the order in the account's `todav/config.json`, so every
