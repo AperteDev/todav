@@ -14,7 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   password (Todav finds the calendars from the address, `/.well-known/caldav` too). Their task
   lists and calendars sync; changes made elsewhere are fetched every minute while the app is in
   front and every 30 minutes otherwise, and settings and the order of categories stay on the
-  device.
+  device. Popular services are picked by name (iCloud, Fastmail, Yahoo, mailbox.org, Posteo),
+  so no address is typed; only "Other" asks for one. What is Nextcloud's alone stays out of the
+  way for them: the Push and Sync settings (DAV Push, ntfy, synced settings) show only with a
+  Nextcloud account, Android asks for no UnifiedPush distributor for them, and Nextcloud's own
+  request headers are not sent.
 - iCloud works as a CalDAV server (`caldav.icloud.com`, with an app-specific password): its
   calendars are on a host of their own, which Todav now follows.
 - With no task list in any account (a server with calendars only, or an account with nothing

@@ -10,6 +10,56 @@ pub trait Keyring {
     fn clear(&self, url: &str, user: &str);
 }
 
+/// A CalDAV service offered by name when adding an account, so no address is typed; "Other"
+/// (an address of one's own) is the front-end's last choice.
+pub struct CalDavService {
+    /// Its brand, not translated.
+    pub name: &'static str,
+    /// Where `todav_core::caldav_login` starts from.
+    pub url: &'static str,
+    /// It takes an app-specific password, made in its account settings, not the usual one.
+    pub app_password: bool,
+}
+
+/// The services offered, the most used first. Their addresses are the ones they give for CalDAV
+/// clients; the core finds the calendars from there.
+pub const CALDAV_SERVICES: [CalDavService; 5] = [
+    CalDavService {
+        name: "iCloud",
+        url: "https://caldav.icloud.com",
+        app_password: true,
+    },
+    CalDavService {
+        name: "Fastmail",
+        url: "https://caldav.fastmail.com",
+        app_password: true,
+    },
+    CalDavService {
+        name: "Yahoo",
+        url: "https://caldav.calendar.yahoo.com",
+        app_password: true,
+    },
+    CalDavService {
+        name: "mailbox.org",
+        url: "https://dav.mailbox.org",
+        app_password: false,
+    },
+    CalDavService {
+        name: "Posteo",
+        url: "https://posteo.de:8443",
+        app_password: false,
+    },
+];
+
+/// Whether the service at `url` (an address typed, or where its calendars were found) takes an
+/// app-specific password only.
+pub fn needs_app_password(url: &str) -> bool {
+    let host = todav_core::caldav::origin(url);
+    CALDAV_SERVICES
+        .iter()
+        .any(|s| s.app_password && todav_core::caldav::origin(s.url) == host)
+}
+
 /// Why an account could not be added, reconnected or removed.
 #[derive(Debug)]
 pub enum Error {
@@ -128,6 +178,30 @@ pub fn host(a: &Account) -> &str {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_services_offered_have_addresses_to_sign_in_at() {
+        let all = super::CALDAV_SERVICES;
+        for s in &all {
+            // https (the password goes there), and as `add` keeps it: no trailing slash.
+            assert!(
+                s.url.starts_with("https://") && !s.url.ends_with('/'),
+                "{}",
+                s.name
+            );
+        }
+        assert!(super::needs_app_password(
+            "https://caldav.icloud.com/12345/principal/"
+        ));
+        assert!(!super::needs_app_password(
+            "https://dav.mailbox.org/caldav/"
+        ));
+        assert!(!super::needs_app_password("https://cloud.example"));
+        let mut names: Vec<_> = all.iter().map(|s| s.name).collect();
+        names.sort();
+        names.dedup();
+        assert_eq!(names.len(), all.len());
+    }
+
     #[test]
     fn google_without_calendar_access() {
         // What Google answers a sign-in given no calendar access, as the sync reports it.

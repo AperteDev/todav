@@ -930,6 +930,10 @@ fn connect_settings_sync(b: &gtk::Builder) -> impl Fn() + 'static {
         n.set_sensitive(id.is_some());
         crate::sync_now(); // pulls that account's settings right away
     });
+    // Push (DAV Push, with ntfy) and synced settings are Nextcloud's: other servers have neither,
+    // so their groups show only with a Nextcloud account.
+    let (push, sync): (adw::PreferencesGroup, adw::PreferencesGroup) =
+        (get(b, "push"), get(b, "sync"));
     move || {
         filling.set(true);
         let mut v = vec![None];
@@ -940,6 +944,8 @@ fn connect_settings_sync(b: &gtk::Builder) -> impl Fn() + 'static {
                 labels.push(crate::account_name(&a));
             }
         }
+        push.set_visible(v.len() > 1);
+        sync.set_visible(v.len() > 1);
         let labels: Vec<&str> = labels.iter().map(String::as_str).collect();
         names.splice(0, names.n_items(), &labels);
         let current = core().settings_account();

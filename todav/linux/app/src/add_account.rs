@@ -12,6 +12,7 @@ use adw::prelude::*;
 use gtk::{gio, glib};
 use std::cell::Cell;
 use std::rc::Rc;
+use todav_app::accounts::CALDAV_SERVICES;
 use todav_core::AccountKind;
 
 /// The second step: where the account comes from.
@@ -33,6 +34,8 @@ pub struct AddAccount {
     /// What a Google or CalDAV account gives, under it when one is chosen.
     note: gtk::Label,
     server: (gtk::DropDown, adw::EntryRow),
+    /// Another CalDAV server: the services offered, then "Other" for `server`.
+    service: adw::ComboRow,
     ntfy: (gtk::DropDown, adw::EntryRow),
     sync_settings: adw::SwitchRow,
     /// The welcome page's ntfy server and settings sync (Nextcloud's).
@@ -65,6 +68,7 @@ pub fn new(welcome: bool, done: impl Fn(i64) + 'static) -> Rc<AddAccount> {
         goa_account: get(&b, "goa_account"),
         note: get(&b, "note"),
         server: (get(&b, "server_scheme"), get(&b, "server")),
+        service: get(&b, "service"),
         ntfy: (get(&b, "ntfy_scheme"), get(&b, "ntfy")),
         sync_settings: get(&b, "sync_settings"),
         welcome_options: get(&b, "welcome_options"),
@@ -81,6 +85,18 @@ pub fn new(welcome: bool, done: impl Fn(i64) + 'static) -> Rc<AddAccount> {
     for g in &a.goa {
         names.append(&g.name);
     }
+    // The services by name, then "Other": only that one asks for an address.
+    let services: gtk::StringList = get(&b, "services");
+    for s in &CALDAV_SERVICES {
+        services.append(s.name);
+    }
+    services.append(&gettext("Other"));
+    let weak = Rc::downgrade(&a);
+    a.service.connect_selected_notify(move |_| {
+        if let Some(a) = weak.upgrade() {
+            a.show_address();
+        }
+    });
 
     let use_goa: adw::ActionRow = get(&b, "use_goa");
     let names: Vec<&str> = a.goa.iter().map(|g| g.name.as_str()).collect();
@@ -126,7 +142,8 @@ pub fn new(welcome: bool, done: impl Fn(i64) + 'static) -> Rc<AddAccount> {
             let caldav = source == Source::CalDav;
             a.source.set(source);
             a.goa_account.set_visible(goa);
-            a.server.1.set_visible(!goa);
+            a.service.set_visible(caldav);
+            a.show_address();
             a.connect_goa.set_visible(goa);
             a.sign_in.set_visible(!goa);
             // Only Nextcloud has the browser's Login Flow.
@@ -160,7 +177,7 @@ pub fn new(welcome: bool, done: impl Fn(i64) + 'static) -> Rc<AddAccount> {
                     page.set_title(&gettext("CalDAV Server"));
                     status.set_icon_name(Some("network-server-symbolic"));
                     status.set_description(Some(&gettext(
-                        "Sign in to any server with CalDAV, such as mailbox.org",
+                        "Pick your service, or enter the address of any server with CalDAV",
                     )));
                     a.server.1.set_title(&gettext("CalDAV server"));
                 }
@@ -215,8 +232,8 @@ pub fn new(welcome: bool, done: impl Fn(i64) + 'static) -> Rc<AddAccount> {
     let password = gio::SimpleAction::new("password-login", None);
     password.connect_activate(move |_, _| {
         let Some(a) = weak.upgrade() else { return };
-        let server = url_text(&a.server);
         let caldav = a.source.get() == Source::CalDav;
+        let server = a.address();
         if server.is_empty() {
             a.root.add_toast(note(&no_server(caldav)));
             return;
@@ -270,6 +287,28 @@ impl AddAccount {
             }
             a.reset_login();
         });
+    }
+
+    /// The service chosen, if one is offered by name (not "Other").
+    fn service(&self) -> Option<&'static todav_app::accounts::CalDavService> {
+        match self.source.get() {
+            Source::CalDav => CALDAV_SERVICES.get(self.service.selected() as usize),
+            _ => None,
+        }
+    }
+
+    /// The address of the server to sign in to: the service's, or what was typed.
+    fn address(&self) -> String {
+        match self.service() {
+            Some(s) => s.url.to_string(),
+            None => url_text(&self.server),
+        }
+    }
+
+    /// The address is asked only for a Nextcloud server, or "Other" among the services.
+    fn show_address(&self) {
+        let goa = self.source.get() == Source::Goa;
+        self.server.1.set_visible(!goa && self.service().is_none());
     }
 
     /// What the account chosen gives, when it is Google's or another CalDAV server's: neither

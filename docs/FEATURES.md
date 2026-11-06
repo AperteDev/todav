@@ -69,9 +69,10 @@ What Todav can do, in short. The details of each release are in the
 
 - Sign in through GNOME Online Accounts, the browser (Nextcloud Login Flow) or a login name and
   app password; passwords stay in the system keyring.
-- Other CalDAV servers than Nextcloud (mailbox.org, Radicale, Fastmail…) with a login name and
-  password, or from GNOME Online Accounts: their task lists and calendars sync, checked every
-  minute (settings and categories' order stay on the device).
+- Other CalDAV servers than Nextcloud with a login name and password: iCloud, Fastmail, Yahoo,
+  mailbox.org and Posteo by name, any other by its address, or from GNOME Online Accounts.
+  Their task lists and calendars sync, checked every minute (settings and categories' order stay
+  on the device; DAV Push and synced settings are Nextcloud's).
 - Several accounts side by side: Nextcloud on one server or more, other CalDAV servers, a Google
   account (its calendars and Google Tasks) and lists kept on this device; each can be switched
   off.

@@ -1282,10 +1282,17 @@ pub fn password_login(
     let password: adw::PasswordEntryRow = get(&b, "password");
     if caldav {
         let group: adw::PreferencesGroup = get(&b, "credentials");
-        group.set_description(Some(&gettext(
-            "The login name and password of your account; some providers ask for an app \
-             password instead",
-        )));
+        group.set_description(Some(&if todav_app::accounts::needs_app_password(&server) {
+            gettext(
+                "This service takes an app-specific password, made in your account's \
+                 security settings, not your usual one",
+            )
+        } else {
+            gettext(
+                "The login name and password of your account; some providers ask for an app \
+                 password instead",
+            )
+        }));
         password.set_title(&gettext("Password"));
     }
     let sign_in: gtk::Button = get(&b, "sign_in");

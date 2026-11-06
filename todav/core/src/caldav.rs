@@ -253,6 +253,8 @@ pub struct Dav {
     origin: std::sync::Mutex<String>,
     /// The server signed in to: its principal's paths are always relative to it.
     root_origin: String,
+    /// A Nextcloud, not another CalDAV server: its own extensions (webcal caching) are used.
+    nextcloud: bool,
     root: String,
     auth: String,
     /// The user's own addresses (calendar-user-address-set), as `home` last read them.
@@ -318,7 +320,7 @@ impl Dav {
             "Basic {}",
             crate::b64encode(format!("{user}:{password}").as_bytes(), false)
         );
-        Dav::with(origin(url), root, auth)
+        Dav::with(origin(url), root, auth, true)
     }
 
     /// Any CalDAV server, with a login name and a password; `url` is where its calendars are
@@ -331,15 +333,21 @@ impl Dav {
         // With the trailing slash of a collection: a server may redirect without it, and a
         // redirect turns the PROPFIND into a GET.
         let root = format!("{}/", url.trim_end_matches('/'));
-        Dav::with(origin(&root), root, auth)
+        Dav::with(origin(&root), root, auth, false)
     }
 
     /// A server signed in to with an OAuth access token (Google); `url` is the user's principal.
     pub fn bearer(url: &str, token: &str) -> Dav {
-        Dav::with(origin(url), url.to_string(), format!("Bearer {token}"))
+        Dav::with(
+            origin(url),
+            url.to_string(),
+            format!("Bearer {token}"),
+            false,
+        )
     }
 
-    fn with(origin: String, root: String, auth: String) -> Dav {
+    /// `nextcloud`: it is Nextcloud, so what only it understands is asked of it.
+    fn with(origin: String, root: String, auth: String, nextcloud: bool) -> Dav {
         let agent = ureq::Agent::config_builder()
             .tls_config(crate::net::tls())
             .allow_non_standard_methods(true)
@@ -351,6 +359,7 @@ impl Dav {
             .new_agent();
         Dav {
             agent,
+            nextcloud,
             root_origin: origin.clone(),
             origin: std::sync::Mutex::new(origin),
             root,
@@ -409,8 +418,8 @@ impl Dav {
                 .uri(self.url(href))
                 .header("Authorization", &self.auth);
             // Nextcloud lists subscriptions (webcal) only to clients asking for its cached
-            // copies: then each is a read-only calendar. Other servers ignore it.
-            if !headers.iter().any(|(k, _)| *k == WEBCAL) {
+            // copies: then each is a read-only calendar. Other servers are not asked.
+            if self.nextcloud && !headers.iter().any(|(k, _)| *k == WEBCAL) {
                 b = b.header(WEBCAL, "On");
             }
             if !body.is_empty()
@@ -592,7 +601,7 @@ impl Dav {
         }
         // Nextcloud claims tasks for a subscription too, but keeps only its events; without
         // the cached copies it lists one as `subscribed`. Asked only when one may be.
-        if lists.iter().any(|l| l.tasks && !l.writable) {
+        if self.nextcloud && lists.iter().any(|l| l.tasks && !l.writable) {
             let body = r#"<?xml version="1.0" encoding="utf-8"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/></d:prop></d:propfind>"#;
             let r = self.request("PROPFIND", &home, &[("Depth", "1"), (WEBCAL, "Off")], body)?;
             if r.status == 207 {

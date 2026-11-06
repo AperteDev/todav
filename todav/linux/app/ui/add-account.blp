@@ -66,7 +66,7 @@ Adw.ToastOverlay root {
 
                 Adw.ActionRow use_caldav {
                   title: _("CalDAV Server");
-                  subtitle: _("Another server, such as mailbox.org, with a login name and password");
+                  subtitle: _("iCloud, Fastmail, mailbox.org, or any server with a login name and password");
                   activatable: true;
 
                   [prefix]
@@ -136,6 +136,14 @@ Adw.ToastOverlay root {
                 Adw.ComboRow goa_account {
                   title: _("Account");
                   model: Gtk.StringList goa_names {};
+                }
+
+                // Another CalDAV server: a service by name, or "Other" with an address of
+                // one's own (src/add_account.rs).
+                Adw.ComboRow service {
+                  title: _("Service");
+                  model: Gtk.StringList services {};
+                  visible: false;
                 }
 
                 Adw.EntryRow server {

@@ -79,6 +79,14 @@ pub(crate) fn utf16_spans(text: &str, spans: Vec<todav_app::note::Span>) -> Vec<
         .collect()
 }
 
+/// A CalDAV service offered by name (`todav_app::accounts::CALDAV_SERVICES`).
+#[derive(uniffi::Record)]
+pub struct CaldavService {
+    pub name: String,
+    pub url: String,
+    pub app_password: bool,
+}
+
 /// A note as read (`todav_app::note::read`).
 #[derive(uniffi::Record)]
 pub struct NoteRead {

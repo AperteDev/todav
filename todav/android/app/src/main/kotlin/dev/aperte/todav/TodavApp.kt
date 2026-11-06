@@ -125,9 +125,9 @@ class TodavApp : Application() {
         ready.first { it }
     }
 
-    /** Register for pushes through UnifiedPush, when a distributor is installed and some account syncs. */
+    /** Register for pushes through UnifiedPush, when a distributor is installed and a Nextcloud account syncs (DAV Push is Nextcloud's). */
     fun pushSetup() {
-        if (core.canSync()) push.register()
+        if (core.accounts().any { it.kind == AccountKind.NEXTCLOUD && core.syncing(it) }) push.register()
     }
 
     /** Connect the Nextcloud and CalDAV accounts signed in here with their saved passwords. */

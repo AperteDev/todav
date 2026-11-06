@@ -173,7 +173,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         app.awaitReady()
         return try {
             app.core.sync()
-            app.push.endpoint?.let { app.core.pushRegister(it, PUSH_EXPIRY) } ?: app.push.register()
+            app.push.endpoint?.let { app.core.pushRegister(it, PUSH_EXPIRY) } ?: app.pushSetup()
             Reminders.schedule(app)
             Result.success()
         } catch (e: Exception) {

@@ -1142,6 +1142,25 @@ pub fn caldav_login(server: String, login_name: String, password: String) -> Res
     Ok(todav_core::caldav_login(server, login_name, password)?)
 }
 
+/// The CalDAV services offered by name when adding an account, the most used first.
+#[uniffi::export]
+pub fn caldav_services() -> Vec<CaldavService> {
+    todav_app::accounts::CALDAV_SERVICES
+        .iter()
+        .map(|s| CaldavService {
+            name: s.name.into(),
+            url: s.url.into(),
+            app_password: s.app_password,
+        })
+        .collect()
+}
+
+/// Whether the CalDAV service at `url` takes an app-specific password only.
+#[uniffi::export]
+pub fn needs_app_password(url: String) -> bool {
+    todav_app::accounts::needs_app_password(&url)
+}
+
 /// Whether an ntfy server answers.
 #[uniffi::export]
 pub fn ntfy_check(ntfy_url: String) -> Result<()> {

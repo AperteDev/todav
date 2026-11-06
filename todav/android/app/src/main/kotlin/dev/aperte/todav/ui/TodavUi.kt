@@ -49,6 +49,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -72,6 +73,8 @@ import dev.aperte.todav.Dest
 import dev.aperte.todav.Main
 import dev.aperte.todav.SignIn
 import dev.aperte.todav.core.AccountKind
+import dev.aperte.todav.core.caldavServices
+import dev.aperte.todav.core.needsAppPassword
 import dev.aperte.todav.tr
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -174,7 +177,7 @@ fun AccountChoice(model: Main, welcome: Boolean) {
             }
             Choice(
                 tr("CalDAV Server"),
-                tr("Another server, such as mailbox.org, with a login name and password"),
+                tr("iCloud, Fastmail, mailbox.org, or any server with a login name and password"),
                 Icons.Outlined.Dns,
             ) {
                 caldav = true
@@ -207,7 +210,7 @@ fun AccountChoice(model: Main, welcome: Boolean) {
             server = null
             login = ""
         }
-        SignInForm(model, entered, { server = it }, login, connect, caldav)
+        SignInForm(model, entered, { server = it }, login, connect, caldav, pick = caldav)
     }
 }
 
@@ -234,17 +237,43 @@ fun SignInForm(
     login: String,
     onDone: (String, String, String) -> Unit,
     caldav: Boolean = false,
+    /** For a CalDAV account being added: a service by name, "Other" asking for the address. */
+    pick: Boolean = false,
 ) {
     val state by model.signIn.collectAsStateWithLifecycle()
     var password by remember { mutableStateOf(false) }
+    val services = remember { if (pick) caldavServices() else emptyList() }
+    var choice by rememberSaveable { mutableIntStateOf(0) }
+    val other = choice >= services.size
+    LaunchedEffect(choice) {
+        val service = services.getOrNull(choice)
+        if (service != null) onServer(service.url) else if (services.any { it.url == server }) onServer("")
+    }
     val context = LocalContext.current
     val s = state
     if (s is SignIn.Browser) {
         LaunchedEffect(s.url) { CustomTabsIntent.Builder().build().launchUrl(context, s.url.toUri()) }
     }
-    Text(if (caldav) tr("Sign in to any server with CalDAV, such as mailbox.org") else tr("Sign in with the browser or an app password"))
+    Text(
+        if (pick) tr("Pick your service, or enter the address of any server with CalDAV")
+        else if (caldav) tr("Sign in with a login name and password")
+        else tr("Sign in with the browser or an app password"),
+    )
     Group {
-        FieldItem(
+        if (pick) {
+            var menu by remember { mutableStateOf(false) }
+            val names = services.map { it.name } + tr("Other")
+            Box {
+                Item(
+                    headlineContent = { Text(tr("Service")) },
+                    supportingContent = { Text(names[choice.coerceIn(0, names.size - 1)]) },
+                    leadingContent = { Icon(Icons.Outlined.Cloud, null) },
+                    modifier = Modifier.clickable { menu = true },
+                )
+                PickMenu(menu, { menu = false }, names, choice) { choice = it }
+            }
+        }
+        if (!pick || other) FieldItem(
             server,
             onServer,
             if (caldav) tr("CalDAV server") else tr("Nextcloud server"),
@@ -286,14 +315,14 @@ fun SignInForm(
             }
         }
     }
-    if (password) PasswordDialog(login, caldav, onDismiss = { password = false }) { name, secret ->
+    if (password) PasswordDialog(login, caldav, caldav && needsAppPassword(server), onDismiss = { password = false }) { name, secret ->
         password = false
         model.signInWithPassword(server, name, secret, onDone, caldav)
     }
 }
 
 @Composable
-private fun PasswordDialog(initial: String, caldav: Boolean, onDismiss: () -> Unit, onConnect: (String, String) -> Unit) {
+private fun PasswordDialog(initial: String, caldav: Boolean, appPassword: Boolean, onDismiss: () -> Unit, onConnect: (String, String) -> Unit) {
     var login by rememberSaveable { mutableStateOf(initial) }
     var secret by remember { mutableStateOf("") }
     var shown by remember { mutableStateOf(false) }
@@ -306,7 +335,8 @@ private fun PasswordDialog(initial: String, caldav: Boolean, onDismiss: () -> Un
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(
-                    if (caldav) tr("The login name and password of your account; some providers ask for an app password instead")
+                    if (appPassword) tr("This service takes an app-specific password, made in your account's security settings, not your usual one")
+                    else if (caldav) tr("The login name and password of your account; some providers ask for an app password instead")
                     else tr("Create an app password in Nextcloud under Settings → Security"),
                 )
                 Group {

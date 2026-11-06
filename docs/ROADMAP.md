@@ -53,8 +53,10 @@ Planned work, not yet done. [FEATURES.md](FEATURES.md) lists it publicly; the or
   board.
 - **More of other CalDAV servers** (`AccountKind::CalDav` signs in with a login name and a
   password and checks for changes on a timer, in the Linux and Android apps): so far tried
-  against Nextcloud's own CalDAV and iCloud (an app-specific password), so mailbox.org,
-  Radicale, Baïkal and Fastmail are to be tried, each with what it needs. Open: where the
+  against Nextcloud's own CalDAV and iCloud (an app-specific password), so the other services
+  picked by name (`CALDAV_SERVICES`: Fastmail, Yahoo, mailbox.org, Posteo; their addresses
+  answer as CalDAV servers) and Radicale and Baïkal are to be tried, each with what it needs.
+  Open: where the
   categories' order and icons and the synced settings are kept for a server without Nextcloud
   Files (they stay on the device now; a file in a calendar-less collection, or a property of
   the calendar, if servers take them); sign-in with OAuth for servers that need it (Fastmail's,
