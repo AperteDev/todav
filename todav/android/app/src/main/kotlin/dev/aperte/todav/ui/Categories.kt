@@ -52,20 +52,15 @@ import dev.aperte.todav.ntr
 import dev.aperte.todav.ptr
 import dev.aperte.todav.tr
 
-/**
- * The categories of the list shown: to show one only (or "Other"), a new one to add, and all of
- * them to put in order, rename or delete.
- */
+/** The categories of the list shown, to show one only (or "Other"), and "Edit Categories…" for the rest. */
 @Composable
 fun CategoryFilter(model: Main, screen: Screen, list: String) {
     var open by remember { mutableStateOf(false) }
-    var naming by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(false) }
     val names = screen.categories
-    // All, each category, "Other" (once there are categories), then New Category… and Edit Categories….
+    // All, each category, "Other" (once there are categories), then Edit Categories….
     val other = if (names.isEmpty()) emptyList() else listOf(ptr("category", "Other"))
-    val actions = listOf(tr("New Category…")) + if (names.isEmpty()) emptyList() else listOf(tr("Edit Categories…"))
-    val options = listOf(tr("All Categories")) + names + other + actions
+    val options = listOf(tr("All Categories")) + names + other + tr("Edit Categories…")
     Box {
         Tip(tr("Categories")) {
             IconButton(onClick = { open = true }) {
@@ -86,20 +81,12 @@ fun CategoryFilter(model: Main, screen: Screen, list: String) {
                 else -> names.indexOf(screen.filter) + 1
             },
         ) {
-            val shown = 1 + names.size + other.size
             when {
                 it == 0 -> model.filterBy(list, null)
-                it == shown -> naming = true
-                it > shown -> editing = true
+                it == options.lastIndex -> editing = true
                 it > names.size -> model.filterBy(list, OTHER)
                 else -> model.filterBy(list, names[it - 1])
             }
-        }
-    }
-    if (naming) {
-        CategoryDialog(null, { naming = false }) {
-            naming = false
-            model.addCategory(list, it)
         }
     }
     if (editing) CategoriesDialog(model, list, names) { editing = false }
@@ -191,6 +178,7 @@ private fun CategoriesDialog(model: Main, list: String, names: List<String>, onD
     var dropped by remember { mutableStateOf<List<String>?>(null) }
     LaunchedEffect(names) { dropped = null }
     var editing by remember { mutableStateOf<String?>(null) }
+    var naming by remember { mutableStateOf(false) }
     val shown = dropped ?: names
     val row = with(LocalDensity.current) { 60.dp.toPx() } // a row and the gap below it
     val haptics = LocalHapticFeedback.current
@@ -250,6 +238,13 @@ private fun CategoriesDialog(model: Main, list: String, names: List<String>, onD
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(tr("Done")) } },
+        dismissButton = { TextButton(onClick = { naming = true }) { Text(tr("New Category…")) } },
     )
     editing?.let { CategoryEditor(model, list, it) { editing = null } }
+    if (naming) {
+        CategoryDialog(null, { naming = false }) {
+            naming = false
+            model.addCategory(list, it)
+        }
+    }
 }

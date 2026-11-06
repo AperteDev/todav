@@ -1,9 +1,7 @@
 package dev.aperte.todav.ui
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -298,11 +296,6 @@ private fun TaskList(model: Main, screen: Screen, state: LazyListState, padding:
     // The task tapped: its details sheet, as the calendar's (pulled up, its page).
     var details by remember { mutableStateOf<TodavTask?>(null) }
     details?.let { ItemSheet(model, Item.Task(it)) { details = null } }
-    // The category being edited or deleted (a heading held).
-    var renaming by remember { mutableStateOf<String?>(null) }
-    renaming?.let { name ->
-        screen.list?.let { CategoryEditor(model, it.href, name) { renaming = null } }
-    }
     if (screen.groups.isEmpty() && screen.completed.isEmpty()) {
         Empty(screen, padding)
         return
@@ -519,7 +512,7 @@ private fun TaskList(model: Main, screen: Screen, state: LazyListState, padding:
                     Box(
                         Modifier.graphicsLayer { translationY = dy }
                             .background(if (on) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent),
-                    ) { Heading(title, group.category?.let { c -> { renaming = c } }) }
+                    ) { Heading(title) }
                 }
             }
             items(group.rows, key = { "${group.title}:${it.task.uid}" }, contentType = { "task" }) { row ->
@@ -586,26 +579,13 @@ private fun Empty(screen: Screen, padding: PaddingValues) {
     }
 }
 
-/** A heading; held, `onLongClick` (a category's, to edit it). */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun Heading(title: String, onLongClick: (() -> Unit)? = null) {
-    val haptics = LocalHapticFeedback.current
+fun Heading(title: String) {
     Text(
         title,
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)
-            .then(
-                if (onLongClick == null) {
-                    Modifier
-                } else {
-                    Modifier.combinedClickable(onClick = {}, onLongClick = {
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onLongClick()
-                    })
-                },
-            )
             .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
     )
 }
