@@ -505,6 +505,48 @@ fn a_caldav_account_syncs_without_nextcloud_extras() {
     assert!(client.lists().iter().any(|l| l.display_name == "it-caldav"));
 }
 
+/// iCloud (`APPLE_*` in `.env`, an app-specific password; skipped without them): its calendars
+/// live on a host of their own, and a task list made here comes back from it.
+#[test]
+fn icloud_syncs_a_task_list_on_its_own_host() {
+    let (Some(url), Some(user), Some(pass)) =
+        (get("APPLE_URL"), get("APPLE_USER"), get("APPLE_PASS"))
+    else {
+        return;
+    };
+    let c = todav_core::caldav_login(url, user.clone(), pass).unwrap();
+    let dir = std::env::temp_dir().join(format!("todav-it-icloud-{}", now()));
+    let client = Client::open(dir.to_string_lossy().into()).unwrap();
+    let id = client
+        .add_account(AccountKind::CalDav, c.server, user, "".into())
+        .unwrap();
+    client.connect(id, c.app_password).unwrap();
+    client.sync().into_result().unwrap();
+    let list = client
+        .create_list(id, "it-icloud".into(), "#0082c9".into(), false)
+        .unwrap();
+    let task = client
+        .add_task(list.clone(), "from Todav".into(), None, None, false)
+        .unwrap();
+    client.sync().into_result().unwrap();
+    assert!(!client.pending(Some(id)));
+    // Another device, fresh: the list and its task come from the server.
+    let dir = std::env::temp_dir().join(format!("todav-it-icloud-b-{}", now()));
+    let other = Client::open(dir.to_string_lossy().into()).unwrap();
+    let id = other
+        .add_account(
+            AccountKind::CalDav,
+            client.account(id).unwrap().url,
+            client.account(id).unwrap().user,
+            "".into(),
+        )
+        .unwrap();
+    other.connect(id, get("APPLE_PASS").unwrap()).unwrap();
+    other.sync().into_result().unwrap();
+    assert!(other.task(task.uid.clone()).is_some());
+    client.delete_list(list).unwrap();
+}
+
 #[test]
 fn events_sync_with_their_zone_and_recurrence() {
     let f = Fixture::with("events", &["VEVENT", "VTODO"]);

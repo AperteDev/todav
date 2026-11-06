@@ -15,12 +15,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lists and calendars sync; changes made elsewhere are fetched every minute while the app is in
   front and every 30 minutes otherwise, and settings and the order of categories stay on the
   device.
+- iCloud works as a CalDAV server (`caldav.icloud.com`, with an app-specific password): its
+  calendars are on a host of their own, which Todav now follows.
 - With no task list in any account (a server with calendars only, or an account with nothing
   yet) the task page says so, with a way to the calendar, instead of staying blank (Android
   showed "All Done"); on Linux the add field is off then. A CalDAV server that does not allow
   making lists or calendars from an app says so.
 - Linux: GNOME Online Accounts' other accounts with calendars (a WebDAV account, for one) can be
   chosen too, next to Nextcloud and Google.
+
+### Fixed
+
+- A task list or calendar that comes from the server with nothing in it (a new account's, one
+  made on the web) now shows in the sidebar after the sync, not only after the next change.
 
 ## [2.6.0] - 2026-11-06
 

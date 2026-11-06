@@ -127,6 +127,11 @@ impl Client {
         }
         let db = self.db.lock().unwrap();
         store::kv_set(&db, &crate::account::key(id, "addresses"), &mine.join("\n"))?;
+        store::kv_set(
+            &db,
+            &crate::account::key(id, "dav_origin"),
+            &dav.data_origin(),
+        )?;
         Ok(remote)
     }
 

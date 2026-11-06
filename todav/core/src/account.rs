@@ -184,6 +184,12 @@ impl Client {
             AccountKind::CalDav => Dav::caldav(&a.url, &a.user, &password),
             _ => Dav::new(&a.url, &a.user, &password),
         };
+        // Where the server's paths are from, as the last sync found out (`remote_lists`): the
+        // paths stored are that host's, and edits go up before the next sync asks again.
+        let origin = store::kv_get(&self.db.lock().unwrap(), &key(id, "dav_origin")).ok();
+        if let Some(origin) = origin.flatten() {
+            dav.set_data_origin(&origin);
+        }
         self.dav.lock().unwrap().insert(id, Arc::new(dav));
         Ok(())
     }

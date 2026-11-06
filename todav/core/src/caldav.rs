@@ -247,7 +247,12 @@ impl HttpResponse {
 
 pub struct Dav {
     agent: ureq::Agent,
-    origin: String,
+    /// What paths are relative to: the server signed in to, until its calendar home turns out
+    /// to be on a host of its own (iCloud's, `home`); every path the server then sends is that
+    /// host's.
+    origin: std::sync::Mutex<String>,
+    /// The server signed in to: its principal's paths are always relative to it.
+    root_origin: String,
     root: String,
     auth: String,
     /// The user's own addresses (calendar-user-address-set), as `home` last read them.
@@ -283,6 +288,15 @@ pub enum SyncResult {
         removed: Vec<String>,
     },
     InvalidToken,
+}
+
+/// `href` as a full URL: a path is on `origin`, a URL stays.
+fn resolve(origin: &str, href: &str) -> String {
+    if href.starts_with("http") {
+        href.to_string()
+    } else {
+        format!("{origin}{href}")
+    }
 }
 
 /// "https://host:8443" of "https://host:8443/nc/remote.php/dav/".
@@ -337,11 +351,23 @@ impl Dav {
             .new_agent();
         Dav {
             agent,
-            origin,
+            root_origin: origin.clone(),
+            origin: std::sync::Mutex::new(origin),
             root,
             auth,
             addresses: Default::default(),
         }
+    }
+
+    /// What paths from the server are relative to now (see `origin`).
+    pub fn data_origin(&self) -> String {
+        self.origin.lock().unwrap().clone()
+    }
+
+    /// Take paths as relative to `origin`: what `data_origin` gave an earlier run, before this
+    /// one has asked the server.
+    pub fn set_data_origin(&self, origin: &str) {
+        *self.origin.lock().unwrap() = origin.to_string();
     }
 
     pub fn url(&self, href: &str) -> String {
@@ -349,14 +375,14 @@ impl Dav {
         if path.starts_with("http") {
             path.to_string()
         } else {
-            format!("{}{}", self.origin, percent_encode_path(path))
+            format!("{}{}", self.data_origin(), percent_encode_path(path))
         }
     }
 
     /// `href` as a path on this server: a list's key (its full URL, see `store::lists`) loses
     /// the origin; a path stays as it is.
     pub fn path<'a>(&self, href: &'a str) -> &'a str {
-        href.strip_prefix(self.origin.as_str())
+        href.strip_prefix(self.data_origin().as_str())
             .filter(|p| p.starts_with('/'))
             .unwrap_or(href)
     }
@@ -366,7 +392,7 @@ impl Dav {
     pub fn absolute(&self, path: &str) -> String {
         match self.path(path) {
             p if p.starts_with("http") => p.to_string(),
-            p => format!("{}{p}", self.origin),
+            p => format!("{}{p}", self.data_origin()),
         }
     }
 
@@ -468,7 +494,10 @@ impl Dav {
         let p = self.propfind(&self.root, "0", "<d:current-user-principal/>")?;
         Ok(p.first()
             .and_then(|r| r.props.find_text(DAV, "href"))
-            .map_or_else(|| self.root.clone(), |h| percent_decode(&h)))
+            .map_or_else(
+                || self.root.clone(),
+                |h| resolve(&self.root_origin, &percent_decode(&h)),
+            ))
     }
 
     /// The collection the user's calendars are in; the user's addresses are read with it
@@ -476,7 +505,16 @@ impl Dav {
     pub fn home(&self) -> Result<String> {
         let principal = self.principal()?;
         let props = "<c:calendar-home-set/><c:calendar-user-address-set/>";
-        let p = self.propfind(&principal, "0", props)?;
+        // The principal is on the server signed in to, which is not where paths are taken to
+        // be from once the calendars are on a host of their own: its path is encoded here.
+        let wire = match principal.strip_prefix(self.data_origin().as_str()) {
+            Some(_) => principal.clone(),
+            None => {
+                let o = origin(&principal);
+                format!("{o}{}", percent_encode_path(&principal[o.len()..]))
+            }
+        };
+        let p = self.propfind(&wire, "0", props)?;
         if let Some(set) = p
             .first()
             .and_then(|r| r.props.child(CALDAV, "calendar-user-address-set"))
@@ -488,10 +526,15 @@ impl Dav {
                 .map(|c| c.text.trim().to_string())
                 .collect();
         }
-        p.first()
+        let home = p
+            .first()
             .and_then(|r| r.props.find_text(DAV, "href"))
-            .map(|h| percent_decode(&h)) // Google's: "/caldav/v2/me%40gmail.com/"
-            .ok_or_else(|| Error::Parse("no calendar-home-set".into()))
+            // Google's: "/caldav/v2/me%40gmail.com/"
+            .map(|h| resolve(&origin(&principal), &percent_decode(&h)))
+            .ok_or_else(|| Error::Parse("no calendar-home-set".into()))?;
+        // iCloud keeps the calendars on a host of its own: its paths are that host's.
+        self.set_data_origin(&origin(&home));
+        Ok(home)
     }
 
     /// The user's own addresses ("mailto:…"), as the last `home` (or `discover`) read them.
