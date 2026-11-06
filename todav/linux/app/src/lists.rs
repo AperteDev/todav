@@ -912,10 +912,16 @@ fn delete_question(l: &List) -> String {
     let what = what
         .replace("{name}", &l.display_name)
         .replace("{n}", &n.to_string());
+    // Only Nextcloud keeps what is deleted in a trash bin; other servers delete it for good.
+    let nextcloud = core()
+        .account(l.account)
+        .is_some_and(|a| a.kind == AccountKind::Nextcloud);
     let back = if l.local {
         gettext("It is on this device only and cannot be restored.")
-    } else {
+    } else if nextcloud {
         gettext("It can be restored from the trash bin in Nextcloud Calendar.")
+    } else {
+        gettext("It is deleted on the server too.")
     };
     format!("{what} {back}")
 }

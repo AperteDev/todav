@@ -23,6 +23,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import dev.aperte.todav.Main
 import dev.aperte.todav.accountName
+import dev.aperte.todav.core.AccountKind
 import dev.aperte.todav.core.TodavList
 import dev.aperte.todav.core.colorPresets
 import dev.aperte.todav.core.listColor
@@ -154,10 +155,14 @@ fun ListDialog(model: Main, href: String?, events: Boolean, onDismiss: () -> Uni
             n == 0L -> tr("“{name}” will be deleted.")
             else -> ntr("“{name}” will be deleted with its {n} task.", "“{name}” will be deleted with its {n} tasks.", n)
         }.replace("{name}", list.displayName).replace("{n}", "$n")
+        // Only Nextcloud keeps what is deleted in a trash bin; other servers delete it for good.
+        val nextcloud = core.account(list.account)?.kind == AccountKind.NEXTCLOUD
         val back = if (list.local) {
             tr("It is on this device only and cannot be restored.")
-        } else {
+        } else if (nextcloud) {
             tr("It can be restored from the trash bin in Nextcloud Calendar.")
+        } else {
+            tr("It is deleted on the server too.")
         }
         AlertDialog(
             onDismissRequest = { confirm = false },

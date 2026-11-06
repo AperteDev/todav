@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Todav\n"
 "Report-Msgid-Bugs-To: https://github.com/AperteDev/todav/issues\n"
-"POT-Creation-Date: 2026-11-06 22:36+0100\n"
+"POT-Creation-Date: 2026-11-06 22:49+0100\n"
 "PO-Revision-Date: 2026-10-22 21:00+0200\n"
 "Last-Translator: SelfRef\n"
 "Language-Team: Polish\n"
@@ -301,7 +301,7 @@ msgstr ""
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:283
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:309
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Import.kt:59
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:78
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:79
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:181
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:203
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:336
@@ -554,7 +554,7 @@ msgstr "W przeciwnym razie te pokazane w aplikacji"
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Categories.kt:122
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Common.kt:654
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Common.kt:660
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:141
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:142
 #: todav/linux/app/src/lists.rs:696 todav/linux/app/src/window.rs:3123
 #: todav/linux/app/ui/edit-dialog.blp:28 todav/linux/app/ui/event-dialog.blp:30
 #: todav/linux/app/ui/list-dialog.blp:23
@@ -574,8 +574,8 @@ msgstr "Zapisz"
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Common.kt:652
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:368
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Import.kt:87
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:143
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:176
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:144
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:181
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:284
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:885
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:902
@@ -877,7 +877,7 @@ msgstr[2] "{n} przypomnień"
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:1907
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:2054
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Categories.kt:158
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:174
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:179
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:560
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TaskPage.kt:331
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:903
@@ -994,7 +994,7 @@ msgid "New Category"
 msgstr "Nowa kategoria"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Categories.kt:108
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:86
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:87
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:784
 #: todav/linux/app/ui/account.blp:18 todav/linux/app/ui/list-dialog.blp:42
 #: todav/linux/app/ui/new-category.blp:12
@@ -1007,13 +1007,13 @@ msgid "Delete Category"
 msgstr "Usuń kategorię"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Categories.kt:122
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:141
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:142
 #: todav/linux/app/src/lists.rs:698 todav/linux/app/ui/new-category.blp:19
 msgid "Create"
 msgstr "Utwórz"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Categories.kt:136
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:154
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:155
 #: todav/linux/app/src/lists.rs:905 todav/linux/app/src/window.rs:3074
 #, rust-format
 msgid "“{name}” will be deleted."
@@ -1066,7 +1066,7 @@ msgstr "Własny kolor…"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Colors.kt:117
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Colors.kt:142
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:107
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:108
 #: todav/linux/app/src/calendar/dialog.rs:119
 #: todav/linux/app/ui/color-dialog.blp:7 todav/linux/app/ui/list-dialog.blp:55
 msgid "Color"
@@ -1443,72 +1443,72 @@ msgstr[2] "Zaimportowano {n} elementów"
 msgid "Import"
 msgstr "Importuj"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:41
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:42
 #: todav/linux/app/src/lists.rs:889
 #, rust-format
 msgid "“{name}” exported"
 msgstr "Wyeksportowano „{name}”"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:44
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:45
 #: todav/linux/app/ui/list-dialog.blp:71
 msgid "Export…"
 msgstr "Eksportuj…"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:67
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:68
 #: todav/linux/app/src/lists.rs:690
 msgid "Edit Calendar"
 msgstr "Edytuj kalendarz"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:68
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:69
 #: todav/linux/app/src/lists.rs:692
 msgid "Edit List"
 msgstr "Edytuj listę"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:69
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:70
 #: todav/linux/app/src/lists.rs:691 todav/linux/app/ui/calendar.blp:133
 msgid "New Calendar"
 msgstr "Nowy kalendarz"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:70
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:71
 #: todav/linux/app/src/lists.rs:693 todav/linux/app/ui/calendar.blp:177
 #: todav/linux/app/ui/window.blp:66
 msgid "New List"
 msgstr "Nowa lista"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:78
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:79
 msgid "Task List"
 msgstr "Lista zadań"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:93
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:94
 #: todav/linux/app/ui/list-dialog.blp:48
 msgid "Save to"
 msgstr "Zapisz w"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:102
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:103
 msgid "Only in Todav: the calendar keeps its own name and color elsewhere"
 msgstr "Tylko w Todav: gdzie indziej kalendarz zachowuje swoją nazwę i kolor"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:113
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:114
 msgid "Use the System's Name and Color"
 msgstr "Użyj nazwy i koloru z systemu"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:119
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:120
 #: todav/linux/app/src/lists.rs:802
 msgid "Delete Calendar"
 msgstr "Usuń kalendarz"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:119
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:120
 #: todav/linux/app/src/lists.rs:804
 msgid "Delete List"
 msgstr "Usuń listę"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:148
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:149
 #: todav/linux/app/src/lists.rs:899
 #, rust-format
 msgid "“{name}” will be deleted with its events."
 msgstr "Spowoduje to usunięcie „{name}” wraz z wydarzeniami."
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:150
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:151
 #: todav/linux/app/src/lists.rs:901
 #, rust-format
 msgid "“{name}” will be deleted with its events and {n} task."
@@ -1519,7 +1519,7 @@ msgstr[1] ""
 msgstr[2] ""
 "Spowoduje to usunięcie „{name}” wraz z wydarzeniami i {n} zadaniami."
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:155
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:156
 #: todav/linux/app/src/lists.rs:907
 #, rust-format
 msgid "“{name}” will be deleted with its {n} task."
@@ -1528,22 +1528,27 @@ msgstr[0] "Spowoduje to usunięcie „{name}” wraz z {n} zadaniem."
 msgstr[1] "Spowoduje to usunięcie „{name}” wraz z {n} zadaniami."
 msgstr[2] "Spowoduje to usunięcie „{name}” wraz z {n} zadaniami."
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:158
-#: todav/linux/app/src/lists.rs:916
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:161
+#: todav/linux/app/src/lists.rs:920
 msgid "It is on this device only and cannot be restored."
 msgstr "Wszystko jest tylko na tym urządzeniu i nie da się tego przywrócić."
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:160
-#: todav/linux/app/src/lists.rs:918
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:163
+#: todav/linux/app/src/lists.rs:922
 msgid "It can be restored from the trash bin in Nextcloud Calendar."
 msgstr "Można to przywrócić z kosza w Kalendarzu Nextcloud."
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:164
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:165
+#: todav/linux/app/src/lists.rs:924
+msgid "It is deleted on the server too."
+msgstr "Jest też usuwana na serwerze."
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:169
 #: todav/linux/app/src/lists.rs:833
 msgid "Delete Calendar?"
 msgstr "Usunąć kalendarz?"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:164
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:169
 #: todav/linux/app/src/lists.rs:835
 msgid "Delete List?"
 msgstr "Usunąć listę?"
@@ -3585,8 +3590,8 @@ msgstr "Todav"
 
 #: todav/linux/data/dev.aperte.Todav.desktop:3
 #: todav/linux/data/dev.aperte.Todav.metainfo.xml:8
-msgid "Tasks and calendar kept in your Nextcloud"
-msgstr "Zadania i kalendarz w twoim Nextcloud"
+msgid "Tasks and calendar for Nextcloud and CalDAV"
+msgstr "Zadania i kalendarz dla Nextcloud i CalDAV"
 
 #: todav/linux/data/dev.aperte.Todav.desktop:9
 msgid "todo;tasks;calendar;events;caldav;nextcloud;"
@@ -3604,28 +3609,36 @@ msgstr ""
 "CalDAV, więc aplikacje Zadania i Kalendarz w Nextcloud oraz inne programy "
 "CalDAV widzą te same listy i wydarzenia."
 
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:15
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:14
+msgid ""
+"Other CalDAV servers work too, such as iCloud, Fastmail, mailbox.org and "
+"Radicale."
+msgstr ""
+"Działa też z innymi serwerami CalDAV, np. iCloud, Fastmail, mailbox.org i "
+"Radicale."
+
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:18
 msgid "Works offline; changes sync when the server is reachable"
 msgstr "Działa bez sieci; zmiany synchronizują się, gdy serwer jest dostępny"
 
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:16
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:19
 msgid "Changes from other devices arrive within seconds through push"
 msgstr ""
 "Zmiany z innych urządzeń docierają w ciągu kilku sekund dzięki "
 "powiadomieniom push"
 
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:17
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:20
 msgid "Categories, subtasks, due dates and reminders"
 msgstr "Kategorie, podzadania, terminy i przypomnienia"
 
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:18
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:21
 msgid ""
 "Month, week and agenda views; plan tasks into time slots by drag and drop"
 msgstr ""
 "Widoki miesiąca, tygodnia i agendy; planowanie zadań w przedziałach czasu "
 "przez przeciąganie"
 
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:19
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:22
 msgid ""
 "An optional GNOME Shell extension, installed separately, puts your tasks and "
 "calendar in the top bar"
@@ -3633,25 +3646,32 @@ msgstr ""
 "Opcjonalne rozszerzenie GNOME Shell, instalowane osobno, pokazuje zadania i "
 "kalendarz na górnym pasku"
 
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:20
-msgid "Connects through GNOME Online Accounts or a browser sign-in"
-msgstr "Łączy się przez Konta online GNOME lub logowanie w przeglądarce"
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:23
+msgid ""
+"Connects through GNOME Online Accounts, a browser sign-in or a login name "
+"and password"
+msgstr ""
+"Łączy się przez Konta online GNOME, logowanie w przeglądarce lub nazwę "
+"użytkownika i hasło"
 
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:40
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:43
 msgid "Tasks grouped by category, with subtasks and due dates"
 msgstr "Zadania pogrupowane według kategorii, z podzadaniami i terminami"
 
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:44
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:47
 msgid "The month, with an event's details"
 msgstr "Miesiąc ze szczegółami wydarzenia"
 
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:48
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:51
 msgid "Tasks planned into the week next to events"
 msgstr "Zadania zaplanowane w tygodniu obok wydarzeń"
 
-#: todav/linux/data/dev.aperte.Todav.metainfo.xml:52
+#: todav/linux/data/dev.aperte.Todav.metainfo.xml:55
 msgid "Editing an event"
 msgstr "Edycja wydarzenia"
+
+#~ msgid "Tasks and calendar kept in your Nextcloud"
+#~ msgstr "Zadania i kalendarz w twoim Nextcloud"
 
 #~ msgid "Sign in to any server with CalDAV, such as mailbox.org"
 #~ msgstr "Zaloguj się na dowolny serwer z CalDAV, np. mailbox.org"
