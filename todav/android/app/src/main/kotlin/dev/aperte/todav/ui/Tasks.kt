@@ -244,7 +244,7 @@ fun TasksPane(model: Main, screen: Screen) {
         if (target == null) {
             model.sharedText.value = null
         } else {
-            AddSheet(model, target, null, screen.filter.takeIf { shown != null }, initial = text) { model.sharedText.value = null }
+            AddSheet(model, target, null, screen.filter.takeIf { shown != null && it != OTHER }, initial = text) { model.sharedText.value = null }
         }
     }
     addingTo?.let { parent -> AddSheet(model, parent.listHref, parent, parent.category) { addingTo = null } }
