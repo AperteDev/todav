@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   heading, held, opens "Edit Category" to rename it on all its tasks (with Undo). The add sheet's
   category chip always shows, with "New Category…".
 
+### Removed
+
+- Android: the sync button in the task list's top bar; pull to refresh does it.
+
 ### Fixed
 
 - Android: a list's category headings, filter and pickers showed only the categories saved in

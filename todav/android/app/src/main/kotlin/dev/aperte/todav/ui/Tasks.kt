@@ -31,7 +31,6 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.IconToggleButton
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Event
@@ -134,11 +133,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -208,7 +203,6 @@ fun TasksPane(model: Main, screen: Screen) {
                     }
                     SortMenu(model)
                     screen.list?.let { CategoryFilter(model, screen, it.href) }
-                    if (model.core.canSync()) SyncButton(sync == SyncState.Syncing && !pulling, model::sync)
                 },
             )
         },
@@ -254,25 +248,6 @@ fun TasksPane(model: Main, screen: Screen) {
         }
     }
     addingTo?.let { parent -> AddSheet(model, parent.listHref, parent, parent.category) { addingTo = null } }
-}
-
-/** The sync button: its icon turns while `syncing`, finishing its turn when that ends. */
-@Composable
-private fun SyncButton(syncing: Boolean, onClick: () -> Unit) {
-    val turn = remember { Animatable(0f) }
-    LaunchedEffect(syncing) {
-        if (syncing) {
-            while (true) turn.animateTo(turn.value + 360f, tween(900, easing = LinearEasing))
-        } else if (turn.value % 360f != 0f) {
-            turn.animateTo(kotlin.math.ceil(turn.value / 360f) * 360f, tween(400, easing = LinearOutSlowInEasing))
-            turn.snapTo(0f)
-        }
-    }
-    Tip(tr("Sync")) {
-        IconButton(onClick = onClick) {
-            Icon(Icons.Default.Refresh, tr("Sync"), Modifier.graphicsLayer { rotationZ = turn.value })
-        }
-    }
 }
 
 /** The task sort of Settings → Tasks, at hand. */
