@@ -36,19 +36,19 @@
   <!-- From the release tag (scripts/release.py moves them to each new one). -->
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.5.2/docs/screenshots/tasks.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.6.0/docs/screenshots/tasks.png</image>
       <caption>Tasks grouped by category, with subtasks and due dates</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.5.2/docs/screenshots/calendar-month.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.6.0/docs/screenshots/calendar-month.png</image>
       <caption>The month, with an event's details</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.5.2/docs/screenshots/calendar-week.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.6.0/docs/screenshots/calendar-week.png</image>
       <caption>Tasks planned into the week next to events</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.5.2/docs/screenshots/event-dialog.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.6.0/docs/screenshots/event-dialog.png</image>
       <caption>Editing an event</caption>
     </screenshot>
   </screenshots>
@@ -63,6 +63,27 @@
     <control>touch</control>
   </supports>
   <releases>
+    <release version="2.6.0" date="2026-11-06">
+      <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.6.0</url>
+      <description translate="no">
+        <p>Added</p>
+        <ul>
+          <li>Categories can be put in order, and deleted. Dragging a category in the Linux sidebar, or by its handle in Android's "Edit Categories…" (in the category filter's menu, where a category is also added, renamed or deleted), saves the order in the account's <code>todav/config.json</code>, so every device follows it. Deleting one (Delete in its menu on Linux) keeps its tasks: a task with other categories takes the next as its own. Adding, renaming, reordering and deleting can be undone.</li>
+          <li>Android: the category filter's menu has "Other", and the add sheet's category chip always shows, with "New Category…".</li>
+        </ul>
+        <p>Removed</p>
+        <ul>
+          <li>Android: the sync button in the task list's top bar; pull to refresh does it.</li>
+        </ul>
+        <p>Fixed</p>
+        <ul>
+          <li>Android: the month planner widget left a gap to its right (the Pixel Launcher reports it 16 dp narrower than it is); its days now fill the width.</li>
+          <li>Android: the month planner widget's weekday names lined up with its days only at the width the launcher reported; they now share the days' column width.</li>
+          <li>Android: a list's category headings, filter and pickers showed only the categories saved in the account's config, so a list whose tasks had other categories (typed on a task, from another app, or on this device) looked ungrouped. They now include the categories its tasks have, as on Linux.</li>
+          <li>A category added in the sidebar or made on a task is kept and shown last, instead of among the others by name until a task was dropped on it; renaming one keeps its place in the order, and a task's other categories are renamed with it.</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.5.2" date="2026-11-05">
       <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.5.2</url>
       <description translate="no">
