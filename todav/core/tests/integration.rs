@@ -484,6 +484,27 @@ fn password_login_checks_the_credentials() {
     assert!(matches!(wrong, Err(todav_core::Error::Auth)), "{wrong:?}");
 }
 
+/// Nextcloud is a CalDAV server too: signed in as one, its calendars come from the server's own
+/// pointer (`/.well-known/caldav`), without Nextcloud's login or files.
+#[test]
+fn a_caldav_account_syncs_without_nextcloud_extras() {
+    let _ = Fixture::new("caldav");
+    let (url, user, pass) = env();
+    let c = todav_core::caldav_login(url.clone(), user.clone(), pass.clone()).unwrap();
+    assert_eq!(c.server, format!("{url}/remote.php/dav/"));
+    let wrong = todav_core::caldav_login(url, user.clone(), format!("{pass}x"));
+    assert!(matches!(wrong, Err(todav_core::Error::Auth)), "{wrong:?}");
+
+    let dir = std::env::temp_dir().join(format!("todav-it-caldav-account-{}", now()));
+    let client = Client::open(dir.to_string_lossy().into()).unwrap();
+    let id = client
+        .add_account(AccountKind::CalDav, c.server, user, "".into())
+        .unwrap();
+    client.connect(id, c.app_password).unwrap();
+    client.sync().into_result().unwrap();
+    assert!(client.lists().iter().any(|l| l.display_name == "it-caldav"));
+}
+
 #[test]
 fn events_sync_with_their_zone_and_recurrence() {
     let f = Fixture::with("events", &["VEVENT", "VTODO"]);

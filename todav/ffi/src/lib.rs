@@ -194,6 +194,28 @@ impl Todav {
         Ok(id)
     }
 
+    /// Add an account of another CalDAV server (`url` as `caldav_login` returned it), its
+    /// password in `keyring`, and connect it.
+    pub fn add_caldav(
+        &self,
+        keyring: Box<dyn Keyring>,
+        url: String,
+        user: String,
+        password: String,
+    ) -> Result<i64> {
+        let k = KeyringAdapter(keyring);
+        Ok(todav_app::accounts::add(
+            self.c(),
+            &k,
+            AccountKind::CalDav,
+            &url,
+            &user,
+            password,
+            String::new(),
+            false,
+        )?)
+    }
+
     /// Account `id` at `url` with a new app password, or the same user on a moved server.
     pub fn reconnect(
         &self,
@@ -1111,6 +1133,13 @@ pub fn login_flow_poll(flow: LoginFlow) -> Result<Option<Credentials>> {
 #[uniffi::export]
 pub fn password_login(server: String, login_name: String, password: String) -> Result<Credentials> {
     Ok(todav_core::password_login(server, login_name, password)?)
+}
+
+/// Sign in to another CalDAV server with a login name and a password; the credentials hold the
+/// address its calendars were found at (`add_caldav` takes it).
+#[uniffi::export]
+pub fn caldav_login(server: String, login_name: String, password: String) -> Result<Credentials> {
+    Ok(todav_core::caldav_login(server, login_name, password)?)
 }
 
 /// Whether an ntfy server answers.

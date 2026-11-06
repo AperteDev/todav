@@ -188,6 +188,7 @@ pub struct Account {
 #[uniffi::remote(Enum)]
 pub enum AccountKind {
     Nextcloud,
+    CalDav,
     Local,
     Google,
     System,

@@ -1,5 +1,5 @@
-//! Adding an account: first its kind (GNOME Online Accounts' Nextcloud and Google accounts, a
-//! Nextcloud server, this device),
+//! Adding an account: first its kind (GNOME Online Accounts' accounts with calendars, a
+//! Nextcloud server, another CalDAV server, this device),
 //! then the account to connect. The welcome page shows it for the first account, with this
 //! device's ntfy server and whether settings sync through the account; Preferences → Accounts
 //! shows it in a dialog for more.
@@ -10,18 +10,28 @@ use crate::window::{browser_login, cancel_login, get, no_server, note, url_text,
 use crate::{Target, goa};
 use adw::prelude::*;
 use gtk::{gio, glib};
+use std::cell::Cell;
 use std::rc::Rc;
 use todav_core::AccountKind;
+
+/// The second step: where the account comes from.
+#[derive(Clone, Copy, PartialEq)]
+enum Source {
+    Goa,
+    Nextcloud,
+    CalDav,
+}
 
 pub struct AddAccount {
     /// What to show: the steps, with their own toasts.
     pub root: adw::ToastOverlay,
     view: adw::NavigationView,
-    /// GNOME Online Accounts' Nextcloud and Google accounts not added yet.
+    source: Cell<Source>,
+    /// GNOME Online Accounts' accounts with calendars, not added yet.
     goa: Vec<goa::Account>,
     goa_account: adw::ComboRow,
-    /// What a Google account gives, under it when one is chosen.
-    google_note: gtk::Label,
+    /// What a Google or CalDAV account gives, under it when one is chosen.
+    note: gtk::Label,
     server: (gtk::DropDown, adw::EntryRow),
     ntfy: (gtk::DropDown, adw::EntryRow),
     sync_settings: adw::SwitchRow,
@@ -31,6 +41,8 @@ pub struct AddAccount {
     /// The ways to sign in to a server.
     sign_in: gtk::Box,
     login: gtk::Button,
+    copy_login: gtk::Button,
+    password_login: gtk::Button,
     cancel_login: gtk::Button,
     welcome: bool,
     /// Runs with the new account's id.
@@ -45,12 +57,13 @@ pub fn new(welcome: bool, done: impl Fn(i64) + 'static) -> Rc<AddAccount> {
     let a = Rc::new(AddAccount {
         root: get(&b, "root"),
         view: get(&b, "view"),
+        source: Cell::new(Source::Goa),
         goa: goa::accounts()
             .into_iter()
             .filter(|g| !added.contains(&g.id))
             .collect(),
         goa_account: get(&b, "goa_account"),
-        google_note: get(&b, "google_note"),
+        note: get(&b, "note"),
         server: (get(&b, "server_scheme"), get(&b, "server")),
         ntfy: (get(&b, "ntfy_scheme"), get(&b, "ntfy")),
         sync_settings: get(&b, "sync_settings"),
@@ -58,6 +71,8 @@ pub fn new(welcome: bool, done: impl Fn(i64) + 'static) -> Rc<AddAccount> {
         connect_goa: get(&b, "connect_goa"),
         sign_in: get(&b, "sign_in"),
         login: get(&b, "login"),
+        copy_login: get(&b, "copy_login"),
+        password_login: get(&b, "password_login"),
         cancel_login: get(&b, "cancel_login"),
         welcome,
         done: Box::new(done),
@@ -72,15 +87,15 @@ pub fn new(welcome: bool, done: impl Fn(i64) + 'static) -> Rc<AddAccount> {
     use_goa.set_subtitle(&if !names.is_empty() {
         names.join(", ")
     } else if added.iter().any(|s| !s.is_empty()) {
-        gettext("Its Nextcloud and Google accounts are all added")
+        gettext("Its accounts with calendars are all added")
     } else {
-        gettext("No Nextcloud or Google account in Settings → Online Accounts")
+        gettext("No account with calendars in Settings → Online Accounts")
     });
     use_goa.set_sensitive(!a.goa.is_empty());
     let weak = Rc::downgrade(&a);
     a.goa_account.connect_selected_notify(move |_| {
         if let Some(a) = weak.upgrade() {
-            a.show_google_note();
+            a.show_note();
         }
     });
     let local = core()
@@ -95,7 +110,7 @@ pub fn new(welcome: bool, done: impl Fn(i64) + 'static) -> Rc<AddAccount> {
         intro.set_icon_name(None);
         intro.set_title(&gettext("Add Account"));
         intro.set_description(Some(&gettext(
-            "Tasks and calendars of another Nextcloud account, or kept on this device",
+            "Tasks and calendars of another account, or kept on this device",
         )));
         get::<adw::NavigationPage>(&b, "choose_page").set_title(&gettext("Add Account"));
     }
@@ -105,34 +120,60 @@ pub fn new(welcome: bool, done: impl Fn(i64) + 'static) -> Rc<AddAccount> {
     let status: adw::StatusPage = get(&b, "connect_status");
     let open = {
         let weak = Rc::downgrade(&a);
-        move |goa: bool| {
+        move |source: Source| {
             let Some(a) = weak.upgrade() else { return };
+            let goa = source == Source::Goa;
+            let caldav = source == Source::CalDav;
+            a.source.set(source);
             a.goa_account.set_visible(goa);
             a.server.1.set_visible(!goa);
             a.connect_goa.set_visible(goa);
             a.sign_in.set_visible(!goa);
-            if goa {
-                page.set_title(&gettext("GNOME Online Accounts"));
-                status.set_icon_name(Some("goa-panel-symbolic"));
-                status.set_description(Some(&gettext(
-                    "Connect with a Nextcloud or Google account from GNOME Settings",
-                )));
-                a.show_google_note();
+            // Only Nextcloud has the browser's Login Flow.
+            a.login.set_visible(!caldav);
+            a.copy_login.set_visible(!caldav);
+            if caldav {
+                a.password_login.set_label(&gettext("Sign In…"));
+                a.password_login.add_css_class("suggested-action");
             } else {
-                a.google_note.set_visible(false);
-                a.welcome_options.set_visible(a.welcome);
-                page.set_title(&gettext("Nextcloud Server"));
-                status.set_icon_name(Some("network-server-symbolic"));
-                status.set_description(Some(&gettext(
-                    "Sign in to your Nextcloud; Todav gets an app password of its own",
-                )));
+                a.password_login
+                    .set_label(&gettext("Sign In with Password…"));
+                a.password_login.remove_css_class("suggested-action");
             }
+            match source {
+                Source::Goa => {
+                    page.set_title(&gettext("GNOME Online Accounts"));
+                    status.set_icon_name(Some("goa-panel-symbolic"));
+                    status.set_description(Some(&gettext(
+                        "Connect with an account from GNOME Settings",
+                    )));
+                }
+                Source::Nextcloud => {
+                    page.set_title(&gettext("Nextcloud Server"));
+                    status.set_icon_name(Some("network-server-symbolic"));
+                    status.set_description(Some(&gettext(
+                        "Sign in to your Nextcloud; Todav gets an app password of its own",
+                    )));
+                    a.server.1.set_title(&gettext("Nextcloud server"));
+                }
+                Source::CalDav => {
+                    page.set_title(&gettext("CalDAV Server"));
+                    status.set_icon_name(Some("network-server-symbolic"));
+                    status.set_description(Some(&gettext(
+                        "Sign in to any server with CalDAV, such as mailbox.org",
+                    )));
+                    a.server.1.set_title(&gettext("CalDAV server"));
+                }
+            }
+            a.show_note();
             a.view.push_by_tag("connect");
         }
     };
     let o = open.clone();
-    use_goa.connect_activated(move |_| o(true));
-    get::<adw::ActionRow>(&b, "use_server").connect_activated(move |_| open(false));
+    use_goa.connect_activated(move |_| o(Source::Goa));
+    let o = open.clone();
+    get::<adw::ActionRow>(&b, "use_server").connect_activated(move |_| o(Source::Nextcloud));
+    get::<adw::ActionRow>(&b, "use_caldav").connect_activated(move |_| open(Source::CalDav));
     let weak = Rc::downgrade(&a);
     get::<adw::ActionRow>(&b, "use_local").connect_activated(move |_| {
         let Some(a) = weak.upgrade() else { return };
@@ -175,14 +216,22 @@ pub fn new(welcome: bool, done: impl Fn(i64) + 'static) -> Rc<AddAccount> {
     password.connect_activate(move |_, _| {
         let Some(a) = weak.upgrade() else { return };
         let server = url_text(&a.server);
+        let caldav = a.source.get() == Source::CalDav;
         if server.is_empty() {
-            a.root.add_toast(note(&no_server()));
+            a.root.add_toast(note(&no_server(caldav)));
             return;
         }
         let weak = Rc::downgrade(&a);
-        crate::window::password_login(&a.root, server, None, move |c| {
+        crate::window::password_login(&a.root, server, None, caldav, move |c| {
             if let Some(a) = weak.upgrade() {
-                glib::spawn_future_local(async move { a.connect_with(Target::Manual(c)).await });
+                glib::spawn_future_local(async move {
+                    let target = if caldav {
+                        Target::CalDav(c)
+                    } else {
+                        Target::Manual(c)
+                    };
+                    a.connect_with(target).await
+                });
             }
         });
     });
@@ -206,7 +255,7 @@ impl AddAccount {
     fn start_login(self: &Rc<Self>, copy: bool) {
         let server = url_text(&self.server);
         if server.is_empty() {
-            self.root.add_toast(note(&no_server()));
+            self.root.add_toast(note(&no_server(false)));
             return;
         }
         self.sign_in.set_visible(false);
@@ -223,14 +272,32 @@ impl AddAccount {
         });
     }
 
-    /// A Google account chosen: what it gives, and neither push nor settings sync with it.
-    fn show_google_note(&self) {
-        let google = self
-            .goa
-            .get(self.goa_account.selected() as usize)
-            .is_some_and(|g| g.kind == AccountKind::Google);
-        self.google_note.set_visible(google);
-        self.welcome_options.set_visible(self.welcome && !google);
+    /// What the account chosen gives, when it is Google's or another CalDAV server's: neither
+    /// push nor settings sync with it, so the welcome page's options (Nextcloud's) go.
+    fn show_note(&self) {
+        let kind = match self.source.get() {
+            Source::Goa => self
+                .goa
+                .get(self.goa_account.selected() as usize)
+                .map_or(AccountKind::Nextcloud, |g| g.kind),
+            Source::Nextcloud => AccountKind::Nextcloud,
+            Source::CalDav => AccountKind::CalDav,
+        };
+        let text = match kind {
+            AccountKind::Google => Some(gettext(
+                "Only Nextcloud is fully supported. With Google, Todav shows and edits the events of your calendars, added and deleted in Google Calendar, and your Google Tasks, which keep only a title, notes, a due date without a time and subtasks.",
+            )),
+            AccountKind::CalDav => Some(gettext(
+                "Task lists and calendars sync with any CalDAV server. Changes made elsewhere are fetched every minute while Todav is in front and every 30 minutes otherwise, and settings stay on this device.",
+            )),
+            _ => None,
+        };
+        self.note.set_visible(text.is_some());
+        if let Some(text) = text {
+            self.note.set_label(&text);
+        }
+        self.welcome_options
+            .set_visible(self.welcome && kind == AccountKind::Nextcloud);
     }
 
     fn reset_login(&self) {

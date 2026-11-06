@@ -35,7 +35,7 @@ impl From<todav_core::Error> for Error {
     }
 }
 
-/// Add a Nextcloud or Google account (`kind`) at `url` and connect it; `source` says where its
+/// Add a Nextcloud, CalDAV or Google account (`kind`) at `url` and connect it; `source` says where its
 /// password comes from (empty: signed in in Todav, the password goes into the keyring). With
 /// `settings`, settings sync through it (Nextcloud only).
 #[allow(clippy::too_many_arguments)]
@@ -103,7 +103,7 @@ pub fn remove(c: &Client, keyring: &dyn Keyring, id: i64, force: bool) -> Result
             return Err(Error::NotUploaded);
         }
     }
-    if a.kind == AccountKind::Nextcloud && a.source.is_empty() {
+    if matches!(a.kind, AccountKind::Nextcloud | AccountKind::CalDav) && a.source.is_empty() {
         keyring.clear(&a.url, &a.user);
     }
     Ok(c.remove_account(id)?)
@@ -120,7 +120,7 @@ pub fn no_access(error: &str) -> bool {
     error.contains("insufficientPermissions") || error.contains("insufficient authentication")
 }
 
-/// The host of a Nextcloud account's server, as its default name shows it ("user@host").
+/// The host of a Nextcloud or CalDAV account's server, as its default name shows it ("user@host").
 pub fn host(a: &Account) -> &str {
     let host = a.url.split_once("://").map_or(a.url.as_str(), |(_, h)| h);
     host.trim_end_matches('/')

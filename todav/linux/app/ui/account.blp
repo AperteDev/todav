@@ -20,7 +20,7 @@ Adw.NavigationPage page {
         }
       }
 
-      // Nextcloud and Google accounts: how it is connected. Signed in here: "Sign In Again" (a
+      // Accounts on a server: how it is connected. Signed in here: "Sign In Again" (a
       // new app password) and the server's address. A GOA account is managed in GNOME Settings.
       Adw.PreferencesGroup connection {
         title: _("Connection");
@@ -37,6 +37,14 @@ Adw.NavigationPage page {
             styles ["flat"]
           }
 
+          // A CalDAV server has no browser sign-in: the password only.
+          [suffix]
+          Gtk.Button sign_in_password {
+            label: _("Sign In Again");
+            valign: center;
+            visible: false;
+          }
+
           [suffix]
           Adw.SplitButton sign_in {
             label: _("Sign In Again");
@@ -46,7 +54,7 @@ Adw.NavigationPage page {
           }
         }
 
-        // Another address moves the account there (same user and app password).
+        // Another address moves the account there (same user and password).
         Adw.EntryRow server {
           title: _("Nextcloud server");
           show-apply-button: true;

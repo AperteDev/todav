@@ -23,6 +23,7 @@ import dev.aperte.todav.core.TodavList
 import dev.aperte.todav.core.TodavTask
 import dev.aperte.todav.core.listColor
 import dev.aperte.todav.core.listHeadings
+import dev.aperte.todav.core.caldavLogin
 import dev.aperte.todav.core.loginFlowPoll
 import dev.aperte.todav.core.loginFlowStart
 import dev.aperte.todav.core.midnight
@@ -718,16 +719,23 @@ class Main(app: Application) : AndroidViewModel(app) {
     }
 
     /** Sign in with a login name and a password or app password. */
-    fun signInWithPassword(server: String, login: String, password: String, then: (String, String, String) -> Unit = ::connect) {
+    fun signInWithPassword(
+        server: String,
+        login: String,
+        password: String,
+        then: (String, String, String) -> Unit = ::connect,
+        caldav: Boolean = false,
+    ) {
         if (server.isBlank()) {
-            signIn.value = SignIn.Failed(tr("Enter the Nextcloud server first"))
+            signIn.value = SignIn.Failed(if (caldav) tr("Enter the CalDAV server first") else tr("Enter the Nextcloud server first"))
             return
         }
         polling?.cancel()
         signIn.value = SignIn.Working
         polling = viewModelScope.launch(Dispatchers.IO) {
             try {
-                val c = passwordLogin(server.trim(), login.trim(), password)
+                // A CalDAV server's calendars are looked for from the address (its own pointer too).
+                val c = if (caldav) caldavLogin(server.trim(), login.trim(), password) else passwordLogin(server.trim(), login.trim(), password)
                 then(c.server, c.loginName, c.appPassword)
             } catch (e: Exception) {
                 signIn.value = SignIn.Failed(tr("Sign-in failed: {error}").replace("{error}", reason(e)))
@@ -740,11 +748,15 @@ class Main(app: Application) : AndroidViewModel(app) {
         signIn.value = SignIn.Idle
     }
 
-    /** Add the account; on the welcome page settings sync through it (`settings`). */
-    fun connect(server: String, user: String, password: String) {
+    /** Add the account (`caldav`: of a CalDAV server other than Nextcloud); on the welcome page settings sync through it. */
+    fun connect(server: String, user: String, password: String, caldav: Boolean = false) {
         try {
             val first = core.accounts().isEmpty()
-            core.addNextcloud(todav.passwords, server, user, password, first && core.settingsAccount() == null)
+            if (caldav) {
+                core.addCaldav(todav.passwords, server, user, password)
+            } else {
+                core.addNextcloud(todav.passwords, server, user, password, first && core.settingsAccount() == null)
+            }
             core.accountAdded(false)
             signIn.value = SignIn.Idle
             todav.changed()

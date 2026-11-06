@@ -96,7 +96,7 @@ ALTER TABLE tasks ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;
     r#"
 CREATE TABLE accounts (
   id INTEGER PRIMARY KEY,
-  kind TEXT NOT NULL,                   -- 'nextcloud' or 'local'
+  kind TEXT NOT NULL,                   -- 'nextcloud', 'caldav', 'google', 'system' or 'local'
   name TEXT NOT NULL DEFAULT '',        -- empty: the front-end names it
   url TEXT NOT NULL DEFAULT '',
   user TEXT NOT NULL DEFAULT '',

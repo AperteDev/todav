@@ -28,6 +28,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Password
 import androidx.compose.material.icons.outlined.Person
@@ -132,7 +133,9 @@ fun AccountChoice(model: Main, welcome: Boolean) {
     val context = LocalContext.current
     var server by rememberSaveable { mutableStateOf<String?>(null) }
     var login by rememberSaveable { mutableStateOf("") }
-    val connect = { s: String, l: String, p: String -> model.connect(s, l, p) }
+    // Another CalDAV server than Nextcloud: a password only.
+    var caldav by rememberSaveable { mutableStateOf(false) }
+    val connect = { s: String, l: String, p: String -> model.connect(s, l, p, caldav) }
     // An account of the Nextcloud app: its server and login name, then the browser at once.
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         NextcloudApp.server(r.data)?.let { (url, user) ->
@@ -156,7 +159,7 @@ fun AccountChoice(model: Main, welcome: Boolean) {
     }
     val entered = server
     if (entered == null) {
-        Text(tr("Tasks and calendar synced with your Nextcloud, or kept on this device"))
+        Text(tr("Tasks and calendar synced with your Nextcloud or another CalDAV server, or kept on this device"))
         Group {
             if (remember { NextcloudApp.installed(context) }) {
                 Choice(
@@ -166,6 +169,15 @@ fun AccountChoice(model: Main, welcome: Boolean) {
                 ) { pick.launch(NextcloudApp.chooser(context)) }
             }
             Choice(tr("Nextcloud Server"), tr("Sign in to your Nextcloud; Todav gets an app password of its own"), Icons.Outlined.Cloud) {
+                caldav = false
+                server = ""
+            }
+            Choice(
+                tr("CalDAV Server"),
+                tr("Another server, such as mailbox.org, with a login name and password"),
+                Icons.Outlined.Dns,
+            ) {
+                caldav = true
                 server = ""
             }
             if (model.core.accounts().none { it.kind == AccountKind.SYSTEM }) {
@@ -195,7 +207,7 @@ fun AccountChoice(model: Main, welcome: Boolean) {
             server = null
             login = ""
         }
-        SignInForm(model, entered, { server = it }, login, connect)
+        SignInForm(model, entered, { server = it }, login, connect, caldav)
     }
 }
 
@@ -208,7 +220,10 @@ private fun Choice(title: String, description: String, icon: ImageVector, onClic
     modifier = Modifier.clickable(onClick = onClick),
 )
 
-/** A server to sign in to, with the browser or an app password; `onDone` gets the credentials. */
+/**
+ * A server to sign in to, with the browser or an app password (`caldav`: a CalDAV server other
+ * than Nextcloud, with a password only); `onDone` gets the credentials.
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SignInForm(
@@ -218,6 +233,7 @@ fun SignInForm(
     /** The login name to fill in (from the Nextcloud app, or the account signing in again). */
     login: String,
     onDone: (String, String, String) -> Unit,
+    caldav: Boolean = false,
 ) {
     val state by model.signIn.collectAsStateWithLifecycle()
     var password by remember { mutableStateOf(false) }
@@ -226,16 +242,25 @@ fun SignInForm(
     if (s is SignIn.Browser) {
         LaunchedEffect(s.url) { CustomTabsIntent.Builder().build().launchUrl(context, s.url.toUri()) }
     }
-    Text(tr("Sign in with the browser or an app password"))
+    Text(if (caldav) tr("Sign in to any server with CalDAV, such as mailbox.org") else tr("Sign in with the browser or an app password"))
     Group {
         FieldItem(
             server,
             onServer,
-            tr("Nextcloud server"),
-            icon = Icons.Outlined.Cloud,
+            if (caldav) tr("CalDAV server") else tr("Nextcloud server"),
+            icon = if (caldav) Icons.Outlined.Dns else Icons.Outlined.Cloud,
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
-            keyboardActions = KeyboardActions(onGo = { model.signInWithBrowser(server, onDone, login) }),
+            keyboardActions = KeyboardActions(
+                onGo = { if (caldav) password = true else model.signInWithBrowser(server, onDone, login) },
+            ),
+        )
+    }
+    if (caldav) {
+        Text(
+            tr("Task lists and calendars sync with any CalDAV server. Changes made elsewhere are fetched every minute while Todav is in front and every 30 minutes otherwise, and settings stay on this device."),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
     when (s) {
@@ -249,22 +274,26 @@ fun SignInForm(
         }
         else -> {
             if (s is SignIn.Failed) Text(s.message, color = MaterialTheme.colorScheme.error)
-            Button(onClick = { model.signInWithBrowser(server, onDone, login) }, Modifier.fillMaxWidth()) {
-                Text(tr("Sign In with Browser"))
-            }
-            OutlinedButton(onClick = { password = true }, Modifier.fillMaxWidth()) {
-                Text(tr("Sign In with Password…"))
+            if (caldav) {
+                Button(onClick = { password = true }, Modifier.fillMaxWidth()) { Text(tr("Sign In…")) }
+            } else {
+                Button(onClick = { model.signInWithBrowser(server, onDone, login) }, Modifier.fillMaxWidth()) {
+                    Text(tr("Sign In with Browser"))
+                }
+                OutlinedButton(onClick = { password = true }, Modifier.fillMaxWidth()) {
+                    Text(tr("Sign In with Password…"))
+                }
             }
         }
     }
-    if (password) PasswordDialog(login, onDismiss = { password = false }) { name, secret ->
+    if (password) PasswordDialog(login, caldav, onDismiss = { password = false }) { name, secret ->
         password = false
-        model.signInWithPassword(server, name, secret, onDone)
+        model.signInWithPassword(server, name, secret, onDone, caldav)
     }
 }
 
 @Composable
-private fun PasswordDialog(initial: String, onDismiss: () -> Unit, onConnect: (String, String) -> Unit) {
+private fun PasswordDialog(initial: String, caldav: Boolean, onDismiss: () -> Unit, onConnect: (String, String) -> Unit) {
     var login by rememberSaveable { mutableStateOf(initial) }
     var secret by remember { mutableStateOf("") }
     var shown by remember { mutableStateOf(false) }
@@ -276,7 +305,10 @@ private fun PasswordDialog(initial: String, onDismiss: () -> Unit, onConnect: (S
         title = { Text(tr("Sign In with Password")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text(tr("Create an app password in Nextcloud under Settings → Security"))
+                Text(
+                    if (caldav) tr("The login name and password of your account; some providers ask for an app password instead")
+                    else tr("Create an app password in Nextcloud under Settings → Security"),
+                )
                 Group {
                     FieldItem(
                         login,
@@ -290,7 +322,7 @@ private fun PasswordDialog(initial: String, onDismiss: () -> Unit, onConnect: (S
                     FieldItem(
                         secret,
                         { secret = it },
-                        tr("App password"),
+                        if (caldav) tr("Password") else tr("App password"),
                         icon = Icons.Outlined.Password,
                         trailing = {
                             val label = if (shown) tr("Hide Password") else tr("Show Password")

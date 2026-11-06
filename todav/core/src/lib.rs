@@ -33,7 +33,9 @@ pub use account::{Account, AccountKind};
 pub use config::{CategoryGroup, CategoryMeta, DoneView, Sort};
 pub use event::{Event, EventPatch, EventTime, Repeat, Scope};
 pub use import::IcsCount;
-pub use login::{Credentials, LoginFlow, login_flow_poll, login_flow_start, password_login};
+pub use login::{
+    Credentials, LoginFlow, caldav_login, login_flow_poll, login_flow_start, password_login,
+};
 pub use net::set_roots;
 pub use push::{PushRegistration, PushStatus, ntfy_check};
 pub use settings::DEVICE_ONLY;

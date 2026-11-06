@@ -130,10 +130,10 @@ class TodavApp : Application() {
         if (core.canSync()) push.register()
     }
 
-    /** Connect the Nextcloud accounts signed in here with their saved app passwords. */
+    /** Connect the Nextcloud and CalDAV accounts signed in here with their saved passwords. */
     private fun connectAccounts() {
         for (a in core.accounts()) {
-            if (a.kind != AccountKind.NEXTCLOUD || a.source.isNotEmpty()) continue
+            if ((a.kind != AccountKind.NEXTCLOUD && a.kind != AccountKind.CAL_DAV) || a.source.isNotEmpty()) continue
             val password = passwords.load(a.url, a.user) ?: continue
             runCatching { core.connect(a.id, password) }
         }

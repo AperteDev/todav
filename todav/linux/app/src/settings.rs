@@ -638,14 +638,14 @@ fn set_status(row: &adw::ActionRow, icon: &gtk::Image, look: Option<&str>, text:
 
 /// The "Server Status" group of account `id`: the server (asked each time the returned closure
 /// runs), the last sync and DAV Push, the latter two kept up to date while the page is open.
-/// Google's has only the last sync.
-fn connect_status(b: &gtk::Builder, id: i64, google: bool) -> Rc<dyn Fn()> {
+/// Other than Nextcloud's (`sync_only`: Google's, a CalDAV server's) has only the last sync.
+fn connect_status(b: &gtk::Builder, id: i64, sync_only: bool) -> Rc<dyn Fn()> {
     let (server, server_icon): (adw::ActionRow, gtk::Image) =
         (get(b, "server_row"), get(b, "server_icon"));
     let (sync, sync_icon): (adw::ActionRow, gtk::Image) = (get(b, "sync_row"), get(b, "sync_icon"));
     let (push, push_icon): (adw::ActionRow, gtk::Image) = (get(b, "push_row"), get(b, "push_icon"));
-    server.set_visible(!google);
-    push.set_visible(!google);
+    server.set_visible(!sync_only);
+    push.set_visible(!sync_only);
     let get_push: gtk::Button = get(b, "get_push");
     get_push.connect_clicked(|button| {
         let window = button.root().and_downcast::<gtk::Window>();
@@ -725,7 +725,7 @@ fn connect_status(b: &gtk::Builder, id: i64, google: bool) -> Rc<dyn Fn()> {
 
     Rc::new(move || {
         show();
-        if google {
+        if sync_only {
             return;
         }
         set_status(&server, &server_icon, None, &gettext("Checking…"));
@@ -890,8 +890,10 @@ fn connect_reorder(row: &adw::ActionRow, id: i64, title: &str) {
 fn account_icon(a: &Account) -> &'static str {
     match a.kind {
         AccountKind::Local | AccountKind::System => "computer-symbolic",
-        AccountKind::Nextcloud if a.source.is_empty() => "network-server-symbolic",
-        AccountKind::Nextcloud | AccountKind::Google => "goa-panel-symbolic",
+        AccountKind::Nextcloud | AccountKind::CalDav if a.source.is_empty() => {
+            "network-server-symbolic"
+        }
+        AccountKind::Nextcloud | AccountKind::CalDav | AccountKind::Google => "goa-panel-symbolic",
     }
 }
 
@@ -903,8 +905,11 @@ fn account_state(a: &Account) -> String {
         AccountKind::System => gettext("Calendars of the accounts on this device"),
         _ if !core().connected(a.id) => gettext("Not connected"),
         AccountKind::Google => gettext("Google Calendar and Tasks"),
-        AccountKind::Nextcloud if !a.source.is_empty() => gettext("GNOME Online Accounts"),
+        AccountKind::Nextcloud | AccountKind::CalDav if !a.source.is_empty() => {
+            gettext("GNOME Online Accounts")
+        }
         AccountKind::Nextcloud => gettext("Nextcloud server"),
+        AccountKind::CalDav => gettext("CalDAV server"),
     }
 }
 
@@ -1013,7 +1018,9 @@ fn account_page(dialog: &adw::PreferencesDialog, id: i64) -> adw::NavigationPage
     page.set_title(&crate::account_name(&a));
     let remote = a.kind != AccountKind::Local;
     let google = a.kind == AccountKind::Google;
-    let manual = a.kind == AccountKind::Nextcloud && a.source.is_empty();
+    let caldav = a.kind == AccountKind::CalDav;
+    let manual =
+        matches!(a.kind, AccountKind::Nextcloud | AccountKind::CalDav) && a.source.is_empty();
     get::<gtk::Widget>(&b, "connection").set_visible(remote);
     get::<gtk::Widget>(&b, "google_note").set_visible(google);
 
@@ -1062,9 +1069,14 @@ fn account_page(dialog: &adw::PreferencesDialog, id: i64) -> adw::NavigationPage
     server_status.set_visible(false); // a synced account's, while connected (`describe`)
     set_url(&server, &a.url);
     server.1.set_visible(manual);
-    sign_in.set_visible(manual);
+    if caldav {
+        server.1.set_title(&gettext("CalDAV server"));
+    }
+    sign_in.set_visible(manual && !caldav);
+    let sign_in_password: gtk::Button = get(&b, "sign_in_password");
+    sign_in_password.set_visible(manual && caldav);
     let check_server: Rc<dyn Fn()> = if remote {
-        connect_status(&b, id, google)
+        connect_status(&b, id, a.kind != AccountKind::Nextcloud)
     } else {
         Rc::new(|| {})
     };
@@ -1197,11 +1209,15 @@ fn account_page(dialog: &adw::PreferencesDialog, id: i64) -> adw::NavigationPage
         let (Some(d), Some(a)) = (d.upgrade(), core().account(id)) else {
             return;
         };
-        crate::window::password_login(&d, a.url, Some(a.user), reconnect.clone());
+        let caldav = a.kind == AccountKind::CalDav;
+        crate::window::password_login(&d, a.url, Some(a.user), caldav, reconnect.clone());
     });
     actions.add_action(&password);
     page.insert_action_group("account", Some(&actions));
     sign_in.connect_clicked(move |_| start(false));
+    sign_in_password.connect_clicked(move |b| {
+        let _ = b.activate_action("account.sign-in-password", None);
+    });
 
     // Another address: the same account on a moved server.
     let (d, describe_, row) = (dialog.downgrade(), describe.clone(), server.1.clone());
@@ -1216,6 +1232,7 @@ fn account_page(dialog: &adw::PreferencesDialog, id: i64) -> adw::NavigationPage
             let msg = match crate::password_load(&a.url, &a.user) {
                 None => gettext("No saved password: sign in again first"),
                 Some(pw) => match crate::reconnect(id, url, pw).await {
+                    Ok(()) if a.kind == AccountKind::CalDav => gettext("CalDAV server changed"),
                     Ok(()) => gettext("Nextcloud server changed"),
                     Err(e) => e,
                 },
@@ -1249,7 +1266,7 @@ async fn remove_account(dialog: adw::PreferencesDialog, id: i64) {
             "Its lists and calendars, with everything in them, are deleted from this device. \
              This cannot be undone.",
         ),
-        AccountKind::Nextcloud | AccountKind::Google => gettext(
+        AccountKind::Nextcloud | AccountKind::CalDav | AccountKind::Google => gettext(
             "Its lists and calendars leave this device; they stay on the server. Switch it \
              off instead to only hide them.",
         ),

@@ -182,7 +182,8 @@ Todav is developed and tested mainly on this setup:
 - Optionally, for instant updates: the [DAV Push](https://github.com/bitfireAT/nc_ext_dav_push)
   Nextcloud app (`dav_push`) and an [ntfy](https://ntfy.sh) server.
 
-Todav speaks standard CalDAV, but other servers and desktops are untested for now.
+Todav speaks standard CalDAV and signs in to other CalDAV servers with a login name and
+password, but those, and other desktops, are untested for now.
 
 ### Building and installing
 

@@ -51,10 +51,14 @@ Planned work, not yet done. [FEATURES.md](FEATURES.md) lists it publicly; the or
   running app's D-Bus interface (`todav/cli` is a debugging tool with data of its own).
 - **Nextcloud Deck** boards as task lists. Open: whether it is worth it next to the Plan view's
   board.
-- **More services** besides Nextcloud: other CalDAV servers first (Radicale, Baïkal, Fastmail,
-  iCloud…), which mostly means login without Login Flow v2, settings and categories without
-  Nextcloud Files, and polling where there is no WebDAV-Push. Each would be another
-  `AccountKind`.
+- **More of other CalDAV servers** (`AccountKind::CalDav` signs in with a login name and a
+  password and checks for changes on a timer, in the Linux and Android apps): so far tried
+  only against Nextcloud's own CalDAV, so mailbox.org, Radicale, Baïkal, Fastmail and iCloud
+  (an app-specific password) are to be tried, each with what it needs. Open: where the
+  categories' order and icons and the synced settings are kept for a server without Nextcloud
+  Files (they stay on the device now; a file in a calendar-less collection, or a property of
+  the calendar, if servers take them); sign-in with OAuth for servers that need it (Fastmail's,
+  Microsoft's), as Google's; a push, where a server has one besides WebDAV-Push.
 - **Google Tasks on Android** (Linux has them, `core/src/gtasks.rs`): Android has no Google
   account of its own yet, so it needs a sign-in first. Google gives a token for the `tasks`
   scope only to an app registered in a Google Cloud project: an OAuth client for the package

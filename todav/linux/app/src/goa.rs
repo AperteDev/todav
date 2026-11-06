@@ -1,5 +1,5 @@
-//! GNOME Online Accounts: a Nextcloud or Google account set up in Settings, used instead of
-//! signing in here.
+//! GNOME Online Accounts: a Nextcloud, Google or other CalDAV account set up in Settings, used
+//! instead of signing in here.
 
 use gtk::{gio, glib};
 use todav_core::AccountKind;
@@ -14,7 +14,8 @@ pub struct Account {
     /// "user@host", as GNOME shows it.
     pub name: String,
     pub kind: AccountKind,
-    /// Nextcloud: the server; Google: the user's CalDAV principal.
+    /// Nextcloud: the server; Google: the user's CalDAV principal; another CalDAV server: the
+    /// address GOA has for its calendars.
     pub url: String,
     pub user: String,
 }
@@ -23,8 +24,9 @@ fn bus() -> Option<gio::DBusConnection> {
     gio::bus_get_sync(gio::BusType::Session, gio::Cancellable::NONE).ok()
 }
 
-/// Nextcloud accounts with calendars and tasks turned on and Google accounts with calendars
-/// turned on, by name. Empty without GOA.
+/// Nextcloud accounts with calendars and tasks turned on, Google accounts with calendars turned
+/// on and the calendars of any other account signed in with a password that has a CalDAV address
+/// (GOA's WebDAV accounts), by name. Empty without GOA.
 pub fn accounts() -> Vec<Account> {
     let Some(reply) = bus().and_then(|b| {
         b.call_sync(
@@ -58,6 +60,10 @@ pub fn accounts() -> Vec<Account> {
         let kind = match text(ACCOUNT, "ProviderType").as_deref() {
             Some("owncloud") if !off("TodoDisabled") => AccountKind::Nextcloud,
             Some("google") => AccountKind::Google,
+            Some("owncloud") => continue,
+            _ if field(&ifaces, "org.gnome.OnlineAccounts.PasswordBased").is_some() => {
+                AccountKind::CalDav
+            }
             _ => continue,
         };
         if off("CalendarDisabled") {
@@ -74,6 +80,7 @@ pub fn accounts() -> Vec<Account> {
             name: text(ACCOUNT, "PresentationIdentity").unwrap_or_else(|| user.clone()),
             url: match kind {
                 AccountKind::Google => uri,
+                AccountKind::CalDav => dav_url(&uri),
                 _ => server_url(&uri),
             },
             kind,
@@ -92,7 +99,7 @@ fn field(dict: &glib::Variant, key: &str) -> Option<glib::Variant> {
         .map(|e| e.child_value(1))
 }
 
-/// What account `id` signs in with: Nextcloud's app password (GOA keeps it in the keyring), or
+/// What account `id` signs in with: a Nextcloud or CalDAV password (GOA keeps it in the keyring), or
 /// Google's access token, valid for at least ten more minutes (GOA renews it).
 pub fn password(id: &str, kind: AccountKind) -> Option<String> {
     let (iface, method, args, reply) = match kind {
@@ -119,6 +126,24 @@ pub fn password(id: &str, kind: AccountKind) -> Option<String> {
         .ok()?
         .child_value(0)
         .get::<String>()
+}
+
+/// A CalDAV address from GOA's URI, without the user: "https://u@host:443/dav/" → "https://host/dav".
+fn dav_url(uri: &str) -> String {
+    let Ok(u) = glib::Uri::parse(uri, glib::UriFlags::NONE) else {
+        return String::new();
+    };
+    let port = match (u.scheme().as_str(), u.port()) {
+        (_, -1) | ("https", 443) | ("http", 80) => String::new(),
+        (_, p) => format!(":{p}"),
+    };
+    let path = u.path();
+    format!(
+        "{}://{}{port}{}",
+        u.scheme(),
+        u.host().unwrap_or_default(),
+        path.trim_end_matches('/')
+    )
 }
 
 /// Server address from GOA's DAV URI: "https://user@host:443/nc/remote.php/dav/" → "https://host/nc".
@@ -152,5 +177,15 @@ mod tests {
             "https://host:8443/nc"
         );
         assert_eq!(s("http://host/remote.php/dav"), "http://host");
+    }
+
+    #[test]
+    fn dav_url_keeps_the_path() {
+        let s = super::dav_url;
+        assert_eq!(
+            s("https://me@dav.example:443/caldav/"),
+            "https://dav.example/caldav"
+        );
+        assert_eq!(s("http://h:8080/"), "http://h:8080");
     }
 }

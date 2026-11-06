@@ -207,13 +207,15 @@ pub fn account_name(a: &Account) -> String {
     }
     match a.kind {
         AccountKind::Local => i18n::gettext("On This Device"),
-        AccountKind::Nextcloud => format!("{}@{}", a.user, todav_app::accounts::host(a)),
+        AccountKind::Nextcloud | AccountKind::CalDav => {
+            format!("{}@{}", a.user, todav_app::accounts::host(a))
+        }
         AccountKind::Google => a.user.clone(),
         AccountKind::System => i18n::gettext("System Calendars"), // Android's
     }
 }
 
-/// Connect a Nextcloud or Google account with its saved password: from GNOME Online Accounts
+/// Connect an account with its saved password: from GNOME Online Accounts
 /// (its `source`) or Todav's keyring entry. False without one (keyring cleared, GOA account
 /// gone or with tasks or calendars turned off).
 pub fn connect_saved(a: &Account) -> bool {
@@ -291,14 +293,17 @@ fn account_error(e: todav_app::accounts::Error) -> String {
     }
 }
 
-/// A Nextcloud or Google account to add.
+/// An account to add.
 pub enum Target {
     Goa(goa::Account),
-    /// Signed in here (browser or password); the app password goes into Todav's keyring entry.
+    /// Nextcloud, signed in here (browser or password); the app password goes into Todav's
+    /// keyring entry.
     Manual(todav_core::Credentials),
+    /// Another CalDAV server, signed in here with a password, kept the same way.
+    CalDav(todav_core::Credentials),
 }
 
-/// Add a Nextcloud or Google account and connect it (`settings`: settings sync through it),
+/// Add an account and connect it (`settings`: settings sync through it),
 /// then run the background service with it. A Google account whose calendars Google keeps from
 /// Todav is not added.
 pub async fn add_account(target: Target, settings: bool) -> Result<i64, String> {
@@ -312,6 +317,13 @@ pub async fn add_account(target: Target, settings: bool) -> Result<i64, String> 
             }
             Target::Manual(c) => (
                 AccountKind::Nextcloud,
+                c.server,
+                c.login_name,
+                c.app_password,
+                String::new(),
+            ),
+            Target::CalDav(c) => (
+                AccountKind::CalDav,
                 c.server,
                 c.login_name,
                 c.app_password,

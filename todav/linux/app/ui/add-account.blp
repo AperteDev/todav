@@ -18,7 +18,7 @@ Adw.ToastOverlay root {
         content: Adw.StatusPage intro {
           icon-name: "dev.aperte.Todav";
           title: "Todav";
-          description: _("Tasks and calendar synced with your Nextcloud, or kept on this device");
+          description: _("Tasks and calendar synced with your Nextcloud or another CalDAV server, or kept on this device");
           // A smaller icon and margins: the choices fit the default window size.
           styles ["compact"]
 
@@ -51,6 +51,22 @@ Adw.ToastOverlay root {
                 Adw.ActionRow use_server {
                   title: _("Nextcloud Server");
                   subtitle: _("Sign in with the browser or an app password");
+                  activatable: true;
+
+                  [prefix]
+                  Gtk.Image {
+                    icon-name: "network-server-symbolic";
+                  }
+
+                  [suffix]
+                  Gtk.Image {
+                    icon-name: "go-next-symbolic";
+                  }
+                }
+
+                Adw.ActionRow use_caldav {
+                  title: _("CalDAV Server");
+                  subtitle: _("Another server, such as mailbox.org, with a login name and password");
                   activatable: true;
 
                   [prefix]
@@ -134,9 +150,9 @@ Adw.ToastOverlay root {
                 }
               }
 
-              // With a Google account chosen: what Todav does with it.
-              Gtk.Label google_note {
-                label: _("Only Nextcloud is fully supported. With Google, Todav shows and edits the events of your calendars, added and deleted in Google Calendar, and your Google Tasks, which keep only a title, notes, a due date without a time and subtasks.");
+              // With a Google or CalDAV account chosen: what Todav does with it (the text is
+              // set in code).
+              Gtk.Label note {
                 wrap: true;
                 justify: center;
                 visible: false;
@@ -187,13 +203,14 @@ Adw.ToastOverlay root {
                     styles ["suggested-action", "pill"]
                   }
 
-                  Gtk.Button {
+                  Gtk.Button copy_login {
                     label: _("Copy Login Link");
                     action-name: "add.copy-login";
                     styles ["pill"]
                   }
 
-                  Gtk.Button {
+                  // For a CalDAV server, the only way: then "Sign In…" and suggested.
+                  Gtk.Button password_login {
                     label: _("Sign In with Password…");
                     action-name: "add.password-login";
                     styles ["pill"]

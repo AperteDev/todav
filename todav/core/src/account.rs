@@ -1,5 +1,5 @@
-//! Accounts: where lists are kept. A Nextcloud account syncs over CalDAV, a Google one too (its
-//! calendars' events only); the local account (one at most) keeps its lists on this device only. Each list belongs to one
+//! Accounts: where lists are kept. A Nextcloud account syncs over CalDAV, so does one of another
+//! CalDAV server, and a Google one (its calendars' events only); the local account (one at most) keeps its lists on this device only. Each list belongs to one
 //! (`lists.account`); a switched-off account's lists are hidden and not synced, nothing is
 //! deleted.
 
@@ -11,6 +11,10 @@ use std::sync::Arc;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum AccountKind {
     Nextcloud,
+    /// Any other CalDAV server (mailbox.org, Radicale, Fastmail…), signed in to with a login name
+    /// and a password. Nothing of Nextcloud's: no push (the service's timer checks for
+    /// changes), the categories and synced settings stay on this device.
+    CalDav,
     /// Lists on this device only (`store::LOCAL`), never synced.
     Local,
     /// Google Calendar over CalDAV with an OAuth access token as the password: events only;
@@ -26,6 +30,7 @@ impl AccountKind {
     fn as_str(self) -> &'static str {
         match self {
             AccountKind::Nextcloud => "nextcloud",
+            AccountKind::CalDav => "caldav",
             AccountKind::Local => "local",
             AccountKind::Google => "google",
             AccountKind::System => "system",
@@ -39,7 +44,8 @@ pub struct Account {
     pub kind: AccountKind,
     /// Given by the user; empty: the front-end names it ("user@host", "On This Device").
     pub name: String,
-    /// The server, as signed in to (Nextcloud); Google: the user's CalDAV principal.
+    /// The server, as signed in to (Nextcloud); another CalDAV server: the address its calendars
+    /// are found from (`login::caldav_login`); Google: the user's CalDAV principal.
     pub url: String,
     pub user: String,
     /// The front-end's note on where the password comes from: on Linux the GNOME Online
@@ -55,6 +61,7 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Account> {
     Ok(Account {
         id: r.get(0)?,
         kind: match r.get::<_, String>(1)?.as_str() {
+            "caldav" => AccountKind::CalDav,
             "local" => AccountKind::Local,
             "google" => AccountKind::Google,
             "system" => AccountKind::System,
@@ -95,8 +102,8 @@ impl Client {
         .ok()?
     }
 
-    /// A new account; returns its id. Refuses (`Error::Exists`) a Nextcloud account already
-    /// here (same server and user) and a second local or system one.
+    /// A new account; returns its id. Refuses (`Error::Exists`) a Nextcloud or CalDAV account
+    /// already here (same server and user) and a second local or system one.
     pub fn add_account(
         &self,
         kind: AccountKind,
@@ -174,6 +181,7 @@ impl Client {
         let a = self.account(id).ok_or(Error::NoAccount)?;
         let dav = match a.kind {
             AccountKind::Google => Dav::bearer(&a.url, &password),
+            AccountKind::CalDav => Dav::caldav(&a.url, &a.user, &password),
             _ => Dav::new(&a.url, &a.user, &password),
         };
         self.dav.lock().unwrap().insert(id, Arc::new(dav));
@@ -395,6 +403,36 @@ mod tests {
             .collect();
         assert_eq!(local, [y, x]);
         assert!(!c.pending(Some(here)));
+    }
+
+    #[test]
+    fn a_caldav_account_connects_at_its_own_address() {
+        let dir = std::env::temp_dir().join(format!("todav-test-caldav-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let add = |kind| {
+            c.add_account(
+                kind,
+                "https://dav.example/caldav/".into(),
+                "me".into(),
+                "".into(),
+            )
+        };
+        let id = add(AccountKind::CalDav).unwrap();
+        assert_eq!(c.account(id).unwrap().kind, AccountKind::CalDav);
+        assert_eq!(c.account(id).unwrap().url, "https://dav.example/caldav");
+        // Another account for the same server and user, of another kind, is another account.
+        assert!(matches!(add(AccountKind::CalDav), Err(Error::Exists)));
+        assert!(add(AccountKind::Nextcloud).is_ok());
+        c.connect(id, "pw".into()).unwrap();
+        assert!(c.connected(id));
+        // Its CalDAV root is the address itself, not Nextcloud's `/remote.php/dav/` under it.
+        let dav = Dav::caldav("https://dav.example/caldav", "me", "pw");
+        assert_eq!(dav.url("/caldav/work/"), "https://dav.example/caldav/work/");
+        assert_eq!(
+            dav.absolute("/caldav/work/"),
+            "https://dav.example/caldav/work/"
+        );
     }
 
     #[test]

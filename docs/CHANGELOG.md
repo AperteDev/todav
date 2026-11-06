@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- CalDAV servers other than Nextcloud (mailbox.org, Radicale, Fastmail…): "CalDAV Server" next
+  to "Nextcloud Server" when adding an account, on Linux and Android, with a login name and
+  password (Todav finds the calendars from the address, `/.well-known/caldav` too). Their task
+  lists and calendars sync; changes made elsewhere are fetched every minute while the app is in
+  front and every 30 minutes otherwise, and settings and the order of categories stay on the
+  device.
+- Linux: GNOME Online Accounts' other accounts with calendars (a WebDAV account, for one) can be
+  chosen too, next to Nextcloud and Google.
+
 ## [2.6.0] - 2026-11-06
 
 ### Added

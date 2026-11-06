@@ -1188,8 +1188,12 @@ fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
 }
 
 /// What every way of signing in says when the server field is empty.
-pub fn no_server() -> String {
-    gettext("Enter the Nextcloud server first")
+pub fn no_server(caldav: bool) -> String {
+    if caldav {
+        gettext("Enter the CalDAV server first")
+    } else {
+        gettext("Enter the Nextcloud server first")
+    }
 }
 
 /// Full URL from a scheme picker and host entry; empty stays empty, a typed scheme wins over the picker.
@@ -1261,12 +1265,14 @@ pub async fn browser_login(
     Err(gettext("Login timed out"))
 }
 
-/// Ask for a login name and (app) password for `server` and check them there; `done` gets the
+/// Ask for a login name and (app) password for `server` and check them there (`caldav`: a
+/// CalDAV server other than Nextcloud, whose calendars are looked for); `done` gets the
 /// credentials once they work.
 pub fn password_login(
     parent: &impl IsA<gtk::Widget>,
     server: String,
     login_name: Option<String>,
+    caldav: bool,
     done: impl Fn(todav_core::Credentials) + 'static,
 ) {
     let b = view!("password-login");
@@ -1274,6 +1280,14 @@ pub fn password_login(
     let dialog: adw::Dialog = get(&b, "dialog");
     let user: adw::EntryRow = get(&b, "user");
     let password: adw::PasswordEntryRow = get(&b, "password");
+    if caldav {
+        let group: adw::PreferencesGroup = get(&b, "credentials");
+        group.set_description(Some(&gettext(
+            "The login name and password of your account; some providers ask for an app \
+             password instead",
+        )));
+        password.set_title(&gettext("Password"));
+    }
     let sign_in: gtk::Button = get(&b, "sign_in");
     let error: adw::Banner = get(&b, "error");
     // Signing in again keeps the login name.
@@ -1304,8 +1318,14 @@ pub fn password_login(
         button.set_sensitive(false);
         let (d, done, error, button) = (d.clone(), done.clone(), error.clone(), button.clone());
         glib::spawn_future_local(async move {
-            let r =
-                gio::spawn_blocking(move || todav_core::password_login(server, login, pw)).await;
+            let r = gio::spawn_blocking(move || {
+                if caldav {
+                    todav_core::caldav_login(server, login, pw)
+                } else {
+                    todav_core::password_login(server, login, pw)
+                }
+            })
+            .await;
             let msg = match r {
                 Ok(Ok(c)) => {
                     d.close();

@@ -513,6 +513,7 @@ fun accountKind(model: Main, a: dev.aperte.todav.core.Account): String = when {
     a.kind == AccountKind.LOCAL -> tr("Lists and calendars that stay on this device")
     a.kind == AccountKind.SYSTEM -> tr("Calendars of the accounts on this device")
     !model.core.connected(a.id) -> tr("Not connected")
+    a.kind == AccountKind.CAL_DAV -> tr("CalDAV server")
     else -> tr("Nextcloud server")
 }
 
@@ -788,7 +789,8 @@ fun AccountPage(model: Main, id: Long) {
                 model.act { core.renameAccount(id, name.trim()) }
             }
         }
-        if (account.kind == AccountKind.NEXTCLOUD) {
+        if (account.kind == AccountKind.NEXTCLOUD || account.kind == AccountKind.CAL_DAV) {
+            val caldav = account.kind == AccountKind.CAL_DAV
             val connected = core.connected(id)
             Section(tr("Connection")) {
                 Item(
@@ -808,7 +810,7 @@ fun AccountPage(model: Main, id: Long) {
             if (signingIn) {
                 var server by rememberSaveable { mutableStateOf(account.url) }
                 Column(Modifier.padding(16.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
-                    SignInForm(model, server, { server = it }, account.user) { url, user, password ->
+                    SignInForm(model, server, { server = it }, account.user, caldav = caldav, onDone = { url, user, password ->
                         if (user != account.user) {
                             model.signIn.value = SignIn.Failed(
                                 tr("Signed in as {name}: add that as another account").replace("{name}", user),
@@ -824,10 +826,10 @@ fun AccountPage(model: Main, id: Long) {
                                 model.signIn.value = SignIn.Failed(reason(e))
                             }
                         }
-                    }
+                    })
                 }
             }
-            if (connected) ServerStatus(model, id)
+            if (connected) ServerStatus(model, id, nextcloud = !caldav)
         }
         if (account.kind == AccountKind.SYSTEM) SystemCalendarRows(model)
         Section(null) {
@@ -963,12 +965,13 @@ private fun SystemCalendarRows(model: Main) {
     }
 }
 
-/** The server as `status.php` describes it, the last sync and push, as the Linux app's. */
+/** The server as `status.php` describes it, the last sync and push, as the Linux app's; another CalDAV server's (not `nextcloud`) has only the last sync. */
 @Composable
-private fun ServerStatus(model: Main, id: Long) {
+private fun ServerStatus(model: Main, id: Long, nextcloud: Boolean) {
     val core = model.core
     val sync by model.syncState.collectAsStateWithLifecycle()
     val server = load(id, initial = tr("Checking…")) {
+        if (!nextcloud) return@load ""
         try {
             val info = core.serverInfo(id)
             val name = "${info.product} ${info.version}"
@@ -997,8 +1000,8 @@ private fun ServerStatus(model: Main, id: Long) {
         else -> tr("On: changes made elsewhere show up within seconds")
     }
     Section(tr("Server Status")) {
-        Item(headlineContent = { Text(tr("Server")) }, supportingContent = { Text(server) })
+        if (nextcloud) Item(headlineContent = { Text(tr("Server")) }, supportingContent = { Text(server) })
         Item(headlineContent = { Text(tr("Sync")) }, supportingContent = { Text(status) })
-        Item(headlineContent = { Text(tr("DAV Push")) }, supportingContent = { Text(text) })
+        if (nextcloud) Item(headlineContent = { Text(tr("DAV Push")) }, supportingContent = { Text(text) })
     }
 }

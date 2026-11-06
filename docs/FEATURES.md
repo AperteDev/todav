@@ -69,8 +69,12 @@ What Todav can do, in short. The details of each release are in the
 
 - Sign in through GNOME Online Accounts, the browser (Nextcloud Login Flow) or a login name and
   app password; passwords stay in the system keyring.
-- Several accounts side by side: Nextcloud on one server or more, a Google account (its
-  calendars and Google Tasks) and lists kept on this device; each can be switched off.
+- Other CalDAV servers than Nextcloud (mailbox.org, Radicale, Fastmail…) with a login name and
+  password, or from GNOME Online Accounts: their task lists and calendars sync, checked every
+  minute (settings and categories' order stay on the device).
+- Several accounts side by side: Nextcloud on one server or more, other CalDAV servers, a Google
+  account (its calendars and Google Tasks) and lists kept on this device; each can be switched
+  off.
 - Use Todav without a server: lists and calendars on this device only, alone or next to synced
   ones.
 - Local-first: works offline from a local copy; changes go up when the server is reachable.
@@ -107,7 +111,7 @@ What Todav can do, in short. The details of each release are in the
 - Push through UnifiedPush (the ntfy app, for instance), without Google services.
 - Reminders with "Mark as Done" and Snooze; "New Task" from the launcher; text shared as a task.
 - Syncs with Nextcloud by itself, no DAVx⁵ needed; the Nextcloud app's accounts fill in the
-  sign-in.
+  sign-in. Other CalDAV servers sign in with a login name and password.
 - System Calendars: the phone's other calendars (Google, Exchange, DAVx⁵…), read-only; their
   name and colour can be changed in Todav.
 
@@ -136,7 +140,7 @@ What Todav can do, in short. The details of each release are in the
 - Nextcloud Deck boards as task lists.
 - Settings per list and per calendar, such as how its completed tasks show.
 - Export of several lists at once, and automatic backups.
-- More services besides Nextcloud: other CalDAV servers first.
+- More of other CalDAV servers: their categories' order and settings synced, sign-in with OAuth.
 - Google Tasks on Android, with a Google sign-in of its own.
 - Google Play and F-Droid for the Android app; Flathub for the Linux one.
 - Editing System Calendars' events on Android.

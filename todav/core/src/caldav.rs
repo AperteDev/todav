@@ -307,6 +307,19 @@ impl Dav {
         Dav::with(origin(url), root, auth)
     }
 
+    /// Any CalDAV server, with a login name and a password; `url` is where its calendars are
+    /// found from: its CalDAV root, or the principal.
+    pub fn caldav(url: &str, user: &str, password: &str) -> Dav {
+        let auth = format!(
+            "Basic {}",
+            crate::b64encode(format!("{user}:{password}").as_bytes(), false)
+        );
+        // With the trailing slash of a collection: a server may redirect without it, and a
+        // redirect turns the PROPFIND into a GET.
+        let root = format!("{}/", url.trim_end_matches('/'));
+        Dav::with(origin(&root), root, auth)
+    }
+
     /// A server signed in to with an OAuth access token (Google); `url` is the user's principal.
     pub fn bearer(url: &str, token: &str) -> Dav {
         Dav::with(origin(url), url.to_string(), format!("Bearer {token}"))
