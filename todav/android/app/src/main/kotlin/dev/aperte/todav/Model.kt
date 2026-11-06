@@ -44,6 +44,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /** The app is in front (an activity of it shown), not behind the browser, say. */
@@ -139,6 +140,9 @@ data class CalRow(
  */
 data class Group(val title: String?, val rows: List<Row>, val category: String? = null, val drop: Boolean = false)
 
+/** The category filter's value for the tasks without a category ("Other"). */
+const val OTHER = ""
+
 /** What the main screen shows. */
 data class Screen(
     val accounts: List<Account>,
@@ -153,7 +157,7 @@ data class Screen(
     /** Completed tasks shown apart, under "Completed". */
     val completed: List<Row>,
     val now: Long,
-    /** The categories of the list shown, for its filter, and the one picked. */
+    /** The categories of the list shown, for its filter, and the one picked (`OTHER`: none). */
     val categories: List<String>,
     val filter: String?,
     val stars: Boolean,
@@ -417,9 +421,9 @@ class Main(app: Application) : AndroidViewModel(app) {
         } else {
             listOf(null to all)
         }
-        val names = core.categories(list.href).map { it.name }
-        val filter = wanted?.takeIf { it in names }
-        val shown = { c: String? -> filter == null || c == filter }
+        val names = categoryNames(list.href)
+        val filter = wanted?.takeIf { it == OTHER || it in names }
+        val shown = { c: String? -> filter == null || (c ?: OTHER) == filter }
         val counts = subtaskCounts(all)
         val tag = { t: TodavTask -> if (categoryView == "tags") t.category else null }
         // `group`: the category of the group the rows are in; null for Pinned, where each is in its own.
@@ -504,8 +508,28 @@ class Main(app: Application) : AndroidViewModel(app) {
         act { core.setExpanded(uid, open) }
     }
 
+    /** Show only `category` of `list` (`OTHER` for tasks without one); null shows all. */
     fun filterBy(list: String, category: String?) {
         filter.value = category?.let { list to it }
+    }
+
+    /** Categories made here, per list, offered until a task has them (the Linux sidebar's "+"). */
+    private val newCategories = java.util.concurrent.ConcurrentHashMap<String, Set<String>>()
+
+    /** The categories to offer for `list`: configured, then the ones its tasks have and the new ones. */
+    fun categoryNames(list: String): List<String> = core.categoryNames(list, newCategories[list]?.toList() ?: emptyList())
+
+    /** A category made on its own joins the list's categories (until a task has it). */
+    fun addCategory(list: String, name: String) {
+        newCategories.merge(list, setOf(name)) { a, b -> a + b }
+        todav.changed()
+    }
+
+    /** Rename category `from` of `list` on all its tasks, as one undo step. */
+    fun renameCategory(list: String, from: String, to: String) {
+        newCategories.computeIfPresent(list) { _, names -> names.map { if (it == from) to else it }.toSet() }
+        filter.update { f -> if (f == list to from) list to to else f }
+        together(tr("Category renamed")) { core.renameCategory(list, from, to) }
     }
 
     fun sync() = act { core.syncNow() }

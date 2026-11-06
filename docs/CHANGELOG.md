@@ -7,8 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Android: the category filter's menu has "Other" and "New Category…", and a category's
+  heading, held, opens "Edit Category" to rename it on all its tasks (with Undo). The add sheet's
+  category chip always shows, with "New Category…".
+
 ### Fixed
 
+- Android: a list's category headings, filter and pickers showed only the categories saved in
+  the account's config, so a list whose tasks had other categories (typed on a task, from
+  another app, or on this device) looked ungrouped. They now include the categories its tasks
+  have, as on Linux.
 - Linux: a category added in the sidebar is placed by name at once, instead of at the end until a
   task is dropped on it.
 

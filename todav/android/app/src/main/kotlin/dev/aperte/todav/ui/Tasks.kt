@@ -1,7 +1,9 @@
 package dev.aperte.todav.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,6 +40,7 @@ import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -104,6 +107,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.aperte.todav.Dest
 import dev.aperte.todav.IMPORTANT
 import dev.aperte.todav.Main
+import dev.aperte.todav.OTHER
 import dev.aperte.todav.Row as TaskRow
 import dev.aperte.todav.Screen
 import dev.aperte.todav.UPCOMING
@@ -203,9 +207,7 @@ fun TasksPane(model: Main, screen: Screen) {
                         IconButton(onClick = { model.open(Dest.Search) }) { Icon(Icons.Default.Search, tr("Search")) }
                     }
                     SortMenu(model)
-                    screen.list?.takeIf { screen.categories.isNotEmpty() }?.let { list ->
-                        CategoryFilter(screen) { model.filterBy(list.href, it) }
-                    }
+                    screen.list?.let { CategoryFilter(model, screen, it.href) }
                     if (model.core.canSync()) SyncButton(sync == SyncState.Syncing && !pulling, model::sync)
                 },
             )
@@ -288,10 +290,15 @@ private fun SortMenu(model: Main) {
     }
 }
 
-/** The categories of the list shown, to show one only. */
+/** The categories of the list shown, to show one only (or "Other"), and a new one to add. */
 @Composable
-private fun CategoryFilter(screen: Screen, onPick: (String?) -> Unit) {
+private fun CategoryFilter(model: Main, screen: Screen, list: String) {
     var open by remember { mutableStateOf(false) }
+    var naming by remember { mutableStateOf(false) }
+    val names = screen.categories
+    // All, each category, "Other" (once there are categories), then New Category…
+    val other = if (names.isEmpty()) emptyList() else listOf(ptr("category", "Other"))
+    val options = listOf(tr("All Categories")) + names + other + tr("New Category…")
     Box {
         Tip(tr("Categories")) {
             IconButton(onClick = { open = true }) {
@@ -305,9 +312,26 @@ private fun CategoryFilter(screen: Screen, onPick: (String?) -> Unit) {
         PickMenu(
             open,
             { open = false },
-            listOf(tr("All Categories")) + screen.categories,
-            screen.categories.indexOf(screen.filter) + 1,
-        ) { onPick(screen.categories.getOrNull(it - 1)) }
+            options,
+            when (screen.filter) {
+                null -> 0
+                OTHER -> names.size + 1
+                else -> names.indexOf(screen.filter) + 1
+            },
+        ) {
+            when {
+                it == 0 -> model.filterBy(list, null)
+                it == options.lastIndex -> naming = true
+                it > names.size -> model.filterBy(list, OTHER)
+                else -> model.filterBy(list, names[it - 1])
+            }
+        }
+    }
+    if (naming) {
+        CategoryDialog(null, { naming = false }) {
+            naming = false
+            model.addCategory(list, it)
+        }
     }
 }
 
@@ -345,6 +369,14 @@ private fun TaskList(model: Main, screen: Screen, state: LazyListState, padding:
     // The task tapped: its details sheet, as the calendar's (pulled up, its page).
     var details by remember { mutableStateOf<TodavTask?>(null) }
     details?.let { ItemSheet(model, Item.Task(it)) { details = null } }
+    // The category being edited (a heading held).
+    var renaming by remember { mutableStateOf<String?>(null) }
+    renaming?.let { from ->
+        CategoryDialog(from, { renaming = null }) { to ->
+            renaming = null
+            screen.list?.let { model.renameCategory(it.href, from, to) }
+        }
+    }
     if (screen.groups.isEmpty() && screen.completed.isEmpty()) {
         Empty(screen, padding)
         return
@@ -561,7 +593,7 @@ private fun TaskList(model: Main, screen: Screen, state: LazyListState, padding:
                     Box(
                         Modifier.graphicsLayer { translationY = dy }
                             .background(if (on) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent),
-                    ) { Heading(title) }
+                    ) { Heading(title, group.category?.let { c -> { renaming = c } }) }
                 }
             }
             items(group.rows, key = { "${group.title}:${it.task.uid}" }, contentType = { "task" }) { row ->
@@ -628,14 +660,56 @@ private fun Empty(screen: Screen, padding: PaddingValues) {
     }
 }
 
+/** A heading; held, `onLongClick` (a category's, to edit it). */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun Heading(title: String) {
+fun Heading(title: String, onLongClick: (() -> Unit)? = null) {
+    val haptics = LocalHapticFeedback.current
     Text(
         title,
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)
+            .then(
+                if (onLongClick == null) {
+                    Modifier
+                } else {
+                    Modifier.combinedClickable(onClick = {}, onLongClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onLongClick()
+                    })
+                },
+            )
             .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
+    )
+}
+
+/** A category's name: a new one (`current` null) or the one being edited. */
+@Composable
+private fun CategoryDialog(current: String?, onDismiss: () -> Unit, onDone: (String) -> Unit) {
+    var name by rememberSaveable { mutableStateOf(current ?: "") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (current == null) tr("New Category") else tr("Edit Category")) },
+        text = {
+            Group {
+                FieldItem(
+                    name,
+                    { name = it },
+                    tr("Name"),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (name.isNotBlank()) onDone(name.trim()) }),
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                )
+            }
+        },
+        confirmButton = {
+            Button(enabled = name.isNotBlank(), onClick = { onDone(name.trim()) }) {
+                Text(if (current == null) tr("Create") else tr("Save"))
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("Cancel")) } },
     )
 }
 
@@ -994,7 +1068,13 @@ fun AddSheet(model: Main, list: String, parent: TodavTask?, category: String?, i
     var pickDate by remember { mutableStateOf(false) }
     var pickCategory by remember { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
-    val categories = remember(list) { model.core.categories(list).map { it.name } }
+    var newCategory by remember { mutableStateOf(false) }
+    // The list's categories, and the one made here.
+    var made by rememberSaveable { mutableStateOf<String?>(null) }
+    val categories = remember(list, made) {
+        val names = model.categoryNames(list)
+        made?.takeIf { it !in names }?.let { names + it } ?: names
+    }
     DetailsSheet(
         onDismiss,
         full = { sheet ->
@@ -1061,21 +1141,19 @@ fun AddSheet(model: Main, list: String, parent: TodavTask?, category: String?, i
                     label = { Text(due?.let { date(it) } ?: tr("Due Date")) },
                     leadingIcon = { Icon(Icons.Outlined.CalendarToday, null, Modifier.size(18.dp)) },
                 )
-                if (categories.isNotEmpty() || cat != null) {
-                    Box {
-                        FilterChip(
-                            selected = cat != null,
-                            onClick = { pickCategory = true },
-                            label = { Text(cat ?: tr("Category")) },
-                            leadingIcon = { Icon(Icons.AutoMirrored.Outlined.Label, null, Modifier.size(18.dp)) },
-                        )
-                        PickMenu(
-                            pickCategory,
-                            { pickCategory = false },
-                            listOf(ptr("category", "None")) + categories,
-                            categories.indexOf(cat) + 1,
-                        ) { cat = categories.getOrNull(it - 1) }
-                    }
+                Box {
+                    FilterChip(
+                        selected = cat != null,
+                        onClick = { pickCategory = true },
+                        label = { Text(cat ?: tr("Category")) },
+                        leadingIcon = { Icon(Icons.AutoMirrored.Outlined.Label, null, Modifier.size(18.dp)) },
+                    )
+                    PickMenu(
+                        pickCategory,
+                        { pickCategory = false },
+                        listOf(ptr("category", "None")) + categories + tr("New Category…"),
+                        categories.indexOf(cat) + 1,
+                    ) { if (it > categories.size) newCategory = true else cat = categories.getOrNull(it - 1) }
                 }
                 FilterChip(
                     selected = priority != null,
@@ -1084,6 +1162,13 @@ fun AddSheet(model: Main, list: String, parent: TodavTask?, category: String?, i
                     leadingIcon = { StarIcon(priority) },
                 )
             }
+        }
+    }
+    if (newCategory) {
+        CategoryDialog(null, { newCategory = false }) {
+            newCategory = false
+            made = it
+            cat = it
         }
     }
     if (pickDate) {

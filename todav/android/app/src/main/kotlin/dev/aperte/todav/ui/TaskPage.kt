@@ -145,7 +145,7 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null, draft: 
     val startReminders = remember(uid) { mutableStateListOf<Long>().apply { addAll(oldStartReminders) } }
     var confirmDelete by remember { mutableStateOf(false) }
     var discard by remember { mutableStateOf(false) }
-    val categories = remember(list) { core.categories(list).map { it.name } }
+    val categories = remember(list) { model.categoryNames(list) }
 
     val changed = summary != task.summary || list != task.listHref || category != (task.category ?: "") ||
         priority != task.priority || note != (task.description ?: "") || start != task.start ||

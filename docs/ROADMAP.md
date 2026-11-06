@@ -158,9 +158,6 @@ on a phone, whether Week shows as a list of days.
 - Verify push delivery through a real UnifiedPush distributor (ntfy) in the background.
 - Move a task to another list by dragging it onto the sidebar (Move to List in its menu does it
   now).
-- Add a category to a list and rename one (as on Linux: its sidebar's "+" and the category's
-  context menu); the core does it, `rename_category` in `todav-ffi`. The category filter's menu
-  needs a "New category" and a long press on a category for "Edit…".
 - Drop the material3 pin in `gradle/libs.versions.toml` once the Compose BOM ships 1.5.
 - System calendars (`SystemCalendars.kt`, read-only now): editing their events, written back to
   Android's calendar store (whole events with their repeat rules, not the occurrences copied
