@@ -233,18 +233,44 @@ pub fn context_menu(
 /// account's lists in that sidebar section, in order): above or below that one (its upper or
 /// lower half). The new order syncs as Nextcloud's own, and stays here for lists on this device.
 pub fn reorderable(row: &gtk::ListBoxRow, l: &List, siblings: Vec<String>) {
+    reorder_row(
+        row,
+        &l.href,
+        &l.display_name,
+        siblings,
+        |order| core().reorder_lists(order).map_err(|e| e.to_string()),
+        || {
+            crate::window::lists_changed();
+            crate::calendar::refresh();
+            crate::request_sync();
+        },
+    );
+}
+
+/// Sidebar row `row`, which `label` names and `key` is among `siblings` (those of its section,
+/// in order), moves by dragging onto another of them: above or below it (its upper or lower
+/// half). `apply` gets the new order, and `then` runs after the drop is done and the rows are
+/// made anew.
+pub fn reorder_row(
+    row: &gtk::ListBoxRow,
+    key: &str,
+    label: &str,
+    siblings: Vec<String>,
+    apply: impl Fn(Vec<String>) -> Result<(), String> + 'static,
+    then: impl Fn() + 'static,
+) {
     // A variant, not a string: text fields would take a string and type it.
     let drag = gtk::DragSource::new();
     drag.set_actions(gdk::DragAction::MOVE);
-    let value = l.href.to_variant().to_value();
+    let value = key.to_variant().to_value();
     drag.set_content(Some(&gdk::ContentProvider::for_value(&value)));
     // Its list box shows where the row lands, not the highlight a task dropped on a row gets;
     // kept from now, as the drop makes the rows anew, maybe before the drag ends.
     let rows = row.parent();
     let (r, name, href, b) = (
         row.clone(),
-        l.display_name.clone(),
-        l.href.clone(),
+        label.to_string(),
+        key.to_string(),
         rows.clone(),
     );
     drag.connect_drag_begin(move |_, drag| {
@@ -273,13 +299,14 @@ pub fn reorderable(row: &gtk::ListBoxRow, l: &List, siblings: Vec<String>) {
 
     let below =
         |dt: &gtk::DropTarget, y: f64| dt.widget().is_some_and(|w| y > f64::from(w.height()) / 2.0);
+    let then = Rc::new(then);
     let drop = gtk::DropTarget::new(glib::Variant::static_type(), gdk::DragAction::MOVE);
-    let (own, s) = (l.href.clone(), siblings.clone());
+    let (own, s) = (key.to_string(), siblings.clone());
     drop.connect_accept(move |_, _| {
         DRAGGED.with_borrow(|d| d.as_ref().is_some_and(|d| *d != own && s.contains(d)))
     });
     // Where the dragged list lands next to this one, or None where it already is.
-    let own = l.href.clone();
+    let own = key.to_string();
     let order = Rc::new(move |below: bool| {
         let moved = DRAGGED.with_borrow(Clone::clone)?;
         let mut order = siblings.clone();
@@ -311,16 +338,13 @@ pub fn reorderable(row: &gtk::ListBoxRow, l: &List, siblings: Vec<String>) {
         let Some(order) = order(below(dt, y)) else {
             return false;
         };
-        if let Err(e) = core().reorder_lists(order) {
-            crate::window::toast(&e.to_string());
+        if let Err(e) = apply(order) {
+            crate::window::toast(&e);
             return true;
         }
         // After the drop is done: the rows are made anew.
-        glib::idle_add_local_once(|| {
-            crate::window::lists_changed();
-            crate::calendar::refresh();
-            crate::request_sync();
-        });
+        let then = then.clone();
+        glib::idle_add_local_once(move || then());
         true
     });
     row.add_controller(drop);

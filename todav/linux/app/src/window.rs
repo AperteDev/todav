@@ -105,8 +105,6 @@ struct Ui {
     cat_rows: RefCell<Vec<Option<String>>>,
     /// Category the task page is narrowed to, with the list it belongs to.
     filter: RefCell<Option<(String, Option<String>)>>,
-    /// Categories made in the sidebar per list, shown until a task or the config has them.
-    new_cats: RefCell<Vec<(String, String)>>,
     hrefs: RefCell<Vec<String>>,
     /// Name and colour of each list's row, to notice when they change.
     looks: RefCell<Vec<(String, Option<String>)>>,
@@ -807,7 +805,6 @@ fn build(app: &adw::Application) -> Rc<Ui> {
         cat_list: get(&b, "cat_list"),
         cat_rows: RefCell::new(Vec::new()),
         filter: RefCell::new(None),
-        new_cats: RefCell::new(Vec::new()),
         hrefs: RefCell::new(Vec::new()),
         looks: RefCell::new(Vec::new()),
         current: RefCell::new(None),
@@ -1012,11 +1009,16 @@ fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
         }
     });
     let weak = Rc::downgrade(ui);
-    crate::lists::context_menu(&ui.cat_list, "win.edit-category", None, move |row| {
-        let ui = weak.upgrade()?;
-        let name = ui.cat_rows.borrow().get(row.index() as usize).cloned();
-        name.flatten() // "Other" is no category
-    });
+    crate::lists::context_menu(
+        &ui.cat_list,
+        "win.edit-category",
+        Some("win.delete-category"),
+        move |row| {
+            let ui = weak.upgrade()?;
+            let name = ui.cat_rows.borrow().get(row.index() as usize).cloned();
+            name.flatten() // "Other" is no category
+        },
+    );
     let edit = gio::SimpleAction::new("edit-category", Some(glib::VariantTy::STRING));
     let weak = Rc::downgrade(ui);
     edit.connect_activate(move |_, name| {
@@ -1030,6 +1032,16 @@ fn connect(ui: &Rc<Ui>, b: &gtk::Builder) {
         });
     });
     ui.window.add_action(&edit);
+    let delete = gio::SimpleAction::new("delete-category", Some(glib::VariantTy::STRING));
+    let weak = Rc::downgrade(ui);
+    delete.connect_activate(move |_, name| {
+        let (Some(ui), Some(name)) = (weak.upgrade(), name.and_then(|n| n.str().map(String::from)))
+        else {
+            return;
+        };
+        glib::spawn_future_local(delete_category(ui, name));
+    });
+    ui.window.add_action(&delete);
 
     // "+": accented and usable once something is typed.
     let add: gtk::Button = get(b, "add_task");
@@ -1576,14 +1588,7 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
 
     // Category picker: configured categories, then any others in use; keep the selection.
     let selected = ui.cats.string(ui.cat.selected()).map(|s| s.to_string());
-    let fresh: Vec<String> = ui
-        .new_cats
-        .borrow()
-        .iter()
-        .filter(|(h, _)| *h == href)
-        .map(|(_, n)| n.clone())
-        .collect();
-    let names = tasks::category_names(core(), &href, &fresh);
+    let names = tasks::category_names(core(), &href);
     let none = gettext("No category");
     let refs: Vec<&str> = std::iter::once(none.as_str())
         .chain(names.iter().map(String::as_str))
@@ -1628,6 +1633,23 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
             if let Some(row) = ui.cat_list.row_at_index(i as i32) {
                 row.add_css_class("cat-drop");
                 row.add_controller(drop);
+                // A category moves by dragging it onto another ("Other" stays last).
+                if let Some(name) = r {
+                    let weak = Rc::downgrade(ui);
+                    crate::lists::reorder_row(
+                        &row,
+                        name,
+                        name,
+                        names.clone(),
+                        move |order| {
+                            let href = weak.upgrade().and_then(|ui| ui.current.borrow().clone());
+                            let href = href.ok_or_else(|| gettext("No list is shown"))?;
+                            tasks::reorder_categories(core(), &href, order)
+                                .map_err(|e| e.to_string())
+                        },
+                        request_sync,
+                    );
+                }
             }
         }
         *ui.cat_rows.borrow_mut() = rows;
@@ -2949,18 +2971,21 @@ fn undo(change: Option<u64>) {
     }
 }
 
-/// A category made in the sidebar joins the shown list's categories (until a task has it) and
-/// becomes the picker's choice.
+/// A category made in the sidebar joins the shown list's categories, last, and becomes the
+/// picker's choice.
 fn add_category(ui: &Rc<Ui>, name: String) {
-    let href = ui.current.borrow().clone();
-    if let Some(href) = href {
-        ui.new_cats.borrow_mut().push((href, name.clone()));
+    let Some(href) = ui.current.borrow().clone() else {
+        return;
+    };
+    if let Err(e) = tasks::add_category(core(), &href, &name) {
+        return toast(&e.to_string());
     }
+    request_sync();
     refresh_tasks(ui);
     select_name(&ui.cat, &ui.cats, &name);
 }
 
-/// Rename category `from` of the shown list: its tasks, the picker's new ones and the filter.
+/// Rename category `from` of the shown list: its tasks, its place in the order and the filter.
 fn rename_category(ui: &Rc<Ui>, from: &str, to: String) {
     let Some(href) = ui.current.borrow().clone() else {
         return;
@@ -2969,11 +2994,6 @@ fn rename_category(ui: &Rc<Ui>, from: &str, to: String) {
         return toast(&e.to_string());
     }
     request_sync();
-    for (h, n) in ui.new_cats.borrow_mut().iter_mut() {
-        if *h == href && n == from {
-            *n = to.clone();
-        }
-    }
     if let Some((h, Some(c))) = ui.filter.borrow_mut().as_mut()
         && *h == href
         && c == from
@@ -2982,6 +3002,53 @@ fn rename_category(ui: &Rc<Ui>, from: &str, to: String) {
     }
     refresh_tasks(ui);
     select_name(&ui.cat, &ui.cats, &to);
+}
+
+/// Delete category `name` of the shown list once the user agrees: its tasks stay without it,
+/// and Undo puts it back.
+async fn delete_category(ui: Rc<Ui>, name: String) {
+    let Some(href) = ui.current.borrow().clone() else {
+        return;
+    };
+    let n = core()
+        .tasks(href.clone(), true)
+        .iter()
+        .filter(|t| t.category.as_deref() == Some(&name))
+        .count() as u64;
+    let body = match n {
+        0 => gettext("“{name}” will be deleted."),
+        n => ngettext(
+            "“{name}” will be removed from its {n} task, which stays.",
+            "“{name}” will be removed from its {n} tasks, which stay.",
+            n,
+        ),
+    }
+    .replace("{name}", &name)
+    .replace("{n}", &n.to_string());
+    let alert = adw::AlertDialog::new(Some(&gettext("Delete Category?")), Some(&body));
+    alert.add_responses(&[
+        ("cancel", &gettext("Cancel")),
+        ("delete", &gettext("Delete")),
+    ]);
+    alert.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
+    alert.set_close_response("cancel");
+    if alert.choose_future(Some(&ui.window)).await != "delete" {
+        return;
+    }
+    if let Err(e) = tasks::delete_category(core(), &href, &name) {
+        return toast(&e.to_string());
+    }
+    request_sync();
+    if ui
+        .filter
+        .borrow()
+        .as_ref()
+        .is_some_and(|(h, c)| *h == href && c.as_deref() == Some(&name))
+    {
+        *ui.filter.borrow_mut() = None;
+    }
+    refresh_tasks(&ui);
+    undo_toast(&gettext("“{name}” deleted").replace("{name}", &name));
 }
 
 /// Ask for a category name, given to `created`. With `current`, the name of the category being
@@ -3078,14 +3145,20 @@ fn edit_dialog(ui: &Rc<Ui>, t: &Task, sub: bool) {
     }
     let busy = Rc::new(Cell::new(false));
     let (combo, list, uid) = (category.downgrade(), cats.clone(), t.uid.clone());
-    let b2 = busy.clone();
+    let (b2, task_list) = (busy.clone(), t.list_href.clone());
     connect_new_category(ui, &category, &cats, busy, move |_, name| {
-        // A category made from this dialog applies to the task right away.
+        // A category made from this dialog applies to the task right away, and joins the list's,
+        // last.
         let patch = TaskPatch {
             category: Some(name.clone()),
             ..Default::default()
         };
-        if core().update_task(uid.clone(), patch).is_ok() {
+        // One step for undo.
+        let done = core().together(|| {
+            tasks::add_category(core(), &task_list, &name)?;
+            core().update_task(uid.clone(), patch)
+        });
+        if done.is_ok() {
             request_sync();
         }
         b2.set(true);
