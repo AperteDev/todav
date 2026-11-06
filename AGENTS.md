@@ -97,15 +97,25 @@
   `dev.aperte.Todav2` next to `Todav1`); do not rename, retype, reorder or remove, and do not
   give an existing key another meaning or format (a synced setting changed in meaning goes under
   a new name, as under Settings).
+- The other way round holds too: the extension updates on its own while the app comes from a
+  distribution, the Flatpak or a package that may be older, so the extension must work with the
+  app of the last 3 months' releases (and with none installed, as it does now: it says so). A
+  call to something the app may not have yet (a method added since, a new `ext_*` key, a result
+  with more fields) is caught and falls back to the older way or to a default, as the agenda's
+  does (`GetAgendaLinks`, then `GetAgendaFrom`, then `GetAgenda`) and `EditItem` (then
+  `ShowTask`); read a new setting with a default for when `GetSettings` lacks it. When the
+  extension starts to need a new app feature, the fallback goes in the same change, and the
+  extension's description or the app's changelog says which app version has the feature.
 - Drop what only an old extension uses once the extension version that no longer needs it has
   been on extensions.gnome.org for at least 3 months, not before: say so in `docs/CHANGELOG.md`
   under `Removed`, and mark such code with a comment naming the extension version it is for
   (`// compat: extension 2.6.0`), so it can be found and removed then.
-- Check a change to `dbus.rs`, to the `ext_*` settings or to what they read: run the last
-  published extension (its tag's `todav/gnome-extension`, `version-name` in `metadata.json`)
-  against the new build (`cargo build -p todav-linux`, then `make -C todav/gnome-extension
-  nested`, which links the extension and runs `run-nested.sh`), and open its menu and
-  Preferences page.
+- Check both ways before committing: a change to `dbus.rs`, to the `ext_*` settings or to what
+  they read, against the last published extension (its tag's `todav/gnome-extension`,
+  `version-name` in `metadata.json`); a change to the extension, against the app of the last
+  release (built from its tag, or the installed one) as well as the new build. Build the app
+  (`cargo build -p todav-linux`), run `make -C todav/gnome-extension nested` (it links the
+  extension and runs `run-nested.sh`) and open the extension's menu and its Preferences page.
 
 ## Translations
 
