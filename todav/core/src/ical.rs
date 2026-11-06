@@ -337,6 +337,20 @@ impl Calendar {
         parse_time(&self.prop(name)?.value)
     }
 
+    /// Replace the categories with `cats` (one line; none removes it).
+    pub fn set_categories(&mut self, cats: &[String]) {
+        let v: Vec<String> = cats
+            .iter()
+            .filter(|c| !c.is_empty())
+            .map(|c| escape(c))
+            .collect();
+        self.set(
+            "CATEGORIES",
+            "",
+            Some(v.join(",").as_str()).filter(|v| !v.is_empty()),
+        );
+    }
+
     pub fn categories(&self) -> Vec<String> {
         self.props("CATEGORIES")
             .flat_map(|l| split_unescaped(&l.value, ','))

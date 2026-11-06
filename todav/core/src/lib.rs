@@ -857,20 +857,58 @@ impl Client {
                     cats.push(String::new());
                 }
                 cats[0] = c.clone();
-                let v: Vec<String> = cats
-                    .iter()
-                    .filter(|c| !c.is_empty())
-                    .map(|c| ical::escape(c))
-                    .collect();
-                cal.set(
-                    "CATEGORIES",
-                    "",
-                    Some(v.join(",").as_str()).filter(|v| !v.is_empty()),
-                );
+                cal.set_categories(&cats);
             }
         })?;
         self.note_late(&uid, &before.unwrap_or_default());
         Ok(())
+    }
+
+    /// Replace category `from` with `to` (None: take it off) on every task of the list that has
+    /// it, done ones too and wherever it stands among their categories; the task's category
+    /// is the first of them, so one that loses it takes the next. One that has `to` already keeps
+    /// it once. The tasks stay.
+    pub fn replace_category(
+        &self,
+        list_href: String,
+        from: String,
+        to: Option<String>,
+    ) -> Result<()> {
+        let uids: Vec<String> = {
+            let db = self.db.lock().unwrap();
+            let tasks = store::tasks(&db, &list_href, true)?;
+            let has = |uid: &str| -> Result<bool> {
+                let raw = store::raw(&db, Kind::Task, &list_href, uid)?;
+                let cal = raw.and_then(|r| Calendar::parse(&r.raw_ics));
+                Ok(cal.is_some_and(|c| c.categories().contains(&from)))
+            };
+            let mut found = Vec::new();
+            for t in tasks {
+                if has(&t.uid)? {
+                    found.push(t.uid);
+                }
+            }
+            found
+        };
+        self.together(|| {
+            for uid in &uids {
+                self.modify(uid, |cal| {
+                    let mut cats: Vec<String> = Vec::new();
+                    for c in cal.categories() {
+                        let c = match (c == from, &to) {
+                            (false, _) => c,
+                            (true, Some(to)) => to.clone(),
+                            (true, None) => continue,
+                        };
+                        if !cats.contains(&c) {
+                            cats.push(c);
+                        }
+                    }
+                    cal.set_categories(&cats);
+                })?;
+            }
+            Ok(())
+        })
     }
 
     /// A reminder this change set in the past, while what it counts from (the due date or the
@@ -955,9 +993,10 @@ impl Client {
     /// Put back what change `id` (else the latest) replaced; false when there is none. A delete
     /// the server already has comes back as a new resource there.
     pub fn undo(&self, id: Option<u64>) -> Result<bool> {
-        let Some(before) = self.journal.lock().unwrap().take(id) else {
+        let Some(undone) = self.journal.lock().unwrap().take(id) else {
             return Ok(false);
         };
+        let before = undone.items;
         let mut changed = Vec::new();
         {
             let db = self.db.lock().unwrap();
@@ -1016,6 +1055,9 @@ impl Client {
         }
         for (list, uid) in changed {
             self.emit(&list, vec![uid]);
+        }
+        for c in undone.config.into_iter().rev() {
+            self.restore_categories(&c.list_href, c.categories.as_deref())?;
         }
         Ok(true)
     }

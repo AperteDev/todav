@@ -718,3 +718,57 @@ fn google_tasks_round_trip() {
     b.sync().into_result().unwrap();
     assert!(b.lists().iter().all(|l| l.href != list));
 }
+
+#[test]
+fn category_order_and_deletion_reach_the_other_device() {
+    let f = Fixture::new("categories");
+    let names = |c: &Client| -> Vec<String> {
+        c.categories(f.href.clone())
+            .into_iter()
+            .map(|m| m.name)
+            .collect()
+    };
+    // The file may hold what an earlier run left for this list.
+    f.a.set_categories(f.href.clone(), vec![]).unwrap();
+    for (summary, cat) in [("x", "Beta"), ("y", "Alpha"), ("z", "Gamma")] {
+        f.a.add_task(
+            f.href.clone(),
+            summary.into(),
+            Some(cat.into()),
+            None,
+            false,
+        )
+        .unwrap();
+    }
+    f.a.sync().into_result().unwrap();
+    f.b.sync().into_result().unwrap();
+    f.a.set_categories(
+        f.href.clone(),
+        vec!["Gamma".into(), "Alpha".into(), "Beta".into()],
+    )
+    .unwrap();
+    assert!(f.a.pending(None), "the order waits for the server");
+    f.a.sync().into_result().unwrap();
+    assert!(!f.a.pending(None));
+    f.b.sync().into_result().unwrap();
+    assert_eq!(names(&f.b), ["Gamma", "Alpha", "Beta"]);
+    // Deleting on b keeps the tasks, and a gets both.
+    f.b.replace_category(f.href.clone(), "Alpha".into(), None)
+        .unwrap();
+    f.b.set_categories(f.href.clone(), vec!["Gamma".into(), "Beta".into()])
+        .unwrap();
+    f.b.sync().into_result().unwrap();
+    f.a.sync().into_result().unwrap();
+    assert_eq!(names(&f.a), ["Gamma", "Beta"]);
+    let y = f.a.tasks(f.href.clone(), true);
+    assert_eq!(y.len(), 3);
+    assert!(y.iter().any(|t| t.summary == "y" && t.category.is_none()));
+    // And a reorder on a goes the other way; the file is left empty for this list.
+    f.a.set_categories(f.href.clone(), vec!["Beta".into(), "Gamma".into()])
+        .unwrap();
+    f.a.sync().into_result().unwrap();
+    f.b.sync().into_result().unwrap();
+    assert_eq!(names(&f.b), ["Beta", "Gamma"]);
+    f.a.set_categories(f.href.clone(), vec![]).unwrap();
+    f.a.sync().into_result().unwrap();
+}

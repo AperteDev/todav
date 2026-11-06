@@ -2,7 +2,8 @@
 
 use crate::caldav::Dav;
 use crate::json::Json;
-use crate::{Client, Error, Result, Task, store};
+use crate::undo::ConfigBefore;
+use crate::{AccountKind, Client, Error, Result, Task, gtasks, store};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -58,16 +59,54 @@ fn list_key(list_href: &str) -> &str {
         .unwrap_or_default()
 }
 
+/// The `categories` array of list `key` in config `doc`.
+fn list_categories<'a>(doc: &'a Json, key: &str) -> Option<&'a Json> {
+    doc.get("lists")?.get(key)?.get("categories")
+}
+
+/// Set (None: remove) the `categories` array of list `key` in config `doc`, keeping whatever
+/// else it has: other versions of the config file may keep more.
+fn set_list_categories(doc: &mut Json, key: &str, cats: Option<Json>) {
+    let Json::Obj(top) = doc else { return };
+    let lists = top
+        .entry("lists".into())
+        .or_insert_with(|| Json::Obj(BTreeMap::new()));
+    let Json::Obj(lists) = lists else { return };
+    let entry = lists
+        .entry(key.into())
+        .or_insert_with(|| Json::Obj(BTreeMap::new()));
+    let Json::Obj(entry) = entry else { return };
+    match cats {
+        Some(c) => entry.insert("categories".into(), c),
+        None => entry.remove("categories"),
+    };
+}
+
+/// An empty config file's content.
+fn empty_config() -> Json {
+    Json::Obj(BTreeMap::from([
+        ("version".into(), Json::Num(1.0)),
+        ("lists".into(), Json::Obj(BTreeMap::new())),
+    ]))
+}
+
 impl Client {
+    /// The list keys (`list_key`) of account `account` whose categories changed here and are not
+    /// in the server's file yet.
+    fn config_dirty(&self, account: i64) -> Vec<String> {
+        self.config_dirty_in(&self.db.lock().unwrap(), account)
+    }
+
     /// Fetch the account's config.json if it changed (ETag), or create it from the categories
-    /// in use when missing.
+    /// in use when missing; and upload the categories changed here (`set_categories`), laid over
+    /// the file list by list.
     pub(crate) fn sync_config(&self, account: i64, dav: &Dav) -> Result<()> {
         let k = |name: &str| crate::account::key(account, name);
         let (href, etag) = {
             let db = self.db.lock().unwrap();
             (
                 store::kv_get(&db, &k("config_href"))?,
-                store::kv_get(&db, &k("config_etag"))?,
+                store::kv_get(&db, &k("config_etag"))?.filter(|e| !e.is_empty()),
             )
         };
         let href = match href {
@@ -82,45 +121,104 @@ impl Client {
                 h
             }
         };
-        let headers: Vec<(&str, &str)> = etag
-            .as_deref()
-            .map(|e| ("If-None-Match", e))
-            .into_iter()
-            .collect();
-        let r = dav.request("GET", &href, &headers, "")?;
-        let (body, etag) = match r.status {
-            304 => return Ok(()),
-            200 => (r.body, r.etag),
-            404 => {
-                let body = self.default_config(account).to_string();
-                let dir = &href[..href.rfind('/').unwrap() + 1];
-                dav.request("MKCOL", dir, &[], "")?; // 405 if it exists: fine
-                let r = dav.request(
-                    "PUT",
-                    &href,
-                    &[("Content-Type", "application/json"), ("If-None-Match", "*")],
-                    &body,
-                )?;
-                match r.status {
-                    200..=299 => {}
-                    // Another device is creating it right now; fetched on the next sync.
-                    404 | 412 => return Ok(()),
-                    s => return Err(Error::Http(s, r.body)),
+        // A refused upload means another device wrote in between: fetch and merge again.
+        for _ in 0..3 {
+            let dirty = self.config_dirty(account);
+            // The server's copy is needed whole to upload; else only when it changed.
+            let headers: Vec<(&str, &str)> = etag
+                .as_deref()
+                .filter(|_| dirty.is_empty())
+                .map(|e| ("If-None-Match", e))
+                .into_iter()
+                .collect();
+            let r = dav.request("GET", &href, &headers, "")?;
+            let missing = r.status == 404;
+            let body = match r.status {
+                304 => return Ok(()),
+                200 => r.body,
+                404 => self.default_config(account).to_string(),
+                s => return Err(Error::Http(s, r.body)),
+            };
+            let (mut sent, mut sent_etag) = (body, r.etag.filter(|e| !e.is_empty()));
+            let mut snapshot = empty_config();
+            if !dirty.is_empty() || missing {
+                let mut doc =
+                    Json::parse(&sent).ok_or_else(|| Error::Parse("config.json".into()))?;
+                snapshot = self.config_doc(account);
+                for key in &dirty {
+                    set_list_categories(&mut doc, key, list_categories(&snapshot, key).cloned());
                 }
-                (body, r.etag)
+                sent = doc.to_string();
+                if missing {
+                    let dir = &href[..href.rfind('/').unwrap() + 1];
+                    dav.request("MKCOL", dir, &[], "")?; // 405 if it exists: fine
+                }
+                let mut headers = vec![("Content-Type", "application/json")];
+                match (&sent_etag, missing) {
+                    (Some(e), false) => headers.push(("If-Match", e)),
+                    (None, true) => headers.push(("If-None-Match", "*")),
+                    _ => {}
+                }
+                let put = dav.request("PUT", &href, &headers, &sent)?;
+                match put.status {
+                    200..=299 => sent_etag = put.etag.filter(|e| !e.is_empty()),
+                    // Another device is writing right now.
+                    404 | 412 => continue,
+                    s => return Err(Error::Http(s, put.body)),
+                }
             }
-            s => return Err(Error::Http(s, r.body)),
-        };
-        {
-            let db = self.db.lock().unwrap();
-            store::kv_set(&db, &k("config_json"), &body)?;
-            let etag = etag.as_deref().unwrap_or_default();
-            store::kv_set(&db, &k("config_etag"), etag)?;
+            {
+                let db = self.db.lock().unwrap();
+                // Edits made while this ran were not sent: they stay to upload, over the file.
+                let local = self.config_doc_in(&db, account);
+                let mut doc = Json::parse(&sent).unwrap_or_else(empty_config);
+                let mut left = Vec::new();
+                for key in self.config_dirty_in(&db, account) {
+                    let unchanged = dirty.contains(&key)
+                        && list_categories(&local, &key) == list_categories(&snapshot, &key);
+                    if !unchanged {
+                        set_list_categories(&mut doc, &key, list_categories(&local, &key).cloned());
+                        left.push(key);
+                    }
+                }
+                store::kv_set(&db, &k("config_json"), &doc.to_string())?;
+                store::kv_set(
+                    &db,
+                    &k("config_etag"),
+                    sent_etag.as_deref().unwrap_or_default(),
+                )?;
+                store::kv_set(&db, &k("config_dirty"), &left.join("\n"))?;
+            }
+            for l in self.lists().iter().filter(|l| l.account == account) {
+                self.emit(&l.href, Vec::new());
+            }
+            return Ok(());
         }
-        for l in self.lists().iter().filter(|l| l.account == account) {
-            self.emit(&l.href, Vec::new());
-        }
-        Ok(())
+        Err(Error::Conflict)
+    }
+
+    /// Account `account`'s config as it is here (an empty one when it has none).
+    fn config_doc(&self, account: i64) -> Json {
+        self.config_doc_in(&self.db.lock().unwrap(), account)
+    }
+
+    fn config_doc_in(&self, db: &rusqlite::Connection, account: i64) -> Json {
+        store::kv_get(db, &crate::account::key(account, "config_json"))
+            .ok()
+            .flatten()
+            .as_deref()
+            .and_then(Json::parse)
+            .unwrap_or_else(empty_config)
+    }
+
+    fn config_dirty_in(&self, db: &rusqlite::Connection, account: i64) -> Vec<String> {
+        store::kv_get(db, &crate::account::key(account, "config_dirty"))
+            .ok()
+            .flatten()
+            .unwrap_or_default()
+            .lines()
+            .map(str::to_string)
+            .collect()
     }
 
     /// Categories in use per list of the account, in order of first appearance.
@@ -182,6 +280,81 @@ impl Client {
             .collect();
         cats.sort_by(|a, b| a.0.total_cmp(&b.0));
         cats.into_iter().map(|(_, m)| m).collect()
+    }
+
+    /// Save the categories of list `list_href` as `names`, in that order: each keeps what the
+    /// config has for it (its icon), the others are new, and those not named go. They sync with
+    /// the account's config.json (Nextcloud) or stay here (lists on this device). One undo step.
+    pub fn set_categories(&self, list_href: String, names: Vec<String>) -> Result<()> {
+        if gtasks::is_list(&list_href) {
+            return Ok(()); // Google Tasks keeps no categories
+        }
+        let account = store::list_account(&self.db.lock().unwrap(), &list_href)?;
+        let doc = self.config_doc(account);
+        let key = list_key(&list_href);
+        let before = list_categories(&doc, key);
+        let old = before.map(Json::arr).unwrap_or_default();
+        let mut seen = HashSet::new();
+        let new: Vec<Json> = names
+            .iter()
+            .filter(|n| !n.is_empty() && seen.insert(n.as_str()))
+            .enumerate()
+            .map(|(i, n)| {
+                let known = old
+                    .iter()
+                    .find(|c| c.get("name").and_then(Json::str) == Some(n));
+                let mut entry = known.cloned().unwrap_or_else(|| {
+                    Json::Obj(BTreeMap::from([("name".into(), Json::Str(n.clone()))]))
+                });
+                if let Json::Obj(m) = &mut entry {
+                    m.insert("order".into(), Json::Num(i as f64));
+                }
+                entry
+            })
+            .collect();
+        if new == old {
+            return Ok(());
+        }
+        self.journal.lock().unwrap().record_config(ConfigBefore {
+            list_href: list_href.clone(),
+            categories: before.map(Json::to_string),
+        });
+        self.store_categories(&list_href, Some(Json::Arr(new)))
+    }
+
+    /// Put back a list's categories as they were (`undo`): `saved` is their JSON text.
+    pub(crate) fn restore_categories(&self, list_href: &str, saved: Option<&str>) -> Result<()> {
+        self.store_categories(list_href, saved.and_then(Json::parse))
+    }
+
+    /// Keep `cats` as the `categories` of list `list_href` in its account's config, for upload
+    /// when it is a Nextcloud one.
+    fn store_categories(&self, list_href: &str, cats: Option<Json>) -> Result<()> {
+        let account = store::list_account(&self.db.lock().unwrap(), list_href)?;
+        let nextcloud = self
+            .account(account)
+            .is_some_and(|a| a.kind == AccountKind::Nextcloud);
+        {
+            let db = self.db.lock().unwrap();
+            let key = list_key(list_href);
+            let mut doc = self.config_doc_in(&db, account);
+            set_list_categories(&mut doc, key, cats);
+            store::kv_set(
+                &db,
+                &crate::account::key(account, "config_json"),
+                &doc.to_string(),
+            )?;
+            if nextcloud {
+                let mut dirty = self.config_dirty_in(&db, account);
+                if !dirty.iter().any(|d| d == key) {
+                    dirty.push(key.to_string());
+                }
+                let k = crate::account::key(account, "config_dirty");
+                store::kv_set(&db, &k, &dirty.join("\n"))?;
+            }
+        }
+        self.emit(list_href, Vec::new());
+        Ok(())
     }
 
     /// Open tasks grouped by category: configured categories first (in order), then unknown
@@ -622,5 +795,142 @@ mod tests {
         assert_eq!(order(true, false), ["b", "b1", "b2", "c", "a", "a1", "a2"]);
         assert_eq!(order(false, true), ["a", "a2", "a1", "b", "b2", "b1", "c"]);
         assert_eq!(order(true, true), ["b", "b2", "b1", "c", "a", "a2", "a1"]);
+    }
+
+    /// A client with a list on this device and tasks with the given categories (a task's are
+    /// comma-separated, the first is its category).
+    fn client_with(name: &str, tasks: &[&str]) -> (Client, String, std::path::PathBuf) {
+        let dir = std::env::temp_dir().join(format!("todav-core-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let acc = c
+            .add_account(AccountKind::Local, "".into(), "".into(), "".into())
+            .unwrap();
+        let list = c
+            .create_list(acc, "L".into(), "#0082C9".into(), false)
+            .unwrap();
+        for (i, cats) in tasks.iter().enumerate() {
+            let first = cats.split(',').next().filter(|c| !c.is_empty());
+            let t = c
+                .add_task(
+                    list.clone(),
+                    format!("t{i}"),
+                    first.map(Into::into),
+                    None,
+                    false,
+                )
+                .unwrap();
+            let rest: Vec<String> = cats.split(',').skip(1).map(Into::into).collect();
+            if !rest.is_empty() {
+                let all: Vec<String> = cats.split(',').map(Into::into).collect();
+                c.modify(&t.uid, |cal| cal.set_categories(&all)).unwrap();
+            }
+        }
+        (c, list, dir)
+    }
+
+    fn names(c: &Client, list: &str) -> Vec<String> {
+        c.categories(list.into())
+            .into_iter()
+            .map(|m| m.name)
+            .collect()
+    }
+
+    #[test]
+    fn saved_categories_keep_their_order_and_icon_and_undo() {
+        let (c, list, dir) = client_with("cat-order", &["B", "A", "A"]);
+        assert!(names(&c, &list).is_empty(), "nothing is configured yet");
+        c.set_categories(
+            list.clone(),
+            vec!["B".into(), "A".into(), "A".into(), "".into()],
+        )
+        .unwrap();
+        assert_eq!(
+            names(&c, &list),
+            ["B", "A"],
+            "twice and empty ones left out"
+        );
+        // An icon (made by another client) stays with its category through a reorder.
+        let key = list_key(&list).to_string();
+        let acc = store::list_account(&c.db.lock().unwrap(), &list).unwrap();
+        let mut doc = c.config_doc(acc);
+        let cats = list_categories(&doc, &key).unwrap().arr().to_vec();
+        let with_icon: Vec<Json> = cats
+            .into_iter()
+            .map(|mut e| {
+                if e.get("name").and_then(Json::str) == Some("A")
+                    && let Json::Obj(m) = &mut e
+                {
+                    m.insert("icon".into(), Json::Str("star".into()));
+                }
+                e
+            })
+            .collect();
+        set_list_categories(&mut doc, &key, Some(Json::Arr(with_icon)));
+        store::kv_set(
+            &c.db.lock().unwrap(),
+            &crate::account::key(acc, "config_json"),
+            &doc.to_string(),
+        )
+        .unwrap();
+        c.set_categories(list.clone(), vec!["A".into(), "B".into(), "C".into()])
+            .unwrap();
+        let meta = c.categories(list.clone());
+        assert_eq!(
+            meta.iter().map(|m| m.name.as_str()).collect::<Vec<_>>(),
+            ["A", "B", "C"]
+        );
+        assert_eq!(meta[0].icon.as_deref(), Some("star"));
+        // The tasks follow it.
+        let g: Vec<_> = c
+            .grouped(list.clone())
+            .into_iter()
+            .map(|g| g.name)
+            .collect();
+        assert_eq!(g, [Some("A".into()), Some("B".into())]);
+        // One undo step each, newest first.
+        assert!(c.undo(None).unwrap());
+        assert_eq!(names(&c, &list), ["B", "A"]);
+        assert!(c.undo(None).unwrap());
+        assert!(names(&c, &list).is_empty(), "back to nothing configured");
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn replacing_a_category_leaves_the_tasks_and_their_other_categories() {
+        let (c, list, dir) = client_with("cat-replace", &["Work,Home", "Work", "Home,Work", ""]);
+        let cats = |c: &Client| -> Vec<(Option<String>, Vec<String>)> {
+            c.tasks(list.clone(), true)
+                .into_iter()
+                .map(|t| {
+                    let raw = store::raw(&c.db.lock().unwrap(), store::Kind::Task, "", &t.uid)
+                        .unwrap()
+                        .unwrap();
+                    let all = crate::ical::Calendar::parse(&raw.raw_ics)
+                        .unwrap()
+                        .categories();
+                    (t.category, all)
+                })
+                .collect()
+        };
+        c.replace_category(list.clone(), "Work".into(), None)
+            .unwrap();
+        let got = cats(&c);
+        assert_eq!(got.len(), 4, "no task is deleted");
+        // The next category becomes the task's; a task left with none has none.
+        assert_eq!(got[0], (Some("Home".into()), vec!["Home".into()]));
+        assert_eq!(got[1], (None, vec![]));
+        assert_eq!(got[2], (Some("Home".into()), vec!["Home".into()]));
+        assert_eq!(got[3], (None, vec![]));
+        // One step undoes all of it.
+        assert!(c.undo(None).unwrap());
+        assert_eq!(cats(&c)[1], (Some("Work".into()), vec!["Work".into()]));
+        // A rename into a name a task has already leaves it once.
+        c.replace_category(list.clone(), "Work".into(), Some("Home".into()))
+            .unwrap();
+        let got = cats(&c);
+        assert_eq!(got[0], (Some("Home".into()), vec!["Home".into()]));
+        assert_eq!(got[1], (Some("Home".into()), vec!["Home".into()]));
+        let _ = std::fs::remove_dir_all(dir);
     }
 }

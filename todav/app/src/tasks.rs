@@ -275,41 +275,69 @@ pub fn set_category(c: &Client, uid: &str, category: Option<String>) -> Result<(
 }
 
 /// The categories of list `list_href` a front-end offers (sidebar or filter, pickers, headers):
-/// the configured ones in their order, then those its open tasks have and the `extra` ones (made
-/// but not yet used) by name, as the list groups them, so a category does not move when a task
-/// gets it.
-pub fn category_names(c: &Client, list_href: &str, extra: &[String]) -> Vec<String> {
+/// the configured ones in their order (`reorder_categories`), then those its open tasks have,
+/// by name, as the list groups them.
+pub fn category_names(c: &Client, list_href: &str) -> Vec<String> {
     let mut names: Vec<String> = c
         .categories(list_href.into())
         .into_iter()
         .map(|m| m.name)
         .collect();
     let configured = names.len();
-    let used = c.grouped(list_href.into());
-    let used = used.iter().filter_map(|g| g.name.as_ref());
-    for n in used.chain(extra) {
-        if !names.contains(n) {
-            names.push(n.clone());
+    for g in c.grouped(list_href.into()) {
+        if let Some(n) = g.name.filter(|n| !names.contains(n)) {
+            names.push(n);
         }
     }
     names[configured..].sort();
     names
 }
 
+/// Make category `name` of list `list_href`, last among its categories. Nothing happens when it
+/// is there.
+pub fn add_category(c: &Client, list_href: &str, name: &str) -> Result<()> {
+    let mut names = category_names(c, list_href);
+    if name.is_empty() || names.iter().any(|n| n == name) {
+        return Ok(());
+    }
+    names.push(name.into());
+    c.set_categories(list_href.into(), names)
+}
+
 /// Rename category `from` of list `list_href` to `to`, on every task of the list that has it,
-/// done ones too, as one change for undo. A name the list already has joins its tasks.
+/// done ones too, and in the saved order, as one change for undo. A name the list already has
+/// joins its tasks.
 pub fn rename_category(c: &Client, list_href: &str, from: &str, to: &str) -> Result<()> {
     if from == to || to.is_empty() {
         return Ok(());
     }
     c.together(|| {
-        for t in c.tasks(list_href.into(), true) {
-            if t.category.as_deref() == Some(from) {
-                set_category(c, &t.uid, Some(to.into()))?;
-            }
-        }
-        Ok(())
+        let names = category_names(c, list_href)
+            .into_iter()
+            .map(|n| if n == from { to.to_string() } else { n })
+            .collect();
+        c.replace_category(list_href.into(), from.into(), Some(to.into()))?;
+        c.set_categories(list_href.into(), names)
     })
+}
+
+/// Delete category `name` of list `list_href`: it goes from the saved order and from every task
+/// of the list that has it, done ones too, and the tasks stay. A task with other categories
+/// takes the next one as its category. One change for undo.
+pub fn delete_category(c: &Client, list_href: &str, name: &str) -> Result<()> {
+    c.together(|| {
+        let names = category_names(c, list_href)
+            .into_iter()
+            .filter(|n| n != name)
+            .collect();
+        c.replace_category(list_href.into(), name.into(), None)?;
+        c.set_categories(list_href.into(), names)
+    })
+}
+
+/// Save the order of list `list_href`'s categories (all of `category_names`, in the new order).
+pub fn reorder_categories(c: &Client, list_href: &str, names: Vec<String>) -> Result<()> {
+    c.set_categories(list_href.into(), names)
 }
 
 /// A task dropped on a category: into it (a subtask becomes top-level), first or last in it as
@@ -786,10 +814,10 @@ pub(crate) mod tests {
         let _ = std::fs::remove_dir_all(dir);
     }
 
-    #[test]
-    fn category_names_are_the_used_and_new_ones_by_name() {
+    /// A client with a list on this device, and its href.
+    fn local_list(name: &str) -> (Client, String, std::path::PathBuf) {
         use todav_core::AccountKind;
-        let dir = std::env::temp_dir().join(format!("todav-app-cat-names-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("todav-app-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let c = Client::open(dir.to_string_lossy().into()).unwrap();
         let acc = c
@@ -798,15 +826,52 @@ pub(crate) mod tests {
         let list = c
             .create_list(acc, "A".into(), "#0082C9".into(), false)
             .unwrap();
+        (c, list, dir)
+    }
+
+    #[test]
+    fn category_names_are_the_saved_order_then_the_used_ones_by_name() {
+        let (c, list, dir) = local_list("cat-names");
         for cat in ["b", "Z", "b"] {
             c.add_task(list.clone(), "t".into(), Some(cat.into()), None, false)
                 .unwrap();
         }
-        assert_eq!(category_names(&c, &list, &[]), ["Z", "b"]);
-        assert_eq!(
-            category_names(&c, &list, &["a".into(), "b".into()]),
-            ["Z", "a", "b"]
-        );
+        assert_eq!(category_names(&c, &list), ["Z", "b"]);
+        // A new one is last, and stays where it is when a task has it.
+        add_category(&c, &list, "a").unwrap();
+        assert_eq!(category_names(&c, &list), ["Z", "b", "a"]);
+        c.add_task(list.clone(), "t".into(), Some("a".into()), None, false)
+            .unwrap();
+        assert_eq!(category_names(&c, &list), ["Z", "b", "a"]);
+        reorder_categories(&c, &list, vec!["a".into(), "Z".into(), "b".into()]).unwrap();
+        assert_eq!(category_names(&c, &list), ["a", "Z", "b"]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn deleting_a_category_keeps_its_tasks_and_the_order_of_the_rest() {
+        let (c, list, dir) = local_list("cat-delete");
+        let add = |s: &str, cat: &str| {
+            c.add_task(list.clone(), s.into(), Some(cat.into()), None, false)
+                .unwrap()
+        };
+        let (x, y, z) = (add("x", "One"), add("y", "Two"), add("z", "Three"));
+        reorder_categories(&c, &list, vec!["Three".into(), "One".into(), "Two".into()]).unwrap();
+        delete_category(&c, &list, "One").unwrap();
+        assert_eq!(category_names(&c, &list), ["Three", "Two"]);
+        let cat = |uid: &str| c.task(uid.into()).unwrap().category;
+        assert_eq!(cat(&x.uid), None);
+        assert_eq!(cat(&y.uid).as_deref(), Some("Two"));
+        assert_eq!(cat(&z.uid).as_deref(), Some("Three"));
+        assert_eq!(c.tasks(list.clone(), true).len(), 3, "no task is deleted");
+        // Renamed, it keeps its place; undone, it is back as it was.
+        rename_category(&c, &list, "Three", "Tres").unwrap();
+        assert_eq!(category_names(&c, &list), ["Tres", "Two"]);
+        assert!(c.undo(None).unwrap());
+        assert_eq!(category_names(&c, &list), ["Three", "Two"]);
+        assert!(c.undo(None).unwrap());
+        assert_eq!(category_names(&c, &list), ["Three", "One", "Two"]);
+        assert_eq!(cat(&x.uid).as_deref(), Some("One"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 

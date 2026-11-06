@@ -144,7 +144,7 @@ impl Client {
     }
 
     /// Something waits for the server: edits in synced lists, old copies of moved tasks, or the
-    /// lists' new order (of account `id`, or of any). Edits in lists on this device never do.
+    /// lists' new order, or the categories' (of account `id`, or of any). Edits in lists on this device never do.
     pub fn pending(&self, id: Option<i64>) -> bool {
         let db = self.db.lock().unwrap();
         let moved = db.query_row(
@@ -154,7 +154,15 @@ impl Client {
             [id],
             |r| r.get(0),
         );
-        moved.unwrap_or(false) || store::dirty(&db, id).is_ok_and(|d| !d.is_empty())
+        let config = db.query_row(
+            "SELECT EXISTS (SELECT 1 FROM kv WHERE value != '' AND key IN
+               (SELECT 'a' || id || '_config_dirty' FROM accounts WHERE enabled AND (?1 IS NULL OR id = ?1)))",
+            [id],
+            |r| r.get(0),
+        );
+        moved.unwrap_or(false)
+            || config.unwrap_or(false)
+            || store::dirty(&db, id).is_ok_and(|d| !d.is_empty())
     }
 
     pub fn sync_list(&self, list_href: String) -> Result<SyncReport> {

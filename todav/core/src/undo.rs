@@ -14,9 +14,29 @@ pub(crate) struct Before {
     pub raw_ics: Option<String>,
 }
 
+/// A list's categories as configured before a step: its entry's `categories` array as JSON
+/// text, or None when it had none.
+pub(crate) struct ConfigBefore {
+    pub list_href: String,
+    pub categories: Option<String>,
+}
+
 struct Step {
     id: u64,
     before: Vec<Before>,
+    config: Vec<ConfigBefore>,
+}
+
+impl Step {
+    fn is_empty(&self) -> bool {
+        self.before.is_empty() && self.config.is_empty()
+    }
+}
+
+/// What a step replaced, oldest change first.
+pub(crate) struct Undone {
+    pub items: Vec<Before>,
+    pub config: Vec<ConfigBefore>,
 }
 
 #[derive(Default)]
@@ -38,7 +58,7 @@ impl Journal {
 
     pub fn end(&mut self) {
         self.depth -= 1;
-        if self.depth == 0 && self.steps.last().is_some_and(|s| s.before.is_empty()) {
+        if self.depth == 0 && self.steps.last().is_some_and(Step::is_empty) {
             self.steps.pop();
         }
     }
@@ -48,6 +68,7 @@ impl Journal {
         self.steps.push(Step {
             id: self.next,
             before: Vec::new(),
+            config: Vec::new(),
         });
         if self.steps.len() > KEEP {
             self.steps.remove(0);
@@ -67,12 +88,24 @@ impl Journal {
         }
     }
 
+    /// A list's categories before a change, as `record` does for an item.
+    pub fn record_config(&mut self, b: ConfigBefore) {
+        if self.depth == 0 {
+            self.open();
+        }
+        let step = self.steps.last_mut().expect("a step is open");
+        if !step.config.iter().any(|x| x.list_href == b.list_href) {
+            step.config.push(b);
+        }
+    }
+
     /// Drop what was in list `href`, now deleted: there is nowhere to put it back.
     pub fn forget_list(&mut self, href: &str) {
         for s in &mut self.steps {
             s.before.retain(|b| b.list_href != href);
+            s.config.retain(|b| b.list_href != href);
         }
-        self.steps.retain(|s| !s.before.is_empty());
+        self.steps.retain(|s| !s.is_empty());
     }
 
     pub fn last(&self) -> Option<u64> {
@@ -80,12 +113,16 @@ impl Journal {
     }
 
     /// Remove step `id` (else the latest) and return what it replaced, oldest change first.
-    pub fn take(&mut self, id: Option<u64>) -> Option<Vec<Before>> {
+    pub fn take(&mut self, id: Option<u64>) -> Option<Undone> {
         let i = match id {
             Some(id) => self.steps.iter().position(|s| s.id == id)?,
             None => self.steps.len().checked_sub(1)?,
         };
-        Some(self.steps.remove(i).before)
+        let s = self.steps.remove(i);
+        Some(Undone {
+            items: s.before,
+            config: s.config,
+        })
     }
 }
 
@@ -118,9 +155,13 @@ mod tests {
         j.begin();
         j.end();
         let step = j.take(None).unwrap();
-        let got: Vec<_> = step.iter().map(|b| b.raw_ics.clone().unwrap()).collect();
+        let got: Vec<_> = step
+            .items
+            .iter()
+            .map(|b| b.raw_ics.clone().unwrap())
+            .collect();
         assert_eq!(got, ["b0", "c0"]);
-        assert_eq!(j.take(alone).unwrap()[0].uid, "a");
+        assert_eq!(j.take(alone).unwrap().items[0].uid, "a");
         assert!(j.take(None).is_none());
         assert!(j.take(alone).is_none(), "a step is undone once");
     }

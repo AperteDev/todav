@@ -359,10 +359,33 @@ impl Todav {
         self.c().categories(list_href)
     }
 
-    /// The categories to offer for a list: the configured ones, then those its tasks have and
-    /// the `extra` ones (made but not yet used) by name.
-    pub fn category_names(&self, list_href: String, extra: Vec<String>) -> Vec<String> {
-        todav_app::tasks::category_names(self.c(), &list_href, &extra)
+    /// The categories to offer for a list: the saved order, then those its tasks have by name.
+    pub fn category_names(&self, list_href: String) -> Vec<String> {
+        todav_app::tasks::category_names(self.c(), &list_href)
+    }
+
+    /// A category made for a list, last of its categories.
+    pub fn add_category(&self, list_href: String, name: String) -> Result<()> {
+        Ok(todav_app::tasks::add_category(self.c(), &list_href, &name)?)
+    }
+
+    /// Save the order of a list's categories (all of `category_names`, in the new order).
+    pub fn reorder_categories(&self, list_href: String, names: Vec<String>) -> Result<()> {
+        Ok(todav_app::tasks::reorder_categories(
+            self.c(),
+            &list_href,
+            names,
+        )?)
+    }
+
+    /// A category deleted from a list: from its order and its tasks, which stay (one with other
+    /// categories takes the next as its own), as one undo step.
+    pub fn delete_category(&self, list_href: String, name: String) -> Result<()> {
+        Ok(todav_app::tasks::delete_category(
+            self.c(),
+            &list_href,
+            &name,
+        )?)
     }
 
     // --- tasks
@@ -575,7 +598,7 @@ impl Todav {
         )?)
     }
 
-    /// Category `from` of a list renamed to `to` on all its tasks, as one undo step.
+    /// Category `from` of a list renamed to `to` on all its tasks and in its order, as one undo step.
     pub fn rename_category(&self, list_href: String, from: String, to: String) -> Result<()> {
         Ok(todav_app::tasks::rename_category(
             self.c(),
