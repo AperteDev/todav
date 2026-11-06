@@ -547,6 +547,62 @@ fn icloud_syncs_a_task_list_on_its_own_host() {
     client.delete_list(list).unwrap();
 }
 
+/// A plain CalDAV server that is not Nextcloud, such as a Radicale on localhost
+/// (`RADICALE_URL`, e.g. `http://127.0.0.1:5232`, run with `--auth-type none`; skipped without
+/// it): an account with nothing in it, lists made here, a task and an event on another device.
+#[test]
+fn radicale_syncs_lists_tasks_and_events() {
+    let Some(url) = get("RADICALE_URL") else {
+        return;
+    };
+    let device = |name: &str| {
+        let dir = std::env::temp_dir().join(format!("todav-it-radicale-{name}-{}", now()));
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let login = todav_core::caldav_login(url.clone(), "me".into(), "pw".into()).unwrap();
+        let id = c
+            .add_account(AccountKind::CalDav, login.server, "me".into(), "".into())
+            .unwrap();
+        c.connect(id, "pw".into()).unwrap();
+        (c, id)
+    };
+    let (a, id) = device("a");
+    a.sync().into_result().unwrap();
+    let tasks = a
+        .create_list(id, "it-tasks".into(), "#0082c9".into(), false)
+        .unwrap();
+    let cal = a
+        .create_list(id, "it-events".into(), "#c98879".into(), true)
+        .unwrap();
+    assert_eq!(a.lists().iter().filter(|l| l.href == tasks).count(), 1);
+    assert_eq!(a.calendars().iter().filter(|l| l.href == cal).count(), 1);
+    let task = a
+        .add_task(tasks.clone(), "from Todav".into(), None, None, false)
+        .unwrap();
+    a.sync().into_result().unwrap();
+    assert!(!a.pending(Some(id)));
+
+    let (b, _) = device("b");
+    b.sync().into_result().unwrap();
+    assert!(b.task(task.uid.clone()).is_some());
+    // An edit on b reaches a.
+    b.update_task(
+        task.uid.clone(),
+        todav_core::TaskPatch {
+            summary: Some("edited on b".into()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    b.sync().into_result().unwrap();
+    a.sync().into_result().unwrap();
+    assert_eq!(a.task(task.uid.clone()).unwrap().summary, "edited on b");
+    // Deleted lists go from the server and from the other device.
+    a.delete_list(tasks).unwrap();
+    a.delete_list(cal).unwrap();
+    b.sync().into_result().unwrap();
+    assert!(b.lists().is_empty() && b.calendars().is_empty());
+}
+
 #[test]
 fn events_sync_with_their_zone_and_recurrence() {
     let f = Fixture::with("events", &["VEVENT", "VTODO"]);
