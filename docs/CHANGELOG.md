@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Android: the month planner widget's weekday names lined up with its days only at the width the
+  launcher reported; they now share the days' column width.
 - Android: a list's category headings, filter and pickers showed only the categories saved in
   the account's config, so a list whose tasks had other categories (typed on a task, from
   another app, or on this device) looked ungrouped. They now include the categories its tasks

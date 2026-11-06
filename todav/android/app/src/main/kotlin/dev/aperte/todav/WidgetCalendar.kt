@@ -141,9 +141,12 @@ private fun monthAt(day: Long, offset: Int): Long {
 /** A month's name and year, as a title ("Październik 2026"). */
 private fun monthTitle(first: Long) = format(first, "LLLL yyyy").replaceFirstChar { it.titlecase() }
 
-/** The weekdays' short names over a month from `start`. */
+/**
+ * The weekdays' short names over a month from `start`, sharing the width; or `cell` wide each,
+ * over days laid out in cells of that width (the planner's: a bar needs a width of its own).
+ */
 @Composable
-private fun WeekdayNames(start: Long, numbered: Boolean = false) {
+private fun WeekdayNames(start: Long, numbered: Boolean = false, cell: Dp? = null) {
     Row(GlanceModifier.fillMaxWidth()) {
         // Over the month widget's column of week numbers.
         if (numbered) Spacer(GlanceModifier.width(WEEK_COLUMN))
@@ -155,7 +158,7 @@ private fun WeekdayNames(start: Long, numbered: Boolean = false) {
                     fontSize = 12.sp, textAlign = TextAlign.Center,
                     color = if (weekend(start + i * DAY)) weekendColor(LocalContext.current, variant = true) else GlanceTheme.colors.onSurfaceVariant,
                 ),
-                modifier = GlanceModifier.defaultWeight(),
+                modifier = cell?.let { GlanceModifier.width(it) } ?: GlanceModifier.defaultWeight(),
             )
         }
     }
@@ -604,7 +607,7 @@ class PlannerWidget : TodavWidget() {
         val fit = floor(room / bar).toInt().coerceIn(0, 8)
         WidgetFrame(context) {
             TurnHeader(context, widget, monthTitle(first), openDay(context, first, month = true), newEvent(context, widget, account, shown, today, allDay = true))
-            WeekdayNames(start)
+            WeekdayNames(start, cell = cell)
             // Flat, a view for each number and bar: a widget has 500 at most.
             for (w in 0 until 6) {
                 val monday = start + w * 7 * DAY
