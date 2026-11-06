@@ -52,12 +52,18 @@ pub const CALDAV_SERVICES: [CalDavService; 5] = [
 ];
 
 /// What an account's background check interval (`Client::set_sync_interval`) can be set to, in
-/// minutes: Android's periodic work cannot run more often than every 15.
-pub const SYNC_INTERVALS: [u32; 5] = [15, 30, 60, 120, 240];
+/// minutes: Android's periodic work cannot run more often than every 15. The last, 0, turns the
+/// background check off.
+pub const SYNC_INTERVALS: [u32; 6] = [15, 30, 60, 120, 240, 0];
 
-/// Where `minutes` stands among `SYNC_INTERVALS` (the nearest one, for a value set otherwise).
+/// Where `minutes` stands among `SYNC_INTERVALS` (0, disabled, is its own; any other value the
+/// nearest of the rest, for one set otherwise).
 pub fn sync_interval_index(minutes: u32) -> usize {
-    (0..SYNC_INTERVALS.len())
+    let on = SYNC_INTERVALS.len() - 1;
+    if minutes == 0 {
+        return on;
+    }
+    (0..on)
         .min_by_key(|i| SYNC_INTERVALS[*i].abs_diff(minutes))
         .unwrap_or(0)
 }
@@ -219,10 +225,11 @@ mod tests {
         assert_eq!(super::SYNC_INTERVALS[i], todav_core::DEFAULT_SYNC_INTERVAL);
         assert_eq!(super::sync_interval_index(1), 0);
         assert_eq!(super::sync_interval_index(90), 2); // nearest, the lower on a tie
-        assert_eq!(
-            super::sync_interval_index(10_000),
-            super::SYNC_INTERVALS.len() - 1
-        );
+        assert_eq!(super::sync_interval_index(10_000), 4);
+        // Disabled is the last, and the only one that is 0.
+        let off = super::sync_interval_index(0);
+        assert_eq!((off, super::SYNC_INTERVALS[off]), (5, 0));
+        assert_eq!(super::SYNC_INTERVALS.iter().filter(|m| **m == 0).count(), 1);
     }
 
     #[test]

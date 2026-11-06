@@ -887,9 +887,12 @@ fn connect_reorder(row: &adw::ActionRow, id: i64, title: &str) {
     row.add_controller(drop);
 }
 
-/// How often an account is checked in the background ("Every 15 minutes", "Every 2 hours").
+/// How often an account is checked in the background ("Every 15 minutes", "Every 2 hours";
+/// 0: "Disabled").
 fn interval_name(minutes: u32) -> String {
-    if minutes.is_multiple_of(60) {
+    if minutes == 0 {
+        pgettext("background check", "Disabled")
+    } else if minutes.is_multiple_of(60) {
         let n = u64::from(minutes / 60);
         ngettext("Every {n} hour", "Every {n} hours", n).replace("{n}", &n.to_string())
     } else {

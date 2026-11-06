@@ -95,7 +95,7 @@ impl Client {
     }
 
     /// The switched-on, connected accounts whose last sync or try is older than their
-    /// `sync_interval`.
+    /// `sync_interval` (never, when that is 0).
     pub fn due_accounts(&self) -> Vec<i64> {
         let now = crate::now();
         let tried = |id: i64| {
@@ -109,8 +109,9 @@ impl Client {
             .into_iter()
             .filter(|a| a.enabled && self.connected(a.id))
             .filter(|a| {
+                let every = i64::from(self.sync_interval(a.id)) * 60;
                 let last = self.last_sync(a.id).into_iter().chain(tried(a.id)).max();
-                last.is_none_or(|t| now - t >= i64::from(self.sync_interval(a.id)) * 60)
+                every > 0 && last.is_none_or(|t| now - t >= every)
             })
             .map(|a| a.id)
             .collect()

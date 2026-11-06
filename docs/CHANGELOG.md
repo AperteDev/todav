@@ -32,8 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - How often an account's server is checked for changes in the background is a setting of each
   account (Preferences → Accounts → the account → "Background Check" on Linux, its page in
-  Settings on Android): every 15 minutes at first, up to every 4 hours, instead of every 30
-  minutes for all. It stays on this device. While Todav is in front it is still every minute.
+  Settings on Android): every 15 minutes at first, up to every 4 hours, or Disabled, instead of
+  every 30 minutes for all. It stays on this device. While Todav is in front it is still every
+  minute, and pushes and edits still sync at once.
   Android's background check now runs every 15 minutes and syncs the accounts whose turn it is.
 
 ### Fixed

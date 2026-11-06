@@ -266,7 +266,8 @@ impl Client {
     }
 
     /// How often the background checks account `id`'s server for changes, in minutes (15 until
-    /// set). Kept on this device, with the account's other `kv` keys: ids are not the same
+    /// set); 0: never (pushes, the check every minute in front and syncs asked for still
+    /// happen). Kept on this device, with the account's other `kv` keys: ids are not the same
     /// on every device, so it does not sync.
     pub fn sync_interval(&self, id: i64) -> u32 {
         let db = self.db.lock().unwrap();
@@ -274,14 +275,13 @@ impl Client {
             .ok()
             .flatten()
             .and_then(|m| m.parse().ok())
-            .filter(|m| *m > 0)
             .unwrap_or(DEFAULT_SYNC_INTERVAL)
     }
 
-    /// Check account `id`'s server every `minutes` (at least 1) in the background.
+    /// Check account `id`'s server every `minutes` in the background; 0 turns that off.
     pub fn set_sync_interval(&self, id: i64, minutes: u32) -> Result<()> {
         let db = self.db.lock().unwrap();
-        store::kv_set(&db, &key(id, "sync_interval"), &minutes.max(1).to_string())
+        store::kv_set(&db, &key(id, "sync_interval"), &minutes.to_string())
     }
 
     /// The account whose server synced settings go through (the device-only
@@ -638,6 +638,13 @@ mod tests {
         assert!(c.due_accounts().is_empty());
         set(slow, "last_sync", 61);
         set(fast, "last_sync", 20);
+        assert_eq!(c.due_accounts(), [fast, slow]);
+
+        // Disabled: never its turn, however long ago it was; set again, due at once.
+        c.set_sync_interval(slow, 0).unwrap();
+        assert_eq!(c.sync_interval(slow), 0);
+        assert_eq!(c.due_accounts(), [fast]);
+        c.set_sync_interval(slow, 60).unwrap();
         assert_eq!(c.due_accounts(), [fast, slow]);
 
         // A turn taken counts, whether the server answers (`fast`) or not (`slow`).

@@ -81,7 +81,7 @@ What Todav can do, in short. The details of each release are in the
 - Local-first: works offline from a local copy; changes go up when the server is reachable.
 - Changes from elsewhere within seconds with WebDAV Push and ntfy; otherwise a check every minute
   while the window is focused and in the background as often as each account says (every 15
-  minutes at first, up to every 4 hours).
+  minutes at first, up to every 4 hours, or not at all).
 - Conflicts resolve per task, and a task ticked done on any device stays done.
 - Properties Todav does not understand are kept, so other clients' data survives.
 - Preferences synced between devices through `.config/todav/settings.json` in the Nextcloud

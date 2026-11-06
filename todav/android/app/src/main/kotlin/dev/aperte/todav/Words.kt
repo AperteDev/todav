@@ -24,9 +24,11 @@ fun accountName(a: Account): String = when {
     else -> "${a.user}@${accountHost(a)}"
 }
 
-/** How often an account is checked in the background, as the Linux app words it ("Every 15 minutes", "Every 2 hours"). */
+/** How often an account is checked in the background, as the Linux app words it ("Every 15 minutes", "Every 2 hours"; 0: "Disabled"). */
 fun intervalName(minutes: UInt): String =
-    if (minutes % 60u == 0u) {
+    if (minutes == 0u) {
+        ptr("background check", "Disabled")
+    } else if (minutes % 60u == 0u) {
         val n = (minutes / 60u).toLong()
         ntr("Every {n} hour", "Every {n} hours", n).replace("{n}", "$n")
     } else {
