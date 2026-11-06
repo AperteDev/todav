@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Android: the month planner widget left a gap to its right (the Pixel Launcher reports it 16 dp
+  narrower than it is); its days now fill the width.
 - Android: the month planner widget's weekday names lined up with its days only at the width the
   launcher reported; they now share the days' column width.
 - Android: a list's category headings, filter and pickers showed only the categories saved in

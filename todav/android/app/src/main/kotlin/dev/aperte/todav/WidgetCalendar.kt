@@ -569,6 +569,9 @@ class DayWidgetReceiver : TodavWidgetReceiver() {
 
 // --- month planner ------------------------------------------------------------------------------
 
+/** What the Pixel Launcher leaves out of the width it reports for a widget. */
+private val LAUNCHER_INSET = 16.dp
+
 /** A bar of the month planner: an item over the days `first` to `last` of its week (0 to 6). */
 private class Bar(val item: Item, val first: Int, val last: Int, val color: String?)
 
@@ -596,7 +599,11 @@ class PlannerWidget : TodavWidget() {
         // in the rest. They share what is there (a launcher may say less than it gives); this says
         // how many bars fit in each.
         val size = LocalSize.current
-        val cell = (size.width - 20.dp) / 7
+        // The days are cells of a width of their own, so this must be the width there is: the
+        // Pixel Launcher says 16 dp less than it gives (366 for 384), which left a gap to the right.
+        // ponytail: a launcher that reports it exactly cuts 6 dp off the last day; measure the
+        // widget's width if one turns up.
+        val cell = (size.width + LAUNCHER_INSET - 20.dp) / 7
         val week = (size.height - 20.dp - 40.dp - 16.dp) / 6
         // Shorter in a low widget, down to what a number needs; then slimmer bars, as Fossify
         // Calendar's, before none.
