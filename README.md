@@ -4,7 +4,7 @@
 
 <h1 align="center">Todav</h1>
 
-<p align="center">Tasks and calendar for GNOME and Android, kept in your Nextcloud.</p>
+<p align="center">Tasks and calendar for GNOME and Android, kept in your hands.</p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue" alt="License: GPL-3.0-or-later"></a>
