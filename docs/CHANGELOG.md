@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Linux: a category added in the sidebar is placed by name at once, instead of at the end until a
+  task is dropped on it.
+
 ## [2.5.2] - 2026-11-05
 
 ### Fixed

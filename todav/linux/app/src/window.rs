@@ -1583,11 +1583,15 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
         .collect();
     let fresh = ui.new_cats.borrow();
     let fresh = fresh.iter().filter(|(h, _)| *h == href).map(|(_, n)| n);
+    // Unconfigured ones go by name, as the core groups them, so a new category does not move
+    // once a task has it.
+    let configured = names.len();
     for n in groups.iter().filter_map(|g| g.name.as_ref()).chain(fresh) {
         if !names.contains(n) {
             names.push(n.clone());
         }
     }
+    names[configured..].sort();
     let none = gettext("No category");
     let refs: Vec<&str> = std::iter::once(none.as_str())
         .chain(names.iter().map(String::as_str))
