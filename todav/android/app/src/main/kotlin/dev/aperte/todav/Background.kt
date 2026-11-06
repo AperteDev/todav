@@ -164,15 +164,15 @@ class RaiseService : Service() {
 // --- sync -------------------------------------------------------------------------------------
 
 /**
- * The safety net for lost pushes: a sync every 30 minutes on a network; it also renews the push
- * registration (the core skips calendars whose registration has time left) and the reminder alarm.
+ * The safety net for lost pushes: every 15 minutes on a network, a sync of the accounts whose own
+ * interval has passed (`Client::sync_due`); it also renews the push registration (the core skips calendars whose registration has time left) and the reminder alarm.
  */
 class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val app = applicationContext as TodavApp
         app.awaitReady()
         return try {
-            app.core.sync()
+            app.core.syncDue()
             app.push.endpoint?.let { app.core.pushRegister(it, PUSH_EXPIRY) } ?: app.pushSetup()
             Reminders.schedule(app)
             Result.success()
@@ -184,11 +184,13 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
 
     companion object {
         fun start(context: Context) {
-            val request = PeriodicWorkRequestBuilder<SyncWorker>(30, TimeUnit.MINUTES)
+            // As often as Android lets work run (15 minutes); each account is checked when its own
+            // interval (Settings → its page) has passed. UPDATE: the old 30 minutes become 15.
+            val request = PeriodicWorkRequestBuilder<SyncWorker>(15, TimeUnit.MINUTES)
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .build()
             WorkManager.getInstance(context)
-                .enqueueUniquePeriodicWork("sync", ExistingPeriodicWorkPolicy.KEEP, request)
+                .enqueueUniquePeriodicWork("sync", ExistingPeriodicWorkPolicy.UPDATE, request)
         }
     }
 }

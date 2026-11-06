@@ -29,7 +29,7 @@ use std::sync::{Arc, Mutex};
 use store::{Kind, RawObject};
 use undo::{Before, Journal};
 
-pub use account::{Account, AccountKind};
+pub use account::{Account, AccountKind, DEFAULT_SYNC_INTERVAL};
 pub use config::{CategoryGroup, CategoryMeta, DoneView, Sort};
 pub use event::{Event, EventPatch, EventTime, Repeat, Scope};
 pub use import::IcsCount;

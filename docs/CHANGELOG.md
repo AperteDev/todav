@@ -13,8 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to "Nextcloud Server" when adding an account, on Linux and Android, with a login name and
   password (Todav finds the calendars from the address, `/.well-known/caldav` too). Their task
   lists and calendars sync; changes made elsewhere are fetched every minute while the app is in
-  front and every 30 minutes otherwise, and settings and the order of categories stay on the
-  device. Popular services are picked by name (iCloud, Fastmail, Yahoo, mailbox.org, Posteo),
+  front and in the background as often as the account says, and settings and the order of
+  categories stay on the device. Popular services are picked by name (iCloud, Fastmail, Yahoo, mailbox.org, Posteo),
   so no address is typed; only "Other" asks for one. What is Nextcloud's alone stays out of the
   way for them: the Push and Sync settings (DAV Push, ntfy, synced settings) show only with a
   Nextcloud account, Android asks for no UnifiedPush distributor for them, and Nextcloud's own
@@ -27,6 +27,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   making lists or calendars from an app says so.
 - Linux: GNOME Online Accounts' other accounts with calendars (a WebDAV account, for one) can be
   chosen too, next to Nextcloud and Google.
+
+### Changed
+
+- How often an account's server is checked for changes in the background is a setting of each
+  account (Preferences → Accounts → the account → "Background Check" on Linux, its page in
+  Settings on Android): every 15 minutes at first, up to every 4 hours, instead of every 30
+  minutes for all. It stays on this device. While Todav is in front it is still every minute.
+  Android's background check now runs every 15 minutes and syncs the accounts whose turn it is.
 
 ### Fixed
 

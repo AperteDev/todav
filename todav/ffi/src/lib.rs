@@ -945,6 +945,21 @@ impl Todav {
         self.c().sync().into()
     }
 
+    /// Push and pull the accounts whose `sync_interval` has passed (what a background check
+    /// does; the others wait for their turn).
+    pub fn sync_due(&self) -> SyncReport {
+        self.c().sync_due().into()
+    }
+
+    /// Minutes between the background's checks of account `id` (15 until set); this device only.
+    pub fn sync_interval(&self, id: i64) -> u32 {
+        self.c().sync_interval(id)
+    }
+
+    pub fn set_sync_interval(&self, id: i64, minutes: u32) -> Result<()> {
+        Ok(self.c().set_sync_interval(id, minutes)?)
+    }
+
     pub fn sync_account(&self, id: i64) -> Result<SyncReport> {
         Ok(self.c().sync_account(id)?.into())
     }
@@ -1153,6 +1168,18 @@ pub fn caldav_services() -> Vec<CaldavService> {
             app_password: s.app_password,
         })
         .collect()
+}
+
+/// What an account's background check interval can be set to, in minutes.
+#[uniffi::export]
+pub fn sync_intervals() -> Vec<u32> {
+    todav_app::accounts::SYNC_INTERVALS.to_vec()
+}
+
+/// Where `minutes` stands among `sync_intervals` (the nearest).
+#[uniffi::export]
+pub fn sync_interval_index(minutes: u32) -> u32 {
+    todav_app::accounts::sync_interval_index(minutes) as u32
 }
 
 /// Whether the CalDAV service at `url` takes an app-specific password only.

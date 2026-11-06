@@ -71,6 +71,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -92,7 +93,10 @@ import dev.aperte.todav.SignIn
 import dev.aperte.todav.WidgetKind
 import dev.aperte.todav.WidgetsSettings
 import dev.aperte.todav.accountName
+import dev.aperte.todav.intervalName
 import dev.aperte.todav.core.AccountKind
+import dev.aperte.todav.core.syncIntervalIndex
+import dev.aperte.todav.core.syncIntervals
 import dev.aperte.todav.core.SyncState
 import dev.aperte.todav.dayLabel
 import dev.aperte.todav.hours24
@@ -805,6 +809,18 @@ fun AccountPage(model: Main, id: Long) {
                         leadingContent = { Icon(Icons.AutoMirrored.Outlined.Login, null) },
                         modifier = Modifier.clickable { signingIn = true },
                     )
+                }
+                // How often this server is checked while Todav is not in front (every minute when it is).
+                val minutes = remember(id) { syncIntervals() }
+                var chosen by remember(id) { mutableIntStateOf(syncIntervalIndex(core.syncInterval(id)).toInt()) }
+                PickRow(
+                    tr("Background Check"),
+                    minutes.map { intervalName(it) },
+                    chosen,
+                    tr("While Todav is not in front; every minute when it is"),
+                ) { i ->
+                    chosen = i
+                    model.act { core.setSyncInterval(id, minutes[i]) }
                 }
             }
             if (signingIn) {

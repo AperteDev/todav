@@ -4,7 +4,7 @@
 
 use crate::accounts::syncing;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::Ordering;
 use std::sync::mpsc::{Sender, channel};
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 use std::time::Duration;
@@ -36,7 +36,8 @@ pub trait Shell: Send + Sync {
 pub struct Service {
     client: Arc<Client>,
     shell: Box<dyn Shell>,
-    worker: OnceLock<Sender<()>>,
+    /// Requests for the sync worker: true for every account, false for the ones due only.
+    worker: OnceLock<Sender<bool>>,
     state: Mutex<State>,
     /// Why each account's last sync failed, by id; gone once one goes through.
     errors: Mutex<Option<HashMap<i64, String>>>,
@@ -46,8 +47,6 @@ pub struct Service {
     listens: std::sync::atomic::AtomicBool,
     /// What the push listener last failed with; cleared by its next success.
     push_error: Mutex<Option<String>>,
-    /// Minutes `tick` has counted.
-    ticks: AtomicU32,
 }
 
 impl Service {
@@ -61,7 +60,6 @@ impl Service {
             push_url: Mutex::new(String::new()),
             listens: std::sync::atomic::AtomicBool::new(false),
             push_error: Mutex::new(None),
-            ticks: AtomicU32::new(0),
         });
         let settings = Settings(Arc::downgrade(&service));
         service.client.subscribe(Box::new(settings));
@@ -82,18 +80,27 @@ impl Service {
             return false;
         }
         self.listens.store(listen, Ordering::Relaxed);
-        let (tx, rx) = channel::<()>();
+        let (tx, rx) = channel::<bool>();
         let _ = self.worker.set(tx);
         let me = self.clone();
         std::thread::spawn(move || {
-            while rx.recv().is_ok() {
+            while let Ok(mut all) = rx.recv() {
                 std::thread::sleep(Duration::from_millis(300)); // let a burst of edits settle
-                while rx.try_recv().is_ok() {}
+                while let Ok(more) = rx.try_recv() {
+                    all |= more;
+                }
                 if !me.can_sync() {
                     continue; // no account, or no password for one: nothing to sync until one connects
                 }
+                if !all && me.client.due_accounts().is_empty() {
+                    continue; // nobody's turn
+                }
                 me.set_state(State::Syncing);
-                let report = me.client.sync();
+                let report = if all {
+                    me.client.sync()
+                } else {
+                    me.client.sync_due()
+                };
                 *me.errors.lock().unwrap() = Some(
                     report
                         .failed
@@ -114,7 +121,7 @@ impl Service {
     /// Ask the worker for a full sync; requests arriving while one runs are coalesced.
     pub fn sync_now(&self) {
         if let Some(tx) = self.worker.get() {
-            let _ = tx.send(());
+            let _ = tx.send(true);
         }
     }
 
@@ -234,11 +241,12 @@ impl Service {
     }
 
     /// Call once a minute: the safety net for lost pushes syncs every minute while the app is
-    /// in front (`active`), every 30 minutes otherwise.
+    /// in front (`active`), otherwise each account when its `sync_interval` has passed.
     pub fn tick(&self, active: bool) {
-        let ticks = self.ticks.fetch_add(1, Ordering::Relaxed) + 1;
-        if active || ticks.is_multiple_of(30) {
+        if active {
             self.sync_now();
+        } else if let Some(tx) = self.worker.get() {
+            let _ = tx.send(false);
         }
     }
 

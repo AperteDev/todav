@@ -287,7 +287,7 @@ fun SignInForm(
     }
     if (caldav) {
         Text(
-            tr("Task lists and calendars sync with any CalDAV server. Changes made elsewhere are fetched every minute while Todav is in front and every 30 minutes otherwise, and settings stay on this device."),
+            tr("Task lists and calendars sync with any CalDAV server. Changes made elsewhere are fetched every minute while Todav is in front, and in the background as often as the account says (every 15 minutes at first); settings stay on this device."),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

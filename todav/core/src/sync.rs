@@ -64,17 +64,56 @@ impl Client {
     /// Sync every switched-on account that is connected. One failing (`SyncReport::failed`)
     /// does not stop the others.
     pub fn sync(&self) -> SyncReport {
+        self.sync_accounts(|a| a.enabled && self.connected(a.id))
+    }
+
+    /// Sync the accounts whose turn has come (`due_accounts`): the background's check, which
+    /// leaves the others for theirs.
+    pub fn sync_due(&self) -> SyncReport {
+        let due = self.due_accounts();
+        for id in &due {
+            // A failing account waits for its next turn too, not every minute.
+            let db = self.db.lock().unwrap();
+            let _ = store::kv_set(
+                &db,
+                &crate::account::key(*id, "last_try"),
+                &crate::now().to_string(),
+            );
+        }
+        self.sync_accounts(|a| due.contains(&a.id))
+    }
+
+    fn sync_accounts(&self, wanted: impl Fn(&crate::Account) -> bool) -> SyncReport {
         let mut report = SyncReport::default();
-        for a in self.accounts() {
-            if !a.enabled || !self.connected(a.id) {
-                continue;
-            }
+        for a in self.accounts().iter().filter(|a| wanted(a)) {
             match self.sync_account(a.id) {
                 Ok(r) => report.add(r),
                 Err(e) => report.failed.push((a.id, e)),
             }
         }
         report
+    }
+
+    /// The switched-on, connected accounts whose last sync or try is older than their
+    /// `sync_interval`.
+    pub fn due_accounts(&self) -> Vec<i64> {
+        let now = crate::now();
+        let tried = |id: i64| {
+            let db = self.db.lock().unwrap();
+            store::kv_get(&db, &crate::account::key(id, "last_try"))
+                .ok()
+                .flatten()
+                .and_then(|t| t.parse::<i64>().ok())
+        };
+        self.accounts()
+            .into_iter()
+            .filter(|a| a.enabled && self.connected(a.id))
+            .filter(|a| {
+                let last = self.last_sync(a.id).into_iter().chain(tried(a.id)).max();
+                last.is_none_or(|t| now - t >= i64::from(self.sync_interval(a.id)) * 60)
+            })
+            .map(|a| a.id)
+            .collect()
     }
 
     /// Push the account's dirty tasks, refresh its calendars, then pull each of them; and the

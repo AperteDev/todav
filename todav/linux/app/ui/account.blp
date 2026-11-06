@@ -67,6 +67,14 @@ Adw.NavigationPage page {
           }
         }
 
+        // How often this server is checked while the window is not in front (every minute when
+        // it is): `Client::set_sync_interval`, for this device.
+        Adw.ComboRow sync_interval {
+          title: _("Background Check");
+          subtitle: _("While Todav is not in front; every minute when it is");
+          model: Gtk.StringList sync_intervals {};
+        }
+
         // Google's: what Todav does with it.
         Adw.ActionRow google_note {
           title: _("What Google Keeps");

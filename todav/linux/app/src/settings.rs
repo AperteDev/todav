@@ -4,7 +4,7 @@
 //! Extension.
 
 use crate::core;
-use crate::i18n::{gettext, gettext_noop, pgettext};
+use crate::i18n::{gettext, gettext_noop, ngettext, pgettext};
 use crate::window::{get, note, url_text, view};
 use adw::prelude::*;
 use gtk::{gio, glib};
@@ -887,6 +887,17 @@ fn connect_reorder(row: &adw::ActionRow, id: i64, title: &str) {
     row.add_controller(drop);
 }
 
+/// How often an account is checked in the background ("Every 15 minutes", "Every 2 hours").
+fn interval_name(minutes: u32) -> String {
+    if minutes.is_multiple_of(60) {
+        let n = u64::from(minutes / 60);
+        ngettext("Every {n} hour", "Every {n} hours", n).replace("{n}", &n.to_string())
+    } else {
+        let n = u64::from(minutes);
+        ngettext("Every {n} minute", "Every {n} minutes", n).replace("{n}", &n.to_string())
+    }
+}
+
 fn account_icon(a: &Account) -> &'static str {
     match a.kind {
         AccountKind::Local | AccountKind::System => "computer-symbolic",
@@ -1064,6 +1075,20 @@ fn account_page(dialog: &adw::PreferencesDialog, id: i64) -> adw::NavigationPage
         accounts_changed();
         crate::window::lists_changed();
         crate::calendar::refresh();
+    });
+
+    // How often the background checks this server.
+    let interval: adw::ComboRow = get(&b, "sync_interval");
+    let names: gtk::StringList = get(&b, "sync_intervals");
+    for m in todav_app::accounts::SYNC_INTERVALS {
+        names.append(&interval_name(m));
+    }
+    interval
+        .set_selected(todav_app::accounts::sync_interval_index(core().sync_interval(id)) as u32);
+    interval.connect_selected_notify(move |r| {
+        if let Some(m) = todav_app::accounts::SYNC_INTERVALS.get(r.selected() as usize) {
+            let _ = core().set_sync_interval(id, *m);
+        }
     });
 
     let status: adw::ActionRow = get(&b, "status");

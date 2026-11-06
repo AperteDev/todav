@@ -55,6 +55,9 @@ pub struct Account {
     pub enabled: bool,
 }
 
+/// Minutes between the background's checks of an account's server, until the user sets one.
+pub const DEFAULT_SYNC_INTERVAL: u32 = 15;
+
 const COLS: &str = "id, kind, name, url, user, source, enabled";
 
 fn row(r: &rusqlite::Row) -> rusqlite::Result<Account> {
@@ -260,6 +263,25 @@ impl Client {
         let st = db.prepare("SELECT href FROM lists WHERE account = ? ORDER BY href");
         st.and_then(|mut st| st.query_map([id], |r| r.get(0))?.collect())
             .unwrap_or_default()
+    }
+
+    /// How often the background checks account `id`'s server for changes, in minutes (15 until
+    /// set). Kept on this device, with the account's other `kv` keys: ids are not the same
+    /// on every device, so it does not sync.
+    pub fn sync_interval(&self, id: i64) -> u32 {
+        let db = self.db.lock().unwrap();
+        store::kv_get(&db, &key(id, "sync_interval"))
+            .ok()
+            .flatten()
+            .and_then(|m| m.parse().ok())
+            .filter(|m| *m > 0)
+            .unwrap_or(DEFAULT_SYNC_INTERVAL)
+    }
+
+    /// Check account `id`'s server every `minutes` (at least 1) in the background.
+    pub fn set_sync_interval(&self, id: i64, minutes: u32) -> Result<()> {
+        let db = self.db.lock().unwrap();
+        store::kv_set(&db, &key(id, "sync_interval"), &minutes.max(1).to_string())
     }
 
     /// The account whose server synced settings go through (the device-only
@@ -578,6 +600,52 @@ mod tests {
         home.lock().unwrap().clear();
         sync(&c);
         assert_eq!(state(&c), (vec![], vec![]));
+    }
+
+    /// The background checks an account when its own interval has passed since the last sync or
+    /// try, and not before; a server that fails is not asked again every minute.
+    #[test]
+    fn the_background_checks_each_account_in_its_turn() {
+        let dir = std::env::temp_dir().join(format!("todav-test-due-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let url = serve(Arc::new(std::sync::Mutex::new(String::new())));
+        let add = |url: String, user: &str| {
+            let id = c
+                .add_account(AccountKind::CalDav, url, user.into(), "".into())
+                .unwrap();
+            c.connect(id, "pw".into()).unwrap();
+            id
+        };
+        let (fast, slow) = (add(url, "me"), add("http://127.0.0.1:1/".into(), "you"));
+        let set = |id: i64, name: &str, ago: i64| {
+            let db = c.db.lock().unwrap();
+            store::kv_set(&db, &key(id, name), &(crate::now() - ago * 60).to_string()).unwrap();
+        };
+        assert_eq!(c.sync_interval(fast), DEFAULT_SYNC_INTERVAL);
+
+        // Never synced: due. Just synced: not. Past its interval: due again.
+        assert_eq!(c.due_accounts(), [fast, slow]);
+        set(fast, "last_sync", 1);
+        set(slow, "last_sync", 14);
+        assert!(c.due_accounts().is_empty());
+        set(slow, "last_sync", 16);
+        assert_eq!(c.due_accounts(), [slow]);
+
+        // Each its own interval: an hour for one, the default for the other.
+        c.set_sync_interval(slow, 60).unwrap();
+        assert_eq!(c.sync_interval(slow), 60);
+        assert!(c.due_accounts().is_empty());
+        set(slow, "last_sync", 61);
+        set(fast, "last_sync", 20);
+        assert_eq!(c.due_accounts(), [fast, slow]);
+
+        // A turn taken counts, whether the server answers (`fast`) or not (`slow`).
+        let report = c.sync_due();
+        assert_eq!(report.failed.len(), 1);
+        assert!(c.due_accounts().is_empty());
+        // A manual sync of everything is not held back by turns.
+        assert_eq!(c.sync().failed.len(), 1);
     }
 
     #[test]

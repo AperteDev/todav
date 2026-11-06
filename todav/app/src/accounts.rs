@@ -51,6 +51,17 @@ pub const CALDAV_SERVICES: [CalDavService; 5] = [
     },
 ];
 
+/// What an account's background check interval (`Client::set_sync_interval`) can be set to, in
+/// minutes: Android's periodic work cannot run more often than every 15.
+pub const SYNC_INTERVALS: [u32; 5] = [15, 30, 60, 120, 240];
+
+/// Where `minutes` stands among `SYNC_INTERVALS` (the nearest one, for a value set otherwise).
+pub fn sync_interval_index(minutes: u32) -> usize {
+    (0..SYNC_INTERVALS.len())
+        .min_by_key(|i| SYNC_INTERVALS[*i].abs_diff(minutes))
+        .unwrap_or(0)
+}
+
 /// Whether the service at `url` (an address typed, or where its calendars were found) takes an
 /// app-specific password only.
 pub fn needs_app_password(url: &str) -> bool {
@@ -200,6 +211,18 @@ mod tests {
         names.sort();
         names.dedup();
         assert_eq!(names.len(), all.len());
+    }
+
+    #[test]
+    fn the_default_interval_is_one_to_pick() {
+        let i = super::sync_interval_index(todav_core::DEFAULT_SYNC_INTERVAL);
+        assert_eq!(super::SYNC_INTERVALS[i], todav_core::DEFAULT_SYNC_INTERVAL);
+        assert_eq!(super::sync_interval_index(1), 0);
+        assert_eq!(super::sync_interval_index(90), 2); // nearest, the lower on a tie
+        assert_eq!(
+            super::sync_interval_index(10_000),
+            super::SYNC_INTERVALS.len() - 1
+        );
     }
 
     #[test]

@@ -327,7 +327,7 @@ impl AddAccount {
                 "Only Nextcloud is fully supported. With Google, Todav shows and edits the events of your calendars, added and deleted in Google Calendar, and your Google Tasks, which keep only a title, notes, a due date without a time and subtasks.",
             )),
             AccountKind::CalDav => Some(gettext(
-                "Task lists and calendars sync with any CalDAV server. Changes made elsewhere are fetched every minute while Todav is in front and every 30 minutes otherwise, and settings stay on this device.",
+                "Task lists and calendars sync with any CalDAV server. Changes made elsewhere are fetched every minute while Todav is in front, and in the background as often as the account says (every 15 minutes at first); settings stay on this device.",
             )),
             _ => None,
         };

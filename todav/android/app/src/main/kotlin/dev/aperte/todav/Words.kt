@@ -24,6 +24,15 @@ fun accountName(a: Account): String = when {
     else -> "${a.user}@${accountHost(a)}"
 }
 
+/** How often an account is checked in the background, as the Linux app words it ("Every 15 minutes", "Every 2 hours"). */
+fun intervalName(minutes: UInt): String =
+    if (minutes % 60u == 0u) {
+        val n = (minutes / 60u).toLong()
+        ntr("Every {n} hour", "Every {n} hours", n).replace("{n}", "$n")
+    } else {
+        ntr("Every {n} minute", "Every {n} minutes", minutes.toLong()).replace("{n}", "$minutes")
+    }
+
 /** A local wall-clock time of the core (seconds, read as if UTC) as a date and time. */
 fun fields(t: Long): LocalDateTime = LocalDateTime.ofEpochSecond(t, 0, ZoneOffset.UTC)
 
