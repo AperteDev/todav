@@ -80,6 +80,33 @@
   no `Gio.Settings` (it asks for a schema of our own). The PyPI release may lag the site's (0.2.1
   calls `shell-version` 51 a future release, which the site accepts).
 
+## GNOME extension compatibility
+
+- The extension is published on extensions.gnome.org and updates on its own, after review and
+  when the user gets to it, so for a while after every app release the extension on people's
+  computers is an older one. A change to the app must leave the extension of the last published
+  version, and of every version published in the last 3 months, working as it is, without an
+  update.
+- What the extension depends on is a contract, not an internal: the bus name `dev.aperte.Todav`
+  and object path `/dev/aperte/Todav`, the interface `dev.aperte.Todav1` (`linux/app/src/dbus.rs`,
+  copied in `gnome-extension/dbus.js`) with every method's, signal's and property's name and
+  argument types, what the results mean and the order of their fields, the keys `GetSettings`
+  gives and `SetSetting` accepts (`ext_*`) with their value formats and defaults, the app's
+  `show-preferences` action and its page names, and the D-Bus service file that starts the app
+  on the first call. Add beside them (a new method, a new key, a new interface name such as
+  `dev.aperte.Todav2` next to `Todav1`); do not rename, retype, reorder or remove, and do not
+  give an existing key another meaning or format (a synced setting changed in meaning goes under
+  a new name, as under Settings).
+- Drop what only an old extension uses once the extension version that no longer needs it has
+  been on extensions.gnome.org for at least 3 months, not before: say so in `docs/CHANGELOG.md`
+  under `Removed`, and mark such code with a comment naming the extension version it is for
+  (`// compat: extension 2.6.0`), so it can be found and removed then.
+- Check a change to `dbus.rs`, to the `ext_*` settings or to what they read: run the last
+  published extension (its tag's `todav/gnome-extension`, `version-name` in `metadata.json`)
+  against the new build (`cargo build -p todav-linux`, then `make -C todav/gnome-extension
+  nested`, which links the extension and runs `run-nested.sh`), and open its menu and
+  Preferences page.
+
 ## Translations
 
 - All text a user sees is translatable, in the app, its UI files and the extension; one gettext
