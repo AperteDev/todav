@@ -20,6 +20,13 @@ Thunderbird and other CalDAV clients keep seeing the same data. Todav adds fast 
 work from a local copy, sync in the background and pick up changes from other devices within
 seconds.
 
+Nextcloud is what Todav is made for, and it gets the most: instant updates, settings synced
+between devices, categories kept with the account. **Other CalDAV servers work too** (iCloud,
+Fastmail, Yahoo, mailbox.org, Posteo, Radicale, Baïkal…): pick your service or enter its address and
+sign in with a login name and password. Their task lists and calendars sync, checked on a timer
+you set per account; settings and the order of categories stay on the device. See
+[FEATURES](docs/FEATURES.md).
+
 Todav is developed in my free time. If it keeps your days in order, you can support its
 development:
 

@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The README, the features list, the Flatpak's and Android's store texts and the app's summary
+  now say that other CalDAV servers work too, next to Nextcloud, which stays the main target.
 - How often an account's server is checked for changes in the background is a setting of each
   account (Preferences → Accounts → the account → "Background Check" on Linux, its page in
   Settings on Android): every 15 minutes at first, up to every 4 hours, or Disabled, instead of
@@ -39,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Deleting a list or calendar on a server other than Nextcloud no longer says it can be restored
+  from Nextcloud's trash bin; it says it is deleted on the server too.
 - A task list or calendar that comes from the server with nothing in it (a new account's, one
   made on the web) now shows in the sidebar after the sync, not only after the next change.
 

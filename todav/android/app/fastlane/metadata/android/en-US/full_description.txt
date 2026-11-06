@@ -1,4 +1,4 @@
-Todav is a task list and calendar kept in your Nextcloud through CalDAV, so the Nextcloud Tasks and Calendar web apps, DAVx⁵, Thunderbird and other CalDAV clients see the same lists and events. It syncs with your Nextcloud by itself: it needs neither DAVx⁵ nor the Nextcloud app. Or keep your lists on this device only, without a server.
+Todav is a task list and calendar kept in your Nextcloud through CalDAV, so the Nextcloud Tasks and Calendar web apps, DAVx⁵, Thunderbird and other CalDAV clients see the same lists and events. It syncs with your Nextcloud by itself: it needs neither DAVx⁵ nor the Nextcloud app. Other CalDAV servers work too, such as iCloud, Fastmail, Yahoo, mailbox.org and Radicale. Or keep your lists on this device only, without a server.
 
 <b>Tasks</b>
 <ul>
@@ -21,6 +21,7 @@ Todav is a task list and calendar kept in your Nextcloud through CalDAV, so the 
 <li>Local-first: works offline and sends changes when the server is reachable</li>
 <li>Changes from other devices arrive within seconds through UnifiedPush (with the ntfy app, for instance) and Nextcloud's DAV Push; no Google services</li>
 <li>Several Nextcloud accounts side by side; sign in with the browser or an app password</li>
+<li>Other CalDAV servers (iCloud, Fastmail, Yahoo, mailbox.org, Posteo or any address) with a login name and password; they are checked on a timer you set per account, without Nextcloud's push and synced settings</li>
 <li>Preferences sync between devices, also with Todav on the GNOME desktop</li>
 </ul>
 

@@ -3,6 +3,11 @@
 What Todav can do, in short. The details of each release are in the
 [changelog](CHANGELOG.md), the plans in the [roadmap](ROADMAP.md).
 
+Todav is made for Nextcloud and does the most there. **Other CalDAV servers work too** (iCloud,
+Fastmail, Yahoo, mailbox.org, Posteo, Radicale…), without what is Nextcloud's alone: DAV Push,
+settings synced between devices, the order of categories kept on the server. See "Accounts and
+sync" below.
+
 ## Now
 
 **Tasks**

@@ -5,11 +5,14 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
   <name>Todav</name>
-  <summary>Tasks and calendar kept in your Nextcloud</summary>
+  <summary>Tasks and calendar for Nextcloud and CalDAV</summary>
   <description>
     <p>
       Todav is a task list and calendar kept in your Nextcloud through CalDAV, so the Nextcloud
       Tasks and Calendar web apps and other CalDAV clients see the same lists and events.
+    </p>
+    <p>
+      Other CalDAV servers work too, such as iCloud, Fastmail, mailbox.org and Radicale.
     </p>
     <ul>
       <li>Works offline; changes sync when the server is reachable</li>
@@ -17,7 +20,7 @@
       <li>Categories, subtasks, due dates and reminders</li>
       <li>Month, week and agenda views; plan tasks into time slots by drag and drop</li>
       <li>An optional GNOME Shell extension, installed separately, puts your tasks and calendar in the top bar</li>
-      <li>Connects through GNOME Online Accounts or a browser sign-in</li>
+      <li>Connects through GNOME Online Accounts, a browser sign-in or a login name and password</li>
     </ul>
   </description>
   <developer id="dev.aperte">
