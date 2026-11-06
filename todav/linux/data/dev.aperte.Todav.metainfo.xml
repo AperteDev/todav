@@ -39,19 +39,19 @@
   <!-- From the release tag (scripts/release.py moves them to each new one). -->
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.6.0/docs/screenshots/tasks.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.7.0/docs/screenshots/tasks.png</image>
       <caption>Tasks grouped by category, with subtasks and due dates</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.6.0/docs/screenshots/calendar-month.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.7.0/docs/screenshots/calendar-month.png</image>
       <caption>The month, with an event's details</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.6.0/docs/screenshots/calendar-week.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.7.0/docs/screenshots/calendar-week.png</image>
       <caption>Tasks planned into the week next to events</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.6.0/docs/screenshots/event-dialog.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.7.0/docs/screenshots/event-dialog.png</image>
       <caption>Editing an event</caption>
     </screenshot>
   </screenshots>
@@ -66,6 +66,28 @@
     <control>touch</control>
   </supports>
   <releases>
+    <release version="2.7.0" date="2026-11-06">
+      <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.7.0</url>
+      <description translate="no">
+        <p>Added</p>
+        <ul>
+          <li>CalDAV servers other than Nextcloud (mailbox.org, Radicale, Fastmail…): "CalDAV Server" next to "Nextcloud Server" when adding an account, on Linux and Android, with a login name and password (Todav finds the calendars from the address, <code>/.well-known/caldav</code> too). Their task lists and calendars sync; changes made elsewhere are fetched every minute while the app is in front and in the background as often as the account says, and settings and the order of categories stay on the device. Popular services are picked by name (iCloud, Fastmail, Yahoo, mailbox.org, Posteo), so no address is typed; only "Other" asks for one. What is Nextcloud's alone stays out of the way for them: the Push and Sync settings (DAV Push, ntfy, synced settings) show only with a Nextcloud account, Android asks for no UnifiedPush distributor for them, and Nextcloud's own request headers are not sent.</li>
+          <li>iCloud works as a CalDAV server (<code>caldav.icloud.com</code>, with an app-specific password): its calendars are on a host of their own, which Todav now follows.</li>
+          <li>With no task list in any account (a server with calendars only, or an account with nothing yet) the task page says so, with a way to the calendar, instead of staying blank (Android showed "All Done"); on Linux the add field is off then. A CalDAV server that does not allow making lists or calendars from an app says so.</li>
+          <li>Linux: GNOME Online Accounts' other accounts with calendars (a WebDAV account, for one) can be chosen too, next to Nextcloud and Google.</li>
+        </ul>
+        <p>Changed</p>
+        <ul>
+          <li>The README, the features list, the Flatpak's and Android's store texts and the app's summary now say that other CalDAV servers work too, next to Nextcloud, which stays the main target.</li>
+          <li>How often an account's server is checked for changes in the background is a setting of each account (Preferences → Accounts → the account → "Background Check" on Linux, its page in Settings on Android): every 15 minutes at first, up to every 4 hours, or Disabled, instead of every 30 minutes for all. It stays on this device. While Todav is in front it is still every minute, and pushes and edits still sync at once. Android's background check now runs every 15 minutes and syncs the accounts whose turn it is.</li>
+        </ul>
+        <p>Fixed</p>
+        <ul>
+          <li>Deleting a list or calendar on a server other than Nextcloud no longer says it can be restored from Nextcloud's trash bin; it says it is deleted on the server too.</li>
+          <li>A task list or calendar that comes from the server with nothing in it (a new account's, one made on the web) now shows in the sidebar after the sync, not only after the next change.</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.6.0" date="2026-11-06">
       <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.6.0</url>
       <description translate="no">
