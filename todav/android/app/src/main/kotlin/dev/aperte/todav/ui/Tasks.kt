@@ -34,7 +34,6 @@ import androidx.compose.material3.IconToggleButton
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Event
-import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Repeat
@@ -265,51 +264,6 @@ private fun SortMenu(model: Main) {
     }
 }
 
-/** The categories of the list shown, to show one only (or "Other"), and a new one to add. */
-@Composable
-private fun CategoryFilter(model: Main, screen: Screen, list: String) {
-    var open by remember { mutableStateOf(false) }
-    var naming by remember { mutableStateOf(false) }
-    val names = screen.categories
-    // All, each category, "Other" (once there are categories), then New Category…
-    val other = if (names.isEmpty()) emptyList() else listOf(ptr("category", "Other"))
-    val options = listOf(tr("All Categories")) + names + other + tr("New Category…")
-    Box {
-        Tip(tr("Categories")) {
-            IconButton(onClick = { open = true }) {
-                Icon(
-                    Icons.Outlined.FilterList,
-                    tr("Categories"),
-                    tint = if (screen.filter != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        PickMenu(
-            open,
-            { open = false },
-            options,
-            when (screen.filter) {
-                null -> 0
-                OTHER -> names.size + 1
-                else -> names.indexOf(screen.filter) + 1
-            },
-        ) {
-            when {
-                it == 0 -> model.filterBy(list, null)
-                it == options.lastIndex -> naming = true
-                it > names.size -> model.filterBy(list, OTHER)
-                else -> model.filterBy(list, names[it - 1])
-            }
-        }
-    }
-    if (naming) {
-        CategoryDialog(null, { naming = false }) {
-            naming = false
-            model.addCategory(list, it)
-        }
-    }
-}
-
 /** A drag in progress: the row, its key and height, and the finger in the list's item coordinates. */
 private class Drag(val row: TaskRow, val key: String, val size: Int, val grab: Float, y: Float) {
     var y by mutableFloatStateOf(y)
@@ -344,13 +298,10 @@ private fun TaskList(model: Main, screen: Screen, state: LazyListState, padding:
     // The task tapped: its details sheet, as the calendar's (pulled up, its page).
     var details by remember { mutableStateOf<TodavTask?>(null) }
     details?.let { ItemSheet(model, Item.Task(it)) { details = null } }
-    // The category being edited (a heading held).
+    // The category being edited or deleted (a heading held).
     var renaming by remember { mutableStateOf<String?>(null) }
-    renaming?.let { from ->
-        CategoryDialog(from, { renaming = null }) { to ->
-            renaming = null
-            screen.list?.let { model.renameCategory(it.href, from, to) }
-        }
+    renaming?.let { name ->
+        screen.list?.let { CategoryEditor(model, it.href, name) { renaming = null } }
     }
     if (screen.groups.isEmpty() && screen.completed.isEmpty()) {
         Empty(screen, padding)
@@ -656,35 +607,6 @@ fun Heading(title: String, onLongClick: (() -> Unit)? = null) {
                 },
             )
             .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
-    )
-}
-
-/** A category's name: a new one (`current` null) or the one being edited. */
-@Composable
-private fun CategoryDialog(current: String?, onDismiss: () -> Unit, onDone: (String) -> Unit) {
-    var name by rememberSaveable { mutableStateOf(current ?: "") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (current == null) tr("New Category") else tr("Edit Category")) },
-        text = {
-            Group {
-                FieldItem(
-                    name,
-                    { name = it },
-                    tr("Name"),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { if (name.isNotBlank()) onDone(name.trim()) }),
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                )
-            }
-        },
-        confirmButton = {
-            Button(enabled = name.isNotBlank(), onClick = { onDone(name.trim()) }) {
-                Text(if (current == null) tr("Create") else tr("Save"))
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("Cancel")) } },
     )
 }
 

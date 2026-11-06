@@ -540,7 +540,7 @@ private fun Sidebar(model: Main, screen: Screen, view: View, modifier: Modifier,
 }
 
 /** A drawer row held to move among `among` (its account's, in order), dragged `shift` px. */
-private class Moving(val key: String, val among: List<String>) {
+internal class Moving(val key: String, val among: List<String>) {
     var shift by mutableFloatStateOf(0f)
     val from = among.indexOf(key)
 

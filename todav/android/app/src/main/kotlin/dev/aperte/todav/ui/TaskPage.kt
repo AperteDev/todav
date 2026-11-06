@@ -189,6 +189,8 @@ fun TaskPage(model: Main, uid: String, sheet: DetailsSheetState? = null, draft: 
         )
         val to = list.takeIf { it != task.listHref }
         model.together(tr("“{title}” saved").replace("{title}", summary.trim())) {
+            // A new category joins the list's, last.
+            patch.category?.takeIf { it.isNotEmpty() }?.let { core.addCategory(to ?: task.listHref, it) }
             core.updateTask(uid, patch)
             if (to != null) core.moveTask(uid, to)
         }

@@ -513,23 +513,31 @@ class Main(app: Application) : AndroidViewModel(app) {
         filter.value = category?.let { list to it }
     }
 
-    /** Categories made here, per list, offered until a task has them (the Linux sidebar's "+"). */
-    private val newCategories = java.util.concurrent.ConcurrentHashMap<String, Set<String>>()
+    /** The categories to offer for `list`: its saved order, then the ones its tasks have by name. */
+    fun categoryNames(list: String): List<String> = core.categoryNames(list)
 
-    /** The categories to offer for `list`: configured, then the ones its tasks have and the new ones. */
-    fun categoryNames(list: String): List<String> = core.categoryNames(list, newCategories[list]?.toList() ?: emptyList())
-
-    /** A category made on its own joins the list's categories (until a task has it). */
-    fun addCategory(list: String, name: String) {
-        newCategories.merge(list, setOf(name)) { a, b -> a + b }
-        todav.changed()
+    /** A category made on its own, last of the list's. */
+    fun addCategory(list: String, name: String) = act {
+        core.addCategory(list, name)
+        synced()
     }
 
-    /** Rename category `from` of `list` on all its tasks, as one undo step. */
+    /** Rename category `from` of `list` on all its tasks and in its order, as one undo step. */
     fun renameCategory(list: String, from: String, to: String) {
-        newCategories.computeIfPresent(list) { _, names -> names.map { if (it == from) to else it }.toSet() }
         filter.update { f -> if (f == list to from) list to to else f }
         together(tr("Category renamed")) { core.renameCategory(list, from, to) }
+    }
+
+    /** Delete category `name` of `list`: its tasks stay; one with other categories takes the next. */
+    fun deleteCategory(list: String, name: String) {
+        filter.update { f -> if (f == list to name) null else f }
+        together(tr("“{name}” deleted").replace("{name}", name)) { core.deleteCategory(list, name) }
+    }
+
+    /** Save the order of `list`'s categories (all of `categoryNames`, in the new order). */
+    fun reorderCategories(list: String, names: List<String>) = act {
+        core.reorderCategories(list, names)
+        synced()
     }
 
     fun sync() = act { core.syncNow() }
@@ -545,6 +553,8 @@ class Main(app: Application) : AndroidViewModel(app) {
         }
         core.together(object : Changes {
             override fun run() {
+                // A new category joins the list's, last.
+                category?.let { core.addCategory(list, it) }
                 val t = core.addTask(list, text, category, parent, if (parent == null) order.taskStart else order.subStart)
                 if (patch != null) core.updateTask(t.uid, patch)
             }

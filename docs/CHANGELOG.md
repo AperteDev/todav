@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Categories can be put in order, and deleted. Dragging a category in the Linux sidebar, or by
+  its handle in Android's "Edit Categories…" (in the category filter's menu), saves the order in
+  the account's `todav/config.json`, so every device follows it. Deleting one (Delete in its
+  menu on Linux; Edit Category on Android, from a heading held or the dialog) keeps its tasks: a
+  task with other categories takes the next as its own. Both, and adding and renaming, can be
+  undone.
 - Android: the category filter's menu has "Other" and "New Category…", and a category's
   heading, held, opens "Edit Category" to rename it on all its tasks (with Undo). The add sheet's
   category chip always shows, with "New Category…".
@@ -27,8 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the account's config, so a list whose tasks had other categories (typed on a task, from
   another app, or on this device) looked ungrouped. They now include the categories its tasks
   have, as on Linux.
-- Linux: a category added in the sidebar is placed by name at once, instead of at the end until a
-  task is dropped on it.
+- A category added in the sidebar or made on a task is kept and shown last, instead of among the
+  others by name until a task was dropped on it; renaming one keeps its place in the order,
+  and a task's other categories are renamed with it.
 
 ## [2.5.2] - 2026-11-05
 
