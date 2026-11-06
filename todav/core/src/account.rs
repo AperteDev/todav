@@ -543,10 +543,20 @@ mod tests {
         sync(&c);
         assert_eq!(state(&c), (vec![], vec!["Events".to_string()]));
 
-        // Task lists only: no calendar.
+        // Task lists only: no calendar. A list that holds nothing yet is announced all the same,
+        // for the sidebar to show it.
+        struct Heard(Arc<std::sync::Mutex<Vec<String>>>);
+        impl crate::ChangeListener for Heard {
+            fn changed(&self, list_href: String, _: Vec<String>) {
+                self.0.lock().unwrap().push(list_href);
+            }
+        }
+        let heard = Arc::new(std::sync::Mutex::new(Vec::new()));
+        c.subscribe(Box::new(Heard(heard.clone())));
         *home.lock().unwrap() = calendar("Todo", &["VTODO"]);
         sync(&c);
         assert_eq!(state(&c), (vec!["Todo".to_string()], vec![]));
+        assert!(heard.lock().unwrap().iter().any(|h| h.ends_with("/Todo/")));
 
         // A calendar for both kinds, and one that names no components (any).
         *home.lock().unwrap() = calendar("Both", &["VEVENT", "VTODO"]) + &calendar("Any", &[]);

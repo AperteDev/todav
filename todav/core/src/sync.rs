@@ -6,7 +6,7 @@ use crate::json::Json;
 use crate::store::Kind;
 use crate::{AccountKind, Client, Error, Result, gtasks, store};
 use rusqlite::params;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Default)]
 pub struct SyncReport {
@@ -346,8 +346,35 @@ impl Client {
         Ok(())
     }
 
-    /// The account's lists as the server has them now; ones it no longer has go.
+    /// What the front-ends show of the account's lists, by href: to tell the ones a sync changed.
+    fn list_looks(&self, account: i64) -> HashMap<String, String> {
+        let db = self.db.lock().unwrap();
+        let st = db.prepare(
+            "SELECT href, display_name || '|' || COALESCE(color, '') || '|' || has_tasks || has_events
+               || writable || subscribed || '|' || position FROM lists WHERE account = ?",
+        );
+        st.and_then(|mut st| {
+            st.query_map([account], |r| Ok((r.get(0)?, r.get(1)?)))?
+                .collect()
+        })
+        .unwrap_or_default()
+    }
+
+    /// The account's lists as the server has them now; ones it no longer has go. Each list that
+    /// came, went or changed is announced, so a new one shows although it holds nothing yet.
     pub(crate) fn save_lists(&self, account: i64, dav: &Dav, remote: &[RemoteList]) -> Result<()> {
+        let before = self.list_looks(account);
+        self.store_lists(account, dav, remote)?;
+        let after = self.list_looks(account);
+        for href in before.keys().chain(after.keys()).collect::<HashSet<_>>() {
+            if before.get(href) != after.get(href) {
+                self.emit(href, Vec::new());
+            }
+        }
+        Ok(())
+    }
+
+    fn store_lists(&self, account: i64, dav: &Dav, remote: &[RemoteList]) -> Result<()> {
         let db = self.db.lock().unwrap();
         let tx = db.unchecked_transaction()?;
         let keep: HashSet<String> = remote.iter().map(|l| dav.absolute(&l.href)).collect();
