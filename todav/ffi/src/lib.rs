@@ -359,6 +359,12 @@ impl Todav {
         self.c().categories(list_href)
     }
 
+    /// The categories to offer for a list: the configured ones, then those its tasks have and
+    /// the `extra` ones (made but not yet used) by name.
+    pub fn category_names(&self, list_href: String, extra: Vec<String>) -> Vec<String> {
+        todav_app::tasks::category_names(self.c(), &list_href, &extra)
+    }
+
     // --- tasks
 
     pub fn tasks(&self, list_href: String, include_done: bool) -> Vec<Task> {

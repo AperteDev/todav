@@ -1576,22 +1576,14 @@ fn rebuild_tasks(ui: &Rc<Ui>) {
 
     // Category picker: configured categories, then any others in use; keep the selection.
     let selected = ui.cats.string(ui.cat.selected()).map(|s| s.to_string());
-    let mut names: Vec<String> = core()
-        .categories(href.clone())
-        .into_iter()
-        .map(|c| c.name)
+    let fresh: Vec<String> = ui
+        .new_cats
+        .borrow()
+        .iter()
+        .filter(|(h, _)| *h == href)
+        .map(|(_, n)| n.clone())
         .collect();
-    let fresh = ui.new_cats.borrow();
-    let fresh = fresh.iter().filter(|(h, _)| *h == href).map(|(_, n)| n);
-    // Unconfigured ones go by name, as the core groups them, so a new category does not move
-    // once a task has it.
-    let configured = names.len();
-    for n in groups.iter().filter_map(|g| g.name.as_ref()).chain(fresh) {
-        if !names.contains(n) {
-            names.push(n.clone());
-        }
-    }
-    names[configured..].sort();
+    let names = tasks::category_names(core(), &href, &fresh);
     let none = gettext("No category");
     let refs: Vec<&str> = std::iter::once(none.as_str())
         .chain(names.iter().map(String::as_str))

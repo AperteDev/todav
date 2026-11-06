@@ -274,6 +274,28 @@ pub fn set_category(c: &Client, uid: &str, category: Option<String>) -> Result<(
     c.update_task(uid.into(), patch)
 }
 
+/// The categories of list `list_href` a front-end offers (sidebar or filter, pickers, headers):
+/// the configured ones in their order, then those its open tasks have and the `extra` ones (made
+/// but not yet used) by name, as the list groups them, so a category does not move when a task
+/// gets it.
+pub fn category_names(c: &Client, list_href: &str, extra: &[String]) -> Vec<String> {
+    let mut names: Vec<String> = c
+        .categories(list_href.into())
+        .into_iter()
+        .map(|m| m.name)
+        .collect();
+    let configured = names.len();
+    let used = c.grouped(list_href.into());
+    let used = used.iter().filter_map(|g| g.name.as_ref());
+    for n in used.chain(extra) {
+        if !names.contains(n) {
+            names.push(n.clone());
+        }
+    }
+    names[configured..].sort();
+    names
+}
+
 /// Rename category `from` of list `list_href` to `to`, on every task of the list that has it,
 /// done ones too, as one change for undo. A name the list already has joins its tasks.
 pub fn rename_category(c: &Client, list_href: &str, from: &str, to: &str) -> Result<()> {
@@ -762,6 +784,30 @@ pub(crate) mod tests {
                 .all(|u| c.task(u.to_string()).is_some())
         );
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn category_names_are_the_used_and_new_ones_by_name() {
+        use todav_core::AccountKind;
+        let dir = std::env::temp_dir().join(format!("todav-app-cat-names-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let acc = c
+            .add_account(AccountKind::Local, "".into(), "".into(), "".into())
+            .unwrap();
+        let list = c
+            .create_list(acc, "A".into(), "#0082C9".into(), false)
+            .unwrap();
+        for cat in ["b", "Z", "b"] {
+            c.add_task(list.clone(), "t".into(), Some(cat.into()), None, false)
+                .unwrap();
+        }
+        assert_eq!(category_names(&c, &list, &[]), ["Z", "b"]);
+        assert_eq!(
+            category_names(&c, &list, &["a".into(), "b".into()]),
+            ["Z", "a", "b"]
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
