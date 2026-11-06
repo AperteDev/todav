@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lists and calendars sync; changes made elsewhere are fetched every minute while the app is in
   front and every 30 minutes otherwise, and settings and the order of categories stay on the
   device.
+- With no task list in any account (a server with calendars only, or an account with nothing
+  yet) the task page says so, with a way to the calendar, instead of staying blank (Android
+  showed "All Done"); on Linux the add field is off then. A CalDAV server that does not allow
+  making lists or calendars from an app says so.
 - Linux: GNOME Online Accounts' other accounts with calendars (a WebDAV account, for one) can be
   chosen too, next to Nextcloud and Google.
 

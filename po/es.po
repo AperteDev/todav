@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Todav\n"
 "Report-Msgid-Bugs-To: https://github.com/AperteDev/todav/issues\n"
-"POT-Creation-Date: 2026-11-06 21:44+0100\n"
+"POT-Creation-Date: 2026-11-06 21:55+0100\n"
 "PO-Revision-Date: 2026-10-22 21:00+0200\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
@@ -86,14 +86,14 @@ msgstr "No se puede abrir {name}: {error}"
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:317
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:198
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:199
-#: todav/linux/app/src/calendar.rs:2152 todav/linux/app/src/window.rs:1935
+#: todav/linux/app/src/calendar.rs:2152 todav/linux/app/src/window.rs:1963
 #: todav/linux/app/ui/shortcuts.blp:11
 msgid "Search"
 msgstr "Buscar"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/MainActivity.kt:265
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:321
-#: todav/linux/app/src/window.rs:2972 todav/linux/app/ui/shortcuts.blp:16
+#: todav/linux/app/src/window.rs:3000 todav/linux/app/ui/shortcuts.blp:16
 msgid "Undo"
 msgstr "Deshacer"
 
@@ -188,7 +188,7 @@ msgstr "Todav no puede abrir sus datos"
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Widget.kt:625
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:89
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:270
-#: todav/linux/app/src/window.rs:1378 todav/linux/app/src/window.rs:1832
+#: todav/linux/app/src/window.rs:1378 todav/linux/app/src/window.rs:1860
 msgid "Upcoming"
 msgstr "Próximas"
 
@@ -197,13 +197,13 @@ msgstr "Próximas"
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Widget.kt:632
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:90
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:270
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:1038
-#: todav/linux/app/src/window.rs:1380 todav/linux/app/src/window.rs:1895
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:1047
+#: todav/linux/app/src/window.rs:1380 todav/linux/app/src/window.rs:1923
 msgid "Important"
 msgstr "Importante"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:454
-#: todav/linux/app/src/window.rs:1764
+#: todav/linux/app/src/window.rs:1792
 msgid "Pinned"
 msgstr "Fijadas"
 
@@ -226,7 +226,7 @@ msgstr "Otras"
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:332
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:541
 #: todav/linux/app/src/calendar.rs:1579 todav/linux/app/src/main.rs:371
-#: todav/linux/app/src/window.rs:1776 todav/linux/app/ui/settings.blp:46
+#: todav/linux/app/src/window.rs:1804 todav/linux/app/ui/settings.blp:46
 #: todav/linux/app/ui/settings.blp:153 todav/linux/app/ui/settings.blp:157
 #: todav/linux/app/ui/settings.blp:507 todav/linux/app/ui/shortcuts.blp:62
 #: todav/linux/app/ui/window.blp:26
@@ -238,7 +238,7 @@ msgid "Category renamed"
 msgstr "Categoría renombrada"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:535
-#: todav/linux/app/src/window.rs:3071
+#: todav/linux/app/src/window.rs:3099
 #, rust-format
 msgid "“{name}” deleted"
 msgstr "«{name}» eliminada"
@@ -256,13 +256,13 @@ msgstr "«{title}» movida a su próxima fecha"
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/EventPage.kt:353
 #: todav/linux/app/src/calendar.rs:1988
 #: todav/linux/app/src/calendar/dialog.rs:562
-#: todav/linux/app/src/window.rs:2956
+#: todav/linux/app/src/window.rs:2984
 #, rust-format
 msgid "“{title}” deleted"
 msgstr "«{title}» eliminado"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:632
-#: todav/linux/app/src/window.rs:2958
+#: todav/linux/app/src/window.rs:2986
 #, rust-format
 msgid "“{title}” deleted with {n} subtask"
 msgid_plural "“{title}” deleted with {n} subtasks"
@@ -272,7 +272,7 @@ msgstr[1] "«{title}» eliminado con {n} subtareas"
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:641
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:648
 #: todav/linux/app/src/calendar/dialog.rs:541
-#: todav/linux/app/src/window.rs:3357
+#: todav/linux/app/src/window.rs:3385
 #, rust-format
 msgid "“{title}” duplicated"
 msgstr "«{title}» duplicado"
@@ -282,7 +282,7 @@ msgid "Moved to “{list}”"
 msgstr "Movida a «{list}»"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:669
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:120
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:121
 #: todav/linux/app/src/main.rs:372
 msgid "Welcome to Todav"
 msgstr "Bienvenido a Todav"
@@ -380,7 +380,7 @@ msgstr "Nada planificado esta semana"
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:393
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:1066
 #: todav/linux/app/src/calendar.rs:630 todav/linux/app/src/calendar.rs:2215
-#: todav/linux/app/src/window.rs:1842
+#: todav/linux/app/src/window.rs:1870
 msgid "All day"
 msgstr "Todo el día"
 
@@ -556,7 +556,7 @@ msgstr "Si no, los mostrados en la aplicación"
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Common.kt:654
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Common.kt:660
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:141
-#: todav/linux/app/src/lists.rs:696 todav/linux/app/src/window.rs:3088
+#: todav/linux/app/src/lists.rs:696 todav/linux/app/src/window.rs:3116
 #: todav/linux/app/ui/edit-dialog.blp:28 todav/linux/app/ui/event-dialog.blp:30
 #: todav/linux/app/ui/list-dialog.blp:23
 msgid "Save"
@@ -581,13 +581,13 @@ msgstr "Guardar"
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:869
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:886
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TaskPage.kt:333
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:929
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:1061
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:272
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:346
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:938
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:1070
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:273
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:347
 #: todav/linux/app/src/calendar/dialog.rs:234 todav/linux/app/src/lists.rs:840
 #: todav/linux/app/src/open.rs:120 todav/linux/app/src/settings.rs:1279
-#: todav/linux/app/src/window.rs:2842 todav/linux/app/src/window.rs:3050
+#: todav/linux/app/src/window.rs:2870 todav/linux/app/src/window.rs:3078
 #: todav/linux/app/ui/account.blp:34 todav/linux/app/ui/add-account.blp:221
 #: todav/linux/app/ui/edit-dialog.blp:23 todav/linux/app/ui/event-dialog.blp:25
 #: todav/linux/app/ui/list-dialog.blp:18 todav/linux/app/ui/new-category.blp:18
@@ -601,7 +601,7 @@ msgid "On This Device"
 msgstr "En este dispositivo"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:23
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:184
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:185
 #: todav/linux/app/src/main.rs:214
 msgid "System Calendars"
 msgstr "Calendarios del sistema"
@@ -837,7 +837,7 @@ msgstr "Nada que planificar"
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:1760
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:1761
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:1999
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:838
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:847
 #: todav/linux/app/src/calendar.rs:1743
 #: todav/linux/app/src/calendar/quick.rs:63 todav/linux/app/src/lists.rs:187
 msgid "Edit…"
@@ -856,10 +856,10 @@ msgstr[1] "{n} recordatorios"
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:174
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:556
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TaskPage.kt:331
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:894
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:903
 #: todav/linux/app/src/calendar.rs:1739 todav/linux/app/src/lists.rs:190
-#: todav/linux/app/src/lists.rs:841 todav/linux/app/src/window.rs:2943
-#: todav/linux/app/src/window.rs:3051
+#: todav/linux/app/src/lists.rs:841 todav/linux/app/src/window.rs:2971
+#: todav/linux/app/src/window.rs:3079
 msgid "Delete"
 msgstr "Eliminar"
 
@@ -884,7 +884,7 @@ msgstr "Quitar del plan"
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:1910
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:560
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TaskPage.kt:449
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:725
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:734
 #: todav/linux/app/src/calendar.rs:1606 todav/linux/app/ui/settings.blp:197
 #: todav/linux/app/ui/settings.blp:516
 msgid "Subtasks"
@@ -892,8 +892,8 @@ msgstr "Subtareas"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:1912
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TaskPage.kt:466
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:839
-#: todav/linux/app/src/window.rs:2228 todav/linux/app/src/window.rs:2267
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:848
+#: todav/linux/app/src/window.rs:2256 todav/linux/app/src/window.rs:2295
 msgid "Add Subtask"
 msgstr "Añadir subtarea"
 
@@ -960,7 +960,7 @@ msgid "Categories"
 msgstr "Categorías"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Categories.kt:101
-#: todav/linux/app/src/window.rs:3087
+#: todav/linux/app/src/window.rs:3115
 msgid "Edit Category"
 msgstr "Editar categoría"
 
@@ -990,13 +990,13 @@ msgstr "Crear"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Categories.kt:136
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:154
-#: todav/linux/app/src/lists.rs:905 todav/linux/app/src/window.rs:3039
+#: todav/linux/app/src/lists.rs:905 todav/linux/app/src/window.rs:3067
 #, rust-format
 msgid "“{name}” will be deleted."
 msgstr "«{name}» se eliminará."
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Categories.kt:139
-#: todav/linux/app/src/window.rs:3041
+#: todav/linux/app/src/window.rs:3069
 #, rust-format
 msgid "“{name}” will be removed from its {n} task, which stays."
 msgid_plural "“{name}” will be removed from its {n} tasks, which stay."
@@ -1005,7 +1005,7 @@ msgstr[1] "«{name}» se quitará de sus {n} tareas, que se conservan."
 
 #
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Categories.kt:146
-#: todav/linux/app/src/window.rs:3048
+#: todav/linux/app/src/window.rs:3076
 msgid "Delete Category?"
 msgstr "¿Eliminar la categoría?"
 
@@ -1016,7 +1016,7 @@ msgstr "Editar categorías"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Categories.kt:210
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:442
-#: todav/linux/app/src/settings.rs:827 todav/linux/app/src/window.rs:2489
+#: todav/linux/app/src/settings.rs:827 todav/linux/app/src/window.rs:2517
 msgid "Drag to Move"
 msgstr "Arrastrar para mover"
 
@@ -1026,8 +1026,8 @@ msgid "Done"
 msgstr "Hecho"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Categories.kt:241
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:1031
-#: todav/linux/app/src/window.rs:3158
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:1040
+#: todav/linux/app/src/window.rs:3186
 msgid "New Category…"
 msgstr "Categoría nueva…"
 
@@ -1071,28 +1071,28 @@ msgid "Select"
 msgstr "Seleccionar"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Common.kt:194
-#: todav/linux/app/src/window.rs:2881 todav/linux/app/ui/edit-dialog.blp:96
+#: todav/linux/app/src/window.rs:2909 todav/linux/app/ui/edit-dialog.blp:96
 #: todav/linux/app/ui/event-dialog.blp:73
 msgctxt "priority"
 msgid "None"
 msgstr "Ninguna"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Common.kt:195
-#: todav/linux/app/src/window.rs:2884 todav/linux/app/ui/edit-dialog.blp:96
+#: todav/linux/app/src/window.rs:2912 todav/linux/app/ui/edit-dialog.blp:96
 #: todav/linux/app/ui/event-dialog.blp:73
 msgctxt "priority"
 msgid "High"
 msgstr "Alta"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Common.kt:196
-#: todav/linux/app/src/window.rs:2883 todav/linux/app/ui/edit-dialog.blp:96
+#: todav/linux/app/src/window.rs:2911 todav/linux/app/ui/edit-dialog.blp:96
 #: todav/linux/app/ui/event-dialog.blp:73
 msgctxt "priority"
 msgid "Medium"
 msgstr "Media"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Common.kt:197
-#: todav/linux/app/src/window.rs:2882 todav/linux/app/ui/edit-dialog.blp:96
+#: todav/linux/app/src/window.rs:2910 todav/linux/app/ui/edit-dialog.blp:96
 #: todav/linux/app/ui/event-dialog.blp:73
 msgctxt "priority"
 msgid "Low"
@@ -1100,15 +1100,15 @@ msgstr "Baja"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Common.kt:212
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Common.kt:214
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:855
-#: todav/linux/app/src/window.rs:2871 todav/linux/app/ui/edit-dialog.blp:95
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:864
+#: todav/linux/app/src/window.rs:2899 todav/linux/app/ui/edit-dialog.blp:95
 #: todav/linux/app/ui/event-dialog.blp:72
 msgid "Priority"
 msgstr "Prioridad"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Common.kt:451
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Common.kt:513
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:1059
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:1068
 msgid "OK"
 msgstr "Aceptar"
 
@@ -1284,8 +1284,8 @@ msgid "The next date counts from the day it is done"
 msgstr "La próxima fecha cuenta desde el día en que se completa"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:254
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:1008
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:1010
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:1017
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:1019
 #: todav/linux/app/ui/window.blp:250
 msgid "Add Task"
 msgstr "Añadir tarea"
@@ -1307,7 +1307,7 @@ msgid "Sync failed: {error}"
 msgstr "Falló la sincronización: {error}"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:353
-#: todav/linux/app/src/window.rs:2820
+#: todav/linux/app/src/window.rs:2848
 #, rust-format
 msgid "“{title}” has {n} open subtask."
 msgid_plural "“{title}” has {n} open subtasks."
@@ -1315,7 +1315,7 @@ msgstr[0] "«{title}» tiene {n} subtarea pendiente."
 msgstr[1] "«{title}» tiene {n} subtareas pendientes."
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:355
-#: todav/linux/app/src/window.rs:2830
+#: todav/linux/app/src/window.rs:2858
 #, rust-format
 msgid "“{title}” has {n} completed subtask."
 msgid_plural "“{title}” has {n} completed subtasks."
@@ -1323,27 +1323,27 @@ msgstr[0] "«{title}» tiene {n} subtarea completada."
 msgstr[1] "«{title}» tiene {n} subtareas completadas."
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:359
-#: todav/linux/app/src/window.rs:2818
+#: todav/linux/app/src/window.rs:2846
 msgid "Complete Subtasks Too?"
 msgstr "¿Completar también las subtareas?"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:359
-#: todav/linux/app/src/window.rs:2828
+#: todav/linux/app/src/window.rs:2856
 msgid "Reopen Subtasks Too?"
 msgstr "¿Reabrir también las subtareas?"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:363
-#: todav/linux/app/src/window.rs:2824
+#: todav/linux/app/src/window.rs:2852
 msgid "Complete All"
 msgstr "Completar todas"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:363
-#: todav/linux/app/src/window.rs:2834
+#: todav/linux/app/src/window.rs:2862
 msgid "Reopen All"
 msgstr "Reabrir todas"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:369
-#: todav/linux/app/src/window.rs:2843
+#: todav/linux/app/src/window.rs:2871
 msgid "Only This Task"
 msgstr "Solo esta tarea"
 
@@ -1386,7 +1386,7 @@ msgid "Task list"
 msgstr "Lista de tareas"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Import.kt:66
-#: todav/linux/app/src/window.rs:1938
+#: todav/linux/app/src/window.rs:1966
 #, rust-format
 msgid "{n} task"
 msgid_plural "{n} tasks"
@@ -1745,7 +1745,7 @@ msgid "Off"
 msgstr "Desactivada"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:513
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:190
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:191
 msgid "Lists and calendars that stay on this device"
 msgstr "Listas y calendarios que se quedan en este dispositivo"
 
@@ -1761,14 +1761,14 @@ msgid "Not connected"
 msgstr "Sin conexión"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:516
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:249
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:250
 #: todav/linux/app/src/add_account.rs:165 todav/linux/app/src/settings.rs:912
 #: todav/linux/app/src/settings.rs:1073
 msgid "CalDAV server"
 msgstr "Servidor CalDAV"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:517
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:249
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:250
 #: todav/linux/app/src/add_account.rs:157 todav/linux/app/src/settings.rs:911
 #: todav/linux/app/ui/account.blp:59 todav/linux/app/ui/add-account.blp:142
 msgid "Nextcloud server"
@@ -1869,8 +1869,8 @@ msgid "Off"
 msgstr "Ninguna"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Settings.kt:556
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:840
-#: todav/linux/app/src/window.rs:2924
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:849
+#: todav/linux/app/src/window.rs:2952
 msgid "Pin"
 msgstr "Fijar"
 
@@ -2303,7 +2303,7 @@ msgid "Not saved on the server"
 msgstr "No guardado en el servidor"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TaskPage.kt:244
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:1025
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:1034
 #: todav/linux/app/ui/edit-dialog.blp:89
 msgid "Category"
 msgstr "Categoría"
@@ -2334,7 +2334,7 @@ msgid "Start"
 msgstr "Inicio"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TaskPage.kt:285
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:1018
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:1027
 #: todav/linux/app/ui/edit-dialog.blp:216
 msgid "Due Date"
 msgstr "Fecha de vencimiento"
@@ -2375,7 +2375,7 @@ msgid "Add Reminder"
 msgstr "Añadir recordatorio"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:195
-#: todav/linux/app/src/window.rs:1966
+#: todav/linux/app/src/window.rs:1994
 #, rust-format
 msgid "{n} open"
 msgid_plural "{n} open"
@@ -2387,90 +2387,112 @@ msgid "“{title}” moved"
 msgstr "«{title}» movida"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:532
-#: todav/linux/app/src/window.rs:1792
+#: todav/linux/app/src/window.rs:1820
 #, rust-format
 msgid "Completed ({n})"
 msgstr "Completadas ({n})"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:560
-#: todav/linux/app/src/window.rs:2510
+#: todav/linux/app/src/window.rs:2538
 msgid "To reorder, set Sort to Manual"
 msgstr "Para reordenar, pon Orden en Manual"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:568
-#: todav/linux/app/src/window.rs:1883
+#: todav/linux/app/src/window.rs:1911
 msgid "Nothing Scheduled"
 msgstr "Nada programado"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:568
-#: todav/linux/app/src/window.rs:1884
+#: todav/linux/app/src/window.rs:1912
 msgid "Tasks with a due date show up here"
 msgstr "Aquí aparecen las tareas con fecha de vencimiento"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:569
-#: todav/linux/app/src/window.rs:1913
+#: todav/linux/app/src/window.rs:1941
 msgid "No Important Tasks"
 msgstr "No hay tareas importantes"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:569
-#: todav/linux/app/src/window.rs:1914
+#: todav/linux/app/src/window.rs:1942
 msgid "Tasks of high priority show up here"
 msgstr "Las tareas de prioridad alta aparecen aquí"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:570
-#: todav/linux/app/src/window.rs:1815
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:571
+#: todav/linux/app/src/window.rs:1565
+msgid "No Task Lists"
+msgstr "Sin listas de tareas"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:572
+#: todav/linux/app/src/window.rs:1567
+msgid ""
+"Create one with New List, or add one in the web interface of your server"
+msgstr ""
+"Cree una con «Lista nueva» o añada una en la interfaz web de su servidor"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:574
+#: todav/linux/app/src/window.rs:1569
+msgid "The task lists of your accounts show up here"
+msgstr "Aquí aparecen las listas de tareas de sus cuentas"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:576
+#: todav/linux/app/src/window.rs:1843
 msgid "All Done"
 msgstr "Todo hecho"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:735
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:736
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:586
+#: todav/linux/app/src/window.rs:1574 todav/linux/app/ui/shortcuts.blp:31
+msgid "Show Calendar"
+msgstr "Mostrar calendario"
+
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:744
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:745
 msgid "More Options"
 msgstr "Más opciones"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:769
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:778
 msgid "Reminder"
 msgstr "Recordatorio"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:772
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:781
 #: todav/linux/app/src/calendar.rs:1923
 msgid "Repeats"
 msgstr "Se repite"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:840
-#: todav/linux/app/src/window.rs:2922
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:849
+#: todav/linux/app/src/window.rs:2950
 msgid "Unpin"
 msgstr "Desfijar"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:843
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:852
 msgid "Make Top-Level Task"
 msgstr "Convertir en tarea principal"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:849
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:858
 msgid "Move to List…"
 msgstr "Mover a la lista…"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:912
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:921
 msgid "Move to List"
 msgstr "Mover a la lista"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:988
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:997
 msgid "Subtask of “{title}”"
 msgstr "Subtarea de «{title}»"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:1001
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:1010
 msgid "New subtask"
 msgstr "Nueva subtarea"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:1001
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:1010
 msgid "New task"
 msgstr "Nueva tarea"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:1031
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Tasks.kt:1040
 msgctxt "category"
 msgid "None"
 msgstr "Ninguna"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:161
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:162
 #: todav/linux/app/ui/add-account.blp:21
 msgid ""
 "Tasks and calendar synced with your Nextcloud or another CalDAV server, or "
@@ -2479,65 +2501,65 @@ msgstr ""
 "Tareas y calendario sincronizados con su Nextcloud u otro servidor CalDAV, o "
 "guardados en este dispositivo"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:165
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:166
 msgid "Account of the Nextcloud App"
 msgstr "Cuenta de la aplicación de Nextcloud"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:166
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:167
 msgid ""
 "Sign in to the server of an account the Nextcloud app on this device has"
 msgstr ""
 "Inicia sesión en el servidor de una cuenta que tiene la aplicación de "
 "Nextcloud de este dispositivo"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:170
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:171
 #: todav/linux/app/src/add_account.rs:152 todav/linux/app/ui/add-account.blp:52
 msgid "Nextcloud Server"
 msgstr "Servidor Nextcloud"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:170
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:171
 #: todav/linux/app/src/add_account.rs:155
 msgid "Sign in to your Nextcloud; Todav gets an app password of its own"
 msgstr ""
 "Inicie sesión en su Nextcloud; Todav obtiene una contraseña de aplicación "
 "propia"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:175
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:176
 #: todav/linux/app/src/add_account.rs:160 todav/linux/app/ui/add-account.blp:68
 msgid "CalDAV Server"
 msgstr "Servidor CalDAV"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:176
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:177
 #: todav/linux/app/ui/add-account.blp:69
 msgid "Another server, such as mailbox.org, with a login name and password"
 msgstr "Otro servidor, como mailbox.org, con nombre de usuario y contraseña"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:185
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:186
 msgid ""
 "Calendars of the accounts on this device, such as Google, shown read-only"
 msgstr ""
 "Calendarios de las cuentas de este dispositivo, como Google, de solo lectura"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:190
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:191
 #: todav/linux/app/ui/add-account.blp:85
 msgid "On This Device Only"
 msgstr "Solo en este dispositivo"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:198
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:199
 msgid "More accounts can be added later in Settings"
 msgstr "Puedes añadir más cuentas más tarde en Ajustes"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:244
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:245
 #: todav/linux/app/src/add_account.rs:163
 msgid "Sign in to any server with CalDAV, such as mailbox.org"
 msgstr "Inicie sesión en cualquier servidor con CalDAV, como mailbox.org"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:244
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:245
 #: todav/linux/app/ui/add-account.blp:53
 msgid "Sign in with the browser or an app password"
 msgstr "Iniciar sesión en el navegador o con una contraseña de aplicación"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:260
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:261
 #: todav/linux/app/src/add_account.rs:291
 msgid ""
 "Task lists and calendars sync with any CalDAV server. Changes made elsewhere "
@@ -2549,33 +2571,33 @@ msgstr ""
 "Todav está en primer plano y cada 30 minutos en caso contrario; los ajustes "
 "se quedan en este dispositivo."
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:271
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:272
 #: todav/linux/app/src/settings.rs:1179
 msgid "Waiting for Sign-In…"
 msgstr "Esperando el inicio de sesión…"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:277
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:278
 #: todav/linux/app/src/add_account.rs:136
 msgid "Sign In…"
 msgstr "Iniciar sesión…"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:280
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:281
 #: todav/linux/app/ui/add-account.blp:202
 msgid "Sign In with Browser"
 msgstr "Iniciar sesión en el navegador"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:283
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:284
 #: todav/linux/app/src/add_account.rs:140 todav/linux/app/ui/account.blp:131
 #: todav/linux/app/ui/add-account.blp:214
 msgid "Sign In with Password…"
 msgstr "Iniciar sesión con contraseña…"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:304
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:305
 #: todav/linux/app/ui/password-login.blp:6
 msgid "Sign In with Password"
 msgstr "Iniciar sesión con contraseña"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:308
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:309
 #: todav/linux/app/src/window.rs:1286
 msgid ""
 "The login name and password of your account; some providers ask for an app "
@@ -2584,36 +2606,36 @@ msgstr ""
 "El nombre de usuario y la contraseña de su cuenta; algunos proveedores piden "
 "en su lugar una contraseña de aplicación"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:309
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:310
 #: todav/linux/app/ui/password-login.blp:38
 msgid "Create an app password in Nextcloud under Settings → Security"
 msgstr ""
 "Cree una contraseña de aplicación en Nextcloud en Configuración → Seguridad"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:315
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:316
 #: todav/linux/app/ui/password-login.blp:45
 msgid "Login name"
 msgstr "Nombre de usuario"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:324
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:325
 #: todav/linux/app/ui/password-login.blp:50
 msgid "App password"
 msgstr "Contraseña de aplicación"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:324
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:325
 #: todav/linux/app/src/window.rs:1289
 msgid "Password"
 msgstr "Contraseña"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:327
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:328
 msgid "Hide Password"
 msgstr "Ocultar contraseña"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:327
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:328
 msgid "Show Password"
 msgstr "Mostrar contraseña"
 
-#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:344
+#: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/TodavUi.kt:345
 #: todav/linux/app/ui/add-account.blp:189
 msgid "Connect"
 msgstr "Conectar"
@@ -2795,7 +2817,7 @@ msgstr "Haz clic para cambiar el nombre"
 msgid "Rename Repeating Event?"
 msgstr "¿Cambiar el nombre del evento repetido?"
 
-#: todav/linux/app/src/calendar.rs:2034 todav/linux/app/src/window.rs:2020
+#: todav/linux/app/src/calendar.rs:2034 todav/linux/app/src/window.rs:2048
 #, rust-format
 msgid "Not saved on the server: {reason}"
 msgstr "No guardado en el servidor: {reason}"
@@ -2814,11 +2836,11 @@ msgstr "Subtarea de {task}"
 msgid "Nothing Planned"
 msgstr "Nada planificado"
 
-#: todav/linux/app/src/calendar.rs:2172 todav/linux/app/src/window.rs:1956
+#: todav/linux/app/src/calendar.rs:2172 todav/linux/app/src/window.rs:1984
 msgid "No Results Found"
 msgstr "No se encontraron resultados"
 
-#: todav/linux/app/src/calendar.rs:2173 todav/linux/app/src/window.rs:1957
+#: todav/linux/app/src/calendar.rs:2173 todav/linux/app/src/window.rs:1985
 msgid "Try a different search"
 msgstr "Pruebe con otra búsqueda"
 
@@ -3024,7 +3046,7 @@ msgstr "No se pudo eliminar «{title}» en el servidor"
 msgid "“{title}” was not saved on the server"
 msgstr "«{title}» no se guardó en el servidor"
 
-#: todav/linux/app/src/window.rs:708 todav/linux/app/src/window.rs:2272
+#: todav/linux/app/src/window.rs:708 todav/linux/app/src/window.rs:2300
 msgid "Edit"
 msgstr "Editar"
 
@@ -3044,50 +3066,50 @@ msgstr "Falló el inicio de sesión"
 msgid "Sign-in failed"
 msgstr "Falló el inicio de sesión"
 
-#: todav/linux/app/src/window.rs:1612 todav/linux/app/ui/window.blp:256
+#: todav/linux/app/src/window.rs:1640 todav/linux/app/ui/window.blp:256
 msgid "No category"
 msgstr "Sin categoría"
 
-#: todav/linux/app/src/window.rs:1666
+#: todav/linux/app/src/window.rs:1694
 msgid "No list is shown"
 msgstr "No se muestra ninguna lista"
 
-#: todav/linux/app/src/window.rs:1838
+#: todav/linux/app/src/window.rs:1866
 msgid "Today’s Events"
 msgstr "Eventos de hoy"
 
-#: todav/linux/app/src/window.rs:1999
+#: todav/linux/app/src/window.rs:2027
 #, rust-format
 msgid "{done} of {all} subtask done"
 msgid_plural "{done} of {all} subtasks done"
 msgstr[0] "{done} de {all} subtarea hecha"
 msgstr[1] "{done} de {all} subtareas hechas"
 
-#: todav/linux/app/src/window.rs:2355
+#: todav/linux/app/src/window.rs:2383
 msgid "Add subtask"
 msgstr "Añadir subtarea"
 
-#: todav/linux/app/src/window.rs:3277
+#: todav/linux/app/src/window.rs:3305
 msgid "Start and due date need a time on both or on neither"
 msgstr "El inicio y el vencimiento deben tener hora los dos o ninguno"
 
-#: todav/linux/app/src/window.rs:3280
+#: todav/linux/app/src/window.rs:3308
 msgid "The task starts after it is due"
 msgstr "La tarea empieza después de vencer"
 
-#: todav/linux/app/src/window.rs:3489
+#: todav/linux/app/src/window.rs:3517
 msgid "Add a Time"
 msgstr "Añadir una hora"
 
-#: todav/linux/app/src/window.rs:3615
+#: todav/linux/app/src/window.rs:3643
 msgid "Low priority"
 msgstr "Prioridad baja"
 
-#: todav/linux/app/src/window.rs:3616
+#: todav/linux/app/src/window.rs:3644
 msgid "Medium priority"
 msgstr "Prioridad media"
 
-#: todav/linux/app/src/window.rs:3617
+#: todav/linux/app/src/window.rs:3645
 msgid "High priority"
 msgstr "Prioridad alta"
 
@@ -3455,10 +3477,6 @@ msgstr "Un evento nuevo en Todav, el día elegido; un campo da su título"
 #: todav/linux/app/ui/shortcuts.blp:26
 msgid "Show Tasks"
 msgstr "Mostrar tareas"
-
-#: todav/linux/app/ui/shortcuts.blp:31
-msgid "Show Calendar"
-msgstr "Mostrar calendario"
 
 #: todav/linux/app/ui/shortcuts.blp:36
 msgid "Toggle Sidebar"

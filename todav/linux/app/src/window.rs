@@ -1556,14 +1556,42 @@ fn refresh_tasks(ui: &Rc<Ui>) {
     }
 }
 
+/// What the task page shows when no account has a task list: an account may have none (a
+/// server with calendars only, or nothing yet), then the calendar is a click away.
+fn no_task_lists(ui: &Rc<Ui>) {
+    let make = !crate::lists::places(false).is_empty();
+    let empty = adw::StatusPage::builder()
+        .icon_name("view-list-symbolic")
+        .title(gettext("No Task Lists"))
+        .description(if make {
+            gettext("Create one with New List, or add one in the web interface of your server")
+        } else {
+            gettext("The task lists of your accounts show up here")
+        })
+        .build();
+    empty.add_css_class("compact");
+    if !core().calendars().is_empty() {
+        let show = gtk::Button::with_label(&gettext("Show Calendar"));
+        show.set_halign(gtk::Align::Center);
+        show.add_css_class("pill");
+        show.connect_clicked(|_| crate::calendar::show_day(core().local_now()));
+        empty.set_child(Some(&show));
+    }
+    ui.groups.append(&empty);
+}
+
 fn rebuild_tasks(ui: &Rc<Ui>) {
     while let Some(c) = ui.groups.first_child() {
         ui.groups.remove(&c);
     }
     ui.adopters.borrow_mut().clear();
     ui.inline.set(prefs::inline_edit(core()));
-    let Some(href) = ui.current.borrow().clone() else {
+    let current = ui.current.borrow().clone();
+    // Nowhere to add a task to without a list.
+    ui.entry.set_sensitive(current.is_some());
+    let Some(href) = current else {
         ui.title.set_title("");
+        no_task_lists(ui);
         return;
     };
     // Upcoming and search results mix lists: count subtasks in all of them.

@@ -405,6 +405,165 @@ mod tests {
         assert!(!c.pending(Some(here)));
     }
 
+    /// A CalDAV server whose calendar home holds what `home` says (the `<d:response>`s of its
+    /// collections); returns its address. Any calendar is empty.
+    fn serve(home: Arc<std::sync::Mutex<String>>) -> String {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/dav/", listener.local_addr().unwrap());
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let mut s = stream.unwrap();
+                // The head, then the body it announces: closing before it is read resets the
+                // connection under the client.
+                let (mut buf, mut chunk) = (Vec::new(), [0; 4096]);
+                let head_end = loop {
+                    let n = s.read(&mut chunk).unwrap();
+                    buf.extend_from_slice(&chunk[..n]);
+                    if let Some(i) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
+                        break i + 4;
+                    }
+                    assert!(n > 0, "request cut short");
+                };
+                let head = String::from_utf8_lossy(&buf[..head_end]).to_string();
+                let length = head
+                    .lines()
+                    .find_map(|l| {
+                        l.to_lowercase()
+                            .strip_prefix("content-length: ")?
+                            .parse()
+                            .ok()
+                    })
+                    .unwrap_or(0);
+                while buf.len() < head_end + length {
+                    let n = s.read(&mut chunk).unwrap();
+                    buf.extend_from_slice(&chunk[..n]);
+                }
+                let line = head.lines().next().unwrap_or_default();
+                let ms = |body: String| {
+                    format!(
+                        "<?xml version=\"1.0\"?><d:multistatus xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\">{body}</d:multistatus>"
+                    )
+                };
+                let prop = |href: &str, props: &str| {
+                    format!(
+                        "<d:response><d:href>{href}</d:href><d:propstat><d:prop>{props}</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>"
+                    )
+                };
+                let body = if line.starts_with("PROPFIND /dav/ ") {
+                    Some(ms(prop(
+                        "/dav/",
+                        "<d:current-user-principal><d:href>/dav/me/</d:href></d:current-user-principal>",
+                    )))
+                } else if line.starts_with("PROPFIND /dav/me/ ") {
+                    Some(ms(prop(
+                        "/dav/me/",
+                        "<c:calendar-home-set><d:href>/dav/cals/</d:href></c:calendar-home-set>",
+                    )))
+                } else if line.starts_with("PROPFIND /dav/cals/ ") {
+                    // The home itself and a scheduling inbox are no calendars.
+                    let own = prop(
+                        "/dav/cals/",
+                        "<d:resourcetype><d:collection/></d:resourcetype>",
+                    );
+                    let inbox = prop(
+                        "/dav/cals/inbox/",
+                        "<d:resourcetype><d:collection/><c:schedule-inbox/></d:resourcetype>",
+                    );
+                    Some(ms(format!("{own}{inbox}{}", home.lock().unwrap())))
+                } else if line.starts_with("REPORT /dav/cals/") {
+                    Some(ms("<d:sync-token>t</d:sync-token>".into()))
+                } else {
+                    None
+                };
+                let reply = match body {
+                    Some(b) => format!(
+                        "HTTP/1.1 207 Multi-Status\r\nContent-Type: application/xml\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{b}",
+                        b.len()
+                    ),
+                    // Calendars are made in the server's own web interface.
+                    None if line.starts_with("MKCALENDAR") => {
+                        "HTTP/1.1 405 Method Not Allowed\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                            .into()
+                    }
+                    None => {
+                        "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                            .into()
+                    }
+                };
+                let _ = s.write_all(reply.as_bytes());
+            }
+        });
+        url
+    }
+
+    /// A calendar collection named `name` for the components `comps`.
+    fn calendar(name: &str, comps: &[&str]) -> String {
+        // None named: the server says nothing of components, and the calendar takes any.
+        let set = if comps.is_empty() {
+            String::new()
+        } else {
+            let comps: String = comps
+                .iter()
+                .map(|c| format!("<c:comp name=\"{c}\"/>"))
+                .collect();
+            format!(
+                "<c:supported-calendar-component-set>{comps}</c:supported-calendar-component-set>"
+            )
+        };
+        format!(
+            "<d:response><d:href>/dav/cals/{name}/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><c:calendar/></d:resourcetype><d:displayname>{name}</d:displayname>{set}</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>"
+        )
+    }
+
+    /// Whatever a CalDAV server holds, an account takes it: no lists, calendars only, task lists
+    /// only, both, and the one for both kinds shows in each.
+    #[test]
+    fn a_caldav_account_may_have_any_mix_of_lists() {
+        let dir = std::env::temp_dir().join(format!("todav-test-mix-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let home = Arc::new(std::sync::Mutex::new(String::new()));
+        let url = serve(home.clone());
+        let id = c
+            .add_account(AccountKind::CalDav, url, "me".into(), "".into())
+            .unwrap();
+        c.connect(id, "pw".into()).unwrap();
+        let names = |l: Vec<crate::List>| l.into_iter().map(|l| l.display_name).collect::<Vec<_>>();
+        let state = |c: &Client| (names(c.lists()), names(c.calendars()));
+        let sync = |c: &Client| c.sync_account(id).unwrap();
+
+        // Nothing at all: a sync that goes through, with nothing to show.
+        sync(&c);
+        assert_eq!(state(&c), (vec![], vec![]));
+        assert!(c.last_sync(id).is_some());
+
+        // Calendars only: no task list.
+        *home.lock().unwrap() = calendar("Events", &["VEVENT"]);
+        sync(&c);
+        assert_eq!(state(&c), (vec![], vec!["Events".to_string()]));
+
+        // Task lists only: no calendar.
+        *home.lock().unwrap() = calendar("Todo", &["VTODO"]);
+        sync(&c);
+        assert_eq!(state(&c), (vec!["Todo".to_string()], vec![]));
+
+        // A calendar for both kinds, and one that names no components (any).
+        *home.lock().unwrap() = calendar("Both", &["VEVENT", "VTODO"]) + &calendar("Any", &[]);
+        sync(&c);
+        let (tasks, events) = state(&c);
+        assert_eq!((tasks.len(), events.len()), (2, 2));
+
+        // A server that keeps its calendars to itself says so, not "HTTP 405".
+        let made = c.create_list(id, "New".into(), "#000000".into(), false);
+        assert!(matches!(&made, Err(Error::Http(405, m)) if m.contains("does not allow")));
+
+        // Everything deleted on the server: back to nothing.
+        home.lock().unwrap().clear();
+        sync(&c);
+        assert_eq!(state(&c), (vec![], vec![]));
+    }
+
     #[test]
     fn a_caldav_account_connects_at_its_own_address() {
         let dir = std::env::temp_dir().join(format!("todav-test-caldav-{}", std::process::id()));

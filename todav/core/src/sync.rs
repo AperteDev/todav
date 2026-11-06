@@ -239,7 +239,16 @@ impl Client {
             dav.home()?.trim_end_matches('/'),
             crate::new_uid()
         );
-        dav.mkcalendar(&path, &name, &color, events)?;
+        dav.mkcalendar(&path, &name, &color, events)
+            .map_err(|e| match e {
+                // Many CalDAV servers (mailbox.org's) keep their calendars to their own web
+                // interface.
+                Error::Http(403 | 405 | 501, _) if kind == AccountKind::CalDav => Error::Http(
+                    405,
+                    "this server does not allow creating lists or calendars from an app".into(),
+                ),
+                e => e,
+            })?;
         self.save_lists(account, &dav, &dav.discover()?)?;
         let href = dav.absolute(&path);
         self.emit(&href, Vec::new());

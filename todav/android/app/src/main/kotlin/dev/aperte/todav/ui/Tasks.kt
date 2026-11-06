@@ -297,7 +297,7 @@ private fun TaskList(model: Main, screen: Screen, state: LazyListState, padding:
     var details by remember { mutableStateOf<TodavTask?>(null) }
     details?.let { ItemSheet(model, Item.Task(it)) { details = null } }
     if (screen.groups.isEmpty() && screen.completed.isEmpty()) {
-        Empty(screen, padding)
+        Empty(model, screen, padding)
         return
     }
     val haptics = LocalHapticFeedback.current
@@ -563,10 +563,16 @@ private fun TaskList(model: Main, screen: Screen, state: LazyListState, padding:
 }
 
 @Composable
-private fun Empty(screen: Screen, padding: PaddingValues) {
+private fun Empty(model: Main, screen: Screen, padding: PaddingValues) {
     val (title, description) = when (screen.current) {
         UPCOMING -> tr("Nothing Scheduled") to tr("Tasks with a due date show up here")
         IMPORTANT -> tr("No Important Tasks") to tr("Tasks of high priority show up here")
+        // No account has a task list (a server with calendars only, or nothing yet).
+        null -> tr("No Task Lists") to if (model.core.places(false).isNotEmpty()) {
+            tr("Create one with New List, or add one in the web interface of your server")
+        } else {
+            tr("The task lists of your accounts show up here")
+        }
         else -> tr("All Done") to null
     }
     Column(
@@ -576,6 +582,9 @@ private fun Empty(screen: Screen, padding: PaddingValues) {
     ) {
         Text(title, style = MaterialTheme.typography.titleLarge)
         description?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        if (screen.current == null && model.core.calendars().isNotEmpty()) {
+            Button({ model.show(dev.aperte.todav.View.CALENDAR) }, Modifier.padding(top = 16.dp)) { Text(tr("Show Calendar")) }
+        }
     }
 }
 
