@@ -34,6 +34,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
@@ -81,6 +83,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -90,6 +93,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import kotlin.math.roundToInt
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -106,6 +110,7 @@ import dev.aperte.todav.core.SyncState
 import dev.aperte.todav.ntr
 import dev.aperte.todav.tr
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 /** The snackbar of the home screen. */
 val LocalSnackbar = compositionLocalOf { SnackbarHostState() }
@@ -335,14 +340,51 @@ private fun Messages(model: Main, screen: Screen, snackbar: SnackbarHostState) {
     }
     val sync by model.syncState.collectAsStateWithLifecycle()
     val failed = sync as? SyncState.Failed
+    var detail by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(failed) {
         if (failed == null) return@LaunchedEffect
         val names = screen.accounts.associate { it.id to accountName(it) }
         val error = failed.failures.joinToString("; ") { f ->
             f.account?.let { names[it] }?.let { "$it: ${f.error}" } ?: f.error
         }
-        snackbar.showSnackbar(tr("Sync failed: {error}").replace("{error}", error))
+        val shown = snackbar.showSnackbar(
+            tr("Sync failed: {error}").replace("{error}", error),
+            tr("Details"),
+            duration = SnackbarDuration.Long,
+        )
+        if (shown == SnackbarResult.ActionPerformed) detail = error
     }
+    detail?.let { ErrorDialog(model, tr("Sync Failed"), it) { detail = null } }
+}
+
+/** An error's full text, to read (it scrolls and can be selected) and copy. */
+@Composable
+private fun ErrorDialog(model: Main, title: String, error: String, onClose: () -> Unit) {
+    val clipboard = androidx.compose.ui.platform.LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text(title) },
+        text = {
+            androidx.compose.foundation.text.selection.SelectionContainer {
+                Text(
+                    error,
+                    Modifier.verticalScroll(rememberScrollState()),
+                    style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val clip = android.content.ClipData.newPlainText(tr("Error"), error)
+                scope.launch { clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(clip)) }
+                // Android 13 and later show the copied text themselves.
+                if (android.os.Build.VERSION.SDK_INT < 33) model.messages.tryEmit(tr("Error copied") to null)
+                onClose()
+            }) { Text(tr("Copy")) }
+        },
+        dismissButton = { TextButton(onClick = onClose) { Text(tr("Close")) } },
+    )
 }
 
 /** Whether completing or reopening a task takes its subtasks along (`onAnswer(null)`: cancelled). */

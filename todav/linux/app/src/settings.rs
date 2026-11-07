@@ -652,6 +652,15 @@ fn connect_status(b: &gtk::Builder, id: i64, sync_only: bool) -> Rc<dyn Fn()> {
         gtk::UriLauncher::new(DAV_PUSH_APP).launch(window.as_ref(), gio::Cancellable::NONE, |_| {});
     });
 
+    let failed: Rc<RefCell<Option<String>>> = Rc::default();
+    sync.connect_activated({
+        let failed = failed.clone();
+        move |row| {
+            if let Some(e) = failed.borrow().as_deref() {
+                crate::window::show_error(row, &gettext("Sync Failed"), e);
+            }
+        }
+    });
     let show = Rc::new(move || {
         // The last sync, as the sidebar dates say it ("Today 14:32").
         let now = core().local_now();
@@ -661,7 +670,11 @@ fn connect_status(b: &gtk::Builder, id: i64, sync_only: bool) -> Rc<dyn Fn()> {
                 .replace("{time}", &crate::dates::label(local, false, now))
         });
         let state = crate::sync_state();
-        match crate::service().sync_error(id) {
+        let error = crate::service().sync_error(id);
+        // A failed sync opens its full text, to read and copy.
+        *failed.borrow_mut() = error.clone().filter(|_| state != "syncing");
+        sync.set_activatable(failed.borrow().is_some());
+        match error {
             _ if state == "syncing" => set_status(&sync, &sync_icon, None, &gettext("Syncing…")),
             Some(e) if todav_app::accounts::no_access(&e) => set_status(
                 &sync,

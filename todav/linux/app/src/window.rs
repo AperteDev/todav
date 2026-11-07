@@ -561,6 +561,40 @@ pub fn note(text: &str) -> adw::Toast {
     t
 }
 
+/// A dialog with an error's full text, to read (it scrolls) and copy.
+pub fn show_error(parent: &impl IsA<gtk::Widget>, heading: &str, text: &str) {
+    let view = gtk::TextView::builder()
+        .editable(false)
+        .cursor_visible(false)
+        .wrap_mode(gtk::WrapMode::WordChar)
+        .top_margin(8)
+        .bottom_margin(8)
+        .left_margin(8)
+        .right_margin(8)
+        .build();
+    view.buffer().set_text(text);
+    view.add_css_class("monospace");
+    let scroll = gtk::ScrolledWindow::builder()
+        .child(&view)
+        .min_content_height(120)
+        .max_content_height(300)
+        .propagate_natural_height(true)
+        .build();
+    scroll.add_css_class("card");
+    let alert = adw::AlertDialog::new(Some(heading), None);
+    alert.set_extra_child(Some(&scroll));
+    alert.add_response("copy", &gettext("Copy"));
+    alert.add_response("close", &gettext("Close"));
+    alert.set_default_response(Some("close"));
+    alert.set_close_response("close");
+    let (text, widget) = (text.to_string(), parent.clone().upcast::<gtk::Widget>());
+    alert.connect_response(Some("copy"), move |_, _| {
+        widget.clipboard().set_text(&text);
+        toast(&gettext("Error copied"));
+    });
+    alert.present(Some(parent));
+}
+
 pub fn show_list(href: &str) {
     if let Some(app) = gio::Application::default().and_downcast::<adw::Application>() {
         present(&app);
@@ -675,9 +709,13 @@ pub fn on_event(ev: &Event) {
             crate::calendar::set_syncing(s == "syncing");
             if let Some(err) = s.strip_prefix("error:") {
                 if *ui.last_error.borrow() != err {
-                    ui.toasts.add_toast(note(
-                        &gettext("Sync failed: {error}").replace("{error}", err),
-                    ));
+                    let t = note(&gettext("Sync failed: {error}").replace("{error}", err));
+                    t.set_button_label(Some(&gettext("Details")));
+                    let (window, error) = (ui.window.clone(), err.to_string());
+                    t.connect_button_clicked(move |_| {
+                        show_error(&window, &gettext("Sync Failed"), &error)
+                    });
+                    ui.toasts.add_toast(t);
                     *ui.last_error.borrow_mut() = err.to_string();
                 }
             } else if s == "idle" {

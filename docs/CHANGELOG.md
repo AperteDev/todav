@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A failed sync's message can be read in full and copied: "Details" on the message opens it in a
+  dialog with a Copy button, on Linux (also by clicking the failed Sync row of an account's
+  Server Status) and Android.
+
 ### Fixed
 
 - CalDAV servers without `sync-collection` (Posteo's) no longer fail with "HTTP 403": Todav reads
