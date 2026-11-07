@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.2] - 2026-11-07
+
 ### Added
 
 - Android: tapping the agenda widget's title opens the calendar on today, as the month widget's
@@ -755,7 +757,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Its options are in the app's Preferences. Without the app installed, its
   menu says so and links to the download.
 
-[Unreleased]: https://github.com/AperteDev/todav/compare/v2.7.1...HEAD
+[Unreleased]: https://github.com/AperteDev/todav/compare/v2.7.2...HEAD
+[2.7.2]: https://github.com/AperteDev/todav/compare/v2.7.1...v2.7.2
 [2.7.1]: https://github.com/AperteDev/todav/compare/v2.7.0...v2.7.1
 [2.7.0]: https://github.com/AperteDev/todav/compare/v2.6.0...v2.7.0
 [2.6.0]: https://github.com/AperteDev/todav/compare/v2.5.2...v2.6.0

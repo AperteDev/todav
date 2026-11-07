@@ -39,19 +39,19 @@
   <!-- From the release tag (scripts/release.py moves them to each new one). -->
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.7.1/docs/screenshots/tasks.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.7.2/docs/screenshots/tasks.png</image>
       <caption>Tasks grouped by category, with subtasks and due dates</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.7.1/docs/screenshots/calendar-month.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.7.2/docs/screenshots/calendar-month.png</image>
       <caption>The month, with an event's details</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.7.1/docs/screenshots/calendar-week.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.7.2/docs/screenshots/calendar-week.png</image>
       <caption>Tasks planned into the week next to events</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.7.1/docs/screenshots/event-dialog.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.7.2/docs/screenshots/event-dialog.png</image>
       <caption>Editing an event</caption>
     </screenshot>
   </screenshots>
@@ -66,6 +66,16 @@
     <control>touch</control>
   </supports>
   <releases>
+    <release version="2.7.2" date="2026-11-07">
+      <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.7.2</url>
+      <description translate="no">
+        <p>Added</p>
+        <ul>
+          <li>Android: tapping the agenda widget's title opens the calendar on today, as the month widget's title opens the month.</li>
+          <li>Android: About offers a newer stable release, as the Linux app's does: a first row, "Version X Available", links to its page on GitHub.</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.7.1" date="2026-11-07">
       <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.7.1</url>
       <description translate="no">
