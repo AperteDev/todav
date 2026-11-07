@@ -304,7 +304,7 @@ private fun agendaHeading(day: Long, today: Long): String {
 /**
  * The agenda widget, as the GNOME extension's agenda: the coming week day by day, an event's dot
  * or a task's circle (checked when done) in its calendar's colour, its time and title; a row
- * opens the app on its day, or on the task.
+ * opens the app on its day, or on the task, and its title on today.
  */
 class AgendaWidget : TodavWidget() {
     @Composable
@@ -323,7 +323,8 @@ class AgendaWidget : TodavWidget() {
                         tr("Agenda"),
                         maxLines = 1,
                         style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 16.sp, color = GlanceTheme.colors.onSurface),
-                        modifier = GlanceModifier.defaultWeight(),
+                        // Tapped, the calendar on today, as the month's name opens the month.
+                        modifier = GlanceModifier.defaultWeight().tap(actionStartActivity(openDay(context, today))),
                     )
                     WidgetButtons(context, widget, add)
                 }
