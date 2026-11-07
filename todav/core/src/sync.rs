@@ -796,28 +796,35 @@ impl Client {
         if gtasks::is_list(list_href) {
             return self.pull_google(dav, list_href, &token, report);
         }
-        let (full, res) = if subscribed {
-            match dav.subscription(list_href, &token)? {
+        // A list read by its ctag (`snapshot`) stays that way: asking sync-collection again
+        // would only be refused again.
+        let (full, res) = if subscribed || token.starts_with("ctag:") {
+            match dav.snapshot(list_href, &token)? {
                 Some(r) => (true, r),
                 None => return Ok(()),
             }
         } else {
-            match dav.sync_collection(list_href, &token)? {
-                SyncResult::InvalidToken => (true, dav.sync_collection(list_href, "")?),
+            match dav.sync_collection(list_href, &token) {
+                Err(e) if Dav::lacks_sync(&e) => match dav.snapshot(list_href, "")? {
+                    Some(r) => (true, r),
+                    None => return Ok(()),
+                },
+                Err(e) => return Err(e),
+                Ok(SyncResult::InvalidToken) => (true, dav.sync_collection(list_href, "")?),
                 // Nextcloud answers a token it never issued (calendar recreated under the same URL)
                 // with its current token and no changes, as if nothing happened.
-                SyncResult::Changes {
+                Ok(SyncResult::Changes {
                     token: t,
                     changed,
                     removed,
-                } if !token.is_empty()
+                }) if !token.is_empty()
                     && t != token
                     && changed.is_empty()
                     && removed.is_empty() =>
                 {
                     (true, dav.sync_collection(list_href, "")?)
                 }
-                r => (token.is_empty(), r),
+                Ok(r) => (token.is_empty(), r),
             }
         };
         let SyncResult::Changes {

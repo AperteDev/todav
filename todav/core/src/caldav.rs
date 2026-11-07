@@ -619,14 +619,22 @@ impl Dav {
         Ok(lists)
     }
 
-    /// A subscription's every event, as a full sync-collection would give them, or None while
-    /// its sync token is still `token`. Nextcloud's sync-collection reads another calendar's
-    /// changes for one (`CachedSubscription` leaves out its calendar type, fixed by
-    /// nextcloud/server#66045), so not that. Servers without the fix stay around for years.
-    pub fn subscription(&self, href: &str, token: &str) -> Result<Option<SyncResult>> {
-        let p = self.propfind(href, "0", "<d:sync-token/>")?;
-        let now = p.first().and_then(|r| r.props.find_text(DAV, "sync-token"));
-        if now.as_deref() == Some(token) {
+    /// A calendar's every member, as a full sync-collection would give them, or None while its
+    /// change marker is still `token`: its sync token, else its ctag (stored as `ctag:…`). For
+    /// a subscription, whose sync-collection on Nextcloud reads another calendar's changes
+    /// (`CachedSubscription` leaves out its calendar type, fixed by nextcloud/server#66045;
+    /// servers without the fix stay around for years), and for servers without
+    /// sync-collection at all (SabreDAV as Posteo runs it answers 403 ReportNotSupported).
+    pub fn snapshot(&self, href: &str, token: &str) -> Result<Option<SyncResult>> {
+        let p = self.propfind(href, "0", "<d:sync-token/><cs:getctag/>")?;
+        let now = p.first().and_then(|r| {
+            r.props.find_text(DAV, "sync-token").or_else(|| {
+                r.props
+                    .find_text(CS, "getctag")
+                    .map(|c| format!("ctag:{c}"))
+            })
+        });
+        if now.is_some() && now.as_deref() == Some(token) {
             return Ok(None);
         }
         let body = format!(
@@ -651,6 +659,12 @@ impl Dav {
             changed,
             removed: Vec::new(),
         }))
+    }
+
+    /// Whether a REPORT answer says the server has no sync-collection (RFC 6578).
+    pub fn lacks_sync(e: &Error) -> bool {
+        matches!(e, Error::Http(501, _))
+            || matches!(e, Error::Http(403 | 405, b) if b.contains("supported-report") || b.contains("ReportNotSupported"))
     }
 
     /// RFC 6578 sync-collection; an empty token returns every member.

@@ -468,6 +468,10 @@ mod tests {
                     buf.extend_from_slice(&chunk[..n]);
                 }
                 let line = head.lines().next().unwrap_or_default();
+                let req = String::from_utf8_lossy(&buf[head_end..]).to_string();
+                // SabreDAV as Posteo runs it: no sync-collection, a ctag and calendar-query.
+                let refused =
+                    line.starts_with("REPORT /dav/cals/Sabre/") && req.contains("sync-collection");
                 let ms = |body: String| {
                     format!(
                         "<?xml version=\"1.0\"?><d:multistatus xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\">{body}</d:multistatus>"
@@ -499,6 +503,18 @@ mod tests {
                         "<d:resourcetype><d:collection/><c:schedule-inbox/></d:resourcetype>",
                     );
                     Some(ms(format!("{own}{inbox}{}", home.lock().unwrap())))
+                } else if refused {
+                    None
+                } else if line.starts_with("PROPFIND /dav/cals/Sabre/ ") {
+                    Some(ms(prop(
+                        "/dav/cals/Sabre/",
+                        "<cs:getctag xmlns:cs=\"http://calendarserver.org/ns/\">7</cs:getctag>",
+                    )))
+                } else if line.starts_with("REPORT /dav/cals/Sabre/") {
+                    Some(ms(prop(
+                        "/dav/cals/Sabre/a.ics",
+                        "<d:getetag>\"1\"</d:getetag><c:calendar-data>BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VTODO\nUID:a\nSUMMARY:Milk\nEND:VTODO\nEND:VCALENDAR\n</c:calendar-data>",
+                    )))
                 } else if line.starts_with("REPORT /dav/cals/") {
                     Some(ms("<d:sync-token>t</d:sync-token>".into()))
                 } else {
@@ -509,6 +525,13 @@ mod tests {
                         "HTTP/1.1 207 Multi-Status\r\nContent-Type: application/xml\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{b}",
                         b.len()
                     ),
+                    None if refused => {
+                        let b = "<d:error xmlns:d=\"DAV:\"><d:supported-report/></d:error>";
+                        format!(
+                            "HTTP/1.1 403 Forbidden\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{b}",
+                            b.len()
+                        )
+                    }
                     // Calendars are made in the server's own web interface.
                     None if line.starts_with("MKCALENDAR") => {
                         "HTTP/1.1 405 Method Not Allowed\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
@@ -600,6 +623,27 @@ mod tests {
         home.lock().unwrap().clear();
         sync(&c);
         assert_eq!(state(&c), (vec![], vec![]));
+    }
+
+    /// A server without sync-collection (Posteo): its list is read in full whenever its ctag
+    /// changes, and not asked again while it stays.
+    #[test]
+    fn a_server_without_sync_collection_is_read_by_its_ctag() {
+        let dir = std::env::temp_dir().join(format!("todav-test-ctag-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let home = Arc::new(std::sync::Mutex::new(calendar("Sabre", &["VTODO"])));
+        let id = c
+            .add_account(AccountKind::CalDav, serve(home), "me".into(), "".into())
+            .unwrap();
+        c.connect(id, "pw".into()).unwrap();
+        for _ in 0..2 {
+            c.sync_account(id).unwrap();
+            let href = c.lists().remove(0).href;
+            let tasks = c.tasks(href.clone(), true);
+            assert_eq!(tasks.len(), 1);
+            assert_eq!(tasks[0].summary, "Milk");
+        }
     }
 
     /// The background checks an account when its own interval has passed since the last sync or

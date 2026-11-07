@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- CalDAV servers without `sync-collection` (Posteo's) no longer fail with "HTTP 403": Todav reads
+  such a calendar in full whenever its change marker (ctag) differs, so its tasks and events
+  show up.
+
 ## [2.7.0] - 2026-11-06
 
 ### Added
