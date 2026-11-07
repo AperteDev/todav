@@ -39,6 +39,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Login
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -73,6 +74,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -95,6 +97,8 @@ import dev.aperte.todav.WidgetsSettings
 import dev.aperte.todav.accountName
 import dev.aperte.todav.intervalName
 import dev.aperte.todav.core.AccountKind
+import dev.aperte.todav.core.NewerRelease
+import dev.aperte.todav.core.newerRelease
 import dev.aperte.todav.core.syncIntervalIndex
 import dev.aperte.todav.core.syncIntervals
 import dev.aperte.todav.core.SyncState
@@ -693,6 +697,17 @@ private fun About(model: Main) {
     val context = LocalContext.current
     val version = remember { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "" }
     val open = { url: String -> context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) }
+    // As the Linux app's About: a newer stable release on GitHub, linked first (none while it cannot be checked).
+    val newer by produceState<NewerRelease?>(null) { value = withContext(Dispatchers.IO) { newerRelease(version) } }
+    newer?.let { r ->
+        Section(null) {
+            Item(
+                headlineContent = { Text(tr("Version {version} Available").replace("{version}", r.version)) },
+                trailingContent = { Icon(Icons.AutoMirrored.Outlined.OpenInNew, null) },
+                modifier = Modifier.clickable { open(r.url) },
+            )
+        }
+    }
     Section(null) {
         Item(headlineContent = { Text("Todav") }, supportingContent = { Text(tr("Version {version}").replace("{version}", version)) })
         Item(

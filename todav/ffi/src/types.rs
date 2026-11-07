@@ -79,6 +79,13 @@ pub(crate) fn utf16_spans(text: &str, spans: Vec<todav_app::note::Span>) -> Vec<
         .collect()
 }
 
+/// A stable release newer than the running version (`newer_release`).
+#[derive(uniffi::Record)]
+pub struct NewerRelease {
+    pub version: String,
+    pub url: String,
+}
+
 /// A CalDAV service offered by name (`todav_app::accounts::CALDAV_SERVICES`).
 #[derive(uniffi::Record)]
 pub struct CaldavService {

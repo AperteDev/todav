@@ -1157,6 +1157,13 @@ pub fn caldav_login(server: String, login_name: String, password: String) -> Res
     Ok(todav_core::caldav_login(server, login_name, password)?)
 }
 
+/// The latest stable release on GitHub if it is newer than `current` (About offers it); None too
+/// when it cannot be checked. Asks the network: not on the main thread.
+#[uniffi::export]
+pub fn newer_release(current: String) -> Option<NewerRelease> {
+    todav_core::release::newer(&current).map(|(version, url)| NewerRelease { version, url })
+}
+
 /// The CalDAV services offered by name when adding an account, the most used first.
 #[uniffi::export]
 pub fn caldav_services() -> Vec<CaldavService> {

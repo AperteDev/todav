@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Android: tapping the agenda widget's title opens the calendar on today, as the month widget's
   title opens the month.
+- Android: About offers a newer stable release, as the Linux app's does: a first row, "Version X
+  Available", links to its page on GitHub.
 
 ## [2.7.1] - 2026-11-07
 
