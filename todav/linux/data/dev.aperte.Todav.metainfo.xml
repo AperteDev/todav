@@ -39,19 +39,19 @@
   <!-- From the release tag (scripts/release.py moves them to each new one). -->
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.7.0/docs/screenshots/tasks.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.7.1/docs/screenshots/tasks.png</image>
       <caption>Tasks grouped by category, with subtasks and due dates</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.7.0/docs/screenshots/calendar-month.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.7.1/docs/screenshots/calendar-month.png</image>
       <caption>The month, with an event's details</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.7.0/docs/screenshots/calendar-week.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.7.1/docs/screenshots/calendar-week.png</image>
       <caption>Tasks planned into the week next to events</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.7.0/docs/screenshots/event-dialog.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.7.1/docs/screenshots/event-dialog.png</image>
       <caption>Editing an event</caption>
     </screenshot>
   </screenshots>
@@ -66,6 +66,19 @@
     <control>touch</control>
   </supports>
   <releases>
+    <release version="2.7.1" date="2026-11-07">
+      <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.7.1</url>
+      <description translate="no">
+        <p>Added</p>
+        <ul>
+          <li>A failed sync's message can be read in full and copied: "Details" on the message opens it in a dialog with a Copy button, on Linux (also by clicking the failed Sync row of an account's Server Status) and Android.</li>
+        </ul>
+        <p>Fixed</p>
+        <ul>
+          <li>CalDAV servers without <code>sync-collection</code> (Posteo's) no longer fail with "HTTP 403": Todav reads such a calendar in full whenever its change marker (ctag) differs, so its tasks and events show up.</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.7.0" date="2026-11-06">
       <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.7.0</url>
       <description translate="no">
