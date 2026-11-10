@@ -110,6 +110,12 @@ fun ListDialog(model: Main, href: String?, events: Boolean, onDismiss: () -> Uni
                 }
                 Text(tr("Color"), style = MaterialTheme.typography.labelLarge)
                 ColorSwatches(presets, color, { color = it })
+                if (list != null && system) {
+                    TextButton(onClick = {
+                        onDismiss()
+                        model.act { core.resetList(list.href) }
+                    }) { Text(tr("Use the System's Name and Color")) }
+                }
                 if (list != null) {
                     // Off and disabled for one its account allows no changes to; the lock is this device's only.
                     Item(
@@ -127,12 +133,6 @@ fun ListDialog(model: Main, href: String?, events: Boolean, onDismiss: () -> Uni
                         trailingContent = { Switch(editable && list.canWrite, { editable = it }, enabled = list.canWrite) },
                         containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                     )
-                }
-                if (list != null && system) {
-                    TextButton(onClick = {
-                        onDismiss()
-                        model.act { core.resetList(list.href) }
-                    }) { Text(tr("Use the System's Name and Color")) }
                 }
                 if (list != null) ExportButton(model, list)
                 // A system calendar is the account's (DAVx⁵, Google): turned off in its page, not deleted.
