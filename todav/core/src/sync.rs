@@ -368,6 +368,13 @@ impl Client {
     pub fn delete_list(&self, href: String) -> Result<()> {
         let _guard = self.sync_lock.lock().unwrap();
         let account = store::list_account(&self.db.lock().unwrap(), &href)?;
+        // A system calendar belongs to the device's account; it leaves Todav by turning it off.
+        if self
+            .account(account)
+            .is_some_and(|a| a.kind == AccountKind::System)
+        {
+            return Err(Error::ReadOnly);
+        }
         if gtasks::is_list(&href) {
             gtasks::delete_list(&*self.list_dav(&href)?, &href)?;
         } else if self

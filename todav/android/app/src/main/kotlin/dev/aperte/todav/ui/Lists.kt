@@ -114,7 +114,8 @@ fun ListDialog(model: Main, href: String?, events: Boolean, onDismiss: () -> Uni
                     }) { Text(tr("Use the System's Name and Color")) }
                 }
                 if (list != null) ExportButton(model, list)
-                if (list != null && list.writable) {
+                // A system calendar is the account's (DAVx⁵, Google): turned off in its page, not deleted.
+                if (list != null && list.writable && !system) {
                     TextButton(onClick = { confirm = true }) {
                         Text(
                             if (list.holdsEvents) tr("Delete Calendar") else tr("Delete List"),

@@ -402,6 +402,10 @@ mod tests {
         c.set_system_events(href.clone(), vec![moved]).unwrap();
         assert_eq!(c.event(ev.uid.clone()).unwrap().summary, "One, moved");
 
+        // The calendar itself is the account's: it is turned off, not deleted here.
+        assert!(matches!(c.delete_list(href.clone()), Err(Error::ReadOnly)));
+        assert_eq!(c.calendars().len(), 1);
+
         // Deleted.
         c.delete_event(href.clone(), ev.uid.clone(), None, crate::Scope::All)
             .unwrap();
