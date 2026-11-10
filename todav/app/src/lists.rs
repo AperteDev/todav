@@ -205,6 +205,7 @@ mod tests {
             href: "system:work".into(),
             name: "Work".into(),
             color: "#B6469D".into(),
+            writable: false,
         };
         c.set_system_calendars(system, vec![work]).unwrap();
         let set = |k: &str, v: &str| c.set_setting(k.into(), v.into()).unwrap();

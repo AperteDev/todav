@@ -8,7 +8,7 @@ use todav_core::rrule::Freq;
 use todav_core::{
     Account, AccountKind, CategoryGroup, CategoryMeta, Credentials, DoneView, Due, Event,
     EventTime, IcsCount, LoginFlow, PushRegistration, PushStatus, Refused, Repeat, Scope,
-    ServerInfo, Sort, SystemCalendar, SystemEvent, Task,
+    ServerInfo, Sort, SystemCalendar, SystemChange, SystemEvent, Task,
 };
 
 #[uniffi::remote(Record)]
@@ -113,6 +113,14 @@ pub struct SystemCalendar {
     pub href: String,
     pub name: String,
     pub color: String,
+    pub writable: bool,
+}
+
+#[uniffi::remote(Record)]
+pub struct SystemChange {
+    pub list_href: String,
+    pub deleted: bool,
+    pub event: SystemEvent,
 }
 
 #[uniffi::remote(Record)]

@@ -1,9 +1,11 @@
 //! The system's calendars (Android's calendar store, filled by the device's accounts: Google,
-//! Exchange, DAVx⁵…), read-only. The front-end reads the calendars the user turned on and hands
+//! Exchange, DAVx⁵…). The front-end reads the calendars the user turned on and hands
 //! their occurrences over; each is stored as an event of its own, repeats, exceptions and time
-//! zones already worked out by the system.
+//! zones already worked out by the system. A change made here to a calendar that allows it
+//! waits in the dirty queue for the front-end to make it in the system's store.
 
 use crate::ical::{escape, fmt_utc};
+use crate::store::{self, Kind};
 use crate::sync::SyncReport;
 use crate::{AccountKind, Client, Error, Result};
 use rusqlite::params;
@@ -15,6 +17,9 @@ pub struct SystemCalendar {
     pub name: String,
     /// "#rrggbb".
     pub color: String,
+    /// Its events may be changed here: the front-end makes the changes in the system's store
+    /// (`system_changes`).
+    pub writable: bool,
 }
 
 /// One occurrence of an event in a system calendar.
@@ -33,8 +38,19 @@ pub struct SystemEvent {
     pub color: String,
 }
 
+/// A change made here to an event of a system calendar, for the front-end to make in the
+/// system's store.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SystemChange {
+    pub list_href: String,
+    /// The event is gone (only its `uid` is set); otherwise it is new (a UID of Todav's own) or
+    /// edited (the UID `set_system_events` gave it).
+    pub deleted: bool,
+    pub event: SystemEvent,
+}
+
 impl Client {
-    /// The system account's calendars are these now (read-only); others it had go.
+    /// The system account's calendars are these now; others it had go.
     pub fn set_system_calendars(&self, account: i64, calendars: Vec<SystemCalendar>) -> Result<()> {
         let kind = self.account(account).ok_or(Error::NoAccount)?.kind;
         if kind != AccountKind::System {
@@ -51,9 +67,9 @@ impl Client {
             for c in &calendars {
                 tx.execute(
                     "INSERT INTO lists (href, display_name, color, has_tasks, has_events, writable, account)
-                     VALUES (?1, ?2, ?3, 0, 1, 0, ?4)
-                     ON CONFLICT(href) DO UPDATE SET display_name = ?2, color = ?3",
-                    params![c.href, c.name, c.color, account],
+                     VALUES (?1, ?2, ?3, 0, 1, ?5, ?4)
+                     ON CONFLICT(href) DO UPDATE SET display_name = ?2, color = ?3, writable = ?5",
+                    params![c.href, c.name, c.color, account, c.writable],
                 )?;
             }
             for h in &gone {
@@ -86,6 +102,64 @@ impl Client {
         )
     }
 
+    /// What was changed here in the system calendars' events (added, edited, deleted) and is not
+    /// in the system's store yet. The front-end makes each change there, then says so with
+    /// `system_applied`; the next `set_system_events` brings the system's version back.
+    pub fn system_changes(&self) -> Result<Vec<SystemChange>> {
+        let rows = store::dirty_system(&self.db.lock().unwrap())?;
+        let mut out = Vec::new();
+        for r in rows {
+            let event = if r.dirty == store::DELETED {
+                Some(SystemEvent {
+                    uid: r.uid.clone(),
+                    start: 0,
+                    end: 0,
+                    all_day: false,
+                    title: String::new(),
+                    description: String::new(),
+                    location: String::new(),
+                    color: String::new(),
+                })
+            } else {
+                self.event(r.uid.clone()).map(|e| SystemEvent {
+                    uid: e.uid,
+                    // Local wall-clock times here; the system's are instants (an all-day
+                    // event's days are the same in both).
+                    start: instant(self, e.start, e.all_day),
+                    end: instant(self, e.end, e.all_day),
+                    all_day: e.all_day,
+                    title: e.summary,
+                    description: e.description.unwrap_or_default(),
+                    location: e.location.unwrap_or_default(),
+                    color: e.color.unwrap_or_default(),
+                })
+            };
+            if let Some(event) = event {
+                out.push(SystemChange {
+                    list_href: r.list_href,
+                    deleted: r.dirty == store::DELETED,
+                    event,
+                });
+            }
+        }
+        Ok(out)
+    }
+
+    /// The change to event `uid` of system calendar `list_href` is in the system's store now (or
+    /// cannot be made): its copy here goes, as the system's own comes with the next
+    /// `set_system_events`.
+    pub fn system_applied(&self, list_href: String, uid: String) -> Result<()> {
+        let _guard = self.sync_lock.lock().unwrap();
+        {
+            let db = self.db.lock().unwrap();
+            if let Some(raw) = store::raw(&db, Kind::Event, &list_href, &uid)? {
+                store::delete(&db, &raw)?;
+            }
+        }
+        self.emit(&list_href, vec![uid]);
+        Ok(())
+    }
+
     /// Refuse to change list `href` when it is read-only: nothing would take the change (the
     /// system's calendars), or the server would refuse it.
     pub(crate) fn writable(&self, href: &str) -> Result<()> {
@@ -101,6 +175,14 @@ impl Client {
             Err(Error::ReadOnly)
         }
     }
+}
+
+/// The instant of a local wall-clock time (an all-day event's midnight stays as it is).
+fn instant(c: &Client, local: i64, all_day: bool) -> i64 {
+    if all_day {
+        return local;
+    }
+    store::to_utc(&c.db.lock().unwrap(), local).unwrap_or(local)
 }
 
 /// An occurrence as an iCalendar object, the same text each time for the same occurrence.
@@ -157,6 +239,7 @@ mod tests {
             href: format!("content://com.android.calendar/calendars/{n}"),
             name: n.into(),
             color: "#3584e4".into(),
+            writable: false,
         };
         c.set_system_calendars(id, vec![cal("1"), cal("2")])
             .unwrap();
@@ -226,6 +309,7 @@ mod tests {
             href: "content://com.android.calendar/calendars/1".into(),
             name: name.into(),
             color: "#3584e4".into(),
+            writable: false,
         };
         let shown = |c: &Client| {
             let l = c.calendars().remove(0);
@@ -248,5 +332,85 @@ mod tests {
             .unwrap();
         c.reset_list(cal("").href).unwrap();
         assert_eq!(shown(&c), ("Work".into(), "#3584e4".into()));
+    }
+
+    #[test]
+    fn changes_to_a_writable_system_calendar_wait_for_the_front_end() {
+        let dir = std::env::temp_dir().join(format!("todav-test-syswrite-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let id = c
+            .add_account(AccountKind::System, "".into(), "".into(), "".into())
+            .unwrap();
+        let href = "content://com.android.calendar/calendars/1".to_string();
+        let cal = SystemCalendar {
+            href: href.clone(),
+            name: "Work".into(),
+            color: "#3584e4".into(),
+            writable: true,
+        };
+        let ev = SystemEvent {
+            uid: "android-7-3600000".into(),
+            start: 3600,
+            end: 7200,
+            all_day: false,
+            title: "One".into(),
+            description: String::new(),
+            location: String::new(),
+            color: String::new(),
+        };
+        c.set_system_calendars(id, vec![cal]).unwrap();
+        c.set_system_events(href.clone(), vec![ev.clone()]).unwrap();
+        assert!(c.system_changes().unwrap().is_empty());
+
+        // Edited: the change waits, and no server is told.
+        let patch = crate::EventPatch {
+            summary: Some("One, moved".into()),
+            ..Default::default()
+        };
+        c.update_event(href.clone(), ev.uid.clone(), None, crate::Scope::All, patch)
+            .unwrap();
+        assert!(!c.pending(None));
+        let changes = c.system_changes().unwrap();
+        assert_eq!(changes.len(), 1);
+        assert!(!changes[0].deleted);
+        assert_eq!(changes[0].event.uid, ev.uid);
+        assert_eq!(changes[0].event.title, "One, moved");
+        assert_eq!((changes[0].event.start, changes[0].event.end), (3600, 7200));
+
+        // Added: a UID of Todav's own.
+        let time = crate::EventTime {
+            start: 10_000,
+            end: 13_600,
+            all_day: false,
+        };
+        let new = c
+            .add_event(href.clone(), "New".into(), time, vec![])
+            .unwrap();
+        assert_eq!(c.system_changes().unwrap().len(), 2);
+
+        // Made in the system's store: both copies go, the system's own come back.
+        for ch in c.system_changes().unwrap() {
+            c.system_applied(ch.list_href, ch.event.uid).unwrap();
+        }
+        assert!(c.system_changes().unwrap().is_empty());
+        assert!(c.event(new).is_none());
+        let moved = SystemEvent {
+            title: "One, moved".into(),
+            ..ev.clone()
+        };
+        c.set_system_events(href.clone(), vec![moved]).unwrap();
+        assert_eq!(c.event(ev.uid.clone()).unwrap().summary, "One, moved");
+
+        // Deleted.
+        c.delete_event(href.clone(), ev.uid.clone(), None, crate::Scope::All)
+            .unwrap();
+        let changes = c.system_changes().unwrap();
+        assert_eq!(changes.len(), 1);
+        assert!(changes[0].deleted);
+        assert_eq!(changes[0].event.uid, ev.uid);
+        c.system_applied(href, ev.uid.clone()).unwrap();
+        assert!(c.system_changes().unwrap().is_empty());
+        assert!(c.event(ev.uid).is_none());
     }
 }

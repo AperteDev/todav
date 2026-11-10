@@ -13,7 +13,7 @@ use todav_app::service::Service;
 use todav_core::{
     Account, AccountKind, CategoryGroup, CategoryMeta, Client, Credentials, DoneView, Event,
     EventTime, IcsCount, LoginFlow, PushRegistration, PushStatus, Refused, Repeat, Scope,
-    ServerInfo, Sort, SystemCalendar, SystemEvent, Task,
+    ServerInfo, Sort, SystemCalendar, SystemChange, SystemEvent, Task,
 };
 
 mod error;
@@ -353,7 +353,7 @@ impl Todav {
         Ok(self.c().import_ics(ics, events_to, tasks_to)?)
     }
 
-    /// The system account's calendars are these now (those turned on), read-only.
+    /// The system account's calendars are these now (those turned on).
     pub fn set_system_calendars(&self, account: i64, calendars: Vec<SystemCalendar>) -> Result<()> {
         Ok(self.c().set_system_calendars(account, calendars)?)
     }
@@ -361,6 +361,18 @@ impl Todav {
     /// System calendar `list_href` holds these occurrences now.
     pub fn set_system_events(&self, list_href: String, events: Vec<SystemEvent>) -> Result<()> {
         Ok(self.c().set_system_events(list_href, events)?)
+    }
+
+    /// What was changed here in the system calendars' events and is not in the system's store
+    /// yet: to be made there, then told with `system_applied`.
+    pub fn system_changes(&self) -> Result<Vec<SystemChange>> {
+        Ok(self.c().system_changes()?)
+    }
+
+    /// The change to event `uid` of system calendar `list_href` is made (or cannot be): its copy
+    /// goes, the system's own comes with the next `set_system_events`.
+    pub fn system_applied(&self, list_href: String, uid: String) -> Result<()> {
+        Ok(self.c().system_applied(list_href, uid)?)
     }
 
     /// Put lists in this order (those of one account, as a sidebar shows them).

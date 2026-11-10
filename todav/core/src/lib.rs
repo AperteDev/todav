@@ -40,7 +40,7 @@ pub use net::set_roots;
 pub use push::{PushRegistration, PushStatus, ntfy_check};
 pub use settings::DEVICE_ONLY;
 pub use sync::{Refused, SyncReport};
-pub use system::{SystemCalendar, SystemEvent};
+pub use system::{SystemCalendar, SystemChange, SystemEvent};
 
 /// A calendar collection: a task list, a calendar of events, or both (Nextcloud's "Personal").
 #[derive(Debug, Clone, PartialEq)]

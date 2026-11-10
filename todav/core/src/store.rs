@@ -677,6 +677,20 @@ pub fn synced(db: &Connection, list_href: &str) -> Result<Vec<RawObject>> {
 }
 
 /// What waits for the server in the lists of `account` (None: of every switched-on account).
+/// The events of the system's calendars changed here, to be made in the system's store (they are
+/// not for a server: `dirty` leaves them out).
+pub fn dirty_system(db: &Connection) -> Result<Vec<RawObject>> {
+    let sql = format!(
+        "SELECT {RAW_COLS} FROM events WHERE dirty != 0
+           AND list_href IN (SELECT l.href FROM lists l JOIN accounts a ON a.id = l.account
+             WHERE a.enabled AND a.kind = 'system')"
+    );
+    Ok(db
+        .prepare(&sql)?
+        .query_map([], |r| raw_row(r, Kind::Event))?
+        .collect::<rusqlite::Result<Vec<_>>>()?)
+}
+
 pub fn dirty(db: &Connection, account: Option<i64>) -> Result<Vec<RawObject>> {
     let mut out = Vec::new();
     for kind in [Kind::Task, Kind::Event] {
@@ -685,7 +699,8 @@ pub fn dirty(db: &Connection, account: Option<i64>) -> Result<Vec<RawObject>> {
             "SELECT {RAW_COLS} FROM {} WHERE dirty != 0 AND refused_ics IS NOT raw_ics
                AND list_href NOT LIKE '{LOCAL}%'
                AND list_href IN (SELECT l.href FROM lists l LEFT JOIN accounts a ON a.id = l.account
-                 WHERE COALESCE(a.enabled, 1) AND (?1 IS NULL OR l.account = ?1))",
+                 WHERE COALESCE(a.enabled, 1) AND COALESCE(a.kind, '') != 'system'
+                   AND (?1 IS NULL OR l.account = ?1))",
             kind.table()
         );
         let rows = db
