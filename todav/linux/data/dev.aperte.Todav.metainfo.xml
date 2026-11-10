@@ -39,19 +39,19 @@
   <!-- From the release tag (scripts/release.py moves them to each new one). -->
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.7.2/docs/screenshots/tasks.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.8.0/docs/screenshots/tasks.png</image>
       <caption>Tasks grouped by category, with subtasks and due dates</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.7.2/docs/screenshots/calendar-month.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.8.0/docs/screenshots/calendar-month.png</image>
       <caption>The month, with an event's details</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.7.2/docs/screenshots/calendar-week.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.8.0/docs/screenshots/calendar-week.png</image>
       <caption>Tasks planned into the week next to events</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.7.2/docs/screenshots/event-dialog.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.8.0/docs/screenshots/event-dialog.png</image>
       <caption>Editing an event</caption>
     </screenshot>
   </screenshots>
@@ -66,6 +66,16 @@
     <control>touch</control>
   </supports>
   <releases>
+    <release version="2.8.0" date="2026-11-10">
+      <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.8.0</url>
+      <description translate="no">
+        <p>Added</p>
+        <ul>
+          <li>Calendars and task lists have an "Allow Editing" switch in their Edit dialog, on Linux and Android: turned off, the calendar or list is only shown and its events and tasks cannot be changed here, to keep a calendar from being changed by accident. It is on for every calendar or list its account lets you change, and off and disabled, with a note, for a read-only one. The switch is kept on this device only.</li>
+          <li>Android: events of System Calendars (Google, DAVx⁵…) can be added, edited, moved and deleted in Todav when the account lets you change that calendar. The change is made in Android's calendar store, and the account's own sync (DAVx⁵, Google) uploads it, so no second sign-in is needed. Events that repeat, and invitations from somebody else, are still only shown there. Todav asks for the permission to change calendars along with the one to read them; Preferences → System Calendars asks again if you allowed reading only.</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.7.2" date="2026-11-07">
       <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.7.2</url>
       <description translate="no">
