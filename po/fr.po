@@ -3864,3 +3864,23 @@ msgstr "Modification d’un événement"
 
 #~ msgid "Tasks synced with your Nextcloud"
 #~ msgstr "Tâches synchronisées avec votre Nextcloud"
+
+#: todav/linux/app/ui/list-dialog.blp:19 todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:112
+msgid "Allow Editing"
+msgstr "Autoriser la modification"
+
+#: todav/linux/app/src/lists.rs:725 todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:118
+msgid "Turn off to only view this calendar in Todav"
+msgstr "Désactiver pour seulement consulter cet agenda dans Todav"
+
+#: todav/linux/app/src/lists.rs:726 todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:119
+msgid "Turn off to only view this list in Todav"
+msgstr "Désactiver pour seulement consulter cette liste dans Todav"
+
+#: todav/linux/app/src/lists.rs:727 todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:116
+msgid "This calendar cannot be edited because it is read-only"
+msgstr "Cet agenda ne peut pas être modifié car il est en lecture seule"
+
+#: todav/linux/app/src/lists.rs:728 todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:117
+msgid "This list cannot be edited because it is read-only"
+msgstr "Cette liste ne peut pas être modifiée car elle est en lecture seule"

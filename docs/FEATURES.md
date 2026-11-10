@@ -45,6 +45,8 @@ sync" below.
 - Month, Week, Work Week, 3 Days, Day and Agenda views of your Nextcloud calendars, with a sidebar month and show/hide
   per calendar.
 - Calendars subscribed to by link in Nextcloud (e.g. a work Outlook calendar), read-only.
+- "Allow Editing" in a calendar's or list's Edit dialog: off keeps it from being changed here (on
+  this device only); a read-only one shows it off and disabled.
 - Create, edit, move and delete events, recurring ones too (this occurrence, this and the
   following, or all), with reminders.
 - Add an event from the month: click a day, or drag across days, for a popover with its title,

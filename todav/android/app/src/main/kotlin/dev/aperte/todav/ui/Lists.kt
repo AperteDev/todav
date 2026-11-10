@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -63,6 +64,8 @@ fun ListDialog(model: Main, href: String?, events: Boolean, onDismiss: () -> Uni
     var color by rememberSaveable { mutableStateOf(list?.let { listColor(it) } ?: presets.first()) }
     var calendar by rememberSaveable { mutableStateOf(list?.holdsEvents ?: events) }
     var place by rememberSaveable { mutableStateOf(places.firstOrNull()) }
+    // Whether it may be changed here: on when its account allows it and the user did not lock it.
+    var editable by rememberSaveable { mutableStateOf(list?.let { it.canWrite && !it.locked } ?: true) }
     var confirm by remember { mutableStateOf(false) }
     val title = when {
         list != null && list.holdsEvents -> tr("Edit Calendar")
@@ -107,6 +110,24 @@ fun ListDialog(model: Main, href: String?, events: Boolean, onDismiss: () -> Uni
                 }
                 Text(tr("Color"), style = MaterialTheme.typography.labelLarge)
                 ColorSwatches(presets, color, { color = it })
+                if (list != null) {
+                    // Off and disabled for one its account allows no changes to; the lock is this device's only.
+                    Item(
+                        headlineContent = { Text(tr("Allow Editing")) },
+                        supportingContent = {
+                            Text(
+                                when {
+                                    !list.canWrite && list.holdsEvents -> tr("This calendar cannot be edited because it is read-only")
+                                    !list.canWrite -> tr("This list cannot be edited because it is read-only")
+                                    list.holdsEvents -> tr("Turn off to only view this calendar in Todav")
+                                    else -> tr("Turn off to only view this list in Todav")
+                                },
+                            )
+                        },
+                        trailingContent = { Switch(editable && list.canWrite, { editable = it }, enabled = list.canWrite) },
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    )
+                }
                 if (list != null && system) {
                     TextButton(onClick = {
                         onDismiss()
@@ -136,6 +157,7 @@ fun ListDialog(model: Main, href: String?, events: Boolean, onDismiss: () -> Uni
                             if (!calendar) model.select(h)
                         } else {
                             core.editList(list.href, name.trim(), color)
+                            if (list.canWrite && editable == list.locked) core.setListLocked(list.href, !editable)
                         }
                         model.synced()
                     }

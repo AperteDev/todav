@@ -3865,3 +3865,23 @@ msgstr "Einen Termin bearbeiten"
 
 #~ msgid "Tasks synced with your Nextcloud"
 #~ msgstr "Aufgaben, synchronisiert mit Ihrer Nextcloud"
+
+#: todav/linux/app/ui/list-dialog.blp:19 todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:112
+msgid "Allow Editing"
+msgstr "Bearbeiten erlauben"
+
+#: todav/linux/app/src/lists.rs:725 todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:118
+msgid "Turn off to only view this calendar in Todav"
+msgstr "Ausschalten, um diesen Kalender in Todav nur anzuzeigen"
+
+#: todav/linux/app/src/lists.rs:726 todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:119
+msgid "Turn off to only view this list in Todav"
+msgstr "Ausschalten, um diese Liste in Todav nur anzuzeigen"
+
+#: todav/linux/app/src/lists.rs:727 todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:116
+msgid "This calendar cannot be edited because it is read-only"
+msgstr "Dieser Kalender kann nicht bearbeitet werden, da er schreibgeschützt ist"
+
+#: todav/linux/app/src/lists.rs:728 todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Lists.kt:117
+msgid "This list cannot be edited because it is read-only"
+msgstr "Diese Liste kann nicht bearbeitet werden, da sie schreibgeschützt ist"

@@ -1,7 +1,7 @@
 using Gtk 4.0;
 using Adw 1;
 
-// A new task list or calendar, or one to rename, recolour or delete (src/lists.rs).
+// A new task list or calendar, or one to rename, recolour, lock or delete (src/lists.rs).
 Adw.Dialog dialog {
   content-width: 380;
   default-widget: save;
@@ -59,6 +59,16 @@ Adw.Dialog dialog {
           halign: center;
           column-spacing: 8;
           row-spacing: 8;
+        }
+      }
+
+      // Whether it may be changed here, for one that exists (src/lists.rs); off and disabled
+      // for one its account allows no changes to.
+      Adw.PreferencesGroup editing_group {
+        visible: false;
+
+        Adw.SwitchRow editing {
+          title: _("Allow Editing");
         }
       }
 

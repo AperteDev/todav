@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Calendars and task lists have an "Allow Editing" switch in their Edit dialog, on Linux and
+  Android: turned off, the calendar or list is only shown and its events and tasks cannot be
+  changed here, to keep a calendar from being changed by accident. It is on for every calendar
+  or list its account lets you change, and off and disabled, with a note, for a read-only one.
+  The switch is kept on this device only.
+
 - Android: events of System Calendars (Google, DAVx⁵…) can be added, edited, moved and deleted in
   Todav when the account lets you change that calendar. The change is made in Android's calendar
   store, and the account's own sync (DAVx⁵, Google) uploads it, so no second sign-in is needed.

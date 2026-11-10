@@ -729,6 +729,21 @@ pub fn open(parent: &gtk::Widget, list: Option<List>, events: bool) {
     }
     place.set_visible(list.is_none() && places.len() > 1);
 
+    // Whether it may be changed here: on when it can be, off and disabled when its account allows
+    // no changes (the lock is this device's only).
+    let editing: adw::SwitchRow = get(&b, "editing");
+    if let Some(l) = &list {
+        get::<adw::PreferencesGroup>(&b, "editing_group").set_visible(true);
+        editing.set_active(l.can_write && !l.locked);
+        editing.set_sensitive(l.can_write);
+        editing.set_subtitle(&match (l.can_write, events) {
+            (true, true) => gettext("Turn off to only view this calendar in Todav"),
+            (true, false) => gettext("Turn off to only view this list in Todav"),
+            (false, true) => gettext("This calendar cannot be edited because it is read-only"),
+            (false, false) => gettext("This list cannot be edited because it is read-only"),
+        });
+    }
+
     let s = save.clone();
     name.connect_changed(move |e| s.set_sensitive(!e.text().trim().is_empty()));
     if let Some(l) = &list {
@@ -762,6 +777,8 @@ pub fn open(parent: &gtk::Widget, list: Option<List>, events: bool) {
     };
 
     let href = list.as_ref().map(|l| l.href.clone());
+    // Changed by the switch, when the account allows changes at all.
+    let was_locked = list.as_ref().filter(|l| l.can_write).map(|l| l.locked);
     let (d, busy2, fail2) = (dialog.clone(), busy.clone(), fail.clone());
     save.connect_clicked(move |_| {
         let n = name.text().trim().to_string();
@@ -769,6 +786,7 @@ pub fn open(parent: &gtk::Widget, list: Option<List>, events: bool) {
             return;
         }
         let (c, href) = (chosen.borrow().clone(), href.clone());
+        let lock = was_locked.filter(|was| *was == editing.is_active());
         let account = places
             .get(place.selected() as usize)
             .map_or(0, |(_, id)| *id);
@@ -776,7 +794,14 @@ pub fn open(parent: &gtk::Widget, list: Option<List>, events: bool) {
         let (d, fail) = (d.clone(), fail2.clone());
         glib::spawn_future_local(async move {
             let r = gio::spawn_blocking(move || match href {
-                Some(h) => core().edit_list(h, n, c).map(|_| None),
+                Some(h) => core()
+                    .edit_list(h.clone(), n, c)
+                    .and_then(|_| match lock {
+                        // `lock` is what it was: the switch moved off it, so the other way.
+                        Some(was) => core().set_list_locked(h, !was),
+                        None => Ok(()),
+                    })
+                    .map(|_| None),
                 None => core().create_list(account, n, c, events).map(Some),
             })
             .await;
