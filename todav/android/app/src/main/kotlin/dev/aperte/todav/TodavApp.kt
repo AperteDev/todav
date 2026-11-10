@@ -78,7 +78,13 @@ class TodavApp : Application() {
         }
         core.setLocalZone(ZoneId.systemDefault().id)
         core.subscribe(object : Listener {
-            override fun changed(listHref: String, uids: List<String>) = changed()
+            override fun changed(listHref: String, uids: List<String>) {
+                changed()
+                // Edited here in a system calendar: made in the system's store (checked off this thread).
+                if (listHref.startsWith(SystemCalendars.PREFIX)) {
+                    scope.launch { if (runCatching { core.systemChanges().isNotEmpty() }.getOrDefault(false)) systemCalendarsChanged() }
+                }
+            }
             override fun settingsChanged() = changed()
         })
         Reminders.channel(this)

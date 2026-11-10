@@ -2,6 +2,7 @@ package dev.aperte.todav
 
 import android.Manifest
 import android.content.ContentUris
+import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.database.ContentObserver
@@ -13,14 +14,18 @@ import android.provider.CalendarContract.Events
 import android.provider.CalendarContract.Instances
 import dev.aperte.todav.core.AccountKind
 import dev.aperte.todav.core.SystemCalendar
+import dev.aperte.todav.core.SystemChange
 import dev.aperte.todav.core.SystemEvent
 import dev.aperte.todav.core.Todav
 
 /**
  * The system's calendars (Android's calendar store, filled by the device's accounts: Google,
- * Exchange, DAVx⁵…), read-only in Todav. Those turned on in the system account's page (the
+ * Exchange, DAVx⁵…). Those turned on in the system account's page (the
  * device-only `system_calendars` setting, none at first) are copied into it, their occurrences
- * as the system works them out (repeats, exceptions and time zones included).
+ * as the system works them out (repeats, exceptions and time zones included). Events that do not
+ * repeat, in a calendar its account lets the user change, can be added, edited and deleted in
+ * Todav: the change is made in the system's store (the account's sync, DAVx⁵'s or Google's,
+ * uploads it), and the copy comes back from there.
  */
 object SystemCalendars {
     /** How the system account's lists are keyed: this and the calendar's id. */
@@ -30,19 +35,28 @@ object SystemCalendars {
     // browsing past them matters.
     private const val YEAR = 365L * 86_400_000L
 
-    data class Cal(val id: Long, val name: String, val account: String, val color: Int)
+    /** Whether `writable` calendars can be changed by the user (the account's access level). */
+    data class Cal(val id: Long, val name: String, val account: String, val color: Int, val writable: Boolean)
 
     fun allowed(context: Context): Boolean =
         context.checkSelfPermission(Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
 
+    /** May change events: allowed to write the system's calendars. */
+    fun mayWrite(context: Context): Boolean =
+        allowed(context) && context.checkSelfPermission(Manifest.permission.WRITE_CALENDAR) == PackageManager.PERMISSION_GRANTED
+
     /** Every calendar of the system's, by account, then name. */
     fun all(context: Context): List<Cal> {
         if (!allowed(context)) return emptyList()
-        val columns = arrayOf(Calendars._ID, Calendars.CALENDAR_DISPLAY_NAME, Calendars.ACCOUNT_NAME, Calendars.CALENDAR_COLOR)
+        val columns = arrayOf(
+            Calendars._ID, Calendars.CALENDAR_DISPLAY_NAME, Calendars.ACCOUNT_NAME, Calendars.CALENDAR_COLOR,
+            Calendars.CALENDAR_ACCESS_LEVEL,
+        )
         val out = mutableListOf<Cal>()
         context.contentResolver.query(Calendars.CONTENT_URI, columns, null, null, null)?.use { c ->
             while (c.moveToNext()) {
-                out += Cal(c.getLong(0), c.getString(1) ?: "", c.getString(2) ?: "", c.getInt(3))
+                val writable = c.getInt(4) >= Calendars.CAL_ACCESS_CONTRIBUTOR
+                out += Cal(c.getLong(0), c.getString(1) ?: "", c.getString(2) ?: "", c.getInt(3), writable)
             }
         }
         return out.sortedWith(compareBy({ it.account.lowercase() }, { it.name.lowercase() }))
@@ -84,11 +98,80 @@ object SystemCalendars {
     fun import(context: Context, core: Todav) {
         val account = core.accounts().firstOrNull { it.kind == AccountKind.SYSTEM } ?: return
         if (!allowed(context)) return
+        push(context, core)
         val on = enabled(core)
         val cals = all(context).filter { it.id in on }
-        core.setSystemCalendars(account.id, cals.map { SystemCalendar(PREFIX + it.id, it.name, hex(it.color)) })
+        val write = mayWrite(context)
+        core.setSystemCalendars(
+            account.id,
+            cals.map { SystemCalendar(PREFIX + it.id, it.name, hex(it.color), it.writable && write) },
+        )
         val now = System.currentTimeMillis()
         for (cal in cals) core.setSystemEvents(PREFIX + cal.id, occurrences(context, cal.id, now - 2 * YEAR, now + 3 * YEAR))
+    }
+
+    /**
+     * Make the changes made in Todav to the system calendars' events in the system's store, which
+     * marks them for the account's sync. A change to a series, or to an event that is gone, is
+     * dropped (its copy comes back as the system has it). Blocks.
+     */
+    fun push(context: Context, core: Todav) {
+        if (!mayWrite(context)) return
+        for (change in core.systemChanges()) {
+            runCatching { apply(context, change) }
+            core.systemApplied(change.listHref, change.event.uid)
+        }
+    }
+
+    private fun apply(context: Context, change: SystemChange) {
+        val resolver = context.contentResolver
+        val e = change.event
+        val id = e.uid.removePrefix("android-").substringBefore('-').toLongOrNull().takeIf { e.uid.startsWith("android-") }
+        if (id != null) {
+            val uri = ContentUris.withAppendedId(Events.CONTENT_URI, id)
+            // Only an event that does not repeat: a series is changed in its own app.
+            if (repeats(context, id)) return
+            if (change.deleted) {
+                resolver.delete(uri, null, null)
+            } else {
+                resolver.update(uri, values(e, timeZone = null), null, null)
+            }
+        } else if (!change.deleted) {
+            val calendar = change.listHref.removePrefix(PREFIX).toLongOrNull() ?: return
+            val v = values(e, timeZone = java.util.TimeZone.getDefault().id)
+            v.put(Events.CALENDAR_ID, calendar)
+            resolver.insert(Events.CONTENT_URI, v)
+        }
+    }
+
+    /** The values of an event: all-day ones in UTC, as the system keeps them. */
+    private fun values(e: dev.aperte.todav.core.SystemEvent, timeZone: String?): ContentValues = ContentValues().apply {
+        put(Events.TITLE, e.title)
+        put(Events.DESCRIPTION, e.description.ifEmpty { null })
+        put(Events.EVENT_LOCATION, e.location.ifEmpty { null })
+        put(Events.ALL_DAY, if (e.allDay) 1 else 0)
+        put(Events.DTSTART, e.start * 1000)
+        put(Events.DTEND, e.end * 1000)
+        // Set for a new event; an edited one keeps its zone, except when it became all-day.
+        if (e.allDay) put(Events.EVENT_TIMEZONE, "UTC") else if (timeZone != null) put(Events.EVENT_TIMEZONE, timeZone)
+        putNull(Events.DURATION)
+    }
+
+    /**
+     * Whether event `uid` of list `listHref` cannot be changed in Todav though its calendar can: it
+     * is an occurrence of a series (changed in the app of its account, for now).
+     */
+    fun locked(context: Context, listHref: String, uid: String): Boolean {
+        if (!listHref.startsWith(PREFIX) || !uid.startsWith("android-")) return false
+        val id = uid.removePrefix("android-").substringBefore('-').toLongOrNull() ?: return false
+        return runCatching { repeats(context, id) }.getOrDefault(false)
+    }
+
+    /** Whether event `id` is a series (or an exception of one): it has a rule, dates or an original. */
+    fun repeats(context: Context, id: Long): Boolean {
+        val columns = arrayOf(Events.RRULE, Events.RDATE, Events.ORIGINAL_ID, Events.ORIGINAL_SYNC_ID)
+        return context.contentResolver.query(ContentUris.withAppendedId(Events.CONTENT_URI, id), columns, null, null, null)
+            ?.use { c -> c.moveToFirst() && (0..3).any { !c.getString(it).isNullOrEmpty() } } ?: false
     }
 
     private fun occurrences(context: Context, calendar: Long, from: Long, to: Long): List<SystemEvent> {

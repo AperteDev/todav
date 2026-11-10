@@ -165,10 +165,13 @@ on a phone, whether Week shows as a list of days.
 - Move a task to another list by dragging it onto the sidebar (Move to List in its menu does it
   now).
 - Drop the material3 pin in `gradle/libs.versions.toml` once the Compose BOM ships 1.5.
-- System calendars (`SystemCalendars.kt`, read-only now): editing their events, written back to
-  Android's calendar store (whole events with their repeat rules, not the occurrences copied
-  now); occurrences outside two years back and three ahead, read when browsed there. Test with
-  a Google account on a real phone (the emulator's image has no Google Play services).
+- System calendars (`SystemCalendars.kt`): events that do not repeat can be added, edited and
+  deleted (the core queues the change, `system_changes`, and the app writes it to Android's
+  calendar store, which the account's sync uploads). Still to do: events that repeat (the whole
+  event with its rule, and exceptions, not the occurrences copied now), their colour, reminders
+  and attendees, dragging in the grids; occurrences outside two years back and three ahead, read
+  when browsed there; the tasks DAVx⁵ keeps for tasks.org or OpenTasks (their own providers).
+  Test with the Google and DAVx⁵ accounts on the emulator (its image has Play services).
 
 ## Distribution
 
@@ -293,6 +296,9 @@ repository. The two keep separate configuration and credentials. What Todav prov
 
 ## Ruled out
 
+- **Changing System Calendars on Linux and Windows**: they are Android's calendar store, filled
+  by the device's accounts; the desktops have none (the Linux app reads GNOME Online Accounts
+  through its own sign-in instead).
 - **Signing in through the Nextcloud Android app** (Single Sign-On; tried and dropped
   2026-10-27): it forwards no REPORT, MKCALENDAR or PROPPATCH, sends PROPFIND at depth 1 only and
   appends "?" to every URL, which breaks DAV Push registration. Worth another look only if it

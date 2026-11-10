@@ -938,22 +938,35 @@ private fun SystemCalendarRows(model: Main) {
     val context = LocalContext.current
     val changes by model.todav.changes.collectAsStateWithLifecycle()
     var allowed by remember { mutableStateOf(SystemCalendars.allowed(context)) }
-    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        allowed = granted
-        if (granted) {
+    var mayWrite by remember { mutableStateOf(SystemCalendars.mayWrite(context)) }
+    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        allowed = SystemCalendars.allowed(context)
+        mayWrite = SystemCalendars.mayWrite(context)
+        if (allowed) {
             model.todav.changed()
             model.todav.systemCalendarsChanged()
         }
     }
+    val request = { ask.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR)) }
     if (!allowed) {
         Section(tr("Calendars")) {
             Item(
                 headlineContent = { Text(tr("Allow Access to Calendars")) },
                 supportingContent = { Text(tr("To show the calendars of the accounts on this device")) },
-                modifier = Modifier.clickable { ask.launch(Manifest.permission.READ_CALENDAR) },
+                modifier = Modifier.clickable { request() },
             )
         }
         return
+    }
+    if (!mayWrite) {
+        // Allowed to read only (as before changing them came): the events stay as they are.
+        Section(null) {
+            Item(
+                headlineContent = { Text(tr("Allow Changing Calendars")) },
+                supportingContent = { Text(tr("To add, edit and delete their events in Todav")) },
+                modifier = Modifier.clickable { request() },
+            )
+        }
     }
     val calendars = load(changes, initial = null) { SystemCalendars.all(context) } ?: return
     val on = load(changes, initial = SystemCalendars.enabled(model.core)) { SystemCalendars.enabled(model.core) }

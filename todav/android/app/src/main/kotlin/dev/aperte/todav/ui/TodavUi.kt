@@ -148,8 +148,9 @@ fun AccountChoice(model: Main, welcome: Boolean) {
         }
     }
     // The system's calendars: allowed to read them, the account comes, and its page to turn them on.
-    val readCalendars = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) {
+    val readCalendars = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+        // Reading is enough for the account; changing them too is asked in the same go.
+        if (result[Manifest.permission.READ_CALENDAR] == true) {
             runCatching { model.core.addAccount(AccountKind.SYSTEM, "", "", "") }.onSuccess { id ->
                 model.todav.changed()
                 model.todav.systemCalendarsChanged()
@@ -186,9 +187,9 @@ fun AccountChoice(model: Main, welcome: Boolean) {
             if (model.core.accounts().none { it.kind == AccountKind.SYSTEM }) {
                 Choice(
                     tr("System Calendars"),
-                    tr("Calendars of the accounts on this device, such as Google, shown read-only"),
+                    tr("Calendars of the accounts on this device, such as Google or DAVx⁵"),
                     Icons.Outlined.CalendarMonth,
-                ) { readCalendars.launch(Manifest.permission.READ_CALENDAR) }
+                ) { readCalendars.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR)) }
             }
             if (model.core.accounts().none { it.kind == AccountKind.LOCAL }) {
                 Choice(tr("On This Device Only"), tr("Lists and calendars that stay on this device"), Icons.Outlined.PhoneAndroid) {

@@ -119,8 +119,9 @@ sync" below.
 - Reminders with "Mark as Done" and Snooze; "New Task" from the launcher; text shared as a task.
 - Syncs with Nextcloud by itself, no DAVx⁵ needed; the Nextcloud app's accounts fill in the
   sign-in. Other CalDAV servers sign in with a login name and password.
-- System Calendars: the phone's other calendars (Google, Exchange, DAVx⁵…), read-only; their
-  name and colour can be changed in Todav.
+- System Calendars: the phone's other calendars (Google, Exchange, DAVx⁵…); their name and
+  colour can be changed in Todav, and their events that do not repeat can be added, edited and
+  deleted (the account's own sync uploads them), without signing in again.
 
 **Languages**
 

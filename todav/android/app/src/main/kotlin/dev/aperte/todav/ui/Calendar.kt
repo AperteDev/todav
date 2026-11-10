@@ -124,6 +124,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalContext
+import dev.aperte.todav.SystemCalendars
 import dev.aperte.todav.core.TodavList
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
@@ -1810,9 +1812,12 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
             when (item) {
                 is Item.Event -> {
                     val e = item.event
-                    val writable = lists[e.listHref]?.writable == true
-                    // Its colour, to change here as in the editor.
-                    Line({ EventColorButton(shownColor, colors[e.listHref], writable) { recolored = Recolor(it) } }) {
+                    val context = LocalContext.current
+                    val system = e.listHref.startsWith(SystemCalendars.PREFIX)
+                    // A series of a system calendar is changed in the app of its account.
+                    val writable = lists[e.listHref]?.writable == true && !SystemCalendars.locked(context, e.listHref, e.uid)
+                    // Its colour, to change here as in the editor (not a system calendar's event: the system keeps it).
+                    Line({ EventColorButton(shownColor, colors[e.listHref], writable && !system) { recolored = Recolor(it) } }) {
                         TitleField(e.summary, editable = writable) { renamed = it }
                     }
                     Line({ Icon(Icons.Outlined.Schedule, null) }) { Text(eventWhen(e, now)) }
@@ -1848,12 +1853,12 @@ fun ItemSheet(model: Main, item: Item, onDismiss: () -> Unit) {
                     }
                     FlowRow(buttons, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         // A read-only calendar's (shared so, or the system's) are only looked at.
-                        if (lists[e.listHref]?.writable == true) {
+                        if (writable) {
                             EditButton(edit)
                             TextButton(onClick = { askDelete = true }) { Text(tr("Delete"), color = MaterialTheme.colorScheme.error) }
                         }
                         CopyLink(model, dev.aperte.todav.core.linkEvent(e.uid))
-                        if (lists[e.listHref]?.writable == true) {
+                        if (writable) {
                             TextButton(onClick = {
                                 dismiss()
                                 model.duplicate(e)
