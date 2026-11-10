@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Android: events of System Calendars (Google, DAVx⁵…) can be added, edited, moved and deleted in
   Todav when the account lets you change that calendar. The change is made in Android's calendar
   store, and the account's own sync (DAVx⁵, Google) uploads it, so no second sign-in is needed.
-  Events that repeat are still only shown there. Todav asks for the permission to change
+  Events that repeat, and invitations from somebody else, are still only shown there. Todav asks for the permission to change
   calendars along with the one to read them; Preferences → System Calendars asks again if you
   allowed reading only.
 

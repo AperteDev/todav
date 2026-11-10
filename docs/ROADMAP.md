@@ -168,9 +168,11 @@ on a phone, whether Week shows as a list of days.
 - System calendars (`SystemCalendars.kt`): events that do not repeat can be added, edited and
   deleted (the core queues the change, `system_changes`, and the app writes it to Android's
   calendar store, which the account's sync uploads). Still to do: events that repeat (the whole
-  event with its rule, and exceptions, not the occurrences copied now), their colour, reminders
-  and attendees, dragging in the grids; occurrences outside two years back and three ahead, read
-  when browsed there; the tasks DAVx⁵ keeps for tasks.org or OpenTasks (their own providers).
+  event with its rule, and exceptions, not the occurrences copied now); invitations from
+  somebody else, which stay read-only as in Android's Calendar (answering them, perhaps); their
+  colour, reminders and attendees, dragging in the grids; occurrences outside two years back and
+  three ahead, read when browsed there; the tasks DAVx⁵ keeps for tasks.org or OpenTasks (their
+  own providers).
   Test with the Google and DAVx⁵ accounts on the emulator (its image has Play services).
 
 ## Distribution

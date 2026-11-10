@@ -129,8 +129,9 @@ object SystemCalendars {
         val id = e.uid.removePrefix("android-").substringBefore('-').toLongOrNull().takeIf { e.uid.startsWith("android-") }
         if (id != null) {
             val uri = ContentUris.withAppendedId(Events.CONTENT_URI, id)
-            // Only an event that does not repeat: a series is changed in its own app.
-            if (repeats(context, id)) return
+            // Only an event that does not repeat and that the user may change: a series, or an
+            // invitation, is changed in the app of its account.
+            if (repeats(context, id) || invited(context, id)) return
             if (change.deleted) {
                 resolver.delete(uri, null, null)
             } else {
@@ -159,12 +160,20 @@ object SystemCalendars {
 
     /**
      * Whether event `uid` of list `listHref` cannot be changed in Todav though its calendar can: it
-     * is an occurrence of a series (changed in the app of its account, for now).
+     * is an occurrence of a series (changed in the app of its account, for now), or an invitation
+     * from somebody else, which its organizer changes (as in Android's Calendar).
      */
     fun locked(context: Context, listHref: String, uid: String): Boolean {
         if (!listHref.startsWith(PREFIX) || !uid.startsWith("android-")) return false
         val id = uid.removePrefix("android-").substringBefore('-').toLongOrNull() ?: return false
-        return runCatching { repeats(context, id) }.getOrDefault(false)
+        return runCatching { repeats(context, id) || invited(context, id) }.getOrDefault(false)
+    }
+
+    /** Whether event `id` is an invitation: it has guests, somebody else organizes it and the guests may not change it. */
+    fun invited(context: Context, id: Long): Boolean {
+        val columns = arrayOf(Events.HAS_ATTENDEE_DATA, Events.IS_ORGANIZER, Events.GUESTS_CAN_MODIFY)
+        return context.contentResolver.query(ContentUris.withAppendedId(Events.CONTENT_URI, id), columns, null, null, null)
+            ?.use { c -> c.moveToFirst() && c.getInt(0) == 1 && c.getInt(1) == 0 && c.getInt(2) == 0 } ?: false
     }
 
     /** Whether event `id` is a series (or an exception of one): it has a rule, dates or an original. */

@@ -121,7 +121,8 @@ sync" below.
   sign-in. Other CalDAV servers sign in with a login name and password.
 - System Calendars: the phone's other calendars (Google, Exchange, DAVx⁵…); their name and
   colour can be changed in Todav, and their events that do not repeat can be added, edited and
-  deleted (the account's own sync uploads them), without signing in again.
+  deleted (the account's own sync uploads them), without signing in again; a series and an
+  invitation from somebody else stay read-only.
 
 **Languages**
 
