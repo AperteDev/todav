@@ -149,6 +149,8 @@ pub struct TodavList {
     pub holds_tasks: bool,
     pub holds_events: bool,
     pub writable: bool,
+    pub can_write: bool,
+    pub locked: bool,
     pub local: bool,
     pub account: i64,
 }

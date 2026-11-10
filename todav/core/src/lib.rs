@@ -51,8 +51,12 @@ pub struct List {
     pub open_count: u32,
     pub holds_tasks: bool,
     pub holds_events: bool,
-    /// We may change it (shared read-only calendars and Birthdays may not).
+    /// It may be changed here: the account allows it (`can_write`) and it is not `locked`.
     pub writable: bool,
+    /// The account allows changes (shared read-only calendars and Birthdays do not).
+    pub can_write: bool,
+    /// Locked by the user, on this device: shown only, though the account allows changes.
+    pub locked: bool,
     /// Kept on this device only, never synced (`store::LOCAL`): the local account's.
     pub local: bool,
     /// The account it belongs to (`Account::id`).

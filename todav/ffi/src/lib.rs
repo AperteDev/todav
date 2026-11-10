@@ -328,6 +328,11 @@ impl Todav {
         Ok(self.c().edit_list(href, name, color)?)
     }
 
+    /// Lock list or calendar `href` against changes made here, or unlock it (this device only).
+    pub fn set_list_locked(&self, href: String, locked: bool) -> Result<()> {
+        Ok(self.c().set_list_locked(href, locked)?)
+    }
+
     /// A system calendar named and coloured as the system has it again.
     pub fn reset_list(&self, href: String) -> Result<()> {
         Ok(self.c().reset_list(href)?)

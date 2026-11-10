@@ -136,6 +136,10 @@ ALTER TABLE lists ADD COLUMN own_color TEXT;
 ALTER TABLE tasks ADD COLUMN rule TEXT;
 ALTER TABLE tasks ADD COLUMN from_done INTEGER NOT NULL DEFAULT 0;
 "#,
+    // A list or calendar the user locked here: shown, not to be changed (this device only).
+    r#"
+ALTER TABLE lists ADD COLUMN locked INTEGER NOT NULL DEFAULT 0;
+"#,
 ];
 
 /// `user_version` after the migration that adds accounts.
@@ -407,7 +411,8 @@ pub fn lists(db: &Connection) -> Result<Vec<List>> {
         "SELECT l.href, COALESCE(l.own_name, l.display_name) AS name, COALESCE(l.own_color, l.color),
            (SELECT COUNT(*) FROM tasks t WHERE t.list_href = l.href AND t.dirty != 2
               AND t.status NOT IN ('COMPLETED', 'CANCELLED')),
-           l.has_tasks, l.has_events, l.writable, COALESCE(l.account, 0)
+           l.has_tasks, l.has_events, l.writable AND NOT l.locked, COALESCE(l.account, 0),
+           l.writable, l.locked
          FROM lists l ORDER BY l.position, name COLLATE NOCASE",
     )?;
     let rows = st.query_map([], |r| {
@@ -422,6 +427,8 @@ pub fn lists(db: &Connection) -> Result<Vec<List>> {
             holds_events: r.get(5)?,
             writable: r.get(6)?,
             account: r.get(7)?,
+            can_write: r.get(8)?,
+            locked: r.get(9)?,
         })
     })?;
     Ok(rows.collect::<rusqlite::Result<_>>()?)
@@ -1048,6 +1055,27 @@ END:VCALENDAR
             (l.display_name.as_str(), l.color.as_deref()),
             ("Work", Some("#0082C9"))
         );
+    }
+
+    #[test]
+    fn lists_from_before_are_not_locked() {
+        // As the step before left it: no locked column.
+        let path = at("locked", 16);
+        let old = Connection::open(&path).unwrap();
+        old.execute(
+            "INSERT INTO lists (href, display_name, writable) VALUES ('/a/', 'A', 1), ('/b/', 'B', 0)",
+            [],
+        )
+        .unwrap();
+        drop(old);
+        let db = open(&path).unwrap();
+        let all = lists(&db).unwrap();
+        let state = |h: &str| {
+            let l = all.iter().find(|l| l.href == h).unwrap();
+            (l.writable, l.can_write, l.locked)
+        };
+        assert_eq!(state("/a/"), (true, true, false));
+        assert_eq!(state("/b/"), (false, false, false));
     }
 
     #[test]

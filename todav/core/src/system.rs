@@ -160,14 +160,16 @@ impl Client {
         Ok(())
     }
 
-    /// Refuse to change list `href` when it is read-only: nothing would take the change (the
-    /// system's calendars), or the server would refuse it.
+    /// Refuse to change list `href` when it is read-only: nothing would take the change, the
+    /// server would refuse it, or the user locked it (`set_list_locked`).
     pub(crate) fn writable(&self, href: &str) -> Result<()> {
         let db = self.db.lock().unwrap();
         let writable: bool = db
-            .query_row("SELECT writable FROM lists WHERE href = ?", [href], |r| {
-                r.get(0)
-            })
+            .query_row(
+                "SELECT writable AND NOT locked FROM lists WHERE href = ?",
+                [href],
+                |r| r.get(0),
+            )
             .map_err(|_| Error::NotFound(href.into()))?;
         if writable {
             Ok(())
@@ -416,5 +418,58 @@ mod tests {
         c.system_applied(href, ev.uid.clone()).unwrap();
         assert!(c.system_changes().unwrap().is_empty());
         assert!(c.event(ev.uid).is_none());
+    }
+
+    #[test]
+    fn a_locked_calendar_is_read_only_until_unlocked() {
+        let dir = std::env::temp_dir().join(format!("todav-test-lock-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        let id = c
+            .add_account(AccountKind::System, "".into(), "".into(), "".into())
+            .unwrap();
+        let cal = |n: &str, writable| SystemCalendar {
+            href: format!("content://com.android.calendar/calendars/{n}"),
+            name: n.into(),
+            color: "#3584e4".into(),
+            writable,
+        };
+        c.set_system_calendars(id, vec![cal("1", true), cal("2", false)])
+            .unwrap();
+        let state = |c: &Client, n: &str| {
+            let l = c
+                .calendars()
+                .into_iter()
+                .find(|l| l.display_name == n)
+                .unwrap();
+            (l.writable, l.can_write, l.locked)
+        };
+        assert_eq!(state(&c, "1"), (true, true, false));
+        assert_eq!(state(&c, "2"), (false, false, false));
+
+        let href = cal("1", true).href;
+        let time = crate::EventTime {
+            start: 10_000,
+            end: 13_600,
+            all_day: false,
+        };
+        c.set_list_locked(href.clone(), true).unwrap();
+        assert_eq!(state(&c, "1"), (false, true, true));
+        assert!(matches!(
+            c.add_event(href.clone(), "x".into(), time, vec![]),
+            Err(Error::ReadOnly)
+        ));
+        // The system's calendars coming again keep it locked.
+        c.set_system_calendars(id, vec![cal("1", true), cal("2", false)])
+            .unwrap();
+        assert_eq!(state(&c, "1"), (false, true, true));
+
+        c.set_list_locked(href.clone(), false).unwrap();
+        assert_eq!(state(&c, "1"), (true, true, false));
+        c.add_event(href, "x".into(), time, vec![]).unwrap();
+        assert!(matches!(
+            c.set_list_locked("nowhere".into(), true),
+            Err(Error::NotFound(_))
+        ));
     }
 }

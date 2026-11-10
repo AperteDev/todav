@@ -340,6 +340,20 @@ impl Client {
         Ok(())
     }
 
+    /// Lock list or calendar `href` against changes made here (it stays shown), or unlock it. Only
+    /// on this device; a list the account does not allow changes to stays read-only unlocked.
+    pub fn set_list_locked(&self, href: String, locked: bool) -> Result<()> {
+        let n = self.db.lock().unwrap().execute(
+            "UPDATE lists SET locked = ?2 WHERE href = ?1",
+            params![href, locked],
+        )?;
+        if n == 0 {
+            return Err(Error::NotFound(href));
+        }
+        self.emit(&href, Vec::new());
+        Ok(())
+    }
+
     /// Put lists in this order (hrefs, those of one account as a sidebar shows them; the
     /// others keep their place): at once here, on a Nextcloud server (its calendar-order,
     /// shared with Nextcloud's apps) at the next sync; Google keeps none.
