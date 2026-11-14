@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Linux: an AppImage with each release (`todav-<version>-x86_64.AppImage`), for distributions the
+  other packages do not fit, such as Linux Mint. It carries GTK, libadwaita and glibc, so it runs
+  on systems older than GNOME 49's and needs nothing installed. It is the app only, without the
+  GNOME Shell extension, and does not start itself at login.
+
 ## [2.8.0] - 2026-11-10
 
 ### Added

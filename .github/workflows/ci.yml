@@ -198,6 +198,57 @@ jobs:
           path: target/todav-*.tar.gz
           if-no-files-found: error
 
+  appimage:
+    name: AppImage
+    runs-on: ubuntu-24.04
+    # quick-sharun's recommended build system. The AppImage carries its libraries and glibc, so
+    # it runs on older distributions than this one.
+    container: archlinux:base-devel
+    steps:
+      - name: Install the build dependencies
+        run: >-
+          pacman -Syu --noconfirm --needed
+          git python rust gtk4 libadwaita libsecret glib2 sqlite blueprint-compiler gettext
+          patchelf
+      - uses: actions/checkout@v7
+      - name: Set the release version
+        if: env.VERSION != ''
+        run: python3 scripts/release.py "$VERSION" > /dev/null
+      - run: cargo build --release --locked -p todav-linux
+      - name: Package it
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          make -C todav/linux install-data PREFIX=/usr DESTDIR="$PWD/target/appimage-stage"
+          scripts/appimage.sh target/appimage-stage "$version" target/appimage
+      - uses: actions/upload-artifact@v7
+        with:
+          name: todav-appimage
+          path: target/appimage/todav-*.AppImage
+          if-no-files-found: error
+
+  # Linux Mint 22's base: its GTK 4 and libadwaita are older than the app needs, and its glibc
+  # older than the one the AppImage was built with.
+  appimage-test:
+    name: AppImage on Ubuntu 24.04
+    needs: appimage
+    runs-on: ubuntu-24.04
+    container: ubuntu:24.04
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Install a display, a session bus and the Polish locale
+        run: >-
+          apt-get update && apt-get install -y --no-install-recommends
+          xvfb xauth dbus libglib2.0-bin libgl1-mesa-dri locales fonts-dejavu-core
+          && locale-gen pl_PL.UTF-8
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: todav-appimage
+          path: target
+      - run: chmod +x target/todav-*.AppImage
+      - run: xvfb-run -a dbus-run-session -- scripts/appimage-test.sh target/todav-*.AppImage
+
   deb:
     name: Debian package
     needs: tarball

@@ -132,7 +132,16 @@ sudo apt install ./todav_<version>_amd64.deb
 
 # Other distributions: the same files to unpack into /
 sudo tar -xzf todav-<version>-x86_64.tar.gz -C /
+
+# Any distribution: an AppImage, which brings its own GTK and libadwaita
+chmod +x todav-<version>-x86_64.AppImage
+./todav-<version>-x86_64.AppImage
 ```
+
+The AppImage carries its libraries, so it also runs where the system's are older than GNOME 49's
+(Linux Mint 22, Ubuntu 24.04…), and it needs nothing installed. It is the app alone: it does not
+start itself at login or when the extension asks for it, so add it to your startup applications
+to keep reminders and syncing going in the background, and install the extension from its zip.
 
 <p align="center">
   <a href="https://extensions.gnome.org/extension/11473/todav-tasks-calendar/"><img src="https://raw.githubusercontent.com/andyholmes/gnome-shell-extensions-badge/master/get-it-on-ego.svg?sanitize=true" alt="Get it on GNOME Extensions" height="60"></a>
