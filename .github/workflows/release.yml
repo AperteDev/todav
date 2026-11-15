@@ -44,7 +44,8 @@ jobs:
           pattern: todav-*
           path: dist
           merge-multiple: true
-      # The Flatpak bundle, the tarball, the .deb, the AppImage, the extension zip and the APK.
+      # The Flatpak bundle, the tarball, the .deb and the AppImage (each for x86_64 and aarch64), the
+      # extension zip and the APK.
       - name: Checksums
         working-directory: dist
         run: sha256sum * > SHA256SUMS

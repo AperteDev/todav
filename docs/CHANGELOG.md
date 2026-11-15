@@ -9,8 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Linux: the AppImage is also built for ARM (`todav-<version>-aarch64.AppImage`), for a Raspberry
-  Pi and the like.
+- Linux: the Flatpak bundle, the tarball, the `.deb` and the AppImage are also built for ARM
+  (aarch64, a Raspberry Pi and the like), as `…-aarch64` / `_arm64` files next to the x86_64 ones.
+
+### Changed
+
+- Linux: the Flatpak bundle is now `dev.aperte.Todav-x86_64.flatpak`, named by its architecture
+  like the other packages (it was `dev.aperte.Todav.flatpak`).
 
 ### Fixed
 

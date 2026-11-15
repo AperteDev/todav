@@ -119,21 +119,21 @@ sudo dnf copr enable selfref/todav
 sudo dnf install todav gnome-shell-extension-todav
 ```
 
-**Other distributions:** download a package from the
+**Other distributions**, on x86_64 and ARM (aarch64, a Raspberry Pi): download a package from the
 [latest release](https://github.com/AperteDev/todav/releases/latest):
 
 ```sh
 # Flatpak, on any distribution (the GNOME runtime comes from Flathub), plus the extension
-flatpak install --user dev.aperte.Todav.flatpak
+flatpak install --user dev.aperte.Todav-<x86_64 or aarch64>.flatpak
 gnome-extensions install todav@aperte.dev.shell-extension.zip
 
 # Ubuntu 26.04 and newer: the app with the extension
-sudo apt install ./todav_<version>_amd64.deb
+sudo apt install ./todav_<version>_<amd64 or arm64>.deb
 
 # Other distributions: the same files to unpack into /
-sudo tar -xzf todav-<version>-x86_64.tar.gz -C /
+sudo tar -xzf todav-<version>-<x86_64 or aarch64>.tar.gz -C /
 
-# Any distribution, also on ARM: an AppImage, which brings its own GTK and libadwaita
+# Any distribution: an AppImage, which brings its own GTK and libadwaita
 chmod +x todav-<version>-<x86_64 or aarch64>.AppImage
 ./todav-<version>-<x86_64 or aarch64>.AppImage
 ```
