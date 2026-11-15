@@ -12,6 +12,7 @@ import Shell from 'gi://Shell';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as ModalDialog from 'resource:///org/gnome/shell/ui/modalDialog.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import {Extension, gettext as _, ngettext, pgettext} from 'resource:///org/gnome/shell/extensions/extension.js';
@@ -114,6 +115,8 @@ class TodavIndicator extends PanelMenu.Button {
         box.add_child(this._warning);
         this.add_child(box);
 
+        // The alarms shown, by the key the app gave: their dialogs.
+        this._alarms = new Map();
         // Don't launch the app at Shell start; the first method call (menu open) activates it.
         this._cancellable = new Gio.Cancellable();
         const TodavProxy = makeTodavProxy();
@@ -125,6 +128,10 @@ class TodavIndicator extends PanelMenu.Button {
             }
             this._proxy = proxy;
             this._signalId = proxy.connectSignal('Changed', () => this._refreshCount());
+            // An alarm reminder ringing, from an app that has them (an older one never sends
+            // these): shown here, over everything, since a background app cannot take the focus.
+            this._alarmRangId = proxy.connectSignal('AlarmRang', (_p, _sender, [key, summary, body, task]) => this._alarmRang(key, summary, body, task));
+            this._alarmOverId = proxy.connectSignal('AlarmOver', (_p, _sender, [key]) => this._alarmOver(key));
             this._propsId = proxy.connect('g-properties-changed', () => this._updateState());
             this._ownerId = proxy.connect('notify::g-name-owner', () => {
                 this._refreshCount();
@@ -154,6 +161,44 @@ class TodavIndicator extends PanelMenu.Button {
                 toggle();
         };
         this._clockSetup();
+    }
+
+    /// The alarm `key` as a dialog over everything, with the choices of its notification; the app
+    /// is told it is shown, so it shows none of its own. Its choices go back to the app.
+    _alarmRang(key, summary, body, task) {
+        this._alarmOver(key);
+        const dialog = new ModalDialog.ModalDialog({styleClass: 'todav-alarm', destroyOnClose: true});
+        const box = new St.BoxLayout({orientation: VERTICAL, x_align: CENTER, style_class: 'todav-alarm-box'});
+        box.add_child(new St.Icon({icon_name: 'alarm-symbolic', icon_size: 64, x_align: CENTER}));
+        box.add_child(new St.Label({text: summary, x_align: CENTER, style_class: 'todav-alarm-title'}));
+        if (body)
+            box.add_child(new St.Label({text: body, x_align: CENTER, style_class: 'todav-alarm-body'}));
+        dialog.contentLayout.add_child(box);
+        const choose = action => {
+            this._alarms?.delete(key);
+            dialog.close();
+            this._proxy?.AlarmActionAsync(key, action).catch(e => logError(e, 'Todav: cannot answer the alarm'));
+        };
+        const buttons = [];
+        if (task)
+            buttons.push({label: _('Mark as Done'), action: () => choose('done')});
+        buttons.push({label: _('Snooze'), action: () => choose('snooze')});
+        buttons.push({label: _('Stop'), action: () => choose('stop'), default: true});
+        dialog.setButtons(buttons);
+        // Not opened (another modal is up, the screen is locked): the app shows its own.
+        if (!dialog.open())
+            return dialog.destroy();
+        this._alarms.set(key, dialog);
+        this._proxy?.AlarmShownAsync(key).catch(e => logError(e, 'Todav: cannot tell the app'));
+    }
+
+    /// The alarm `key` is over (answered here or in the app, or out of time): its dialog goes.
+    _alarmOver(key) {
+        const dialog = this._alarms?.get(key);
+        if (!dialog)
+            return;
+        this._alarms.delete(key);
+        dialog.close();
     }
 
     /// Open Todav, and the extension's preferences: Todav's, on the Extension page, asked
@@ -895,6 +940,9 @@ class TodavIndicator extends PanelMenu.Button {
         this._lingers?.forEach(id => GLib.source_remove(id));
         this._context.destroy();
         this._context = null;
+        this._alarms.forEach(d => d.destroy());
+        this._alarms.clear();
+        this._alarms = null;
         if (this._dateMenu) {
             this._clockPlace(() => false);
             this._dateMenu.menu.disconnect(this._clockOpenId);
@@ -906,6 +954,8 @@ class TodavIndicator extends PanelMenu.Button {
         }
         if (this._proxy) {
             this._proxy.disconnectSignal(this._signalId);
+            this._proxy.disconnectSignal(this._alarmRangId);
+            this._proxy.disconnectSignal(this._alarmOverId);
             this._proxy.disconnect(this._propsId);
             this._proxy.disconnect(this._ownerId);
             this._proxy = null;

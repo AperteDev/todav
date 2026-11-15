@@ -28,7 +28,11 @@ const XML = `<node>
   <method name="GetSettings"><arg direction="out" type="a{ss}"/></method>
   <method name="SetSetting"><arg direction="in" name="key" type="s"/><arg direction="in" name="value" type="s"/></method>
   <method name="Sync"/>
+  <method name="AlarmShown"><arg direction="in" name="key" type="s"/></method>
+  <method name="AlarmAction"><arg direction="in" name="key" type="s"/><arg direction="in" name="action" type="s"/></method>
   <signal name="Changed"><arg name="list" type="s"/></signal>
+  <signal name="AlarmRang"><arg name="key" type="s"/><arg name="summary" type="s"/><arg name="body" type="s"/><arg name="task" type="b"/></signal>
+  <signal name="AlarmOver"><arg name="key" type="s"/></signal>
   <property name="SyncState" type="s" access="read"/>
 </interface>
 </node>`;
