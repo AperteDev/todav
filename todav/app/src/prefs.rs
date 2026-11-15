@@ -105,6 +105,46 @@ pub fn urgent_reminder(c: &Client, priority: Option<i64>) -> bool {
     matches!(priority, Some(1..=4)) || urgent_reminders(c)
 }
 
+/// Which reminders ring like an alarm (`alarm_reminders`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AlarmReminders {
+    /// None; the default.
+    Off,
+    /// Those of important tasks and events (high priority, as for urgent ones).
+    Important,
+    /// Every reminder.
+    All,
+}
+
+/// Stored values of the `alarm_reminders` choices, in the order the front-ends offer them.
+pub const ALARM_REMINDERS: [(&str, AlarmReminders); 3] = [
+    ("off", AlarmReminders::Off),
+    ("important", AlarmReminders::Important),
+    ("all", AlarmReminders::All),
+];
+
+pub fn alarm_reminders(c: &Client) -> AlarmReminders {
+    let v = c.setting("alarm_reminders".into()).unwrap_or_default();
+    ALARM_REMINDERS
+        .iter()
+        .find(|(s, _)| *s == v)
+        .map_or(AlarmReminders::Off, |(_, k)| *k)
+}
+
+/// Whether a reminder of a task or event of `priority` rings like an alarm (`alarm_reminders`):
+/// until it is acted on, and for `ALARM_SECONDS` at most.
+pub fn alarm_reminder(c: &Client, priority: Option<i64>) -> bool {
+    match alarm_reminders(c) {
+        AlarmReminders::Off => false,
+        AlarmReminders::Important => matches!(priority, Some(1..=4)),
+        AlarmReminders::All => true,
+    }
+}
+
+/// How long an alarm reminder rings, seconds: it stops by itself after that, and the reminder
+/// stays as a notification.
+pub const ALARM_SECONDS: i64 = 600;
+
 /// A switch that is on unless turned off.
 fn on(c: &Client, key: &str) -> bool {
     c.setting(key.into()).as_deref() != Some("false")
@@ -364,6 +404,24 @@ mod tests {
         c.set_setting("urgent_reminders".into(), "true".into())
             .unwrap();
         assert!(urgent_reminder(&c, Some(9)) && urgent_reminder(&c, None));
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn alarm_reminders_ring_for_the_priorities_the_setting_names() {
+        let dir = std::env::temp_dir().join(format!("todav-app-alarm-{}", std::process::id()));
+        let c = Client::open(dir.to_string_lossy().into()).unwrap();
+        assert!(!alarm_reminder(&c, Some(1)) && !alarm_reminder(&c, None));
+        c.set_setting("alarm_reminders".into(), "important".into())
+            .unwrap();
+        assert!(alarm_reminder(&c, Some(1)) && alarm_reminder(&c, Some(4)));
+        assert!(!alarm_reminder(&c, Some(5)) && !alarm_reminder(&c, None));
+        c.set_setting("alarm_reminders".into(), "all".into())
+            .unwrap();
+        assert!(alarm_reminder(&c, Some(9)) && alarm_reminder(&c, None));
+        c.set_setting("alarm_reminders".into(), "nonsense".into())
+            .unwrap();
+        assert!(!alarm_reminder(&c, Some(1)));
         let _ = std::fs::remove_dir_all(dir);
     }
 

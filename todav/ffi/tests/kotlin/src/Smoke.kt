@@ -78,6 +78,7 @@ fun main() {
     check(!t.canSync() && t.syncState() == SyncState.Idle)
     t.dueReminders()
     t.nextReminder()
+    check(!t.alarmReminder(1) && t.alarmSeconds() == 600L)
 
     // Translations from the Polish catalog (made by scripts/bindings.sh).
     val pl = Translations(java.io.File("../../target/bindings/pl.mo").readBytes())

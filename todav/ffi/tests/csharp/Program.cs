@@ -78,6 +78,7 @@ t.StartService(new Shell(), false);
 Check(!t.CanSync() && t.SyncState() is SyncState.Idle, "service");
 t.DueReminders();
 t.NextReminder();
+Check(!t.AlarmReminder(1) && t.AlarmSeconds() == 600, "alarm");
 
 // Translations from the Polish catalog (made by scripts/bindings.sh).
 var pl = new Translations(File.ReadAllBytes("../../target/bindings/pl.mo"));

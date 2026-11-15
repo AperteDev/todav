@@ -858,6 +858,16 @@ impl Todav {
         todav_app::prefs::urgent_reminder(self.c(), priority)
     }
 
+    /// Whether a reminder of a task or event of `priority` rings like an alarm (`alarm_reminders`).
+    pub fn alarm_reminder(&self, priority: Option<i64>) -> bool {
+        todav_app::prefs::alarm_reminder(self.c(), priority)
+    }
+
+    /// Seconds an alarm reminder rings at most.
+    pub fn alarm_seconds(&self) -> i64 {
+        todav_app::prefs::ALARM_SECONDS
+    }
+
     pub fn pins(&self) -> bool {
         todav_app::prefs::pins(self.c())
     }
