@@ -39,19 +39,19 @@
   <!-- From the release tag (scripts/release.py moves them to each new one). -->
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.8.1/docs/screenshots/tasks.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.8.2/docs/screenshots/tasks.png</image>
       <caption>Tasks grouped by category, with subtasks and due dates</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.8.1/docs/screenshots/calendar-month.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.8.2/docs/screenshots/calendar-month.png</image>
       <caption>The month, with an event's details</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.8.1/docs/screenshots/calendar-week.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.8.2/docs/screenshots/calendar-week.png</image>
       <caption>Tasks planned into the week next to events</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.8.1/docs/screenshots/event-dialog.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.8.2/docs/screenshots/event-dialog.png</image>
       <caption>Editing an event</caption>
     </screenshot>
   </screenshots>
@@ -66,6 +66,23 @@
     <control>touch</control>
   </supports>
   <releases>
+    <release version="2.8.2" date="2026-11-15">
+      <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.8.2</url>
+      <description translate="no">
+        <p>Added</p>
+        <ul>
+          <li>Linux: the Flatpak bundle, the tarball, the <code>.deb</code> and the AppImage are also built for ARM (aarch64, a Raspberry Pi and the like), as <code>…-aarch64</code> / <code>_arm64</code> files next to the x86_64 ones.</li>
+        </ul>
+        <p>Changed</p>
+        <ul>
+          <li>Linux: the Flatpak bundle is now <code>dev.aperte.Todav-x86_64.flatpak</code>, named by its architecture like the other packages (it was <code>dev.aperte.Todav.flatpak</code>).</li>
+        </ul>
+        <p>Fixed</p>
+        <ul>
+          <li>Linux: the AppImage has its icon in file managers and launchers, not a generic one.</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.8.1" date="2026-11-15">
       <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.8.1</url>
       <description translate="no">
