@@ -39,19 +39,19 @@
   <!-- From the release tag (scripts/release.py moves them to each new one). -->
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.8.2/docs/screenshots/tasks.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.9.0/docs/screenshots/tasks.png</image>
       <caption>Tasks grouped by category, with subtasks and due dates</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.8.2/docs/screenshots/calendar-month.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.9.0/docs/screenshots/calendar-month.png</image>
       <caption>The month, with an event's details</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.8.2/docs/screenshots/calendar-week.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.9.0/docs/screenshots/calendar-week.png</image>
       <caption>Tasks planned into the week next to events</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.8.2/docs/screenshots/event-dialog.png</image>
+      <image>https://raw.githubusercontent.com/AperteDev/todav/v2.9.0/docs/screenshots/event-dialog.png</image>
       <caption>Editing an event</caption>
     </screenshot>
   </screenshots>
@@ -66,6 +66,28 @@
     <control>touch</control>
   </supports>
   <releases>
+    <release version="2.9.0" date="2026-11-15">
+      <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.9.0</url>
+      <description translate="no">
+        <p>Added</p>
+        <ul>
+          <li>GNOME extension: the task list can show Upcoming, the tasks with a due date of every list under their days, as the app's page and the Android widget do: pick it at the top of the list choice. It needs the app of this release (an older one keeps showing the first list); an older extension shows the first list too when Upcoming is picked, until it updates (#11).</li>
+          <li>Alarm reminders (#8): "Alarm reminders" (Off, Important tasks and events, All reminders; Preferences → General → Notifications, Settings → General on Android) makes those reminders ring like an alarm until acted on, for ten minutes at most, and come to the front. On Android: the alarm sound on the alarm volume (through Do Not Disturb's Alarms exception), repeating, with Mark as Done, Snooze and Stop, and a screen over the lock screen (from Android 14 it needs "Allow full-screen alarms", asked in Settings; without it the alarm is a banner that still rings). On Linux: a looping sound and an alarm window; with the GNOME extension of this release the alarm shows over everything instead, which a background app cannot do on Wayland. That extension works with an older app as before (the app has no alarms then), and an older extension with this app shows the app's own window.</li>
+        </ul>
+        <p>Fixed</p>
+        <ul>
+          <li>Android: tapping an event (or a task) could open its details for a moment, then close them and leave the app not answering any touch, when its details finished loading while the sheet was still sliding in (#12).</li>
+        </ul>
+        <p>Changed</p>
+        <ul>
+          <li>Linux: the <code>.deb</code> needs libadwaita 1.7, not 1.8, so it installs on Debian 13 (GNOME 48). There the Keyboard Shortcuts list is GTK's own window, the same list, until libadwaita 1.8's dialog is available.</li>
+        </ul>
+        <p>Fixed</p>
+        <ul>
+          <li>Linux: the AppImage's icon shows in file managers that draw it through a thumbnailer (Linux Mint's Nemo and others). The image is SquashFS now, not DwarFS, which their thumbnailers cannot read.</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.8.2" date="2026-11-15">
       <url type="details">https://github.com/AperteDev/todav/releases/tag/v2.8.2</url>
       <description translate="no">
