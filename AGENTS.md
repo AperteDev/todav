@@ -66,7 +66,8 @@
   bundle, a tarball of the system-wide tree (`make -C todav/linux stage`, built on the oldest
   supported GNOME, now Fedora 43), the `.deb` made from it on Ubuntu 26.04 (`scripts/deb.sh`),
   the AppImage (`scripts/appimage.sh` on Arch Linux, quick-sharun bundling GTK, libadwaita and
-  glibc; it is then run on Ubuntu 24.04, which has older ones, by `scripts/appimage-test.sh`)
+  glibc; it is then run on Ubuntu 24.04, which has older ones, by `scripts/appimage-test.sh`;
+  both for x86_64 and aarch64, the latter on GitHub's ARM runner)
   and the extension zip. Run the checks before committing.
 - The lowest supported GNOME is 49 (libadwaita 1.8, for `Adw.ShortcutsDialog`). A newer
   widget raises it: update the README, `scripts/deb.sh`'s libadwaita version and the

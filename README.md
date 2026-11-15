@@ -133,9 +133,9 @@ sudo apt install ./todav_<version>_amd64.deb
 # Other distributions: the same files to unpack into /
 sudo tar -xzf todav-<version>-x86_64.tar.gz -C /
 
-# Any distribution: an AppImage, which brings its own GTK and libadwaita
-chmod +x todav-<version>-x86_64.AppImage
-./todav-<version>-x86_64.AppImage
+# Any distribution, also on ARM: an AppImage, which brings its own GTK and libadwaita
+chmod +x todav-<version>-<x86_64 or aarch64>.AppImage
+./todav-<version>-<x86_64 or aarch64>.AppImage
 ```
 
 The AppImage carries its libraries, so it also runs where the system's are older than GNOME 49's

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Linux: the AppImage is also built for ARM (`todav-<version>-aarch64.AppImage`), for a Raspberry
+  Pi and the like.
+
 ### Fixed
 
 - Linux: the AppImage has its icon in file managers and launchers, not a generic one.
