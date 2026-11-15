@@ -69,11 +69,14 @@
   glibc; it is then run on Ubuntu 24.04, which has older ones, by `scripts/appimage-test.sh`;
   all of them for x86_64 and aarch64, the latter on GitHub's ARM runner)
   and the extension zip. Run the checks before committing.
-- The lowest supported GNOME is 49 (libadwaita 1.8, for `Adw.ShortcutsDialog`). A newer
-  widget raises it: update the README, `scripts/deb.sh`'s libadwaita version and the
-  tarball's build distribution together. The extension alone goes down to GNOME 48 (Debian
-  13, with the app as a Flatpak; `St.BoxLayout`'s `orientation` is new in 48): keep it
-  working there.
+- The lowest supported GNOME is 48 (libadwaita 1.7, Debian 13; the `.deb` depends on it). Where
+  the shortcuts list needs `Adw.ShortcutsDialog` (1.8) it uses GTK's window instead
+  (`ui/shortcuts-legacy.blp`, same list: keep both in step); the `deb-test` CI job runs it on
+  Debian 13. The crate's `v1_7` feature keeps the binary to 1.7's symbols; a widget of a newer
+  libadwaita, in a UI file, needs a fallback like that one, or raises the minimum: update the
+  README, `scripts/deb.sh`'s libadwaita version and the tarball's build distribution together.
+  The extension also goes down to GNOME 48 (`St.BoxLayout`'s `orientation` is new in 48): keep
+  it working there.
 - extensions.gnome.org runs Shexli (static analysis) on each upload, and reviewers reject the
   extension until its findings are resolved, warnings included. Every change to the extension
   must pass it (only the `shell-version` 51 finding below is accepted); check with it: `make -C todav/gnome-extension stage`, then `uvx --python 3.12 --with

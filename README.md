@@ -85,8 +85,9 @@ All of what Todav does, and what it will, is listed in [FEATURES.md](docs/FEATUR
 
 ## Getting started
 
-Todav needs GNOME 49 or newer, or Android 10 or newer. The GNOME Shell extension is optional;
-it runs on GNOME 48 too (Debian 13, for instance), with the app installed as a Flatpak.
+Todav needs GNOME 48 (libadwaita 1.7) or newer, or Android 10 or newer; on 48, such as Debian 13,
+install the `.deb`, where the keyboard shortcuts list is GTK's older window. The GNOME Shell
+extension is optional.
 
 **Android:** download `todav-<version>.apk` from the
 [latest release](https://github.com/AperteDev/todav/releases/latest) and open it on your phone
@@ -127,7 +128,7 @@ sudo dnf install todav gnome-shell-extension-todav
 flatpak install --user dev.aperte.Todav-<x86_64 or aarch64>.flatpak
 gnome-extensions install todav@aperte.dev.shell-extension.zip
 
-# Ubuntu 26.04 and newer: the app with the extension
+# Ubuntu 26.04 and newer, Debian 13 and newer: the app with the extension
 sudo apt install ./todav_<version>_<amd64 or arm64>.deb
 
 # Other distributions: the same files to unpack into /
@@ -192,7 +193,7 @@ Todav is developed and tested mainly on this setup:
 - **Nextcloud** with its built-in CalDAV server (the Tasks and Calendar apps are optional, but
   handy as web fallbacks).
 - **GNOME** 49 to 51, with the app (GTK 4 + libadwaita) and the optional GNOME Shell extension
-  (which runs on 48 too).
+  (both run on 48 too).
 - **Android** 15 to 17 on phones and foldables (the emulator), with the ntfy app as the
   UnifiedPush distributor.
 - Optionally, for instant updates: the [DAV Push](https://github.com/bitfireAT/nc_ext_dav_push)
@@ -203,7 +204,7 @@ password, but those, and other desktops, are untested for now.
 
 ### Building and installing
 
-**Dependencies:** Rust (stable), GTK 4.14+, libadwaita 1.8+, libsecret, SQLite, `blueprint-compiler`,
+**Dependencies:** Rust (stable), GTK 4.14+, libadwaita 1.7+, libsecret, SQLite, `blueprint-compiler`,
 `glib-compile-resources` (GLib) and gettext's `msgfmt`.
 
 ```sh

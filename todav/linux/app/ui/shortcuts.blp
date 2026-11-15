@@ -2,7 +2,8 @@ using Gtk 4.0;
 using Adw 1;
 
 // Keyboard Shortcuts (Ctrl+?). Window-wide ones show the keys set in code by their action;
-// the pages' own are set in their views.
+// the pages' own are set in their views. libadwaita 1.8 and newer; shortcuts-legacy.blp is the
+// same list for older ones: keep them in step.
 Adw.ShortcutsDialog dialog {
   Adw.ShortcutsSection {
     title: _("General");

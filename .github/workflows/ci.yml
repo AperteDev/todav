@@ -188,8 +188,8 @@ jobs:
             runs-on: ubuntu-24.04
           - arch: aarch64
             runs-on: ubuntu-24.04-arm
-    # The oldest supported GNOME (49, for libadwaita 1.8): its glibc keeps the binary running on
-    # newer distributions, the .deb's Ubuntu among them. Move on when it reaches its end of life.
+    # The oldest GNOME the tarball is built on (49): its glibc keeps the binary running on
+    # newer distributions, the .deb's Ubuntu and Debian among them. Move on when it reaches its end of life.
     container: fedora:43
     steps:
       - name: Install the build dependencies
@@ -325,6 +325,37 @@ jobs:
           name: todav-deb-${{ matrix.arch }}
           path: target/deb/*.deb
           if-no-files-found: error
+
+  # Debian 13 has libadwaita 1.7, the oldest the package accepts: the app starts there and opens
+  # GTK's shortcuts window in place of libadwaita 1.8's.
+  deb-test:
+    name: Debian package on Debian 13 (${{ matrix.arch }})
+    needs: deb
+    runs-on: ${{ matrix.runs-on }}
+    container: debian:13
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runs-on: ubuntu-24.04
+          - arch: aarch64
+            runs-on: ubuntu-24.04-arm
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Install a display and a session bus
+        run: >-
+          apt-get update && apt-get install -y --no-install-recommends
+          xvfb xauth dbus libglib2.0-bin libgl1-mesa-dri fonts-dejavu-core
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: todav-deb-${{ matrix.arch }}
+          path: target
+      - name: Install it, so its dependencies are checked
+        run: apt-get install -y --no-install-recommends ./target/todav_*.deb
+      - run: xvfb-run -a dbus-run-session -- scripts/deb-test.sh
 
   extension:
     name: GNOME Shell extension

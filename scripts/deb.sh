@@ -15,8 +15,9 @@ cp -a "$stage" "$work/root"
 # dpkg-shlibdeps reads a source package's control file from the current directory.
 mkdir -p "$work/src/debian"
 printf 'Source: todav\n\nPackage: todav\nArchitecture: any\n' > "$work/src/debian/control"
-# libadwaita's version comes from the widgets the UI files use (Adw.ShortcutsDialog), which
-# linking does not show: below, in place of the one found.
+# libadwaita's version comes from the widgets the UI files use, which linking does not show:
+# 1.7 (Adw.ToggleGroup, Adw.WrapBox; Debian 13 has it), in place of the one found. The shortcuts
+# dialog of 1.8 (Adw.ShortcutsDialog) is used only where there is 1.8; older ones get GTK's window.
 depends=$(cd "$work/src" && dpkg-shlibdeps -O "$work/root/usr/bin/todav-linux" |
   sed -n 's/^shlibs:Depends=//p' | sed 's/libadwaita-1-0 ([^)]*), *//; s/, *libadwaita-1-0 ([^)]*)//')
 
@@ -27,7 +28,7 @@ Version: $version
 Architecture: $arch
 Maintainer: SelfRef <git@selfref.dev>
 Installed-Size: $(du -sk "$work/root" | cut -f1)
-Depends: $depends, libadwaita-1-0 (>= 1.8)
+Depends: $depends, libadwaita-1-0 (>= 1.7)
 Recommends: gnome-keyring
 Suggests: gnome-shell
 Section: gnome

@@ -256,8 +256,14 @@ pub fn setup_actions(app: &adw::Application) {
     app.add_action(&snooze);
     let shortcuts = gio::SimpleAction::new("shortcuts", None);
     shortcuts.connect_activate(|_, _| {
-        if let Some(ui) = ui() {
+        let Some(ui) = ui() else { return };
+        if adw::minor_version() >= 8 {
             get::<adw::Dialog>(&view!("shortcuts"), "dialog").present(Some(&ui.window));
+        } else {
+            // Before libadwaita 1.8 (Debian 13): GTK's own window, the same list.
+            let window = get::<gtk::Window>(&view!("shortcuts-legacy"), "dialog");
+            window.set_transient_for(Some(&ui.window));
+            window.present();
         }
     });
     // Filled from the metainfo file (bundled, see icons/icons.gresource.xml).

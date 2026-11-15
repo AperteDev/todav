@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Linux: the `.deb` needs libadwaita 1.7, not 1.8, so it installs on Debian 13 (GNOME 48). There the
+  Keyboard Shortcuts list is GTK's own window, the same list, until libadwaita 1.8's dialog is
+  available.
+
 ## [2.8.2] - 2026-11-15
 
 ### Added
