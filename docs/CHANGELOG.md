@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Linux: the AppImage has its icon in file managers and launchers, not a generic one.
+
 ## [2.8.1] - 2026-11-15
 
 ### Added

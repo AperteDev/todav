@@ -31,7 +31,9 @@ sed "/^DBusActivatable=/d; \$aStartupWMClass=$id" "$stage/usr/share/applications
 
 # quick-sharun's temporary files go in work/, and its tools stay out of the build tree.
 export TMPDIR=$work APPDIR=$work/AppDir OUTPATH=$out OUTNAME=todav-$version-$arch.AppImage
-export DESKTOP=$work/$id.desktop ICON=$stage/usr/share/icons/hicolor/scalable/apps/$id.svg
+# The icon is the PNG: it becomes the AppImage's .DirIcon, which file managers and launchers show
+# for the file, and many of them do not draw an SVG there.
+export DESKTOP=$work/$id.desktop ICON=$(realpath "$(dirname "$0")/../todav/linux/data/$id.png")
 # No strace pass: it runs the app to find what it loads at run time, which GTK's modules and the
 # host's graphics drivers (USE_HOST_DRIVERS) do not need told.
 export STRACE_MODE=0 USE_HOST_DRIVERS=1
@@ -45,6 +47,9 @@ cp -a "$stage/usr/share/locale" "$APPDIR/share/"
 ln -s ../share "$APPDIR/shared/share"
 mkdir -p "$APPDIR/share/metainfo"
 cp "$stage/usr/share/metainfo/$id.metainfo.xml" "$APPDIR/share/metainfo/"
+# The icons by name, for the app itself (the About dialog, notifications).
+cp -a "$stage/usr/share/icons/hicolor" "$APPDIR/share/icons/"
+[ "$(head -c 4 "$APPDIR/.DirIcon" | tail -c 3)" = PNG ] || { echo ".DirIcon is not a PNG" >&2; exit 1; }
 
 "$work/quick-sharun" --make-appimage
 rm -f "$out/appinfo"
