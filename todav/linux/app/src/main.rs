@@ -1,6 +1,7 @@
 //! Todav for Linux: GTK UI + background service (sync worker, ntfy push listener, D-Bus API).
 
 mod add_account;
+mod alarm;
 mod calendar;
 mod dates;
 mod dbus;
@@ -466,6 +467,20 @@ pub fn reminded_occurrence(uid: &str) -> Option<i64> {
     SHOWN.with(|s| s.borrow().get(uid).copied().flatten())
 }
 
+/// "Mark as Done" on the reminder of task `uid`, from its notification or alarm.
+pub fn complete(uid: &str) {
+    // From a reminder nobody can be asked: subtasks stay open unless set to complete. An old one
+    // does nothing (a repeating task already moved on).
+    if todav_app::service::complete_from_reminder(core(), uid, reminded_occurrence(uid)).is_ok() {
+        request_sync();
+    }
+    let key = format!("reminder-{uid}");
+    alarm::end(&key);
+    if let Some(app) = gio::Application::default() {
+        app.withdraw_notification(&key);
+    }
+}
+
 /// Take back the reminders shown of tasks done, moved on or deleted since, here or elsewhere.
 fn withdraw_stale_reminders() {
     let Some(app) = gio::Application::default() else {
@@ -476,6 +491,7 @@ fn withdraw_stale_reminders() {
             let stale = todav_app::service::reminder_stale(core(), uid, *at);
             if stale {
                 app.withdraw_notification(&format!("reminder-{uid}"));
+                alarm::end(&format!("reminder-{uid}"));
             }
             !stale
         });
@@ -530,7 +546,10 @@ fn notify_reminders() {
 /// dismissed (and shows it through fullscreen and with banners off).
 fn reminder(summary: &str, priority: Option<i64>) -> gio::Notification {
     let n = gio::Notification::new(summary);
-    if todav_app::prefs::urgent_reminder(core(), priority) {
+    // An alarm is urgent too: its notification stays when the sound is over.
+    if todav_app::prefs::urgent_reminder(core(), priority)
+        || todav_app::prefs::alarm_reminder(core(), priority)
+    {
         n.set_priority(gio::NotificationPriority::Urgent);
     }
     n
@@ -550,10 +569,11 @@ fn notify_task(t: &todav_core::Task) {
         (_, Some(d)) => Some((i18n::gettext("Due {date}"), d, t.due_all_day)),
         _ => None,
     };
-    if let Some((text, at, all_day)) = body {
-        n.set_body(Some(
-            &text.replace("{date}", &dates::label(at, all_day, now)),
-        ));
+    let body = body
+        .map(|(text, at, all_day)| text.replace("{date}", &dates::label(at, all_day, now)))
+        .unwrap_or_default();
+    if !body.is_empty() {
+        n.set_body(Some(&body));
     }
     n.set_default_action_and_target_value("app.show-list", Some(&t.list_href.to_variant()));
     n.add_button_with_target_value(
@@ -569,6 +589,16 @@ fn notify_task(t: &todav_core::Task) {
     );
     app.send_notification(Some(&format!("reminder-{}", t.uid)), &n);
     SHOWN.with(|s| s.borrow_mut().insert(t.uid.clone(), at));
+    if todav_app::prefs::alarm_reminder(core(), t.priority) {
+        alarm::start(alarm::Alarm {
+            key: format!("reminder-{}", t.uid),
+            uid: t.uid.clone(),
+            task: true,
+            at: at.unwrap_or(i64::MIN),
+            title: t.summary.clone(),
+            body,
+        });
+    }
 }
 
 /// The reminder of the occurrence `e` of an event, with Join Call (if it has a call) and Snooze.
@@ -579,10 +609,11 @@ fn notify_event(e: &todav_core::Event) {
     let now = core().local_now();
     let n = reminder(&e.summary, e.priority);
     let when = dates::label(e.start, e.all_day, now);
-    n.set_body(Some(&match &e.location {
+    let body = match &e.location {
         Some(l) => format!("{when} · {l}"),
         None => when,
-    }));
+    };
+    n.set_body(Some(&body));
     n.set_default_action_and_target_value("app.show-day", Some(&e.start.to_variant()));
     if let Some(url) = todav_app::meeting::link(e) {
         n.add_button_with_target_value(
@@ -597,6 +628,16 @@ fn notify_event(e: &todav_core::Event) {
         Some(&(false, e.uid.as_str(), e.start).to_variant()),
     );
     app.send_notification(Some(&format!("event-{}-{}", e.uid, e.start)), &n);
+    if todav_app::prefs::alarm_reminder(core(), e.priority) {
+        alarm::start(alarm::Alarm {
+            key: format!("event-{}-{}", e.uid, e.start),
+            uid: e.uid.clone(),
+            task: false,
+            at: e.start,
+            title: e.summary.clone(),
+            body,
+        });
+    }
 }
 
 /// Minutes a snoozed reminder waits, as on Android.
@@ -613,9 +654,11 @@ pub fn snooze(task: bool, uid: String, at: i64) {
     };
     if task {
         app.withdraw_notification(&format!("reminder-{uid}"));
+        alarm::end(&format!("reminder-{uid}"));
         SHOWN.with(|s| s.borrow_mut().remove(&uid));
     } else {
         app.withdraw_notification(&format!("event-{uid}-{at}"));
+        alarm::end(&format!("event-{uid}-{at}"));
     }
     let wait = std::time::Duration::from_secs(SNOOZE_MINUTES * 60);
     glib::timeout_add_local_once(wait, move || {

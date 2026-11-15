@@ -216,17 +216,8 @@ pub fn setup_actions(app: &adw::Application) {
     app.add_action(&prefs);
     let complete = gio::SimpleAction::new("complete", Some(glib::VariantTy::STRING));
     complete.connect_activate(|_, uid| {
-        // From a notification nobody can be asked: subtasks stay open unless set to complete. An
-        // old one does nothing (a repeating task already moved on).
-        if let Some(uid) = uid.and_then(|u| u.str())
-            && todav_app::service::complete_from_reminder(
-                core(),
-                uid,
-                crate::reminded_occurrence(uid),
-            )
-            .is_ok()
-        {
-            request_sync();
+        if let Some(uid) = uid.and_then(|u| u.str()) {
+            crate::complete(uid);
         }
     });
     let restart = gio::SimpleAction::new("restart", None);

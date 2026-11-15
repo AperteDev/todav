@@ -361,8 +361,9 @@ fn connect_reminders(b: &gtk::Builder) {
     }
 }
 
-/// General → Notifications: whether every reminder is urgent.
+/// General → Notifications: whether every reminder is urgent, which ones ring as alarms.
 fn connect_notifications(b: &gtk::Builder) {
+    connect_choice(b, "alarm_reminders", &["off", "important", "all"]);
     let urgent: adw::SwitchRow = get(b, "urgent_reminders");
     urgent.set_active(prefs::urgent_reminders(core()));
     urgent.connect_active_notify(|r| {

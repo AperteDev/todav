@@ -24,5 +24,7 @@
        translations, as build.rs writes it to OUT_DIR. -->
   <gresource prefix="/dev/aperte/Todav">
     <file alias="metainfo.xml">dev.aperte.Todav.metainfo.xml</file>
+    <!-- The alarm reminders' sound, a short tone of our own that loops (CC0). -->
+    <file>alarm.wav</file>
   </gresource>
 </gresources>

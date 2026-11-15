@@ -1,0 +1,63 @@
+using Gtk 4.0;
+using Adw 1;
+
+// An alarm reminder ringing (todav_app::prefs::alarm_reminder): its item and the choices of its
+// notification, over whatever is open. Closing it stops the alarm.
+Adw.Window window {
+  default-width: 420;
+  resizable: false;
+  title: _("Alarm");
+
+  content: Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {
+      show-start-title-buttons: false;
+      show-end-title-buttons: false;
+      title-widget: Gtk.Label {};
+    }
+
+    content: Gtk.Box {
+      orientation: vertical;
+      spacing: 12;
+      margin-top: 12;
+      margin-bottom: 24;
+      margin-start: 24;
+      margin-end: 24;
+
+      Gtk.Image {
+        icon-name: "alarm-symbolic";
+        pixel-size: 64;
+        margin-bottom: 12;
+        styles ["accent"]
+      }
+
+      Gtk.Label summary {
+        wrap: true;
+        justify: center;
+        styles ["title-1"]
+      }
+
+      Gtk.Label body {
+        wrap: true;
+        justify: center;
+        margin-bottom: 12;
+        styles ["dim-label"]
+      }
+
+      Gtk.Button done {
+        label: _("Mark as Done");
+        styles ["suggested-action", "pill"]
+      }
+
+      Gtk.Button snooze {
+        label: _("Snooze");
+        styles ["pill"]
+      }
+
+      Gtk.Button stop {
+        label: _("Stop");
+        styles ["pill"]
+      }
+    };
+  };
+}

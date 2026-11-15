@@ -78,6 +78,13 @@ Adw.PreferencesDialog dialog {
         subtitle: _("Kept on screen until dismissed, as those of important tasks and events are");
       }
 
+      // Which reminders ring like an alarm (todav_app::prefs::alarm_reminder).
+      Adw.ComboRow alarm_reminders {
+        title: _("Alarm reminders");
+        subtitle: _("Ring like an alarm until you act on them, for ten minutes at most, and come to the front");
+        model: Gtk.StringList { strings [_("Off"), _("Important tasks and events"), _("All reminders")] };
+      }
+
       // Dock icons that show a number (Unity Launcher API); Default leaves it to the dock.
       Adw.ComboRow launcher_count {
         title: _("Number on the app icon");

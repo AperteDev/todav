@@ -29,7 +29,7 @@ Architecture: $arch
 Maintainer: SelfRef <git@selfref.dev>
 Installed-Size: $(du -sk "$work/root" | cut -f1)
 Depends: $depends, libadwaita-1-0 (>= 1.7)
-Recommends: gnome-keyring
+Recommends: gnome-keyring, libgtk-4-media-gstreamer
 Suggests: gnome-shell
 Section: gnome
 Priority: optional
