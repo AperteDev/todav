@@ -147,6 +147,11 @@ jobs:
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-51
       options: --privileged
+      # On some runner images the container's overlay filesystem refuses the directory renames
+      # flatpak makes when it updates the runtimes the image holds ("Invalid cross-device link",
+      # which failed the x86_64 job): a volume is a plain filesystem, filled from the image.
+      volumes:
+        - flatpak-${{ matrix.arch }}:/var/lib/flatpak
     steps:
       - uses: actions/checkout@v7
       - name: Set the release version
