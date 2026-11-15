@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Keyboard Shortcuts list is GTK's own window, the same list, until libadwaita 1.8's dialog is
   available.
 
+### Fixed
+
+- Linux: the AppImage's icon shows in file managers that draw it through a thumbnailer (Linux Mint's
+  Nemo and others). The image is SquashFS now, not DwarFS, which their thumbnailers cannot read.
+
 ## [2.8.2] - 2026-11-15
 
 ### Added

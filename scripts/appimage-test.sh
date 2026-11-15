@@ -18,6 +18,17 @@ cleanup() {
 trap cleanup EXIT
 fail() { echo "FAIL: $*" >&2; sed 's/^/  | /' "$log" >&2; exit 1; }
 
+# The image is SquashFS, with the icon where file managers' thumbnailers read it (unsquashfs, at
+# the offset after the runtime's ELF): a DwarFS image has none they can read.
+[ "$(dd if="$appimage" bs=1 skip="$("$appimage" --appimage-offset)" count=4 2>/dev/null)" = hsqs ] ||
+  { echo "FAIL: the image is not SquashFS" >&2; exit 1; }
+icon=$(mktemp -d)
+(cd "$icon" && "$appimage" --appimage-extract .DirIcon > /dev/null)
+[ "$(head -c 4 "$icon/squashfs-root/.DirIcon" | tail -c 3)" = PNG ] ||
+  { echo "FAIL: .DirIcon is not a PNG" >&2; exit 1; }
+rm -rf "$icon"
+echo "ok: SquashFS, with a PNG icon"
+
 # A home of its own: no data, settings or keyring of the user running it. No FUSE needed (a
 # container has none): the AppImage unpacks itself.
 export HOME=$home XDG_DATA_HOME=$home/data XDG_CONFIG_HOME=$home/config XDG_CACHE_HOME=$home/cache

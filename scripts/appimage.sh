@@ -37,6 +37,8 @@ export DESKTOP=$work/$id.desktop ICON=$(realpath "$(dirname "$0")/../todav/linux
 # No strace pass: it runs the app to find what it loads at run time, which GTK's modules and the
 # host's graphics drivers (USE_HOST_DRIVERS) do not need told.
 export STRACE_MODE=0 USE_HOST_DRIVERS=1
+# The image is SquashFS, not quick-sharun's DwarFS: file managers read the icon with unsquashfs.
+export APPIMAGETOOL=$(realpath "$(dirname "$0")/appimage-pack.sh")
 export ARCH=$arch VERSION=$version
 "$work/quick-sharun" "$stage/usr/bin/todav-linux"
 
