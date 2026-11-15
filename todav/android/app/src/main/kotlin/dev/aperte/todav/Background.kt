@@ -6,6 +6,8 @@ import android.app.BroadcastOptions
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import android.app.Service
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -208,6 +210,12 @@ object Reminders {
     const val SNOOZE = "dev.aperte.todav.SNOOZE"
     const val SNOOZED = "dev.aperte.todav.SNOOZED"
 
+    /** Stops an alarm's sound (the Stop button, and the end of its ten minutes). */
+    const val STOP = "dev.aperte.todav.STOP"
+
+    /** Sent when a reminder's alarm is over (stopped, snoozed, done, gone), to close its screen. */
+    const val OVER = "dev.aperte.todav.ALARM_OVER"
+
     // ponytail: a fixed delay, and an alarm that a reboot forgets; a choice of delays, kept
     // snoozes, if they turn out to be wanted.
     private const val SNOOZE_SECONDS = 600L
@@ -219,6 +227,12 @@ object Reminders {
      */
     const val URGENT = "urgent_reminders"
 
+    /**
+     * Those that ring (`Client::alarmReminder`): the alarm sound, on the alarm volume and
+     * through Do Not Disturb's Alarms exception, repeating until stopped.
+     */
+    const val ALARM = "alarm_reminders"
+
     fun channel(context: Context) {
         val m = context.getSystemService(NotificationManager::class.java)
         m.createNotificationChannel(
@@ -227,11 +241,29 @@ object Reminders {
         m.createNotificationChannel(
             NotificationChannel(URGENT, tr("Urgent reminders"), NotificationManager.IMPORTANCE_HIGH),
         )
+        m.createNotificationChannel(
+            NotificationChannel(ALARM, tr("Alarm reminders"), NotificationManager.IMPORTANCE_HIGH).apply {
+                setSound(
+                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build(),
+                )
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 600, 400, 600, 400)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+            },
+        )
     }
 
-    /** A reminder of something of `priority`, on its channel. */
-    private fun builder(app: TodavApp, priority: Long?) =
-        NotificationCompat.Builder(app, if (app.core.urgentReminder(priority)) URGENT else CHANNEL)
+    /** Whether alarms may take over the screen (Android 14 and later ask the user). */
+    fun canTakeScreen(context: Context): Boolean = Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE ||
+        context.getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
+
+    /** A reminder of something of `priority`, on its channel: `ring` (an alarm), else urgent or not. */
+    private fun builder(app: TodavApp, priority: Long?, ring: Boolean) =
+        NotificationCompat.Builder(app, if (ring) ALARM else if (app.core.urgentReminder(priority)) URGENT else CHANNEL)
 
     /** A task reminder's task UID and the occurrence it is for (`reminderOccurrence`), in its extras. */
     private const val EXTRA_TASK = "dev.aperte.todav.task"
@@ -247,7 +279,10 @@ object Reminders {
             val extras = n.notification.extras
             val uid = extras.getString(EXTRA_TASK) ?: continue
             val at = if (extras.containsKey(EXTRA_AT)) extras.getLong(EXTRA_AT) else null
-            if (app.core.reminderStale(uid, at)) m.cancel(n.tag, n.id)
+            if (app.core.reminderStale(uid, at)) {
+                m.cancel(n.tag, n.id)
+                hush(app, n.id)
+            }
         }
     }
 
@@ -265,7 +300,12 @@ object Reminders {
         }
         // The core's times are local wall-clock; the alarm's are UTC.
         val offset = app.core.localNow() - System.currentTimeMillis() / 1000
-        val at = (next - offset) * 1000
+        wake(app, (next - offset) * 1000, intent)
+    }
+
+    /** `intent` at `at` (UTC milliseconds), on the minute where Android lets the app, waking the device. */
+    private fun wake(context: Context, at: Long, intent: PendingIntent) {
+        val alarms = context.getSystemService(AlarmManager::class.java)
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarms.canScheduleExactAlarms()) {
             alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, intent)
         } else {
@@ -284,8 +324,60 @@ object Reminders {
         val due = app.core.dueReminders()
         val now = app.core.localNow()
         val m = NotificationManagerCompat.from(app)
-        for (t in due.tasks) m.notify(t.uid.hashCode(), task(app, t, now))
-        for (e in due.events) m.notify((e.uid + e.start).hashCode(), event(app, e, now))
+        for (t in due.tasks) post(app, t, now)
+        for (e in due.events) post(app, e, now)
+    }
+
+    /**
+     * A reminder of task `t` shown: an alarm when it is one and not `quiet`, which also rings
+     * for `Client::alarmSeconds` at most; then it goes on as a silent urgent one (`stop`).
+     */
+    private fun post(app: TodavApp, t: TodavTask, now: Long, quiet: Boolean = false) {
+        val ring = !quiet && app.core.alarmReminder(t.priority)
+        val id = t.uid.hashCode()
+        NotificationManagerCompat.from(app).notify(id, task(app, t, now, ring, quiet))
+        if (ring) startAlarm(app, id) { putExtra("task", t.uid); reminderOccurrence(t)?.let { putExtra("at", it) } }
+    }
+
+    /** The same for occurrence `e` of an event. */
+    private fun post(app: TodavApp, e: Event, now: Long, quiet: Boolean = false) {
+        val ring = !quiet && app.core.alarmReminder(e.priority)
+        val id = (e.uid + e.start).hashCode()
+        NotificationManagerCompat.from(app).notify(id, event(app, e, now, ring, quiet))
+        if (ring) startAlarm(app, id) { putExtra("event", e.uid).putExtra("start", e.start) }
+    }
+
+    /** What `Stop` of notification `id` is: also the alarm that stops the sound after its ten minutes. */
+    private fun stopIntent(context: Context, id: Int, flags: Int, f: Intent.() -> Unit = {}): PendingIntent? =
+        PendingIntent.getBroadcast(
+            context, id, Intent(context, ReminderReceiver::class.java).setAction(STOP).putExtra("id", id).apply(f),
+            PendingIntent.FLAG_IMMUTABLE or flags,
+        )
+
+    private fun startAlarm(app: TodavApp, id: Int, f: Intent.() -> Unit) {
+        val end = System.currentTimeMillis() + app.core.alarmSeconds() * 1000
+        wake(app, end, stopIntent(app, id, PendingIntent.FLAG_UPDATE_CURRENT, f)!!)
+    }
+
+    /** Notification `id`'s alarm is over (acted on, stopped or gone): no end to wait for, its screen closed. */
+    fun hush(context: Context, id: Int) {
+        stopIntent(context, id, PendingIntent.FLAG_NO_CREATE)?.let {
+            context.getSystemService(AlarmManager::class.java).cancel(it)
+            it.cancel()
+        }
+        context.sendBroadcast(Intent(OVER).setPackage(context.packageName).putExtra("id", id))
+    }
+
+    /**
+     * Stop an alarm, by the button or at its end: the sound gone, the reminder left as a silent
+     * urgent one (its task or event as it is, unless done, moved on or gone meanwhile).
+     */
+    fun stop(app: TodavApp, intent: Intent) {
+        val id = intent.getIntExtra("id", 0)
+        hush(app, id)
+        // Taken back first: a notification replaced in place may go on ringing.
+        NotificationManagerCompat.from(app).cancel(id)
+        again(app, intent, quiet = true)
     }
 
     /**
@@ -295,33 +387,31 @@ object Reminders {
     fun snooze(context: Context, intent: Intent) {
         val id = intent.getIntExtra("id", 0)
         NotificationManagerCompat.from(context).cancel(id)
+        hush(context, id)
         val again = PendingIntent.getBroadcast(
             context, id, Intent(intent).setAction(SNOOZED),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        val alarms = context.getSystemService(AlarmManager::class.java)
-        val at = System.currentTimeMillis() + SNOOZE_SECONDS * 1000
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarms.canScheduleExactAlarms()) {
-            alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, again)
-        } else {
-            alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, again)
-        }
+        wake(context, System.currentTimeMillis() + SNOOZE_SECONDS * 1000, again)
     }
 
     /** A snoozed reminder again, unless its task is done or moved on or its event gone meanwhile. */
-    fun again(app: TodavApp, intent: Intent) {
-        val id = intent.getIntExtra("id", 0)
+    fun again(app: TodavApp, intent: Intent, quiet: Boolean = false) {
         val now = app.core.localNow()
         val m = NotificationManagerCompat.from(app)
+        val id = intent.getIntExtra("id", 0)
+        var shown = false
         intent.getStringExtra("task")?.takeIf { !app.core.reminderStale(it, at(intent)) }?.let { uid ->
-            app.core.task(uid)?.let { m.notify(id, task(app, it, now)) }
+            app.core.task(uid)?.let { post(app, it, now, quiet); shown = true }
         }
         intent.getStringExtra("event")?.let { uid ->
             val start = intent.getLongExtra("start", 0)
             app.core.events(start - 86_400, start + 86_400)
                 .firstOrNull { it.uid == uid && it.start == start }
-                ?.let { m.notify(id, event(app, it, now)) }
+                ?.let { post(app, it, now, quiet); shown = true }
         }
+        // Gone meanwhile: nothing left to ring or to keep.
+        if (!shown) m.cancel(id)
     }
 
     private fun snoozeAction(app: TodavApp, id: Int, f: Intent.() -> Unit) = NotificationCompat.Action(
@@ -338,7 +428,43 @@ object Reminders {
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 
-    private fun task(app: TodavApp, t: TodavTask, now: Long): android.app.Notification {
+    /**
+     * What an alarm adds to its reminder's notification: it stays until acted on, repeats its
+     * sound (`FLAG_INSISTENT`), takes the screen where Android allows (`AlarmActivity`, with
+     * the same choices) and has Stop. `quiet`: a silent one, as after a Stop.
+     */
+    private fun NotificationCompat.Builder.alarm(
+        app: TodavApp,
+        id: Int,
+        ring: Boolean,
+        quiet: Boolean,
+        title: String,
+        text: String,
+        task: Boolean,
+        open: PendingIntent,
+        f: Intent.() -> Unit,
+    ): android.app.Notification {
+        if (quiet) setSilent(true)
+        if (!ring) return build()
+        setCategory(NotificationCompat.CATEGORY_ALARM)
+        setOngoing(true)
+        setAutoCancel(false)
+        setPriority(NotificationCompat.PRIORITY_MAX)
+        setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+        val screen = PendingIntent.getActivity(
+            app, id,
+            Intent(app, AlarmActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
+                .putExtra("id", id).putExtra("title", title).putExtra("text", text)
+                .putExtra("is_task", task).putExtra("open", open).apply(f),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        setFullScreenIntent(screen, true)
+        addAction(0, tr("Stop"), stopIntent(app, id, PendingIntent.FLAG_UPDATE_CURRENT, f))
+        return build().apply { flags = flags or android.app.Notification.FLAG_INSISTENT }
+    }
+
+    private fun task(app: TodavApp, t: TodavTask, now: Long, ring: Boolean, quiet: Boolean): android.app.Notification {
         // The occurrence it is for, so that it goes, and "Mark as Done" does nothing, once the
         // task has moved on to another.
         val at = reminderOccurrence(t)
@@ -346,18 +472,18 @@ object Reminders {
             putExtra("task", t.uid)
             at?.let { putExtra("at", it) }
         }
-        return builder(app, t.priority)
+        val text = t.start?.takeIf { remindsOfStart(t, now) }
+            ?.let { tr("Starts {date}").replace("{date}", dayLabel(it, t.startAllDay, now)) }
+            ?: dueLabel(t, now)
+        val open = open(app, t.uid.hashCode()) { putExtra("task", t.uid) }
+        return builder(app, t.priority, ring)
             .addExtras(android.os.Bundle().apply { putString(EXTRA_TASK, t.uid); at?.let { putLong(EXTRA_AT, it) } })
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(t.summary)
-            .setContentText(
-                t.start?.takeIf { remindsOfStart(t, now) }
-                    ?.let { tr("Starts {date}").replace("{date}", dayLabel(it, t.startAllDay, now)) }
-                    ?: dueLabel(t, now),
-            )
+            .setContentText(text)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)
-            .setContentIntent(open(app, t.uid.hashCode()) { putExtra("task", t.uid) })
+            .setContentIntent(open)
             .addAction(
                 0,
                 tr("Mark as Done"),
@@ -367,31 +493,36 @@ object Reminders {
                 ),
             )
             .addAction(snoozeAction(app, t.uid.hashCode(), occurrence))
-            .build()
+            .alarm(app, t.uid.hashCode(), ring, quiet, t.summary, text.orEmpty(), true, open, occurrence)
     }
 
-    private fun event(app: TodavApp, e: Event, now: Long) = builder(app, e.priority)
-        .setSmallIcon(R.drawable.ic_notification)
-        .setContentTitle(e.summary)
-        .setContentText(listOfNotNull(dayLabel(e.start, e.allDay, now), e.location?.takeIf { it.isNotBlank() }).joinToString(" · "))
-        .setCategory(NotificationCompat.CATEGORY_EVENT)
-        .setAutoCancel(true)
-        .setContentIntent(open(app, (e.uid + e.start).hashCode()) { putExtra("day", e.start) })
-        .addAction(snoozeAction(app, (e.uid + e.start).hashCode()) { putExtra("event", e.uid).putExtra("start", e.start) })
-        .apply {
-            // Its video call (`todav_app::meeting`), in the browser or the call's app.
-            meetingLink(e)?.let { url ->
-                addAction(
-                    0,
-                    tr("Join Call"),
-                    PendingIntent.getActivity(
-                        app, (e.uid + e.start).hashCode(), Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)),
-                        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-                    ),
-                )
+    private fun event(app: TodavApp, e: Event, now: Long, ring: Boolean, quiet: Boolean): android.app.Notification {
+        val id = (e.uid + e.start).hashCode()
+        val text = listOfNotNull(dayLabel(e.start, e.allDay, now), e.location?.takeIf { it.isNotBlank() }).joinToString(" · ")
+        val open = open(app, id) { putExtra("day", e.start) }
+        return builder(app, e.priority, ring)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(e.summary)
+            .setContentText(text)
+            .setCategory(NotificationCompat.CATEGORY_EVENT)
+            .setAutoCancel(true)
+            .setContentIntent(open)
+            .addAction(snoozeAction(app, id) { putExtra("event", e.uid).putExtra("start", e.start) })
+            .apply {
+                // Its video call (`todav_app::meeting`), in the browser or the call's app.
+                meetingLink(e)?.let { url ->
+                    addAction(
+                        0,
+                        tr("Join Call"),
+                        PendingIntent.getActivity(
+                            app, id, Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)),
+                            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                        ),
+                    )
+                }
             }
-        }
-        .build()
+            .alarm(app, id, ring, quiet, e.summary, text, false, open) { putExtra("event", e.uid).putExtra("start", e.start) }
+    }
 }
 
 /** The alarm going off, and "Mark as Done" and "Snooze" on a reminder. */
@@ -400,10 +531,12 @@ class ReminderReceiver : BroadcastReceiver() {
         when (intent.action) {
             Reminders.SNOOZE -> return Reminders.snooze(context, intent)
             Reminders.SNOOZED -> return background(context) { Reminders.again(it, intent) }
+            Reminders.STOP -> return background(context) { Reminders.stop(it, intent) }
         }
         if (intent.action == Reminders.DONE) {
             val uid = intent.getStringExtra("task") ?: return
             NotificationManagerCompat.from(context).cancel(uid.hashCode())
+            Reminders.hush(context, uid.hashCode())
             // As the Linux app's: it cannot ask about subtasks, so they stay open unless set to
             // complete. An old one does nothing (a repeating task already moved on).
             background(context) {

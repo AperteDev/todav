@@ -11,6 +11,9 @@
     <!-- Reminders at their minute: a calendar app may use exact alarms (Android 13 and later);
          Android 12 asks the user for them instead. -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- Alarm reminders take over the screen, over the lock screen too (Android 14 and later: the
+         user allows it in Settings). -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission
         android:name="android.permission.SCHEDULE_EXACT_ALARM"
         android:maxSdkVersion="32" />
@@ -100,6 +103,16 @@
                 <data android:scheme="todav" />
             </intent-filter>
         </activity>
+
+        <!-- An alarm reminder's screen, started by its notification's full-screen intent. -->
+        <activity
+            android:name=".AlarmActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:showWhenLocked="true"
+            android:taskAffinity=""
+            android:turnScreenOn="true" />
 
         <receiver
             android:name=".PushReceiver"

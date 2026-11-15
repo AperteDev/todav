@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import dev.aperte.todav.Reminders
 import dev.aperte.todav.SystemCalendars
 import android.net.Uri
 import android.os.Build
@@ -355,6 +356,40 @@ private fun General(model: Main) {
         SwitchRow(
             model, tr("Urgent reminders for all"), "urgent_reminders",
             tr("On the Urgent reminders channel, as those of important tasks and events are"), default = false,
+        )
+        AlarmRows(model)
+    }
+}
+
+/**
+ * Alarm reminders: which ring until acted on, and, from Android 14, the permission for their
+ * full-screen screen that the user gives in the system settings (without it they still ring, as
+ * a banner).
+ */
+@Composable
+private fun AlarmRows(model: Main) {
+    val context = LocalContext.current
+    ChoiceRow(
+        model, tr("Alarm reminders"), "alarm_reminders",
+        listOf("off", "important", "all"),
+        listOf(tr("Off"), tr("Important tasks and events"), tr("All reminders")),
+        subtitle = tr("Ring like an alarm until you act on them, for ten minutes at most, and come to the front"),
+    )
+    var allowed by remember { mutableStateOf(Reminders.canTakeScreen(context)) }
+    LifecycleResumeEffect(Unit) {
+        allowed = Reminders.canTakeScreen(context)
+        onPauseOrDispose {}
+    }
+    if (!allowed && setting(model, "alarm_reminders").let { it == "important" || it == "all" }) {
+        Item(
+            headlineContent = { Text(tr("Allow full-screen alarms")) },
+            supportingContent = { Text(tr("Alarms show over the lock screen only when allowed here; until then they are a banner")) },
+            leadingContent = { Icon(Icons.Outlined.Notifications, null) },
+            modifier = Modifier.clickable {
+                context.startActivity(
+                    Intent(SystemSettings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:${context.packageName}")),
+                )
+            },
         )
     }
 }
