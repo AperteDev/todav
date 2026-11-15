@@ -70,13 +70,54 @@ Planned work, not yet done. [FEATURES.md](FEATURES.md) lists it publicly; the or
   `AccountKind::Google`, and the task page hiding what Google does not keep, as Linux does
   (`gtasks::is_list`). Open: whether to ask for the calendar scope too, or keep calendars to
   System Calendars.
+- **Alarm reminders** ([#8](https://github.com/AperteDev/todav/issues/8)): a reminder that rings
+  like an alarm until it is acted on (at most 10 minutes) and comes to the front, for critical
+  tasks and events; on Android and Linux alike, with "Mark as Done", Snooze and Stop.
+  - *Which reminders*: a setting "Alarm reminders" (`alarm_reminders`: Off, Important, All;
+    default Off; synced), as `urgent_reminders` picks urgent ones, in `todav-app::prefs`
+    (`alarm_reminder(priority)`, no text; `ALARM_SECONDS` = 600 beside the snooze delay). An
+    alarm is also an urgent reminder, so it stays when the sound ends. Open: a choice per
+    reminder instead (`VALARM` `ACTION:AUDIO`, which other clients read as a sound alarm and
+    which would sync); every reminder is a bare time (`Vec<i64>`) in the core, `ffi`, both
+    front-ends and the extension now, so it is a larger change, and per list is already under
+    Advanced notifications.
+  - *Android*: a third channel `alarm_reminders` (alarm sound from `RingtoneManager.TYPE_ALARM`
+    with `USAGE_ALARM` attributes, so it follows the alarm volume and Android's Alarms
+    exception in Do Not Disturb, vibration; the user may change it). The notification is
+    `CATEGORY_ALARM`, ongoing, `FLAG_INSISTENT` (the sound repeats), `setTimeoutAfter` 10
+    minutes, with Mark as Done / Snooze / Stop, and a full-screen intent to an `AlarmActivity`
+    (`setShowWhenLocked`, `setTurnScreenOn`) that shows the item and the same buttons; when the
+    app is in front, the activity opens directly. `tidy` already takes back a reminder of a task
+    done elsewhere, which stops the sound. Needs `USE_FULL_SCREEN_INTENT` (granted at install
+    below Android 14; since then the user grants it: check `canUseFullScreenIntent()` and point
+    to Settings → Special app access in the setting's row, falling back to a heads-up
+    notification that still rings). Google Play restricts it to alarm and calling apps (the
+    declaration goes in with the exact-alarm form under Release); GitHub and F-Droid builds
+    are not restricted. Open: whether `FLAG_INSISTENT` keeps ringing 10 minutes on a real device
+    (Honor's battery manager); if not, a foreground service (`mediaPlayback`) looping a
+    `MediaPlayer` on the alarm stream.
+  - *Linux*: GNOME has no alarms, so the app does it: a sound looping up to 10 minutes
+    (`gtk::MediaFile` with `loop`, a short tone of our own in the resources, no new
+    dependency; check the AppImage's and the deb's GTK find GStreamer) and an alarm window
+    (`ui/alarm.blp`: summary, when, Mark as Done, Snooze, Stop) presented when it goes off,
+    next to the urgent notification; Stop, Done, Snooze and the 10 minutes silence it, and so
+    does the task being done elsewhere (`withdraw_stale_reminders`). Wayland does not let a
+    background app take focus, so the window may only show "Todav is ready": the extension
+    then shows the alarm over everything (`Main.layoutManager` modal dialog) from a new
+    `AlarmRang` signal on `dev.aperte.Todav1` with `SnoozeAlarm` and `StopAlarm` methods
+    (additions only, caught and left out for an older app, and an older extension ignores
+    the signal; the app shows its own window unless an extension answers). Verify in the real
+    session: Broadway and the waydriver have no sound and no focus rules.
+  - Translations (`Alarm reminders`, `Stop`, the setting's choices) through `gettext` on both,
+    Android's through `Translations`; the setting and its words are the same on both.
 - **Advanced notifications**, configurable, beyond the reminder notifications shown now
-  (urgent ones for important tasks and events, or for all, and an event's Join Call exist):
+  (urgent ones for important tasks and events, or for all, an alarm for them, see above, and an
+  event's Join Call exist):
   a reminder repeating until the task is done (every n minutes, n times), notifications on or
   off per list and per calendar (with the settings per list), a choice of snooze delays; the
   rest to be specified.
-  Open: on Android an urgent reminder that stays on screen needs a full-screen intent
-  (`USE_FULL_SCREEN_INTENT`), which Android 14+ and Google Play keep for alarm and calling apps.
+  An urgent reminder that stays on screen on Android is the alarm's full-screen intent (see
+  Alarm reminders).
 - **Advanced search, filtering and sorting**: saved filters (smart lists) combining lists,
   categories, dates, priority and status, in the sidebar, the extension and the widgets; tasks
   hidden until their start date, by a setting; the rest to be specified.

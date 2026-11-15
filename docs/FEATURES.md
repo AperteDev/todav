@@ -138,6 +138,8 @@ sync" below.
 - Quick add in plain words ("tomorrow 17:00 #work"), and from anywhere with a system-wide
   shortcut.
 - Task status (in progress, cancelled) and percent complete.
+- Alarm reminders: a reminder that rings until acted on (10 minutes at most) and comes to the
+  front, for important tasks and events or all.
 - Advanced notifications, configurable: repeating until done, per list.
 - Advanced search, filtering and sorting: saved filters, tasks hidden until they start.
 - Selecting several tasks to change them at once.
