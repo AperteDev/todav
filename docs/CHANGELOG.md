@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   their days, as the app's page and the Android widget do: pick it at the top of the list choice. It
   needs the app of this release (an older one keeps showing the first list); an older extension
   shows the first list too when Upcoming is picked, until it updates (#11).
+- Alarm reminders ([#8](https://github.com/AperteDev/todav/issues/8)): "Alarm reminders" (Off,
+  Important tasks and events, All reminders; Preferences → General → Notifications, Settings →
+  General on Android) makes those reminders ring like an alarm until acted on, for ten minutes at
+  most, and come to the front. On Android: the alarm sound on the alarm volume (through Do Not
+  Disturb's Alarms exception), repeating, with Mark as Done, Snooze and Stop, and a screen over
+  the lock screen (from Android 14 it needs "Allow full-screen alarms", asked in Settings; without
+  it the alarm is a banner that still rings). On Linux: a looping sound and an alarm window; with
+  the GNOME extension of this release the alarm shows over everything instead, which a background
+  app cannot do on Wayland. That extension works with an older app as before (the app has no
+  alarms then), and an older extension with this app shows the app's own window.
 
 ### Fixed
 

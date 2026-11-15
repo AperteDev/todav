@@ -36,6 +36,9 @@ sync" below.
   "Mark as Done" and Snooze (back in ten minutes); one already past when set goes off at once.
 - Urgent reminders for important tasks and events (high priority), for all with a setting:
   they stay on screen until dismissed (on Android: a channel of their own).
+- Alarm reminders, for important tasks and events or all: they ring until acted on (ten minutes at
+  most) and come to the front, with Mark as Done, Snooze and Stop; on Android over the lock screen
+  too, on Linux in a window or, with the GNOME extension, over everything.
 - An Upcoming page across all lists: Overdue, Today, Tomorrow, the coming days and later.
 - Search across all lists, ignoring accents.
 - Undo with Ctrl+Z or a toast's Undo.
@@ -138,8 +141,6 @@ sync" below.
 - Quick add in plain words ("tomorrow 17:00 #work"), and from anywhere with a system-wide
   shortcut.
 - Task status (in progress, cancelled) and percent complete.
-- Alarm reminders: a reminder that rings until acted on (10 minutes at most) and comes to the
-  front, for important tasks and events or all.
 - Advanced notifications, configurable: repeating until done, per list.
 - Advanced search, filtering and sorting: saved filters, tasks hidden until they start.
 - Selecting several tasks to change them at once.
