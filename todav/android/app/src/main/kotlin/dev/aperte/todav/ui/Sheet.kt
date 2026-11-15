@@ -65,6 +65,7 @@ import androidx.compose.ui.window.DialogWindowProvider
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /** Where a details sheet rests. */
@@ -166,16 +167,22 @@ fun DetailsSheet(
                 if (details != null && body == 0f) return@LaunchedEffect
                 // Below a sixth of the screen from the top at most, so there is room to pull it up.
                 val rest = (height - handle - body - ime).coerceAtLeast(top + height / 6)
-                val first = drag.anchors.size == 0
                 drag.updateAnchors(
                     DraggableAnchors {
                         Rest.Hidden at height
                         if (details != null) Rest.Details at rest
                         Rest.Full at top
                     },
-                    if (first) Rest.Hidden else drag.targetValue,
+                    if (drag.anchors.size == 0) Rest.Hidden else drag.targetValue,
                 )
-                if (first) drag.animateTo(if (details != null) Rest.Details else Rest.Full)
+            }
+            // Slides in once there are anchors. Not in the effect above, which starts over as the
+            // content is measured again (its details loading, say): that cancelled the slide
+            // just begun, its target fell back to Hidden, and the sheet stayed there, unseen, with
+            // its window still over the screen taking every touch.
+            LaunchedEffect(drag) {
+                snapshotFlow { drag.anchors.size }.first { it > 0 }
+                drag.animateTo(if (details != null) Rest.Details else Rest.Full)
             }
             val offset = drag.offset.takeIf { !it.isNaN() } ?: height
             // Where it shows its first content: the details, or else full height.

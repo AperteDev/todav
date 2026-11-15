@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Android: tapping an event (or a task) could open its details for a moment, then close them and leave
+  the app not answering any touch, when its details finished loading while the sheet was still
+  sliding in (#12).
+
 ### Changed
 
 - Linux: the `.deb` needs libadwaita 1.7, not 1.8, so it installs on Debian 13 (GNOME 48). There the
