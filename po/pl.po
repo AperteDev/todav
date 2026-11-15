@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Todav\n"
 "Report-Msgid-Bugs-To: https://github.com/AperteDev/todav/issues\n"
-"POT-Creation-Date: 2026-11-15 11:09+0100\n"
+"POT-Creation-Date: 2026-11-15 11:36+0100\n"
 "PO-Revision-Date: 2026-10-22 21:00+0200\n"
 "Last-Translator: SelfRef\n"
 "Language-Team: Polish\n"
@@ -49,14 +49,14 @@ msgid "Starts {date}"
 msgstr "Początek: {date}"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Background.kt:363
-#: todav/gnome-extension/extension.js:530 todav/linux/app/src/main.rs:560
+#: todav/gnome-extension/extension.js:590 todav/linux/app/src/main.rs:560
 msgid "Mark as Done"
 msgstr "Oznacz jako zrobione"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Background.kt:386
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Calendar.kt:1834
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/EventPage.kt:279
-#: todav/gnome-extension/extension.js:690 todav/linux/app/src/calendar.rs:1649
+#: todav/gnome-extension/extension.js:751 todav/linux/app/src/calendar.rs:1649
 #: todav/linux/app/src/main.rs:589
 msgid "Join Call"
 msgstr "Dołącz do rozmowy"
@@ -117,7 +117,7 @@ msgstr "Synchronizacja"
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:107
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:174
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Home.kt:179
-#: todav/gnome-extension/extension.js:639 todav/linux/app/src/calendar.rs:2129
+#: todav/gnome-extension/extension.js:700 todav/linux/app/src/calendar.rs:2129
 #: todav/linux/app/src/dates.rs:56 todav/linux/app/src/dates.rs:74
 #: todav/linux/app/ui/shortcuts-legacy.blp:89
 #: todav/linux/app/ui/shortcuts.blp:85
@@ -201,7 +201,9 @@ msgstr "Todav nie może otworzyć swoich danych"
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Widget.kt:625
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:89
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetSettings.kt:270
-#: todav/linux/app/src/window.rs:1429 todav/linux/app/src/window.rs:1911
+#: todav/gnome-extension/extension.js:310
+#: todav/gnome-extension/extension.js:519 todav/linux/app/src/window.rs:1429
+#: todav/linux/app/src/window.rs:1911
 msgid "Upcoming"
 msgstr "Nadchodzące"
 
@@ -223,7 +225,7 @@ msgstr "Przypięte"
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Model.kt:457
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Widget.kt:652
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/ui/Categories.kt:62
-#: todav/gnome-extension/extension.js:505 todav/linux/app/src/window.rs:62
+#: todav/gnome-extension/extension.js:565 todav/linux/app/src/window.rs:62
 msgctxt "category"
 msgid "Other"
 msgstr "Inne"
@@ -374,7 +376,8 @@ msgid "Add"
 msgstr "Dodaj"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Widget.kt:517
-#: todav/gnome-extension/extension.js:513
+#: todav/gnome-extension/extension.js:552
+#: todav/gnome-extension/extension.js:573
 msgid "All done"
 msgstr "Wszystko zrobione"
 
@@ -391,7 +394,7 @@ msgid "Next"
 msgstr "Następny"
 
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:335
-#: todav/gnome-extension/extension.js:654
+#: todav/gnome-extension/extension.js:715
 msgid "Nothing planned this week"
 msgstr "Nic nie zaplanowano w tym tygodniu"
 
@@ -424,7 +427,7 @@ msgstr "{h} h {m} min"
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/WidgetCalendar.kt:469
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:92
 #: todav/android/app/src/main/kotlin/dev/aperte/todav/Words.kt:108
-#: todav/gnome-extension/extension.js:639 todav/linux/app/src/calendar.rs:2130
+#: todav/gnome-extension/extension.js:700 todav/linux/app/src/calendar.rs:2130
 #: todav/linux/app/src/dates.rs:57 todav/linux/app/src/dates.rs:75
 msgid "Tomorrow"
 msgstr "Jutro"
@@ -2805,27 +2808,27 @@ msgstr "Pokaż hasło"
 msgid "Connect"
 msgstr "Połącz"
 
-#: todav/gnome-extension/extension.js:143
-#: todav/gnome-extension/extension.js:387
+#: todav/gnome-extension/extension.js:146
+#: todav/gnome-extension/extension.js:402
 msgid "Starting…"
 msgstr "Uruchamianie…"
 
-#: todav/gnome-extension/extension.js:174
-#: todav/gnome-extension/extension.js:418
+#: todav/gnome-extension/extension.js:177
+#: todav/gnome-extension/extension.js:433
 msgid "Open Todav"
 msgstr "Otwórz Todav"
 
-#: todav/gnome-extension/extension.js:176 todav/linux/app/ui/calendar.blp:477
+#: todav/gnome-extension/extension.js:179 todav/linux/app/ui/calendar.blp:477
 #: todav/linux/app/ui/shortcuts-legacy.blp:46
 #: todav/linux/app/ui/shortcuts.blp:42 todav/linux/app/ui/window.blp:337
 msgid "Preferences"
 msgstr "Preferencje"
 
-#: todav/gnome-extension/extension.js:349 todav/gnome-extension/prefs.js:63
+#: todav/gnome-extension/extension.js:364 todav/gnome-extension/prefs.js:63
 msgid "Todav isn’t installed"
 msgstr "Todav nie jest zainstalowany"
 
-#: todav/gnome-extension/extension.js:351 todav/gnome-extension/prefs.js:64
+#: todav/gnome-extension/extension.js:366 todav/gnome-extension/prefs.js:64
 msgid ""
 "This extension shows the tasks and calendar of the Todav app. Install the "
 "app to use it."
@@ -2833,32 +2836,33 @@ msgstr ""
 "To rozszerzenie pokazuje zadania i kalendarz z aplikacji Todav. Zainstaluj "
 "aplikację, aby z niego korzystać."
 
-#: todav/gnome-extension/extension.js:357 todav/gnome-extension/prefs.js:66
+#: todav/gnome-extension/extension.js:372 todav/gnome-extension/prefs.js:66
 msgid "Get Todav"
 msgstr "Pobierz Todav"
 
-#: todav/gnome-extension/extension.js:429
+#: todav/gnome-extension/extension.js:444
 msgid "No task lists — sign in in Todav"
 msgstr "Brak list zadań — zaloguj się w Todav"
 
-#: todav/gnome-extension/extension.js:457
+#: todav/gnome-extension/extension.js:482
 #, javascript-format
 msgid "%s, choose another list"
 msgstr "%s, wybierz inną listę"
 
-#: todav/gnome-extension/extension.js:462
+#: todav/gnome-extension/extension.js:487
 msgid "Choose a list"
 msgstr "Wybierz listę"
 
-#: todav/gnome-extension/extension.js:472
+#: todav/gnome-extension/extension.js:500
 msgid "New Task…"
 msgstr "Nowe zadanie…"
 
-#: todav/gnome-extension/extension.js:474
+#: todav/gnome-extension/extension.js:502
 msgid "Add a task…"
 msgstr "Dodaj zadanie…"
 
-#: todav/gnome-extension/extension.js:511
+#: todav/gnome-extension/extension.js:550
+#: todav/gnome-extension/extension.js:571
 #, javascript-format
 msgid "+ %d more"
 msgid_plural "+ %d more"
@@ -2866,20 +2870,20 @@ msgstr[0] "+ %d więcej"
 msgstr[1] "+ %d więcej"
 msgstr[2] "+ %d więcej"
 
-#: todav/gnome-extension/extension.js:530
+#: todav/gnome-extension/extension.js:590
 msgctxt "task"
 msgid "Reopen"
 msgstr "Otwórz ponownie"
 
-#: todav/gnome-extension/extension.js:654
+#: todav/gnome-extension/extension.js:715
 msgid "Nothing planned"
 msgstr "Nic nie zaplanowano"
 
-#: todav/gnome-extension/extension.js:712
+#: todav/gnome-extension/extension.js:773
 msgid "New Event…"
 msgstr "Nowe wydarzenie…"
 
-#: todav/gnome-extension/extension.js:713
+#: todav/gnome-extension/extension.js:774
 msgid "Add an event…"
 msgstr "Dodaj wydarzenie…"
 

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- GNOME extension: the task list can show Upcoming, the tasks with a due date of every list under
+  their days, as the app's page and the Android widget do: pick it at the top of the list choice. It
+  needs the app of this release (an older one keeps showing the first list); an older extension
+  shows the first list too when Upcoming is picked, until it updates (#11).
+
 ### Fixed
 
 - Android: tapping an event (or a task) could open its details for a moment, then close them and leave

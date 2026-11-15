@@ -99,7 +99,8 @@ sync" below.
 - Runs in the background: closing the window hides it; reminders and sync go on. Starts with
   your session.
 - A GNOME Shell extension: a count by the clock and a menu with a task list, the month and the
-  agenda, which adds tasks and events; or the same in GNOME's clock menu.
+  agenda, which adds tasks and events; or the same in GNOME's clock menu. Its task list can be
+  one of your lists or Upcoming.
 - Can be the system's calendar app, opened by the date in GNOME's clock menu.
 - A number on the app's icon in docks that show one (Dash to Dock and others), by a setting:
   overdue tasks, tasks due today or earlier, important tasks or today's events; by default the

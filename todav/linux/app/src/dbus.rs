@@ -22,6 +22,7 @@ const XML: &str = r#"<node>
   <method name="GetAgendaFrom"><arg direction="in" name="from" type="x"/><arg direction="in" name="days" type="u"/><arg direction="out" type="a(xsssbbsx)"/></method>
   <method name="GetAgendaLinks"><arg direction="in" name="from" type="x"/><arg direction="in" name="days" type="u"/><arg direction="out" type="a(xsssbbsxs)"/></method>
   <method name="EditItem"><arg direction="in" name="uid" type="s"/><arg direction="in" name="task" type="b"/><arg direction="in" name="start" type="x"/></method>
+  <method name="GetUpcoming"><arg direction="out" type="a(sssbss)"/></method>
   <method name="GetCounts"><arg direction="out" type="a{su}"/></method>
   <method name="ShowDay"><arg direction="in" name="at" type="x"/></method>
   <method name="NewEvent"><arg direction="in" name="summary" type="s"/></method>
@@ -100,6 +101,35 @@ fn call(method: &str, params: &glib::Variant) -> Result<Option<glib::Variant>, S
                 }
             }
             Some((out,).to_variant())
+        }
+        // The Upcoming page's open tasks, in its order: (uid, summary, the section's heading,
+        // done, its list's name, its list's colour). Across lists, so not a list for GetTasks.
+        "GetUpcoming" => {
+            let now = c.local_now();
+            let lists: HashMap<String, (String, String)> = c
+                .lists()
+                .into_iter()
+                .map(|l| {
+                    let color = todav_app::lists::color(&l);
+                    (l.href, (l.display_name, color))
+                })
+                .collect();
+            let tasks: Vec<_> = c
+                .upcoming()
+                .into_iter()
+                .map(|t| {
+                    let (list, color) = lists.get(&t.list_href).cloned().unwrap_or_default();
+                    (
+                        t.uid.clone(),
+                        t.summary.clone(),
+                        crate::dates::section(&t, now),
+                        t.done,
+                        list,
+                        color,
+                    )
+                })
+                .collect();
+            Some((tasks,).to_variant())
         }
         "AddTask" => {
             let (list, summary) = params.get::<(String, String)>().ok_or_else(bad)?;

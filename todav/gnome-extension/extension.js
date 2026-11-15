@@ -22,6 +22,9 @@ const MAX_TASKS = 100;
 /// Days the agenda covers, from today.
 const AGENDA_DAYS = 7;
 const DAY = 86400;
+/// `ext_list` and the list's href for the Upcoming page: the open tasks with a due date of every
+/// list, as the app's sidebar entry of that name (its `GetUpcoming`: an app of 2.8.2 or older has none).
+const UPCOMING = 'upcoming';
 const {HORIZONTAL, VERTICAL} = Clutter.Orientation;
 const CENTER = Clutter.ActorAlign.CENTER;
 /// What St draws dimmed (it has no CSS opacity): done tasks, other months' days, weekdays.
@@ -296,9 +299,21 @@ class TodavIndicator extends PanelMenu.Button {
             this._proxy.GetSettingsAsync(),
             this._proxy.GetListsAsync(),
         ]);
-        const pinned = lists.find(l => l[0] === settings.ext_list) ?? lists[0];
-        // The number by the icon (`ext_count`): the list's open tasks, or one of GetCounts'.
-        const kind = settings.ext_count ?? 'list';
+        // Upcoming (`ext_list`): an app without it shows the first list instead.
+        const upcoming = settings.ext_list === UPCOMING
+            ? await this._proxy.GetUpcomingAsync().then(([rows]) => rows, e => {
+                logError(e, 'Todav: cannot read Upcoming');
+                return null;
+            })
+            : null;
+        const pinned = upcoming
+            ? [UPCOMING, _('Upcoming'), 0, null]
+            : lists.find(l => l[0] === settings.ext_list) ?? lists[0];
+        // The number by the icon (`ext_count`): the list's open tasks, or one of GetCounts'
+        // (Upcoming's own count: the tasks due today or earlier).
+        let kind = settings.ext_count ?? 'list';
+        if (kind === 'list' && upcoming)
+            kind = 'due';
         let count = kind === 'list' ? pinned?.[2] ?? 0 : 0;
         if (kind !== 'list' && kind !== 'none') {
             const [counts] = await this._proxy.GetCountsAsync().catch(e => {
@@ -325,7 +340,7 @@ class TodavIndicator extends PanelMenu.Button {
         // With none of them in its menu, no icon (until then it shows, to say what is missing).
         this.container.visible = ['tasks', 'add_task', 'month', 'agenda', 'add_event'].some(on);
         this._placeIcon(settings.ext_icon);
-        return {on, clock, settings, lists, pinned};
+        return {on, clock, settings, lists, pinned, upcoming};
     }
 
     async _refreshCount() {
@@ -423,13 +438,16 @@ class TodavIndicator extends PanelMenu.Button {
 
     /// The list's tasks, or (its header clicked) the lists to pick another; then a field to add
     /// one. `has` tells whether those two go here.
-    async _tasksColumn({on, lists, pinned}, has = on) {
+    async _tasksColumn({on, lists, pinned, upcoming}, has = on) {
         const col = new St.BoxLayout({style_class: 'todav-column', orientation: VERTICAL, x_expand: true});
         if (!pinned) {
             col.add_child(label(_('No task lists — sign in in Todav'), 'todav-empty'));
             return col;
         }
         const [href, name, , color] = pinned;
+        const isUpcoming = href === UPCOMING;
+        // What Upcoming holds, read already for the first showing.
+        let rows = upcoming;
         const body = new St.ScrollView({
             style_class: 'todav-scroll',
             hscrollbar_policy: St.PolicyType.NEVER,
@@ -440,10 +458,17 @@ class TodavIndicator extends PanelMenu.Button {
         });
         const fill = async () => {
             const content = new St.BoxLayout({orientation: VERTICAL, x_expand: true});
-            if (this._choosing)
+            if (this._choosing) {
+                const entry = await this._upcomingChoice(isUpcoming);
+                if (entry)
+                    content.add_child(entry);
                 lists.forEach(l => content.add_child(this._listRow(l, l[0] === href)));
-            else
+            } else if (isUpcoming) {
+                await this._fillUpcoming(content, rows);
+                rows = null;
+            } else {
                 await this._fillTasks(content, href, on('subtasks'));
+            }
             // Destroyed, not only taken out: left to the garbage collector, the rows' destroy
             // handlers would run during its sweep, which GJS refuses.
             body.child?.destroy();
@@ -451,7 +476,7 @@ class TodavIndicator extends PanelMenu.Button {
         };
         if (has('tasks')) {
             const arrow = new St.Icon({icon_name: 'pan-down-symbolic', style_class: 'todav-arrow'});
-            const mark = dot(color);
+            const mark = color ? dot(color) : new St.Icon({icon_name: 'x-office-calendar-symbolic', style_class: 'todav-arrow'});
             const title = label(name, 'todav-header-name', {x_expand: true});
             const header = row([mark, title, arrow], 'todav-row todav-header');
             header.accessible_name = _('%s, choose another list').replace('%s', name);
@@ -467,23 +492,38 @@ class TodavIndicator extends PanelMenu.Button {
             col.add_child(body);
             await fill();
         }
-        if (has('add_task') && this._buttons?.task) {
-            // An app without NewTask shows the list.
-            addAtBottom(col, button(_('New Task…'), () => this._open(p => p.NewTaskAsync(href).catch(() => p.ShowListAsync(href)))));
-        } else if (has('add_task')) {
-            addAtBottom(col, entry(_('Add a task…'), text => {
-                this._proxy.AddTaskAsync(href, text)
-                    .then(() => has('tasks') && !this._choosing && fill())
-                    .catch(e => logError(e, 'Todav: AddTask failed'));
-            }));
+        // Upcoming is no list to add to: with it shown here, no field; elsewhere, the first list.
+        const target = isUpcoming ? lists[0]?.[0] : href;
+        if (has('add_task') && target && !(isUpcoming && has('tasks'))) {
+            if (this._buttons?.task) {
+                // An app without NewTask shows the list.
+                addAtBottom(col, button(_('New Task…'), () => this._open(p => p.NewTaskAsync(target).catch(() => p.ShowListAsync(target)))));
+            } else {
+                addAtBottom(col, entry(_('Add a task…'), text => {
+                    this._proxy.AddTaskAsync(target, text)
+                        .then(() => has('tasks') && !this._choosing && fill())
+                        .catch(e => logError(e, 'Todav: AddTask failed'));
+                }));
+            }
         }
         return col;
+    }
+
+    /// Upcoming's entry among the lists, if the app has it and (unless it is the one shown) some
+    /// task has a due date: as the app's sidebar, with the count of those due today or earlier.
+    async _upcomingChoice(current) {
+        const rows = await this._proxy.GetUpcomingAsync().then(([r]) => r, () => null);
+        if (!rows || (!rows.length && !current))
+            return null;
+        const [counts] = await this._proxy.GetCountsAsync().catch(() => [{}]);
+        return this._listRow([UPCOMING, _('Upcoming'), counts.due ?? 0, null], current);
     }
 
     /// Picking a list shows it here and in the panel, on every device.
     _listRow([href, name, open, color], current) {
         const count = label(`${open}`, 'todav-list-count');
-        const item = row([dot(color), label(name, current ? 'todav-list current' : 'todav-list', {x_expand: true}), count]);
+        const mark = color ? dot(color) : new St.Icon({icon_name: 'x-office-calendar-symbolic', style_class: 'todav-arrow'});
+        const item = row([mark, label(name, current ? 'todav-list current' : 'todav-list', {x_expand: true}), count]);
         item.connectObject('clicked', () => {
             this._choosing = false;
             this._proxy.SetSettingAsync('ext_list', href)
@@ -491,6 +531,26 @@ class TodavIndicator extends PanelMenu.Button {
                 .catch(e => logError(e, 'Todav: cannot pick the list'));
         }, this);
         return item;
+    }
+
+    /// The tasks of Upcoming under their sections' headings, each with its list's name; `rows`
+    /// as GetUpcoming gave them, else read now.
+    async _fillUpcoming(content, rows = null) {
+        rows ??= (await this._proxy.GetUpcomingAsync())[0];
+        let section = null;
+        for (const [uid, summary, heading, done, list, color] of rows.slice(0, MAX_TASKS)) {
+            if (heading !== section) {
+                section = heading;
+                content.add_child(label(heading, 'todav-category'));
+            }
+            content.add_child(this._taskRow([uid, summary, '', done, 0], UPCOMING, {list, color}));
+        }
+        if (rows.length > MAX_TASKS) {
+            const n = rows.length - MAX_TASKS;
+            content.add_child(label(ngettext('+ %d more', '+ %d more', n).replace('%d', n), 'todav-empty'));
+        } else if (rows.length === 0) {
+            content.add_child(label(_('All done'), 'todav-empty'));
+        }
     }
 
     async _fillTasks(content, href, subtasks) {
@@ -549,12 +609,13 @@ class TodavIndicator extends PanelMenu.Button {
     }
 
     /// A task's circle (`_taskMark`) and title; clicking opens the task in Todav, in its list or
-    /// its editor (`_edit`).
-    _taskRow([uid, summary, , done, depth], href) {
+    /// its editor (`_edit`). In Upcoming (`from`: the task's list's name and colour) the circle
+    /// is in the list's colour and its name follows the title.
+    _taskRow([uid, summary, , done, depth], href, from = null) {
         const title = label(summary, 'todav-task', {x_expand: true});
         let item = null;
-        const mark = this._taskMark(uid, done, title, null, still => this._linger(item, uid, href, still));
-        item = row([mark, title]);
+        const mark = this._taskMark(uid, done, title, from?.color, still => this._linger(item, uid, href, still));
+        item = row(from?.list ? [mark, title, label(from.list, 'todav-time')] : [mark, title]);
         item._depth = depth;
         item.child.style = `padding-left: ${depth * 16}px;`;
         item.connectObject(
@@ -581,7 +642,7 @@ class TodavIndicator extends PanelMenu.Button {
     async _fadeOut(item, uid, href, still) {
         if (item._gone || !still())
             return;
-        const [all] = await this._proxy.GetTasksAsync(href);
+        const [all] = await (href === UPCOMING ? this._proxy.GetUpcomingAsync() : this._proxy.GetTasksAsync(href));
         if (item._gone || !still() || all.some(t => t[0] === uid))
             return;
         const rows = [item];
